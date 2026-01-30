@@ -1,0 +1,86 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Permission;
+use Illuminate\Database\Seeder;
+
+class PermissionSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
+    {
+        $permissions = [
+            // Dashboard (1)
+            ['module' => 'dashboard', 'action' => 'view', 'name' => 'dashboard.view', 'description' => 'View dashboard', 'sort_order' => 10],
+
+            // Users (5)
+            ['module' => 'users', 'action' => 'view', 'name' => 'users.view', 'description' => 'View users list', 'sort_order' => 20],
+            ['module' => 'users', 'action' => 'create', 'name' => 'users.create', 'description' => 'Create new users', 'sort_order' => 21],
+            ['module' => 'users', 'action' => 'edit', 'name' => 'users.edit', 'description' => 'Edit existing users', 'sort_order' => 22],
+            ['module' => 'users', 'action' => 'delete', 'name' => 'users.delete', 'description' => 'Delete users', 'sort_order' => 23],
+            ['module' => 'users', 'action' => 'activate', 'name' => 'users.activate', 'description' => 'Activate/deactivate users', 'sort_order' => 24],
+
+            // Roles (5)
+            ['module' => 'roles', 'action' => 'view', 'name' => 'roles.view', 'description' => 'View roles list', 'sort_order' => 30],
+            ['module' => 'roles', 'action' => 'create', 'name' => 'roles.create', 'description' => 'Create new roles', 'sort_order' => 31],
+            ['module' => 'roles', 'action' => 'edit', 'name' => 'roles.edit', 'description' => 'Edit existing roles', 'sort_order' => 32],
+            ['module' => 'roles', 'action' => 'delete', 'name' => 'roles.delete', 'description' => 'Delete roles', 'sort_order' => 33],
+            ['module' => 'roles', 'action' => 'assign', 'name' => 'roles.assign', 'description' => 'Assign roles to users', 'sort_order' => 34],
+
+            // Shipments (6)
+            ['module' => 'shipments', 'action' => 'view', 'name' => 'shipments.view', 'description' => 'View shipments', 'sort_order' => 40],
+            ['module' => 'shipments', 'action' => 'create', 'name' => 'shipments.create', 'description' => 'Create shipments', 'sort_order' => 41],
+            ['module' => 'shipments', 'action' => 'edit', 'name' => 'shipments.edit', 'description' => 'Edit shipments', 'sort_order' => 42],
+            ['module' => 'shipments', 'action' => 'delete', 'name' => 'shipments.delete', 'description' => 'Delete shipments', 'sort_order' => 43],
+            ['module' => 'shipments', 'action' => 'assign_driver', 'name' => 'shipments.assign_driver', 'description' => 'Assign drivers to shipments', 'sort_order' => 44],
+            ['module' => 'shipments', 'action' => 'update_status', 'name' => 'shipments.update_status', 'description' => 'Update shipment status', 'sort_order' => 45],
+
+            // Vendors (5)
+            ['module' => 'vendors', 'action' => 'view', 'name' => 'vendors.view', 'description' => 'View vendors list', 'sort_order' => 50],
+            ['module' => 'vendors', 'action' => 'create', 'name' => 'vendors.create', 'description' => 'Create new vendors', 'sort_order' => 51],
+            ['module' => 'vendors', 'action' => 'edit', 'name' => 'vendors.edit', 'description' => 'Edit existing vendors', 'sort_order' => 52],
+            ['module' => 'vendors', 'action' => 'delete', 'name' => 'vendors.delete', 'description' => 'Delete vendors', 'sort_order' => 53],
+            ['module' => 'vendors', 'action' => 'activate', 'name' => 'vendors.activate', 'description' => 'Activate/deactivate vendors', 'sort_order' => 54],
+
+            // Drivers (5)
+            ['module' => 'drivers', 'action' => 'view', 'name' => 'drivers.view', 'description' => 'View drivers list', 'sort_order' => 60],
+            ['module' => 'drivers', 'action' => 'create', 'name' => 'drivers.create', 'description' => 'Create new drivers', 'sort_order' => 61],
+            ['module' => 'drivers', 'action' => 'edit', 'name' => 'drivers.edit', 'description' => 'Edit existing drivers', 'sort_order' => 62],
+            ['module' => 'drivers', 'action' => 'delete', 'name' => 'drivers.delete', 'description' => 'Delete drivers', 'sort_order' => 63],
+            ['module' => 'drivers', 'action' => 'assign', 'name' => 'drivers.assign', 'description' => 'Assign drivers to tasks', 'sort_order' => 64],
+
+            // Invoices (4)
+            ['module' => 'invoices', 'action' => 'view', 'name' => 'invoices.view', 'description' => 'View invoices', 'sort_order' => 70],
+            ['module' => 'invoices', 'action' => 'create', 'name' => 'invoices.create', 'description' => 'Create invoices', 'sort_order' => 71],
+            ['module' => 'invoices', 'action' => 'edit', 'name' => 'invoices.edit', 'description' => 'Edit invoices', 'sort_order' => 72],
+            ['module' => 'invoices', 'action' => 'delete', 'name' => 'invoices.delete', 'description' => 'Delete invoices', 'sort_order' => 73],
+
+            // Reports (2)
+            ['module' => 'reports', 'action' => 'view', 'name' => 'reports.view', 'description' => 'View reports', 'sort_order' => 80],
+            ['module' => 'reports', 'action' => 'export', 'name' => 'reports.export', 'description' => 'Export reports', 'sort_order' => 81],
+
+            // Settings (2)
+            ['module' => 'settings', 'action' => 'view', 'name' => 'settings.view', 'description' => 'View settings', 'sort_order' => 90],
+            ['module' => 'settings', 'action' => 'edit', 'name' => 'settings.edit', 'description' => 'Edit settings', 'sort_order' => 91],
+
+            // Platform Settings (5)
+            ['module' => 'platform_settings', 'action' => 'view', 'name' => 'platform_settings.view', 'description' => 'View platform settings', 'sort_order' => 100],
+            ['module' => 'platform_settings', 'action' => 'create', 'name' => 'platform_settings.create', 'description' => 'Create platform settings', 'sort_order' => 101],
+            ['module' => 'platform_settings', 'action' => 'edit', 'name' => 'platform_settings.edit', 'description' => 'Edit platform settings', 'sort_order' => 102],
+            ['module' => 'platform_settings', 'action' => 'delete', 'name' => 'platform_settings.delete', 'description' => 'Delete platform settings', 'sort_order' => 103],
+            ['module' => 'platform_settings', 'action' => 'manage', 'name' => 'platform_settings.manage', 'description' => 'Manage all platform settings', 'sort_order' => 104],
+        ];
+
+        foreach ($permissions as $permission) {
+            Permission::updateOrCreate(
+                ['name' => $permission['name']],
+                $permission
+            );
+        }
+
+        $this->command->info('✓ Successfully seeded ' . count($permissions) . ' permissions.');
+    }
+}
