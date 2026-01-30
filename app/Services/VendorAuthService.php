@@ -72,6 +72,76 @@ class VendorAuthService
     }
 
     /**
+     * Resend OTP for registration or pin reset.
+     */
+    public function resendOtp(string $phone, string $purpose, Request $request): array
+    {
+        // Format phone to international format
+        $phone = PhoneHelper::format($phone);
+        if (!$phone) {
+            return [
+                'success' => false,
+                'message' => 'Invalid Ghana phone number.',
+            ];
+        }
+
+        // Find vendor
+        $vendor = Vendor::where('phone', $phone)->first();
+
+        if (!$vendor) {
+            return [
+                'success' => false,
+                'message' => 'Phone number not found.',
+            ];
+        }
+
+        // Validate purpose against vendor state
+        if ($purpose === 'registration') {
+            if ($vendor->is_phone_verified) {
+                return [
+                    'success' => false,
+                    'message' => 'Phone is already verified.',
+                ];
+            }
+        } elseif ($purpose === 'pin_reset') {
+            if (!$vendor->is_phone_verified) {
+                return [
+                    'success' => false,
+                    'message' => 'Please verify your phone first.',
+                ];
+            }
+        }
+
+        // Check rate limit
+        $waitSeconds = $this->otpService->getSecondsUntilCanResend($phone, $purpose);
+        if ($waitSeconds > 0) {
+            return [
+                'success' => false,
+                'message' => 'Please wait before requesting another OTP.',
+                'data' => ['retry_after' => $waitSeconds],
+            ];
+        }
+
+        // Generate and send new OTP
+        $this->otpService->generate($phone, $purpose);
+
+        // Log activity
+        $this->activityLogService->log(
+            $vendor->id,
+            'resend_otp',
+            "OTP resent for {$purpose}",
+            $request,
+            ['phone' => $phone, 'purpose' => $purpose]
+        );
+
+        return [
+            'success' => true,
+            'message' => 'OTP sent successfully.',
+            'data' => ['expires_in' => 300],
+        ];
+    }
+
+    /**
      * Verify phone with OTP.
      */
     public function verifyPhone(string $phone, string $otp, Request $request): array

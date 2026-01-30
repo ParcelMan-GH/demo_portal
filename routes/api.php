@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1/auth/vendor')->group(function () {
     Route::post('register', [VendorAuthController::class, 'register']);
     Route::post('verify-phone', [VendorAuthController::class, 'verifyPhone']);
+    Route::post('resend-otp', [VendorAuthController::class, 'resendOtp']);
     Route::post('login', [VendorAuthController::class, 'login']);
     Route::post('forgot-pin', [VendorAuthController::class, 'forgotPin']);
     Route::post('reset-pin', [VendorAuthController::class, 'resetPin']);

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Vendor\ForgotPinRequest;
 use App\Http\Requests\Api\Vendor\LoginRequest;
 use App\Http\Requests\Api\Vendor\RegisterRequest;
+use App\Http\Requests\Api\Vendor\ResendOtpRequest;
 use App\Http\Requests\Api\Vendor\ResetPinRequest;
 use App\Http\Requests\Api\Vendor\VerifyPhoneRequest;
 use App\Services\VendorAuthService;
@@ -43,6 +44,23 @@ class VendorAuthController extends Controller
         $result = $this->authService->verifyPhone(
             $request->phone,
             $request->otp,
+            $request
+        );
+
+        $statusCode = $result['success'] ? 200 : 422;
+
+        return response()->json($result, $statusCode);
+    }
+
+    /**
+     * Resend OTP for registration or pin reset.
+     * POST /api/v1/auth/vendor/resend-otp
+     */
+    public function resendOtp(ResendOtpRequest $request): JsonResponse
+    {
+        $result = $this->authService->resendOtp(
+            $request->phone,
+            $request->purpose,
             $request
         );
 

@@ -1231,6 +1231,42 @@
             },
             {
                 method: 'POST',
+                url: '/api/v1/auth/vendor/resend-otp',
+                name: 'Resend OTP',
+                description: 'Resend OTP for phone verification or PIN reset. Has 60-second cooldown between requests.',
+                auth: false,
+                group: 'auth',
+                fields: [
+                    { name: 'phone', type: 'string', required: true, description: 'Ghana phone (0244xxx or +233244xxx)', example: '+233244123456' },
+                    { name: 'purpose', type: 'string', required: true, description: 'Either "registration" or "pin_reset"', example: 'registration' }
+                ],
+                sampleBody: {
+                    phone: '+233244123456',
+                    purpose: 'registration'
+                },
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'OTP sent successfully.',
+                        data: { expires_in: 300 }
+                    },
+                    '422_rate_limited': {
+                        success: false,
+                        message: 'Please wait before requesting another OTP.',
+                        data: { retry_after: 45 }
+                    },
+                    '422_not_found': {
+                        success: false,
+                        message: 'Phone number not found.'
+                    },
+                    '422_already_verified': {
+                        success: false,
+                        message: 'Phone is already verified.'
+                    }
+                }
+            },
+            {
+                method: 'POST',
                 url: '/api/v1/auth/vendor/login',
                 name: 'Login',
                 description: 'Login with phone number and 4-digit PIN.',

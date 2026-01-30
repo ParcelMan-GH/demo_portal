@@ -92,6 +92,32 @@ class OtpService
     }
 
     /**
+     * Get seconds until user can request a new OTP.
+     * Returns 0 if they can resend now, otherwise returns seconds to wait.
+     */
+    public function getSecondsUntilCanResend(string $phone, string $purpose): int
+    {
+        $otp = OtpCode::where('phone', $phone)
+            ->where('purpose', $purpose)
+            ->whereNull('verified_at')
+            ->latest('created_at')
+            ->first();
+
+        if (!$otp) {
+            return 0;
+        }
+
+        // Allow resend after 60 seconds from creation
+        $canResendAt = $otp->created_at->addSeconds(60);
+
+        if (now()->gte($canResendAt)) {
+            return 0;
+        }
+
+        return (int) now()->diffInSeconds($canResendAt);
+    }
+
+    /**
      * Cleanup expired OTPs.
      * Should be run as a scheduled task.
      */
