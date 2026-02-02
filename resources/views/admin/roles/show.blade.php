@@ -2,6 +2,9 @@
 
 @section('title', $role->name)
 
+@section('breadcrumb-parent', 'Roles & Permissions')
+@section('breadcrumb-current', $role->name)
+
 @section('content')
     <div class="mb-6 flex items-center justify-between">
         <div>

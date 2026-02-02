@@ -2,6 +2,9 @@
 
 @section('title', 'Create Role')
 
+@section('breadcrumb-parent', 'Roles & Permissions')
+@section('breadcrumb-current', 'Create Role')
+
 @section('content')
     <div class="mb-6">
         <a href="{{ route('admin.roles.index') }}" class="text-blue-600 hover:text-blue-800 flex items-center">

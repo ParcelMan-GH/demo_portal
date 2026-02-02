@@ -2,6 +2,9 @@
 
 @section('title', 'Edit Admin - ' . $admin->name)
 
+@section('breadcrumb-parent', 'User Management')
+@section('breadcrumb-current', 'Edit ' . $admin->name)
+
 @section('content')
     <div class="mb-6">
         <a href="{{ route('admin.admins.show', $admin) }}" class="text-blue-600 hover:text-blue-800 flex items-center">

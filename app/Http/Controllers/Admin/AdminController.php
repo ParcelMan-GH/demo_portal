@@ -2,16 +2,20 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\UsersExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CreateAdminRequest;
 use App\Http\Requests\Admin\UpdateAdminRequest;
 use App\Models\Role;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
 
 class AdminController extends Controller
 {
@@ -20,21 +24,186 @@ class AdminController extends Controller
      */
     public function index(): View
     {
+        $roles = Role::active()->get();
+        return view('admin.admins.index', compact('roles'));
+    }
+
+    /**
+     * Get users data for datatable (AJAX).
+     */
+    public function data(Request $request): JsonResponse
+    {
         $currentUser = Auth::guard('admin')->user();
 
-        // Super admin sees all, others see only users they created
+        // Base query
         if ($currentUser->isSuperAdmin()) {
-            $admins = User::with(['creator', 'roles'])
-                ->latest()
-                ->paginate(20);
+            $query = User::with(['creator', 'roles']);
         } else {
-            $admins = User::where('created_by_user_id', $currentUser->id)
-                ->with(['creator', 'roles'])
-                ->latest()
-                ->paginate(20);
+            $query = User::where('created_by_user_id', $currentUser->id)
+                ->with(['creator', 'roles']);
         }
 
-        return view('admin.admins.index', compact('admins'));
+        // Search
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by role
+        if ($roleId = $request->input('role')) {
+            $query->whereHas('roles', function ($q) use ($roleId) {
+                $q->where('roles.id', $roleId);
+            });
+        }
+
+        // Filter by status
+        if ($request->has('status') && $request->input('status') !== '') {
+            $query->where('is_active', $request->boolean('status'));
+        }
+
+        // Filter by date range
+        if ($dateFrom = $request->input('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo = $request->input('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        // Get total before pagination
+        $total = $query->count();
+
+        // Sorting
+        $sortField = $request->input('sort', 'created_at');
+        $sortDirection = $request->input('direction', 'desc');
+        $allowedSorts = ['name', 'email', 'created_at', 'last_login_at'];
+
+        if (in_array($sortField, $allowedSorts)) {
+            $query->orderBy($sortField, $sortDirection === 'asc' ? 'asc' : 'desc');
+        }
+
+        // Pagination
+        $perPage = min((int) $request->input('per_page', 10), 100);
+        $page = (int) $request->input('page', 1);
+        $offset = ($page - 1) * $perPage;
+
+        $admins = $query->skip($offset)->take($perPage)->get();
+
+        // Transform data
+        $data = $admins->map(function ($admin) use ($currentUser) {
+            return [
+                'id' => $admin->id,
+                'name' => $admin->name,
+                'email' => $admin->email,
+                'avatar' => strtoupper(substr($admin->name, 0, 1)),
+                'roles' => $admin->roles->map(fn($r) => ['id' => $r->id, 'name' => $r->name]),
+                'is_active' => $admin->is_active,
+                'creator' => $admin->creator?->name ?? 'System',
+                'created_at' => $admin->created_at->format('d/m/Y, H:i:s'),
+                'last_login_at' => $admin->last_login_at?->diffForHumans() ?? 'Never',
+                'can_manage' => $currentUser->canManage($admin),
+                'is_self' => $admin->id === $currentUser->id,
+                'view_url' => route('admin.admins.show', $admin),
+                'edit_url' => route('admin.admins.edit', $admin),
+                'toggle_url' => route('admin.admins.toggle-active', $admin),
+            ];
+        });
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => (int) ceil($total / $perPage),
+                'from' => $total > 0 ? $offset + 1 : 0,
+                'to' => min($offset + $perPage, $total),
+            ],
+        ]);
+    }
+
+    /**
+     * Export users data.
+     */
+    public function export(Request $request)
+    {
+        $currentUser = Auth::guard('admin')->user();
+
+        if ($currentUser->isSuperAdmin()) {
+            $query = User::with(['creator', 'roles']);
+        } else {
+            $query = User::where('created_by_user_id', $currentUser->id)
+                ->with(['creator', 'roles']);
+        }
+
+        // Apply same filters as data method
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if ($roleId = $request->input('role')) {
+            $query->whereHas('roles', function ($q) use ($roleId) {
+                $q->where('roles.id', $roleId);
+            });
+        }
+
+        if ($request->has('status') && $request->input('status') !== '') {
+            $query->where('is_active', $request->boolean('status'));
+        }
+
+        $admins = $query->latest()->get();
+
+        $data = $admins->map(function ($admin) {
+            return [
+                'Name' => $admin->name,
+                'Email' => $admin->email,
+                'Roles' => $admin->roles->pluck('name')->implode(', '),
+                'Status' => $admin->is_active ? 'Active' : 'Inactive',
+                'Created By' => $admin->creator?->name ?? 'System',
+                'Created At' => $admin->created_at->format('Y-m-d H:i:s'),
+                'Last Login' => $admin->last_login_at?->format('Y-m-d H:i:s') ?? 'Never',
+            ];
+        });
+
+        $format = $request->input('format', 'json');
+
+        $rows = $data->values()->toArray();
+
+        if ($format === 'excel') {
+            return $this->exportExcel($rows);
+        }
+
+        if ($format === 'pdf') {
+            return $this->exportPDF($rows);
+        }
+
+        return response()->json(['data' => $rows]);
+    }
+
+    /**
+     * Export users to Excel format.
+     */
+    private function exportExcel(array $rows)
+    {
+        $filename = 'users_' . date('Y-m-d_His') . '.xlsx';
+        return Excel::download(new UsersExport($rows), $filename);
+    }
+
+    /**
+     * Export users to PDF format.
+     */
+    private function exportPDF(array $rows)
+    {
+        $filename = 'users_' . date('Y-m-d_His') . '.pdf';
+        $pdf = Pdf::loadView('admin.admins.export-pdf', [
+            'rows' => $rows,
+            'generatedAt' => now()->format('F d, Y H:i:s'),
+        ]);
+        return $pdf->download($filename);
     }
 
     /**
@@ -57,7 +226,7 @@ class AdminController extends Controller
     /**
      * Store a newly created user.
      */
-    public function store(CreateAdminRequest $request): RedirectResponse
+    public function store(CreateAdminRequest $request): RedirectResponse|JsonResponse
     {
         $currentUser = Auth::guard('admin')->user();
 
@@ -72,6 +241,14 @@ class AdminController extends Controller
         // Assign selected roles
         if ($request->has('roles')) {
             $admin->syncRoles($request->roles);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'User created successfully.',
+                'user' => $admin,
+            ]);
         }
 
         return redirect()->route('admin.admins.show', $admin)
@@ -117,7 +294,7 @@ class AdminController extends Controller
     /**
      * Update the specified user.
      */
-    public function update(UpdateAdminRequest $request, User $admin): RedirectResponse
+    public function update(UpdateAdminRequest $request, User $admin): RedirectResponse|JsonResponse
     {
         $data = $request->only(['name', 'email', 'is_active']);
 
@@ -130,6 +307,14 @@ class AdminController extends Controller
         // Sync roles if provided and if user is not updating themselves
         if ($request->has('roles') && $admin->id !== Auth::guard('admin')->id()) {
             $admin->syncRoles($request->roles);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'User updated successfully.',
+                'user' => $admin,
+            ]);
         }
 
         return redirect()->route('admin.admins.show', $admin)

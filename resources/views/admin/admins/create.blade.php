@@ -2,6 +2,9 @@
 
 @section('title', 'Create Admin')
 
+@section('breadcrumb-parent', 'User Management')
+@section('breadcrumb-current', 'Create User')
+
 @section('content')
     <div class="mb-6">
         <a href="{{ route('admin.admins.index') }}" class="text-blue-600 hover:text-blue-800 flex items-center">

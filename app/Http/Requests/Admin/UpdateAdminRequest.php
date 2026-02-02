@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Enums\AdminRole;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -21,6 +20,18 @@ class UpdateAdminRequest extends FormRequest
     }
 
     /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('is_active')) {
+            $this->merge([
+                'is_active' => filter_var($this->is_active, FILTER_VALIDATE_BOOLEAN),
+            ]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      */
     public function rules(): array
@@ -29,9 +40,10 @@ class UpdateAdminRequest extends FormRequest
 
         return [
             'name' => ['sometimes', 'string', 'max:255'],
-            'email' => ['sometimes', 'email', Rule::unique('admins')->ignore($adminId)],
+            'email' => ['sometimes', 'email', Rule::unique('users')->ignore($adminId)],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
-            'role' => ['sometimes', Rule::enum(AdminRole::class)],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['exists:roles,id'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
@@ -45,21 +57,9 @@ class UpdateAdminRequest extends FormRequest
             $currentAdmin = Auth::guard('admin')->user();
             $targetAdmin = $this->route('admin');
 
-            // Cannot change your own role
-            if ($this->has('role') && $currentAdmin->id === $targetAdmin->id) {
-                $validator->errors()->add('role', 'You cannot change your own role.');
-            }
-
             // Cannot deactivate yourself
             if ($this->has('is_active') && !$this->boolean('is_active') && $currentAdmin->id === $targetAdmin->id) {
                 $validator->errors()->add('is_active', 'You cannot deactivate yourself.');
-            }
-
-            // Warehouse managers can only assign staff role
-            if ($currentAdmin->isWarehouseManager() && $this->has('role')) {
-                if ($this->input('role') !== AdminRole::WAREHOUSE_STAFF->value) {
-                    $validator->errors()->add('role', 'You can only assign the warehouse staff role.');
-                }
             }
         });
     }
@@ -75,7 +75,6 @@ class UpdateAdminRequest extends FormRequest
             'email.unique' => 'This email address is already in use.',
             'password.min' => 'Password must be at least 8 characters.',
             'password.confirmed' => 'Password confirmation does not match.',
-            'role.enum' => 'Invalid role selected.',
         ];
     }
 }

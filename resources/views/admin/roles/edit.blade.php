@@ -2,6 +2,9 @@
 
 @section('title', 'Edit Role - ' . $role->name)
 
+@section('breadcrumb-parent', 'Roles & Permissions')
+@section('breadcrumb-current', 'Edit ' . $role->name)
+
 @section('content')
     <div class="mb-6">
         <a href="{{ route('admin.roles.show', $role) }}" class="text-blue-600 hover:text-blue-800 flex items-center">
