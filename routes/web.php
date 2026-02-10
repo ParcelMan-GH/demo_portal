@@ -3,9 +3,14 @@
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\DriverController;
+use App\Http\Controllers\Admin\InvoiceController;
+use App\Http\Controllers\Admin\PickupAssignmentController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\ShipmentController;
 use App\Http\Controllers\Admin\VendorController;
+use App\Http\Controllers\Admin\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -60,6 +65,50 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('vendors/{vendor}/shipments', [VendorController::class, 'shipments'])->name('vendors.shipments');
         Route::get('vendors/{vendor}/activity-logs', [VendorController::class, 'activityLogs'])->name('vendors.activity-logs');
         Route::get('vendors/{vendor}/otp-logs', [VendorController::class, 'otpLogs'])->name('vendors.otp-logs');
+
+        // Shipment Management
+        Route::get('shipments', [ShipmentController::class, 'index'])->name('shipments.index');
+        Route::get('shipments-data', [ShipmentController::class, 'data'])->name('shipments.data');
+        Route::get('shipments/{shipment}', [ShipmentController::class, 'showPage'])->name('shipments.show');
+        Route::get('shipments/{shipment}/items', [ShipmentController::class, 'items'])->name('shipments.items');
+        Route::get('shipments/{shipment}/tracking', [ShipmentController::class, 'tracking'])->name('shipments.tracking');
+        Route::get('shipments-export', [ShipmentController::class, 'export'])->name('shipments.export');
+
+        // Invoice Management (on shipments)
+        Route::post('shipments/{shipment}/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
+        Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+        Route::put('invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
+        Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
+        Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
+
+        // Pickup Assignment Management
+        Route::get('available-drivers', [PickupAssignmentController::class, 'availableDrivers'])->name('assignments.available-drivers');
+        Route::post('shipments/{shipment}/assign-driver', [PickupAssignmentController::class, 'assign'])->name('assignments.assign');
+        Route::post('assignments/{pickupAssignment}/cancel', [PickupAssignmentController::class, 'cancel'])->name('assignments.cancel');
+
+        // Driver Management
+        Route::get('drivers', [DriverController::class, 'index'])->name('drivers.index');
+        Route::get('drivers-data', [DriverController::class, 'data'])->name('drivers.data');
+        Route::post('drivers', [DriverController::class, 'store'])->name('drivers.store');
+        Route::get('drivers/{driver}', [DriverController::class, 'showPage'])->name('drivers.show');
+        Route::get('drivers/{driver}/json', [DriverController::class, 'show'])->name('drivers.show.json');
+        Route::put('drivers/{driver}', [DriverController::class, 'update'])->name('drivers.update');
+        Route::delete('drivers/{driver}', [DriverController::class, 'destroy'])->name('drivers.destroy');
+        Route::patch('drivers/{driver}/toggle-active', [DriverController::class, 'toggleActive'])->name('drivers.toggle-active');
+        Route::get('drivers-export', [DriverController::class, 'export'])->name('drivers.export');
+        Route::get('drivers/{driver}/assignments', [DriverController::class, 'assignments'])->name('drivers.assignments');
+        Route::get('drivers/{driver}/activity-logs', [DriverController::class, 'activityLogs'])->name('drivers.activity-logs');
+
+        // Warehouse Management
+        Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
+        Route::get('warehouses-data', [WarehouseController::class, 'data'])->name('warehouses.data');
+        Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
+        Route::get('warehouses/{warehouse}', [WarehouseController::class, 'showPage'])->name('warehouses.show');
+        Route::get('warehouses/{warehouse}/json', [WarehouseController::class, 'show'])->name('warehouses.show.json');
+        Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update'])->name('warehouses.update');
+        Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->name('warehouses.destroy');
+        Route::patch('warehouses/{warehouse}/toggle-active', [WarehouseController::class, 'toggleActive'])->name('warehouses.toggle-active');
+        Route::get('warehouses-export', [WarehouseController::class, 'export'])->name('warehouses.export');
 
         // Settings Management
         Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');

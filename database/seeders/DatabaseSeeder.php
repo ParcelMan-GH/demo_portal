@@ -22,7 +22,8 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             SuperAdminSeeder::class,
             DriversSeeder::class,
-            ShipmentSettingsSeeder::class
+            ShipmentSettingsSeeder::class,
+            WarehouseSeeder::class
         ]);
     }
 }

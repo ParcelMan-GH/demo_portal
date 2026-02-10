@@ -6,6 +6,9 @@
 // Page-level components
 import './users-datatable.js';
 import './vendors.js';
+import './shipments.js';
+import './drivers.js';
+import './warehouses.js';
 
 // Global admin utilities
 window.AdminUtils = {

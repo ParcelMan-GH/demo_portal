@@ -3,9 +3,9 @@
 namespace App\Services;
 
 use App\Helpers\PhoneHelper;
+use App\Models\OtpCode;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 
 class VendorAuthService
 {
@@ -19,12 +19,116 @@ class VendorAuthService
     }
 
     /**
+     * Send OTP to phone number.
+     * Works for both existing vendors (login) and new users (registration).
+     */
+    public function sendOtp(string $phone, Request $request): array
+    {
+        $phone = PhoneHelper::format($phone);
+
+        if (!$phone) {
+            return [
+                'success' => false,
+                'message' => 'Invalid phone number.',
+            ];
+        }
+
+        // Check rate limit
+        $waitSeconds = $this->otpService->getSecondsUntilCanResend($phone, 'login');
+        if ($waitSeconds > 0) {
+            return [
+                'success' => false,
+                'message' => 'Please wait before requesting another OTP.',
+                'data' => ['retry_after' => $waitSeconds],
+            ];
+        }
+
+        // Always send OTP regardless of whether vendor exists
+        $this->otpService->generate($phone, 'login');
+
+        // Log activity if vendor exists
+        $vendor = Vendor::where('phone', $phone)->first();
+        if ($vendor) {
+            $this->activityLogService->log(
+                $vendor->id,
+                'login_otp_requested',
+                'Login OTP requested',
+                $request,
+                ['phone' => $phone]
+            );
+        }
+
+        return [
+            'success' => true,
+            'message' => 'OTP sent successfully.',
+            'data' => ['expires_in' => 300],
+        ];
+    }
+
+    /**
+     * Verify OTP and check if vendor exists.
+     * Returns user_exists: true with user+token, or user_exists: false.
+     */
+    public function verifyPhone(string $phone, string $otp, Request $request): array
+    {
+        $phone = PhoneHelper::format($phone);
+        if (!$phone) {
+            return [
+                'success' => false,
+                'message' => 'Invalid phone number.',
+            ];
+        }
+
+        // Verify OTP
+        if (!$this->otpService->verify($phone, $otp, 'login')) {
+            return [
+                'success' => false,
+                'message' => 'Invalid or expired OTP.',
+            ];
+        }
+
+        // Check if vendor exists and is active
+        $vendor = Vendor::where('phone', $phone)
+            ->where('is_active', true)
+            ->first();
+
+        if ($vendor) {
+            $token = $vendor->createToken('vendor-app')->plainTextToken;
+
+            $this->activityLogService->log(
+                $vendor->id,
+                'login',
+                'Vendor logged in via OTP',
+                $request
+            );
+
+            return [
+                'success' => true,
+                'message' => 'Login successful.',
+                'data' => [
+                    'user_exists' => true,
+                    'user' => $this->formatVendor($vendor),
+                    'token' => $token,
+                ],
+            ];
+        }
+
+        // No vendor found - phone verified but no account
+        return [
+            'success' => true,
+            'message' => 'Phone verified. Please complete registration.',
+            'data' => [
+                'user_exists' => false,
+            ],
+        ];
+    }
+
+    /**
      * Register a new vendor.
-     * Returns ['success' => bool, 'message' => string, 'data' => array]
+     * Requires a recently verified OTP (within 10 minutes).
      */
     public function register(array $data, Request $request): array
     {
-        // Format phone to international format
         $phone = PhoneHelper::format($data['phone']);
         if (!$phone) {
             return [
@@ -41,328 +145,42 @@ class VendorAuthService
             ];
         }
 
-        // Create vendor (unverified)
+        // Check for recently verified OTP (10 minute window)
+        $recentVerified = OtpCode::where('phone', $phone)
+            ->where('purpose', 'login')
+            ->whereNotNull('verified_at')
+            ->where('verified_at', '>=', now()->subMinutes(10))
+            ->exists();
+
+        if (!$recentVerified) {
+            return [
+                'success' => false,
+                'message' => 'Phone verification expired. Please verify your phone again.',
+            ];
+        }
+
+        // Create vendor (phone already verified via OTP)
         $vendor = Vendor::create([
             'name' => $data['name'],
             'business_name' => $data['business_name'] ?? null,
             'phone' => $phone,
             'email' => $data['email'] ?? null,
-            'pin_hash' => Hash::make($data['pin']),
-            'is_phone_verified' => false,
             'is_active' => true,
         ]);
 
-        // Send OTP
-        $this->otpService->generate($phone, 'registration');
+        $token = $vendor->createToken('vendor-app')->plainTextToken;
 
-        // Log activity
         $this->activityLogService->log(
             $vendor->id,
             'register',
-            'Vendor registered, awaiting phone verification',
+            'Vendor registered',
             $request,
             ['phone' => $phone]
         );
 
         return [
             'success' => true,
-            'message' => 'OTP sent to verify your phone.',
-            'data' => ['expires_in' => 300],
-        ];
-    }
-
-    /**
-     * Resend OTP for registration or pin reset.
-     */
-    public function resendOtp(string $phone, string $purpose, Request $request): array
-    {
-        // Format phone to international format
-        $phone = PhoneHelper::format($phone);
-        if (!$phone) {
-            return [
-                'success' => false,
-                'message' => 'Invalid Ghana phone number.',
-            ];
-        }
-
-        // Find vendor
-        $vendor = Vendor::where('phone', $phone)->first();
-
-        if (!$vendor) {
-            return [
-                'success' => false,
-                'message' => 'Phone number not found.',
-            ];
-        }
-
-        // Validate purpose against vendor state
-        if ($purpose === 'registration') {
-            if ($vendor->is_phone_verified) {
-                return [
-                    'success' => false,
-                    'message' => 'Phone is already verified.',
-                ];
-            }
-        } elseif ($purpose === 'pin_reset') {
-            if (!$vendor->is_phone_verified) {
-                return [
-                    'success' => false,
-                    'message' => 'Please verify your phone first.',
-                ];
-            }
-        }
-
-        // Check rate limit
-        $waitSeconds = $this->otpService->getSecondsUntilCanResend($phone, $purpose);
-        if ($waitSeconds > 0) {
-            return [
-                'success' => false,
-                'message' => 'Please wait before requesting another OTP.',
-                'data' => ['retry_after' => $waitSeconds],
-            ];
-        }
-
-        // Generate and send new OTP
-        $this->otpService->generate($phone, $purpose);
-
-        // Log activity
-        $this->activityLogService->log(
-            $vendor->id,
-            'resend_otp',
-            "OTP resent for {$purpose}",
-            $request,
-            ['phone' => $phone, 'purpose' => $purpose]
-        );
-
-        return [
-            'success' => true,
-            'message' => 'OTP sent successfully.',
-            'data' => ['expires_in' => 300],
-        ];
-    }
-
-    /**
-     * Verify phone with OTP.
-     */
-    public function verifyPhone(string $phone, string $otp, Request $request): array
-    {
-        // Format phone to international format
-        $phone = PhoneHelper::format($phone);
-        if (!$phone) {
-            return [
-                'success' => false,
-                'message' => 'Invalid phone number.',
-            ];
-        }
-
-        // Find vendor by phone
-        $vendor = Vendor::where('phone', $phone)->first();
-
-        if (!$vendor) {
-            return [
-                'success' => false,
-                'message' => 'Invalid phone number.',
-            ];
-        }
-
-        if ($vendor->is_phone_verified) {
-            return [
-                'success' => false,
-                'message' => 'Phone is already verified.',
-            ];
-        }
-
-        // Verify OTP
-        if (!$this->otpService->verify($phone, $otp, 'registration')) {
-            return [
-                'success' => false,
-                'message' => 'Invalid or expired OTP.',
-            ];
-        }
-
-        // Mark as verified
-        $vendor->is_phone_verified = true;
-        $vendor->save();
-
-        // Create token
-        $token = $vendor->createToken('vendor-app')->plainTextToken;
-
-        // Log activity
-        $this->activityLogService->log(
-            $vendor->id,
-            'verify_phone',
-            'Phone verified successfully',
-            $request
-        );
-
-        return [
-            'success' => true,
-            'message' => 'Phone verified successfully.',
-            'data' => [
-                'user' => $this->formatVendor($vendor),
-                'token' => $token,
-            ],
-        ];
-    }
-
-    /**
-     * Login with phone and PIN.
-     */
-    public function login(string $phone, string $pin, Request $request): array
-    {
-        // Format phone to international format
-        $phone = PhoneHelper::format($phone);
-        if (!$phone) {
-            return [
-                'success' => false,
-                'message' => 'Invalid phone or PIN.',
-            ];
-        }
-
-        $vendor = Vendor::where('phone', $phone)->first();
-
-        if (!$vendor || !$vendor->verifyPin($pin)) {
-            // Log failed attempt (without vendor_id if vendor not found)
-            $this->activityLogService->log(
-                $vendor?->id,
-                'login_failed',
-                'Invalid phone or PIN',
-                $request,
-                ['phone' => $phone]
-            );
-
-            return [
-                'success' => false,
-                'message' => 'Invalid phone or PIN.',
-            ];
-        }
-
-        if (!$vendor->is_phone_verified) {
-            return [
-                'success' => false,
-                'message' => 'Please verify your phone first.',
-            ];
-        }
-
-        if (!$vendor->is_active) {
-            return [
-                'success' => false,
-                'message' => 'Your account has been deactivated.',
-            ];
-        }
-
-        // Create token
-        $token = $vendor->createToken('vendor-app')->plainTextToken;
-
-        // Log activity
-        $this->activityLogService->log(
-            $vendor->id,
-            'login',
-            'Vendor logged in successfully',
-            $request
-        );
-
-        return [
-            'success' => true,
-            'message' => 'Login successful.',
-            'data' => [
-                'user' => $this->formatVendor($vendor),
-                'token' => $token,
-            ],
-        ];
-    }
-
-    /**
-     * Request forgot PIN OTP.
-     */
-    public function forgotPin(string $phone, Request $request): array
-    {
-        // Format phone to international format
-        $formattedPhone = PhoneHelper::format($phone);
-
-        // Always return same message to prevent enumeration
-        $response = [
-            'success' => true,
-            'message' => 'If this phone is registered, an OTP has been sent.',
-            'data' => ['expires_in' => 300],
-        ];
-
-        if (!$formattedPhone) {
-            return $response;
-        }
-
-        $vendor = Vendor::where('phone', $formattedPhone)
-            ->where('is_phone_verified', true)
-            ->first();
-
-        if ($vendor) {
-            // Send OTP
-            $this->otpService->generate($formattedPhone, 'pin_reset');
-
-            // Log activity
-            $this->activityLogService->log(
-                $vendor->id,
-                'forgot_pin',
-                'Requested PIN reset',
-                $request
-            );
-        }
-
-        return $response;
-    }
-
-    /**
-     * Reset PIN with OTP.
-     */
-    public function resetPin(string $phone, string $otp, string $newPin, Request $request): array
-    {
-        // Format phone to international format
-        $phone = PhoneHelper::format($phone);
-        if (!$phone) {
-            return [
-                'success' => false,
-                'message' => 'Invalid phone number.',
-            ];
-        }
-
-        $vendor = Vendor::where('phone', $phone)->first();
-
-        if (!$vendor) {
-            return [
-                'success' => false,
-                'message' => 'Invalid phone number.',
-            ];
-        }
-
-        // Verify OTP
-        if (!$this->otpService->verify($phone, $otp, 'pin_reset')) {
-            return [
-                'success' => false,
-                'message' => 'Invalid or expired OTP.',
-            ];
-        }
-
-        // Update PIN
-        $vendor->setPin($newPin);
-        $vendor->save();
-
-        // Revoke all existing tokens
-        $vendor->tokens()->delete();
-
-        // Create new token
-        $token = $vendor->createToken('vendor-app')->plainTextToken;
-
-        // Log activity
-        $this->activityLogService->log(
-            $vendor->id,
-            'reset_pin',
-            'PIN reset successfully',
-            $request
-        );
-
-        return [
-            'success' => true,
-            'message' => 'PIN reset successful.',
+            'message' => 'Registration successful.',
             'data' => [
                 'user' => $this->formatVendor($vendor),
                 'token' => $token,
@@ -375,10 +193,8 @@ class VendorAuthService
      */
     public function logout(Vendor $vendor, Request $request): array
     {
-        // Revoke current token
         $vendor->currentAccessToken()->delete();
 
-        // Log activity
         $this->activityLogService->log(
             $vendor->id,
             'logout',
@@ -403,8 +219,6 @@ class VendorAuthService
             'business_name' => $vendor->business_name,
             'phone' => $vendor->phone,
             'email' => $vendor->email,
-            'is_phone_verified' => $vendor->is_phone_verified,
-            'is_active' => $vendor->is_active,
         ];
     }
 }

@@ -113,13 +113,13 @@ class ShipmentService
      */
     public function show(Shipment $shipment): array
     {
-        $shipment->load(['region', 'district', 'items.images']);
+        $shipment->load(['region', 'district', 'items.images', 'invoice', 'pickupAssignment.driver']);
 
         return [
             'success' => true,
             'message' => 'Shipment retrieved successfully.',
             'data' => [
-                'shipment' => $this->transformShipment($shipment, true),
+                'shipment' => $this->transformShipment($shipment),
             ],
         ];
     }
@@ -276,6 +276,29 @@ class ShipmentService
             'submitted_at' => $shipment->submitted_at?->toIso8601String(),
             'created_at' => $shipment->created_at->toIso8601String(),
             'updated_at' => $shipment->updated_at->toIso8601String(),
+            'invoice' => $shipment->relationLoaded('invoice') && $shipment->invoice ? [
+                'id' => $shipment->invoice->id,
+                'invoice_number' => $shipment->invoice->invoice_number,
+                'status' => $shipment->invoice->status->value,
+                'status_label' => $shipment->invoice->status->label(),
+                'total_amount' => $shipment->invoice->total_amount,
+                'currency' => $shipment->invoice->currency,
+                'sent_at' => $shipment->invoice->sent_at,
+                'accepted_at' => $shipment->invoice->accepted_at,
+                'rejected_at' => $shipment->invoice->rejected_at,
+            ] : null,
+            'pickup_assignment' => $shipment->relationLoaded('pickupAssignment') && $shipment->pickupAssignment ? [
+                'id' => $shipment->pickupAssignment->id,
+                'status' => $shipment->pickupAssignment->status->value,
+                'status_label' => $shipment->pickupAssignment->status->label(),
+                'driver_name' => $shipment->pickupAssignment->driver?->name,
+                'driver_phone' => $shipment->pickupAssignment->driver?->phone,
+                'assigned_at' => $shipment->pickupAssignment->assigned_at,
+                'en_route_at' => $shipment->pickupAssignment->en_route_at,
+                'arrived_at' => $shipment->pickupAssignment->arrived_at,
+                'picked_up_at' => $shipment->pickupAssignment->picked_up_at,
+                'completed_at' => $shipment->pickupAssignment->completed_at,
+            ] : null,
         ];
     }
 

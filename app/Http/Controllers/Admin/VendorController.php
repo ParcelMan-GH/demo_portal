@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\ShipmentStatus;
 use App\Exports\VendorsExport;
+use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\OtpCode;
 use App\Models\Vendor;
@@ -11,7 +12,6 @@ use App\Models\VendorActivityLog;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -316,7 +316,6 @@ class VendorController extends Controller
                     'email' => $vendor->email,
                     'phone' => $vendor->phone,
                     'is_active' => $vendor->is_active,
-                    'is_phone_verified' => $vendor->is_phone_verified,
                     'shipments_count' => $vendor->shipments()->count(),
                     'created_at' => $vendor->created_at->format('Y-m-d H:i:s'),
                     'can_manage' => $canManage,
@@ -342,20 +341,23 @@ class VendorController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'business_name' => ['nullable', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:vendors,email'],
-            'phone' => ['required', 'string', 'max:20', 'unique:vendors,phone'],
-            'pin' => ['required', 'string', 'size:4', 'regex:/^\d{4}$/', 'confirmed'],
+            'email' => ['nullable', 'email', 'max:255', 'unique:vendors,email'],
+            'phone' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
+                if (!PhoneHelper::isValid($value)) {
+                    $fail('Please enter a valid Ghana phone number.');
+                }
+            }, 'unique:vendors,phone'],
             'is_active' => ['boolean'],
         ]);
+
+        $phone = PhoneHelper::format($validated['phone']);
 
         $vendor = new Vendor();
         $vendor->name = $validated['name'];
         $vendor->business_name = $validated['business_name'] ?? null;
-        $vendor->email = $validated['email'];
-        $vendor->phone = $validated['phone'];
-        $vendor->setPin($validated['pin']);
+        $vendor->email = $validated['email'] ?? null;
+        $vendor->phone = $phone;
         $vendor->is_active = $validated['is_active'] ?? true;
-        $vendor->is_phone_verified = false;
         $vendor->save();
 
         return response()->json([
@@ -380,7 +382,6 @@ class VendorController extends Controller
                 'email' => $vendor->email,
                 'phone' => $vendor->phone,
                 'is_active' => $vendor->is_active,
-                'is_phone_verified' => $vendor->is_phone_verified,
             ],
         ]);
     }
@@ -395,22 +396,14 @@ class VendorController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'business_name' => ['nullable', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('vendors')->ignore($vendor->id)],
-            'phone' => ['required', 'string', 'max:20', Rule::unique('vendors')->ignore($vendor->id)],
-            'pin' => ['nullable', 'string', 'size:4', 'regex:/^\d{4}$/', 'confirmed'],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('vendors')->ignore($vendor->id)],
             'is_active' => ['boolean'],
         ]);
 
         $vendor->name = $validated['name'];
         $vendor->business_name = $validated['business_name'] ?? null;
-        $vendor->email = $validated['email'];
-        $vendor->phone = $validated['phone'];
+        $vendor->email = $validated['email'] ?? null;
         $vendor->is_active = $validated['is_active'] ?? $vendor->is_active;
-
-        if (!empty($validated['pin'])) {
-            $vendor->setPin($validated['pin']);
-        }
-
         $vendor->save();
 
         return response()->json([
@@ -491,7 +484,6 @@ class VendorController extends Controller
                 'Email' => $vendor->email,
                 'Phone' => $vendor->phone,
                 'Status' => $vendor->is_active ? 'Active' : 'Inactive',
-                'Phone Verified' => $vendor->is_phone_verified ? 'Yes' : 'No',
                 'Created At' => $vendor->created_at->format('Y-m-d H:i:s'),
             ];
         })->values()->toArray();

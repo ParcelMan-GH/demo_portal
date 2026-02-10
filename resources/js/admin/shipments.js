@@ -1,14 +1,13 @@
 /**
- * Vendors page Alpine component
+ * Shipments page Alpine component
  */
 
-function buildVendorsTable(config) {
+function buildShipmentsTable(config) {
     return {
         endpoint: config.endpoint,
         exportEndpoint: config.exportEndpoint,
-        storeEndpoint: config.storeEndpoint,
         csrfToken: config.csrfToken,
-        vendors: [],
+        shipments: [],
         meta: {
             current_page: 1,
             from: 0,
@@ -27,38 +26,24 @@ function buildVendorsTable(config) {
         sortBy: 'created_at',
         sortDirection: 'desc',
         columns: [
-            { key: 'name', label: 'Name' },
-            { key: 'business_name', label: 'Business Name' },
-            { key: 'email', label: 'Email' },
-            { key: 'phone', label: 'Phone' },
+            { key: 'shipment_number', label: 'Shipment #' },
+            { key: 'vendor', label: 'Vendor' },
+            { key: 'recipient', label: 'Recipient' },
+            { key: 'location', label: 'Location' },
+            { key: 'items', label: 'Items' },
             { key: 'status', label: 'Status' },
-            { key: 'shipments', label: 'Shipments' },
-            { key: 'created_at', label: 'Created At' },
+            { key: 'submitted_at', label: 'Submitted At' },
             { key: 'actions', label: 'Actions' },
         ],
         visibleColumns: {
-            name: true,
-            business_name: true,
-            email: true,
-            phone: true,
+            shipment_number: true,
+            vendor: true,
+            recipient: true,
+            location: true,
+            items: true,
             status: true,
-            shipments: true,
-            created_at: true,
+            submitted_at: true,
             actions: true,
-        },
-
-        // Modal state
-        showModal: false,
-        modalMode: 'add', // 'add', 'edit', 'view'
-        editingVendorId: null,
-        saving: false,
-        errors: {},
-        form: {
-            name: '',
-            business_name: '',
-            email: '',
-            phone: '',
-            is_active: true,
         },
 
         init() {
@@ -91,7 +76,7 @@ function buildVendorsTable(config) {
                 if (!response.ok) throw new Error('Failed to fetch data');
 
                 const result = await response.json();
-                this.vendors = result.data;
+                this.shipments = result.data;
                 this.meta = {
                     current_page: result.meta.current_page,
                     from: result.meta.from,
@@ -100,7 +85,7 @@ function buildVendorsTable(config) {
                     last_page: result.meta.last_page,
                 };
             } catch (error) {
-                console.error('Error loading vendors:', error);
+                console.error('Error loading shipments:', error);
             } finally {
                 this.loading = false;
             }
@@ -239,156 +224,6 @@ function buildVendorsTable(config) {
             }
         },
 
-        // Modal methods
-        openAddModal() {
-            this.modalMode = 'add';
-            this.editingVendorId = null;
-            this.errors = {};
-            this.form = {
-                name: '',
-                business_name: '',
-                email: '',
-                phone: '',
-                is_active: true,
-            };
-            this.showModal = true;
-        },
-
-        openEditModal(vendor) {
-            this.modalMode = 'edit';
-            this.editingVendorId = vendor.id;
-            this.errors = {};
-            this.form = {
-                name: vendor.name,
-                business_name: vendor.business_name || '',
-                email: vendor.email,
-                phone: vendor.phone,
-                is_active: vendor.is_active,
-            };
-            this.showModal = true;
-        },
-
-        viewVendor(vendor) {
-            this.modalMode = 'view';
-            this.editingVendorId = vendor.id;
-            this.errors = {};
-            this.form = {
-                name: vendor.name,
-                business_name: vendor.business_name || '',
-                email: vendor.email,
-                phone: vendor.phone,
-                is_active: vendor.is_active,
-            };
-            this.showModal = true;
-        },
-
-        closeModal() {
-            this.showModal = false;
-            this.errors = {};
-        },
-
-        async saveVendor() {
-            this.saving = true;
-            this.errors = {};
-
-            try {
-                const url = this.modalMode === 'add'
-                    ? this.storeEndpoint
-                    : `${window.location.origin}/admin/vendors/${this.editingVendorId}`;
-
-                const method = this.modalMode === 'add' ? 'POST' : 'PUT';
-
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': this.csrfToken,
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    body: JSON.stringify(this.form),
-                });
-
-                const result = await response.json();
-
-                if (!response.ok) {
-                    if (response.status === 422) {
-                        this.errors = result.errors || {};
-                    } else {
-                        throw new Error(result.message || 'Failed to save vendor');
-                    }
-                    return;
-                }
-
-                this.closeModal();
-                this.loadData();
-            } catch (error) {
-                console.error('Error saving vendor:', error);
-            } finally {
-                this.saving = false;
-            }
-        },
-
-        async toggleVendorStatus(vendor) {
-            try {
-                const response = await fetch(`${window.location.origin}/admin/vendors/${vendor.id}/toggle-active`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': this.csrfToken,
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-
-                if (response.ok) {
-                    this.loadData();
-                }
-            } catch (err) {
-                console.error('Failed to update vendor status:', err);
-            }
-        },
-
-        openDeleteModal(vendor) {
-            if (this.$store?.vendorsDelete) {
-                this.$store.vendorsDelete.vendor = vendor;
-                this.$store.vendorsDelete.onConfirm = () => this.confirmDelete();
-                this.$store.vendorsDelete.show = true;
-            }
-        },
-
-        async confirmDelete() {
-            const store = this.$store?.vendorsDelete;
-            if (!store?.vendor) return;
-
-            store.deleting = true;
-
-            try {
-                const response = await fetch(`${window.location.origin}/admin/vendors/${store.vendor.id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': this.csrfToken,
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to delete vendor');
-                }
-
-                store.show = false;
-                store.vendor = null;
-                this.loadData();
-            } catch (error) {
-                console.error('Error deleting vendor:', error);
-                alert('Failed to delete vendor. Please try again.');
-            } finally {
-                store.deleting = false;
-            }
-        },
-
         async exportData(format) {
             try {
                 const params = new URLSearchParams();
@@ -462,12 +297,12 @@ function buildVendorsTable(config) {
             const doc = printWindow.document;
             const headers = Object.keys(data[0]);
 
-            doc.title = 'Vendors Export';
+            doc.title = 'Shipments Export';
             doc.body.innerHTML = '';
 
             const style = doc.createElement('style');
             style.textContent = [
-                'body { font-family: \"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; padding: 20px; }',
+                'body { font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 20px; }',
                 'h1 { font-size: 24px; margin-bottom: 20px; color: #1e293b; }',
                 'table { width: 100%; border-collapse: collapse; margin-top: 20px; }',
                 'th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; font-size: 12px; }',
@@ -477,7 +312,7 @@ function buildVendorsTable(config) {
             doc.head.appendChild(style);
 
             const title = doc.createElement('h1');
-            title.textContent = 'Vendors List';
+            title.textContent = 'Shipments List';
             doc.body.appendChild(title);
 
             const meta = doc.createElement('p');
@@ -536,7 +371,7 @@ function buildVendorsTable(config) {
                 )
             ].join('\n');
 
-            this.downloadFile(csvContent, 'vendors.csv', 'text/csv');
+            this.downloadFile(csvContent, 'shipments.csv', 'text/csv');
         },
 
         downloadFile(content, filename, type) {
@@ -566,15 +401,15 @@ function buildVendorsTable(config) {
     };
 }
 
-function getVendorsConfig() {
-    const container = document.querySelector('[data-vendors-config]');
-    let config = window.vendorsTableConfig || null;
+function getShipmentsConfig() {
+    const container = document.querySelector('[data-shipments-config]');
+    let config = window.shipmentsTableConfig || null;
 
     if (container) {
         try {
-            config = JSON.parse(container.getAttribute('data-vendors-config'));
+            config = JSON.parse(container.getAttribute('data-shipments-config'));
         } catch (error) {
-            console.error('Invalid vendors config JSON:', error);
+            console.error('Invalid shipments config JSON:', error);
         }
     }
 
@@ -590,32 +425,25 @@ function getVendorsConfig() {
     return config;
 }
 
-function registerVendorsTable() {
+function registerShipmentsTable() {
     if (!window.Alpine) {
         return;
     }
 
-    const config = getVendorsConfig();
+    const config = getShipmentsConfig();
     if (!config) {
         return;
     }
 
-    if (!window.vendorsTable) {
-        window.vendorsTable = () => buildVendorsTable(config);
+    if (!window.shipmentsTable) {
+        window.shipmentsTable = () => buildShipmentsTable(config);
     }
 
-    Alpine.store('vendorsDelete', {
-        show: false,
-        vendor: null,
-        deleting: false,
-        onConfirm: null,
-    });
-
-    Alpine.data('vendorsTable', window.vendorsTable);
+    Alpine.data('shipmentsTable', window.shipmentsTable);
 }
 
 if (window.Alpine) {
-    registerVendorsTable();
+    registerShipmentsTable();
 } else {
-    document.addEventListener('alpine:init', registerVendorsTable);
+    document.addEventListener('alpine:init', registerShipmentsTable);
 }

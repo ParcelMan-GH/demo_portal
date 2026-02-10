@@ -7,7 +7,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
-class ResendOtpRequest extends FormRequest
+class SendOtpRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -22,14 +22,6 @@ class ResendOtpRequest extends FormRequest
                     $fail('Please enter a valid Ghana phone number.');
                 }
             }],
-            'purpose' => ['required', 'string', 'in:registration,pin_reset'],
-        ];
-    }
-
-    public function messages(): array
-    {
-        return [
-            'purpose.in' => 'Purpose must be either registration or pin_reset.',
         ];
     }
 

@@ -1,14 +1,14 @@
 /**
- * Vendors page Alpine component
+ * Warehouses page Alpine component
  */
 
-function buildVendorsTable(config) {
+function buildWarehousesTable(config) {
     return {
         endpoint: config.endpoint,
         exportEndpoint: config.exportEndpoint,
         storeEndpoint: config.storeEndpoint,
         csrfToken: config.csrfToken,
-        vendors: [],
+        warehouses: [],
         meta: {
             current_page: 1,
             from: 0,
@@ -18,6 +18,8 @@ function buildVendorsTable(config) {
         },
         loading: false,
         search: '',
+        typeFilter: '',
+        typeFilterName: 'All types',
         statusFilter: '',
         statusFilterName: 'All statuses',
         createdFrom: '',
@@ -28,21 +30,25 @@ function buildVendorsTable(config) {
         sortDirection: 'desc',
         columns: [
             { key: 'name', label: 'Name' },
-            { key: 'business_name', label: 'Business Name' },
-            { key: 'email', label: 'Email' },
-            { key: 'phone', label: 'Phone' },
-            { key: 'status', label: 'Status' },
-            { key: 'shipments', label: 'Shipments' },
+            { key: 'code', label: 'Code' },
+            { key: 'type', label: 'Type' },
+            { key: 'region', label: 'Region' },
+            { key: 'district', label: 'District' },
+            { key: 'contact_phone', label: 'Contact Phone' },
+            { key: 'capacity', label: 'Capacity' },
+            { key: 'is_active', label: 'Status' },
             { key: 'created_at', label: 'Created At' },
             { key: 'actions', label: 'Actions' },
         ],
         visibleColumns: {
             name: true,
-            business_name: true,
-            email: true,
-            phone: true,
-            status: true,
-            shipments: true,
+            code: true,
+            type: true,
+            region: true,
+            district: true,
+            contact_phone: true,
+            capacity: true,
+            is_active: true,
             created_at: true,
             actions: true,
         },
@@ -50,20 +56,76 @@ function buildVendorsTable(config) {
         // Modal state
         showModal: false,
         modalMode: 'add', // 'add', 'edit', 'view'
-        editingVendorId: null,
+        editingWarehouseId: null,
         saving: false,
         errors: {},
         form: {
             name: '',
-            business_name: '',
-            email: '',
-            phone: '',
+            code: '',
+            type: 'both',
+            address: '',
+            region_id: '',
+            district_id: '',
+            contact_phone: '',
+            contact_email: '',
+            capacity: '',
             is_active: true,
         },
 
+        // Region/District state
+        regions: [],
+        districts: [],
+        loadingDistricts: false,
+
         init() {
+            this.loadRegions();
             this.initDateRange();
             this.loadData();
+        },
+
+        async loadRegions() {
+            try {
+                const response = await fetch('/api/v1/vendor/regions', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch regions');
+
+                const result = await response.json();
+                this.regions = result.data || result;
+            } catch (error) {
+                console.error('Error loading regions:', error);
+            }
+        },
+
+        async onRegionChange() {
+            this.form.district_id = '';
+            this.districts = [];
+
+            const regionId = this.form.region_id;
+            if (!regionId) return;
+
+            this.loadingDistricts = true;
+            try {
+                const response = await fetch(`/api/v1/vendor/regions/${regionId}/districts`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch districts');
+
+                const result = await response.json();
+                this.districts = result.data || result;
+            } catch (error) {
+                console.error('Error loading districts:', error);
+            } finally {
+                this.loadingDistricts = false;
+            }
         },
 
         async loadData() {
@@ -77,6 +139,7 @@ function buildVendorsTable(config) {
                 });
 
                 if (this.search) params.append('search', this.search);
+                if (this.typeFilter) params.append('type', this.typeFilter);
                 if (this.statusFilter) params.append('status', this.statusFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
@@ -91,7 +154,7 @@ function buildVendorsTable(config) {
                 if (!response.ok) throw new Error('Failed to fetch data');
 
                 const result = await response.json();
-                this.vendors = result.data;
+                this.warehouses = result.data;
                 this.meta = {
                     current_page: result.meta.current_page,
                     from: result.meta.from,
@@ -100,7 +163,7 @@ function buildVendorsTable(config) {
                     last_page: result.meta.last_page,
                 };
             } catch (error) {
-                console.error('Error loading vendors:', error);
+                console.error('Error loading warehouses:', error);
             } finally {
                 this.loading = false;
             }
@@ -242,42 +305,83 @@ function buildVendorsTable(config) {
         // Modal methods
         openAddModal() {
             this.modalMode = 'add';
-            this.editingVendorId = null;
+            this.editingWarehouseId = null;
             this.errors = {};
+            this.districts = [];
             this.form = {
                 name: '',
-                business_name: '',
-                email: '',
-                phone: '',
+                code: '',
+                type: 'both',
+                address: '',
+                region_id: '',
+                district_id: '',
+                contact_phone: '',
+                contact_email: '',
+                capacity: '',
                 is_active: true,
             };
             this.showModal = true;
         },
 
-        openEditModal(vendor) {
+        async openEditModal(warehouse) {
             this.modalMode = 'edit';
-            this.editingVendorId = vendor.id;
+            this.editingWarehouseId = warehouse.id;
             this.errors = {};
             this.form = {
-                name: vendor.name,
-                business_name: vendor.business_name || '',
-                email: vendor.email,
-                phone: vendor.phone,
-                is_active: vendor.is_active,
+                name: warehouse.name,
+                code: warehouse.code || '',
+                type: warehouse.type || 'both',
+                address: warehouse.address || '',
+                region_id: warehouse.region_id || '',
+                district_id: warehouse.district_id || '',
+                contact_phone: warehouse.contact_phone || '',
+                contact_email: warehouse.contact_email || '',
+                capacity: warehouse.capacity || '',
+                is_active: warehouse.is_active,
             };
+
+            // Load districts if a region is set
+            if (this.form.region_id) {
+                this.loadingDistricts = true;
+                try {
+                    const response = await fetch(`/api/v1/vendor/regions/${this.form.region_id}/districts`, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        this.districts = result.data || result;
+                    }
+                } catch (error) {
+                    console.error('Error loading districts:', error);
+                } finally {
+                    this.loadingDistricts = false;
+                }
+            } else {
+                this.districts = [];
+            }
+
             this.showModal = true;
         },
 
-        viewVendor(vendor) {
+        viewWarehouse(warehouse) {
             this.modalMode = 'view';
-            this.editingVendorId = vendor.id;
+            this.editingWarehouseId = warehouse.id;
             this.errors = {};
             this.form = {
-                name: vendor.name,
-                business_name: vendor.business_name || '',
-                email: vendor.email,
-                phone: vendor.phone,
-                is_active: vendor.is_active,
+                name: warehouse.name,
+                code: warehouse.code || '',
+                type: warehouse.type || 'both',
+                address: warehouse.address || '',
+                region_id: warehouse.region_id || '',
+                district_id: warehouse.district_id || '',
+                contact_phone: warehouse.contact_phone || '',
+                contact_email: warehouse.contact_email || '',
+                capacity: warehouse.capacity || '',
+                is_active: warehouse.is_active,
             };
             this.showModal = true;
         },
@@ -287,14 +391,14 @@ function buildVendorsTable(config) {
             this.errors = {};
         },
 
-        async saveVendor() {
+        async saveWarehouse() {
             this.saving = true;
             this.errors = {};
 
             try {
                 const url = this.modalMode === 'add'
                     ? this.storeEndpoint
-                    : `${window.location.origin}/admin/vendors/${this.editingVendorId}`;
+                    : `${window.location.origin}/admin/warehouses/${this.editingWarehouseId}`;
 
                 const method = this.modalMode === 'add' ? 'POST' : 'PUT';
 
@@ -315,7 +419,7 @@ function buildVendorsTable(config) {
                     if (response.status === 422) {
                         this.errors = result.errors || {};
                     } else {
-                        throw new Error(result.message || 'Failed to save vendor');
+                        throw new Error(result.message || 'Failed to save warehouse');
                     }
                     return;
                 }
@@ -323,15 +427,15 @@ function buildVendorsTable(config) {
                 this.closeModal();
                 this.loadData();
             } catch (error) {
-                console.error('Error saving vendor:', error);
+                console.error('Error saving warehouse:', error);
             } finally {
                 this.saving = false;
             }
         },
 
-        async toggleVendorStatus(vendor) {
+        async toggleWarehouseStatus(warehouse) {
             try {
-                const response = await fetch(`${window.location.origin}/admin/vendors/${vendor.id}/toggle-active`, {
+                const response = await fetch(`${window.location.origin}/admin/warehouses/${warehouse.id}/toggle-active`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -345,26 +449,26 @@ function buildVendorsTable(config) {
                     this.loadData();
                 }
             } catch (err) {
-                console.error('Failed to update vendor status:', err);
+                console.error('Failed to update warehouse status:', err);
             }
         },
 
-        openDeleteModal(vendor) {
-            if (this.$store?.vendorsDelete) {
-                this.$store.vendorsDelete.vendor = vendor;
-                this.$store.vendorsDelete.onConfirm = () => this.confirmDelete();
-                this.$store.vendorsDelete.show = true;
+        openDeleteModal(warehouse) {
+            if (this.$store?.warehousesDelete) {
+                this.$store.warehousesDelete.warehouse = warehouse;
+                this.$store.warehousesDelete.onConfirm = () => this.confirmDelete();
+                this.$store.warehousesDelete.show = true;
             }
         },
 
         async confirmDelete() {
-            const store = this.$store?.vendorsDelete;
-            if (!store?.vendor) return;
+            const store = this.$store?.warehousesDelete;
+            if (!store?.warehouse) return;
 
             store.deleting = true;
 
             try {
-                const response = await fetch(`${window.location.origin}/admin/vendors/${store.vendor.id}`, {
+                const response = await fetch(`${window.location.origin}/admin/warehouses/${store.warehouse.id}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
@@ -375,15 +479,15 @@ function buildVendorsTable(config) {
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to delete vendor');
+                    throw new Error('Failed to delete warehouse');
                 }
 
                 store.show = false;
-                store.vendor = null;
+                store.warehouse = null;
                 this.loadData();
             } catch (error) {
-                console.error('Error deleting vendor:', error);
-                alert('Failed to delete vendor. Please try again.');
+                console.error('Error deleting warehouse:', error);
+                alert('Failed to delete warehouse. Please try again.');
             } finally {
                 store.deleting = false;
             }
@@ -393,6 +497,7 @@ function buildVendorsTable(config) {
             try {
                 const params = new URLSearchParams();
                 if (this.search) params.append('search', this.search);
+                if (this.typeFilter) params.append('type', this.typeFilter);
                 if (this.statusFilter) params.append('status', this.statusFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
@@ -427,6 +532,7 @@ function buildVendorsTable(config) {
             try {
                 const params = new URLSearchParams();
                 if (this.search) params.append('search', this.search);
+                if (this.typeFilter) params.append('type', this.typeFilter);
                 if (this.statusFilter) params.append('status', this.statusFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
@@ -462,12 +568,12 @@ function buildVendorsTable(config) {
             const doc = printWindow.document;
             const headers = Object.keys(data[0]);
 
-            doc.title = 'Vendors Export';
+            doc.title = 'Warehouses Export';
             doc.body.innerHTML = '';
 
             const style = doc.createElement('style');
             style.textContent = [
-                'body { font-family: \"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; padding: 20px; }',
+                'body { font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 20px; }',
                 'h1 { font-size: 24px; margin-bottom: 20px; color: #1e293b; }',
                 'table { width: 100%; border-collapse: collapse; margin-top: 20px; }',
                 'th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; font-size: 12px; }',
@@ -477,7 +583,7 @@ function buildVendorsTable(config) {
             doc.head.appendChild(style);
 
             const title = doc.createElement('h1');
-            title.textContent = 'Vendors List';
+            title.textContent = 'Warehouses List';
             doc.body.appendChild(title);
 
             const meta = doc.createElement('p');
@@ -536,7 +642,7 @@ function buildVendorsTable(config) {
                 )
             ].join('\n');
 
-            this.downloadFile(csvContent, 'vendors.csv', 'text/csv');
+            this.downloadFile(csvContent, 'warehouses.csv', 'text/csv');
         },
 
         downloadFile(content, filename, type) {
@@ -566,15 +672,15 @@ function buildVendorsTable(config) {
     };
 }
 
-function getVendorsConfig() {
-    const container = document.querySelector('[data-vendors-config]');
-    let config = window.vendorsTableConfig || null;
+function getWarehousesConfig() {
+    const container = document.querySelector('[data-warehouses-config]');
+    let config = window.warehousesTableConfig || null;
 
     if (container) {
         try {
-            config = JSON.parse(container.getAttribute('data-vendors-config'));
+            config = JSON.parse(container.getAttribute('data-warehouses-config'));
         } catch (error) {
-            console.error('Invalid vendors config JSON:', error);
+            console.error('Invalid warehouses config JSON:', error);
         }
     }
 
@@ -590,32 +696,32 @@ function getVendorsConfig() {
     return config;
 }
 
-function registerVendorsTable() {
+function registerWarehousesTable() {
     if (!window.Alpine) {
         return;
     }
 
-    const config = getVendorsConfig();
+    const config = getWarehousesConfig();
     if (!config) {
         return;
     }
 
-    if (!window.vendorsTable) {
-        window.vendorsTable = () => buildVendorsTable(config);
+    if (!window.warehousesTable) {
+        window.warehousesTable = () => buildWarehousesTable(config);
     }
 
-    Alpine.store('vendorsDelete', {
+    Alpine.store('warehousesDelete', {
         show: false,
-        vendor: null,
+        warehouse: null,
         deleting: false,
         onConfirm: null,
     });
 
-    Alpine.data('vendorsTable', window.vendorsTable);
+    Alpine.data('warehousesTable', window.warehousesTable);
 }
 
 if (window.Alpine) {
-    registerVendorsTable();
+    registerWarehousesTable();
 } else {
-    document.addEventListener('alpine:init', registerVendorsTable);
+    document.addEventListener('alpine:init', registerWarehousesTable);
 }

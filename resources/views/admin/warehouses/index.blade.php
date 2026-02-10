@@ -1,13 +1,13 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Vendor Management')
+@section('title', 'Warehouse Management')
 @section('breadcrumb-parent', 'Management')
-@section('breadcrumb-current', 'Vendors')
+@section('breadcrumb-current', 'Warehouses')
 
 @section('content')
 
-<div class="space-y-6" x-data="vendorsTable" data-vendors-config='@json(["endpoint" => route("admin.vendors.data"), "exportEndpoint" => route("admin.vendors.export"), "storeEndpoint" => route("admin.vendors.store")])'>
-    <!-- Vendors Datatable -->
+<div class="space-y-6" x-data="warehousesTable" data-warehouses-config='@json(["endpoint" => route("admin.warehouses.data"), "exportEndpoint" => route("admin.warehouses.export"), "storeEndpoint" => route("admin.warehouses.store"), "regionsEndpoint" => "/api/v1/vendor/regions"])'>
+    <!-- Warehouses Datatable -->
     <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">
         <!-- Card Header -->
         <div class="px-6 py-5 border-b border-slate-200/50">
@@ -15,15 +15,15 @@
                 <div class="flex items-center gap-3">
                     <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100">
                         <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
                         </svg>
                     </div>
                     <div>
-                        <h2 class="text-lg font-semibold text-slate-900">Vendors</h2>
-                        <p class="mt-0.5 text-sm text-slate-500">Manage vendor accounts and their access</p>
+                        <h2 class="text-lg font-semibold text-slate-900">Warehouses</h2>
+                        <p class="mt-0.5 text-sm text-slate-500">Manage warehouse locations and capacity</p>
                     </div>
                 </div>
-                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="meta.total + ' Total Vendors'">
+                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="meta.total + ' Total Warehouses'">
                 </span>
             </div>
         </div>
@@ -31,14 +31,14 @@
         <!-- Table Controls -->
         <div class="p-6 pb-0">
             <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <!-- Search + Status + Date Range -->
+                <!-- Search + Type + Status + Date Range -->
                 <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
                     <div class="relative flex-1 max-w-xs">
                         <input
                             type="text"
                             x-model="search"
                             @@input.debounce.500ms="loadData()"
-                            placeholder="Search vendors..."
+                            placeholder="Search warehouses..."
                             class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400 transition-colors"
                         >
                         <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -46,6 +46,54 @@
                         </svg>
                     </div>
 
+                    <!-- Type Filter -->
+                    <div x-data="{ open: false }" class="relative w-full sm:w-56">
+                        <button
+                            type="button"
+                            @@click="open = !open"
+                            class="w-full inline-flex items-center justify-between px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors"
+                        >
+                            <span x-text="typeFilterName || 'All types'"></span>
+                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+
+                        <div
+                            x-show="open"
+                            @@click.away="open = false"
+                            x-transition
+                            class="absolute right-0 mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/85 shadow-2xl p-2 z-50 backdrop-blur-xl"
+                            style="display: none;"
+                        >
+                            <button
+                                type="button"
+                                @@click="typeFilter = ''; typeFilterName = 'All types'; loadData(); open = false"
+                                class="w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
+                                :class="typeFilter === '' ? 'bg-white/70 shadow-sm' : ''"
+                            >
+                                <svg x-show="typeFilter === ''" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>All types</span>
+                            </button>
+                            @foreach($types as $type)
+                            <button
+                                type="button"
+                                @@click="typeFilter = '{{ $type['value'] }}'; typeFilterName = '{{ $type['label'] }}'; loadData(); open = false"
+                                class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
+                                :class="typeFilter === '{{ $type['value'] }}' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''"
+                            >
+                                <svg x-show="typeFilter === '{{ $type['value'] }}'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>{{ $type['label'] }}</span>
+                            </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <!-- Status Filter -->
                     <div x-data="{ open: false }" class="relative w-full sm:w-56">
                         <button
                             type="button"
@@ -189,7 +237,7 @@
                         </div>
                     </div>
 
-                    @if(Auth::guard('admin')->user()->hasPermission('vendors.create'))
+                    @if(Auth::guard('admin')->user()->hasPermission('warehouses.create'))
                     <button
                         type="button"
                         @@click="openAddModal()"
@@ -198,7 +246,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
-                        Add Vendor
+                        Add Warehouse
                     </button>
                     @endif
                 </div>
@@ -224,38 +272,32 @@
                                 </svg>
                             </div>
                         </th>
-                        <th x-show="visibleColumns.business_name" @@click="sort('business_name')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                        <th x-show="visibleColumns.code" @@click="sort('code')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                             <div class="flex items-center">
-                                BUSINESS NAME
-                                <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'business_name' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                CODE
+                                <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'code' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
                                 </svg>
                             </div>
                         </th>
-                        <th x-show="visibleColumns.email" @@click="sort('email')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                            <div class="flex items-center">
-                                EMAIL
-                                <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'email' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
-                                </svg>
-                            </div>
+                        <th x-show="visibleColumns.type" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            TYPE
                         </th>
-                        <th x-show="visibleColumns.phone" @@click="sort('phone')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                            <div class="flex items-center">
-                                PHONE
-                                <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'phone' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
-                                </svg>
-                            </div>
+                        <th x-show="visibleColumns.region" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            REGION
+                        </th>
+                        <th x-show="visibleColumns.district" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            DISTRICT
+                        </th>
+                        <th x-show="visibleColumns.contact_phone" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            CONTACT PHONE
+                        </th>
+                        <th x-show="visibleColumns.capacity" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            CAPACITY
                         </th>
                         <th x-show="visibleColumns.status" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             STATUS
-                        </th>
-                        <th x-show="visibleColumns.shipments" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            SHIPMENTS
                         </th>
                         <th x-show="visibleColumns.created_at" @@click="sort('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                             <div class="flex items-center">
@@ -272,36 +314,48 @@
                     </tr>
                 </thead>
                 <tbody class="bg-transparent divide-y divide-slate-100/50">
-                    <template x-if="vendors.length === 0 && !loading">
+                    <template x-if="warehouses.length === 0 && !loading">
                         <tr>
                             <td :colspan="visibleColumnCount()" class="px-4 py-8 text-center text-gray-500 text-xs">
-                                No vendors found
+                                No warehouses found
                             </td>
                         </tr>
                     </template>
 
-                    <template x-for="vendor in vendors" :key="vendor.id">
+                    <template x-for="warehouse in warehouses" :key="warehouse.id">
                         <tr class="hover:bg-slate-50/70">
-                            <td x-show="visibleColumns.name" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="vendor.name"></td>
-                            <td x-show="visibleColumns.business_name" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="vendor.business_name || '-'"></td>
-                            <td x-show="visibleColumns.email" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="vendor.email"></td>
-                            <td x-show="visibleColumns.phone" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="vendor.phone"></td>
+                            <td x-show="visibleColumns.name" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="warehouse.name"></td>
+                            <td x-show="visibleColumns.code" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 font-mono" x-text="warehouse.code || '-'"></td>
+                            <td x-show="visibleColumns.type" class="px-4 py-2.5 whitespace-nowrap text-xs">
+                                <span
+                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                    :class="{
+                                        'bg-blue-100 text-blue-700': warehouse.type === 'origin',
+                                        'bg-violet-100 text-violet-700': warehouse.type === 'destination',
+                                        'bg-emerald-100 text-emerald-700': warehouse.type === 'both'
+                                    }"
+                                    x-text="warehouse.type ? warehouse.type.charAt(0).toUpperCase() + warehouse.type.slice(1) : '-'"
+                                ></span>
+                            </td>
+                            <td x-show="visibleColumns.region" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="warehouse.region || '-'"></td>
+                            <td x-show="visibleColumns.district" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="warehouse.district || '-'"></td>
+                            <td x-show="visibleColumns.contact_phone" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="warehouse.contact_phone || '-'"></td>
+                            <td x-show="visibleColumns.capacity" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 text-center" x-text="warehouse.capacity || '-'"></td>
                             <td x-show="visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap text-xs">
                                 <span
                                     class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                    :class="vendor.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
-                                    x-text="vendor.is_active ? 'Active' : 'Inactive'"
+                                    :class="warehouse.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+                                    x-text="warehouse.is_active ? 'Active' : 'Inactive'"
                                 ></span>
                             </td>
-                            <td x-show="visibleColumns.shipments" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 text-center" x-text="vendor.shipments_count"></td>
-                            <td x-show="visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(vendor.created_at)"></td>
+                            <td x-show="visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(warehouse.created_at)"></td>
                             <td x-show="visibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center text-xs font-medium">
                                 <div class="inline-flex items-center gap-1">
                                     <!-- View Button -->
                                     <a
-                                        :href="'{{ route('admin.vendors.index') }}/' + vendor.id"
+                                        :href="'{{ route('admin.warehouses.index') }}/' + warehouse.id"
                                         class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                        title="View vendor">
+                                        title="View warehouse">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -309,11 +363,11 @@
                                     </a>
 
                                     <!-- Edit Button -->
-                                    <template x-if="vendor.can_manage">
+                                    <template x-if="warehouse.can_manage">
                                         <button
-                                            @@click="openEditModal(vendor)"
+                                            @@click="openEditModal(warehouse)"
                                             class="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                                            title="Edit vendor">
+                                            title="Edit warehouse">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                             </svg>
@@ -321,12 +375,12 @@
                                     </template>
 
                                     <!-- Toggle Status Button -->
-                                    <template x-if="vendor.can_manage">
+                                    <template x-if="warehouse.can_manage">
                                         <button
-                                            @@click="toggleVendorStatus(vendor)"
+                                            @@click="toggleWarehouseStatus(warehouse)"
                                             class="p-1.5 rounded-lg transition-colors"
-                                            :class="vendor.is_active ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-teal-600 hover:bg-teal-50'"
-                                            :title="vendor.is_active ? 'Deactivate vendor' : 'Activate vendor'">
+                                            :class="warehouse.is_active ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-teal-600 hover:bg-teal-50'"
+                                            :title="warehouse.is_active ? 'Deactivate warehouse' : 'Activate warehouse'">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
                                             </svg>
@@ -334,11 +388,11 @@
                                     </template>
 
                                     <!-- Delete Button -->
-                                    <template x-if="vendor.can_manage">
+                                    <template x-if="warehouse.can_manage">
                                         <button
-                                            @@click="openDeleteModal(vendor)"
+                                            @@click="openDeleteModal(warehouse)"
                                             class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                            title="Delete vendor">
+                                            title="Delete warehouse">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                             </svg>
@@ -489,15 +543,15 @@
                     <div class="flex items-start justify-between">
                         <div class="flex items-start gap-4">
                             <!-- Icon Badge -->
-                            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center shadow-lg shadow-slate-900/20">
+                            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-lg shadow-teal-900/20">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
                                 </svg>
                             </div>
                             <!-- Title & Description -->
                             <div>
-                                <h3 class="text-xl font-bold text-slate-900" x-text="modalMode === 'add' ? 'Add New Vendor' : (modalMode === 'edit' ? 'Edit Vendor' : 'View Vendor')"></h3>
-                                <p class="text-sm text-slate-500 mt-1" x-text="modalMode === 'add' ? 'Create a new vendor account with contact details' : (modalMode === 'edit' ? 'Update vendor information and settings' : 'View vendor account details')"></p>
+                                <h3 class="text-xl font-bold text-slate-900" x-text="modalMode === 'add' ? 'Add New Warehouse' : (modalMode === 'edit' ? 'Edit Warehouse' : 'View Warehouse')"></h3>
+                                <p class="text-sm text-slate-500 mt-1" x-text="modalMode === 'add' ? 'Create a new warehouse location' : (modalMode === 'edit' ? 'Update warehouse information and settings' : 'View warehouse details')"></p>
                             </div>
                         </div>
                         <!-- Close Button -->
@@ -510,17 +564,17 @@
                 </div>
 
                 <!-- Body -->
-                <form @submit.prevent="saveVendor()">
+                <form @submit.prevent="saveWarehouse()">
                     <div class="space-y-5 px-6 py-6 max-h-[calc(100vh-240px)] overflow-y-auto">
                             <!-- Name -->
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                    Vendor Name <span class="text-rose-500">*</span>
+                                    Warehouse Name <span class="text-rose-500">*</span>
                                 </label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                         <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
                                         </svg>
                                     </div>
                                     <input
@@ -528,7 +582,7 @@
                                         x-model="form.name"
                                         :disabled="modalMode === 'view'"
                                         class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
-                                        placeholder="John Doe"
+                                        placeholder="Main Warehouse"
                                         required
                                     >
                                 </div>
@@ -542,70 +596,177 @@
                                 </template>
                             </div>
 
-                            <!-- Business Name -->
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                    Business Name <span class="text-slate-400 text-xs font-normal">(Optional)</span>
-                                </label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                                        </svg>
-                                    </div>
-                                    <input
-                                        type="text"
-                                        x-model="form.business_name"
-                                        :disabled="modalMode === 'view'"
-                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
-                                        placeholder="Acme Corporation"
-                                    >
-                                </div>
-                                <template x-if="errors.business_name">
-                                    <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
-                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                                        </svg>
-                                        <span x-text="errors.business_name[0]"></span>
-                                    </p>
-                                </template>
-                            </div>
-
-                            <!-- Email & Phone Grid -->
+                            <!-- Code & Type Grid -->
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <!-- Email -->
+                                <!-- Code -->
                                 <div>
                                     <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                        Email <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                        Code <span class="text-slate-400 text-xs font-normal">(Auto-generated if empty)</span>
                                     </label>
                                     <div class="relative">
                                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                             <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
                                             </svg>
                                         </div>
                                         <input
-                                            type="email"
-                                            x-model="form.email"
+                                            type="text"
+                                            x-model="form.code"
                                             :disabled="modalMode === 'view'"
                                             class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
-                                            placeholder="vendor@example.com"
+                                            placeholder="WH-001"
                                         >
                                     </div>
-                                    <template x-if="errors.email">
+                                    <template x-if="errors.code">
                                         <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
                                             <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
                                             </svg>
-                                            <span x-text="errors.email[0]"></span>
+                                            <span x-text="errors.code[0]"></span>
                                         </p>
                                     </template>
                                 </div>
 
-                                <!-- Phone -->
+                                <!-- Type -->
                                 <div>
                                     <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                        Phone <span class="text-rose-500">*</span>
+                                        Type <span class="text-rose-500">*</span>
+                                    </label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                            </svg>
+                                        </div>
+                                        <select
+                                            x-model="form.type"
+                                            :disabled="modalMode === 'view'"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 transition-all disabled:bg-slate-50 disabled:text-slate-500 appearance-none cursor-pointer"
+                                            required
+                                        >
+                                            <option value="">Select type</option>
+                                            <option value="origin">Origin</option>
+                                            <option value="destination">Destination</option>
+                                            <option value="both">Both</option>
+                                        </select>
+                                    </div>
+                                    <template x-if="errors.type">
+                                        <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                            </svg>
+                                            <span x-text="errors.type[0]"></span>
+                                        </p>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Address -->
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                    Address <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute top-2.5 left-0 pl-3 flex items-start pointer-events-none">
+                                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        </svg>
+                                    </div>
+                                    <textarea
+                                        x-model="form.address"
+                                        :disabled="modalMode === 'view'"
+                                        rows="2"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500 resize-none"
+                                        placeholder="Full address of warehouse location"
+                                    ></textarea>
+                                </div>
+                                <template x-if="errors.address">
+                                    <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                        </svg>
+                                        <span x-text="errors.address[0]"></span>
+                                    </p>
+                                </template>
+                            </div>
+
+                            <!-- Region & District Grid -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <!-- Region -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                        Region <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                    </label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                        </div>
+                                        <select
+                                            x-model="form.region_id"
+                                            :disabled="modalMode === 'view'"
+                                            @@change="onRegionChange()"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 transition-all disabled:bg-slate-50 disabled:text-slate-500 appearance-none cursor-pointer"
+                                        >
+                                            <option value="">Select region</option>
+                                            <template x-for="region in regions" :key="region.id">
+                                                <option :value="region.id" x-text="region.name"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <template x-if="errors.region_id">
+                                        <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                            </svg>
+                                            <span x-text="errors.region_id[0]"></span>
+                                        </p>
+                                    </template>
+                                </div>
+
+                                <!-- District -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                        District <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                    </label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            </svg>
+                                        </div>
+                                        <select
+                                            x-model="form.district_id"
+                                            :disabled="modalMode === 'view' || !form.region_id || loadingDistricts"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 transition-all disabled:bg-slate-50 disabled:text-slate-500 appearance-none cursor-pointer"
+                                        >
+                                            <option value="">Select district</option>
+                                            <template x-for="district in districts" :key="district.id">
+                                                <option :value="district.id" x-text="district.name"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <p x-show="loadingDistricts" class="mt-1 text-xs text-slate-400">Loading districts...</p>
+                                    <template x-if="errors.district_id">
+                                        <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                            </svg>
+                                            <span x-text="errors.district_id[0]"></span>
+                                        </p>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Contact Phone & Email Grid -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <!-- Contact Phone -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                        Contact Phone <span class="text-slate-400 text-xs font-normal">(Optional)</span>
                                     </label>
                                     <div class="relative">
                                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -615,26 +776,83 @@
                                         </div>
                                         <input
                                             type="text"
-                                            x-model="form.phone"
-                                            :disabled="modalMode === 'view' || modalMode === 'edit'"
+                                            x-model="form.contact_phone"
+                                            :disabled="modalMode === 'view'"
                                             class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                             placeholder="+233 24 123 4567"
-                                            required
                                         >
                                     </div>
-                                    <p x-show="modalMode === 'edit'" class="mt-1 text-xs text-slate-400">Phone number cannot be changed after creation</p>
-                                    <template x-if="errors.phone">
+                                    <template x-if="errors.contact_phone">
                                         <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
                                             <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
                                             </svg>
-                                            <span x-text="errors.phone[0]"></span>
+                                            <span x-text="errors.contact_phone[0]"></span>
+                                        </p>
+                                    </template>
+                                </div>
+
+                                <!-- Contact Email -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                        Contact Email <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                    </label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                            </svg>
+                                        </div>
+                                        <input
+                                            type="email"
+                                            x-model="form.contact_email"
+                                            :disabled="modalMode === 'view'"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                            placeholder="warehouse@example.com"
+                                        >
+                                    </div>
+                                    <template x-if="errors.contact_email">
+                                        <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                            </svg>
+                                            <span x-text="errors.contact_email[0]"></span>
                                         </p>
                                     </template>
                                 </div>
                             </div>
 
-                                            <!-- Status Toggle -->
+                            <!-- Capacity -->
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                    Capacity <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                        </svg>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        x-model="form.capacity"
+                                        :disabled="modalMode === 'view'"
+                                        min="0"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                        placeholder="500"
+                                    >
+                                </div>
+                                <template x-if="errors.capacity">
+                                    <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                        </svg>
+                                        <span x-text="errors.capacity[0]"></span>
+                                    </p>
+                                </template>
+                            </div>
+
+                            <!-- Status Toggle -->
                             <div x-show="modalMode !== 'view'" class="bg-slate-50/50 rounded-2xl p-5 border border-slate-200">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-3">
@@ -644,8 +862,8 @@
                                             </svg>
                                         </div>
                                         <div>
-                                            <h4 class="text-sm font-bold text-slate-800">Account Status</h4>
-                                            <p class="text-xs text-slate-500" x-text="form.is_active ? 'Vendor can access portal' : 'Vendor access disabled'"></p>
+                                            <h4 class="text-sm font-bold text-slate-800">Warehouse Status</h4>
+                                            <p class="text-xs text-slate-500" x-text="form.is_active ? 'Warehouse is operational' : 'Warehouse is inactive'"></p>
                                         </div>
                                     </div>
                                     <button
@@ -671,7 +889,7 @@
                                             <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </svg>
-                                            <span class="text-xs font-bold text-slate-700">Account Status</span>
+                                            <span class="text-xs font-bold text-slate-700">Warehouse Status</span>
                                         </div>
                                         <span
                                             class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold shadow-sm"
@@ -710,7 +928,7 @@
                                     <svg x-show="!saving" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                     </svg>
-                                    <span x-text="saving ? 'Saving...' : (modalMode === 'add' ? 'Create Vendor' : 'Save Changes')"></span>
+                                    <span x-text="saving ? 'Saving...' : (modalMode === 'add' ? 'Create Warehouse' : 'Save Changes')"></span>
                                 </button>
                             </div>
                         </div>
@@ -722,13 +940,13 @@
 
     <!-- Delete Confirmation Modal -->
     <div
-        x-show="$store.vendorsDelete.show"
+        x-show="$store.warehousesDelete.show"
         x-cloak
         class="fixed inset-0 z-[110] overflow-y-auto"
-        @keydown.escape.window="$store.vendorsDelete.show = false"
+        @keydown.escape.window="$store.warehousesDelete.show = false"
     >
         <!-- Backdrop -->
-        <div x-show="$store.vendorsDelete.show"
+        <div x-show="$store.warehousesDelete.show"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
@@ -736,12 +954,12 @@
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
              class="fixed inset-0 bg-slate-600/60 backdrop-blur-[2px]"
-             @click="$store.vendorsDelete.show = false"></div>
+             @click="$store.warehousesDelete.show = false"></div>
 
         <!-- Modal Content -->
         <div class="flex min-h-full items-center justify-center p-4">
             <div
-                x-show="$store.vendorsDelete.show"
+                x-show="$store.warehousesDelete.show"
                 x-transition:enter="transition ease-out duration-200"
                 x-transition:enter-start="opacity-0 scale-95"
                 x-transition:enter-end="opacity-100 scale-100"
@@ -759,10 +977,10 @@
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-slate-900">Delete Vendor</h3>
+                            <h3 class="text-lg font-semibold text-slate-900">Delete Warehouse</h3>
                             <p class="mt-1.5 text-sm text-slate-500 leading-relaxed">
                                 Are you sure you want to delete
-                                <span class="font-semibold text-slate-800" x-text="$store.vendorsDelete.vendor?.name"></span>?
+                                <span class="font-semibold text-slate-800" x-text="$store.warehousesDelete.warehouse?.name"></span>?
                                 This action cannot be undone.
                             </p>
                         </div>
@@ -772,19 +990,19 @@
                 <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-5">
                     <button
                         type="button"
-                        @click="$store.vendorsDelete.show = false"
+                        @click="$store.warehousesDelete.show = false"
                         class="text-sm font-medium text-slate-600 hover:text-slate-800"
                     >
                         Cancel
                     </button>
                     <button
                         type="button"
-                        @click="$store.vendorsDelete.onConfirm && $store.vendorsDelete.onConfirm()"
-                        :disabled="$store.vendorsDelete.deleting"
+                        @click="$store.warehousesDelete.onConfirm && $store.warehousesDelete.onConfirm()"
+                        :disabled="$store.warehousesDelete.deleting"
                         class="inline-flex items-center justify-center px-6 py-2.5 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-full shadow-lg shadow-rose-600/25 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <span x-show="$store.vendorsDelete.deleting">Deleting...</span>
-                        <span x-show="!$store.vendorsDelete.deleting">Delete</span>
+                        <span x-show="$store.warehousesDelete.deleting">Deleting...</span>
+                        <span x-show="!$store.warehousesDelete.deleting">Delete</span>
                     </button>
                 </div>
             </div>

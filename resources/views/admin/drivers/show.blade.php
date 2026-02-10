@@ -1,27 +1,25 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Vendor - ' . $vendor->name)
-@section('breadcrumb-parent', 'Vendors')
-@section('breadcrumb-current', $vendor->name)
+@section('title', 'Driver - ' . $driver->name)
+@section('breadcrumb-parent', 'Drivers')
+@section('breadcrumb-current', $driver->name)
 
 @php
-$vendorConfig = [
-    'vendor' => $vendor,
-    'shipmentsEndpoint' => route('admin.vendors.shipments', $vendor),
-    'activityLogsEndpoint' => route('admin.vendors.activity-logs', $vendor),
-    'otpLogsEndpoint' => route('admin.vendors.otp-logs', $vendor),
-    'updateEndpoint' => route('admin.vendors.update', $vendor),
-    'toggleActiveEndpoint' => route('admin.vendors.toggle-active', $vendor),
+$driverConfig = [
+    'driver' => $driver,
+    'assignmentsEndpoint' => route('admin.drivers.assignments', $driver),
+    'activityLogsEndpoint' => route('admin.drivers.activity-logs', $driver),
+    'updateEndpoint' => route('admin.drivers.update', $driver),
+    'toggleActiveEndpoint' => route('admin.drivers.toggle-active', $driver),
     'canManage' => $canManage,
-    'statuses' => $statuses,
 ];
 @endphp
 
 @section('content')
 <script>
-    window.vendorShowConfig = {!! json_encode($vendorConfig) !!};
+    window.driverShowConfig = {!! json_encode($driverConfig) !!};
 </script>
-<div x-data="vendorShow()" class="space-y-6">
+<div x-data="driverShow()" class="space-y-6">
 
     <!-- Hero Section -->
     <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30">
@@ -41,27 +39,36 @@ $vendorConfig = [
             <div class="relative px-6 lg:px-8 py-6">
                 <!-- Top Row: Back Button -->
                 <div class="mb-6">
-                    <a href="{{ route('admin.vendors.index') }}" class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium transition-all backdrop-blur-sm hover:shadow-md">
+                    <a href="{{ route('admin.drivers.index') }}" class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium transition-all backdrop-blur-sm hover:shadow-md">
                         <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                         </svg>
-                        <span class="text-xs">Back to Vendors</span>
+                        <span class="text-xs">Back to Drivers</span>
                     </a>
                 </div>
 
                 <!-- Main Row: Profile LEFT, Summary + Actions RIGHT -->
                 <div class="flex flex-col lg:flex-row lg:items-center gap-6">
-                    <!-- LEFT: Vendor Profile Info -->
+                    <!-- LEFT: Driver Profile Info -->
                     <div class="flex items-start gap-5 lg:flex-shrink-0">
                         <!-- Avatar -->
                         <div class="relative flex-shrink-0">
                             <div class="w-20 h-20 lg:w-24 lg:h-24 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white text-2xl lg:text-3xl font-bold shadow-xl shadow-blue-500/30 ring-4 ring-white/10">
-                                {{ strtoupper(substr($vendor->name, 0, 1)) }}
+                                {{ strtoupper(substr($driver->name, 0, 1)) }}
                             </div>
-                            <div class="absolute -bottom-1.5 -right-1.5 w-7 h-7 lg:w-8 lg:h-8 rounded-full {{ $vendor->is_active ? 'bg-gradient-to-br from-emerald-400 to-emerald-600' : 'bg-gradient-to-br from-slate-400 to-slate-500' }} border-4 border-slate-900 flex items-center justify-center shadow-lg">
-                                @if($vendor->is_active)
+                            <div class="absolute -bottom-1.5 -right-1.5 w-7 h-7 lg:w-8 lg:h-8 rounded-full
+                                @if($driver->status === 'available') bg-gradient-to-br from-emerald-400 to-emerald-600
+                                @elseif($driver->status === 'busy') bg-gradient-to-br from-amber-400 to-amber-600
+                                @else bg-gradient-to-br from-slate-400 to-slate-500
+                                @endif
+                                border-4 border-slate-900 flex items-center justify-center shadow-lg">
+                                @if($driver->status === 'available')
                                     <svg class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                @elseif($driver->status === 'busy')
+                                    <svg class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
                                     </svg>
                                 @else
                                     <svg class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -74,9 +81,11 @@ $vendorConfig = [
                         <!-- Details -->
                         <div class="space-y-2 min-w-0">
                             <div>
-                                <h1 class="text-xl lg:text-2xl font-bold text-white truncate">{{ $vendor->name }}</h1>
-                                @if($vendor->business_name)
-                                    <p class="text-slate-400 text-sm mt-0.5 truncate">{{ $vendor->business_name }}</p>
+                                <h1 class="text-xl lg:text-2xl font-bold text-white truncate">{{ $driver->name }}</h1>
+                                @if($driver->vehicle_type && $driver->vehicle_number)
+                                    <p class="text-slate-400 text-sm mt-0.5 truncate">{{ $driver->vehicle_type }} &mdash; {{ $driver->vehicle_number }}</p>
+                                @elseif($driver->vehicle_type)
+                                    <p class="text-slate-400 text-sm mt-0.5 truncate">{{ $driver->vehicle_type }}</p>
                                 @endif
                             </div>
 
@@ -85,23 +94,40 @@ $vendorConfig = [
                                     <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                                     </svg>
-                                    <span class="truncate">{{ $vendor->email }}</span>
+                                    <span class="truncate">{{ $driver->email }}</span>
                                 </div>
                                 <div class="flex items-center gap-1.5 text-slate-300">
                                     <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                                     </svg>
-                                    {{ $vendor->phone }}
+                                    {{ $driver->phone }}
                                 </div>
                             </div>
 
                             <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $vendor->is_active ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-500/20 text-slate-300' }}">
-                                    <span class="w-1.5 h-1.5 rounded-full {{ $vendor->is_active ? 'bg-emerald-400' : 'bg-slate-400' }}"></span>
-                                    {{ $vendor->is_active ? 'Active' : 'Inactive' }}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold
+                                    @if($driver->status === 'available') bg-emerald-500/20 text-emerald-300
+                                    @elseif($driver->status === 'busy') bg-amber-500/20 text-amber-300
+                                    @else bg-slate-500/20 text-slate-300
+                                    @endif">
+                                    <span class="w-1.5 h-1.5 rounded-full
+                                        @if($driver->status === 'available') bg-emerald-400
+                                        @elseif($driver->status === 'busy') bg-amber-400
+                                        @else bg-slate-400
+                                        @endif"></span>
+                                    {{ ucfirst($driver->status ?? 'offline') }}
                                 </span>
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $driver->is_active ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-500/20 text-slate-300' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $driver->is_active ? 'bg-emerald-400' : 'bg-slate-400' }}"></span>
+                                    {{ $driver->is_active ? 'Active' : 'Inactive' }}
+                                </span>
+                                @if($driver->license_number)
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/20 text-blue-300">
+                                    {{ $driver->license_number }}
+                                </span>
+                                @endif
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-500/20 text-slate-300">
-                                    {{ $vendor->created_at->format('M d, Y') }}
+                                    {{ $driver->created_at->format('M d, Y') }}
                                 </span>
                             </div>
                         </div>
@@ -124,34 +150,34 @@ $vendorConfig = [
                             <button
                                 @@click="showToggleModal = true"
                                 class="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl border transition-all backdrop-blur-sm shadow-sm hover:shadow-md"
-                                :class="vendor.is_active
+                                :class="driver.is_active
                                     ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/30'
                                     : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/30'"
                             >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
                                 </svg>
-                                <span x-text="vendor.is_active ? 'Deactivate' : 'Activate'"></span>
+                                <span x-text="driver.is_active ? 'Deactivate' : 'Activate'"></span>
                             </button>
                         </div>
                         @endif
 
                         <!-- Row 2: Summary Stats - 4 compact cards in one row -->
                         <div class="flex items-center gap-2 flex-wrap lg:flex-nowrap">
-                            <!-- Total Shipments -->
+                            <!-- Total Assignments -->
                             <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
                                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/30 to-blue-600/20 flex items-center justify-center flex-shrink-0">
                                     <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                                     </svg>
                                 </div>
                                 <div>
-                                    <p class="text-lg font-bold text-white leading-none">{{ number_format($shipmentStats['total']) }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Shipments</p>
+                                    <p class="text-lg font-bold text-white leading-none">{{ number_format($assignmentsCount) }}</p>
+                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Assignments</p>
                                 </div>
                             </div>
 
-                            <!-- Delivered -->
+                            <!-- Completed Pickups -->
                             <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
                                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center flex-shrink-0">
                                     <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -159,21 +185,21 @@ $vendorConfig = [
                                     </svg>
                                 </div>
                                 <div>
-                                    <p class="text-lg font-bold text-emerald-400 leading-none">{{ number_format($shipmentStats['delivered']) }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Delivered</p>
+                                    <p class="text-lg font-bold text-emerald-400 leading-none">{{ number_format($completedCount) }}</p>
+                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Completed</p>
                                 </div>
                             </div>
 
-                            <!-- Activities -->
+                            <!-- Active Assignment -->
                             <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
                                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500/30 to-violet-600/20 flex items-center justify-center flex-shrink-0">
                                     <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                                     </svg>
                                 </div>
                                 <div>
-                                    <p class="text-lg font-bold text-white leading-none">{{ number_format($activityLogsCount) }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Activities</p>
+                                    <p class="text-lg font-bold text-white leading-none">{{ $activeAssignment ? 'Yes' : 'No' }}</p>
+                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Active Job</p>
                                 </div>
                             </div>
 
@@ -189,7 +215,7 @@ $vendorConfig = [
                                         @if($lastLogin)
                                             {{ $lastLogin->created_at->format('M d') }}
                                         @else
-                                            —
+                                            &mdash;
                                         @endif
                                     </p>
                                     <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Last Login</p>
@@ -208,17 +234,17 @@ $vendorConfig = [
         <div class="bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-200 px-4">
             <nav class="flex gap-1 -mb-px overflow-x-auto" aria-label="Tabs">
                 <button
-                    @@click="activeTab = 'shipments'; loadShipments()"
-                    :class="activeTab === 'shipments'
+                    @@click="activeTab = 'assignments'; loadAssignments()"
+                    :class="activeTab === 'assignments'
                         ? 'bg-white text-slate-900 border-slate-200 border-b-white shadow-[0_-2px_6px_-1px_rgba(0,0,0,0.05)]'
                         : 'text-slate-500 hover:text-slate-700 hover:bg-white/50 border-transparent'"
                     class="relative flex-shrink-0 py-3 px-5 text-sm font-medium border border-b-0 rounded-t-lg transition-all flex items-center gap-2.5"
                 >
-                    <svg class="w-4 h-4" :class="activeTab === 'shipments' ? 'text-blue-600' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    <svg class="w-4 h-4" :class="activeTab === 'assignments' ? 'text-blue-600' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                     </svg>
-                    <span>Shipments</span>
-                    <span :class="activeTab === 'shipments' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'" class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 text-[10px] font-bold rounded-full">{{ $shipmentsCount }}</span>
+                    <span>Assignments</span>
+                    <span :class="activeTab === 'assignments' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'" class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 text-[10px] font-bold rounded-full">{{ $assignmentsCount }}</span>
                 </button>
                 <button
                     @@click="activeTab = 'activity'; loadActivityLogs()"
@@ -233,35 +259,22 @@ $vendorConfig = [
                     <span>Activity Logs</span>
                     <span :class="activeTab === 'activity' ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-600'" class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 text-[10px] font-bold rounded-full">{{ $activityLogsCount }}</span>
                 </button>
-                <button
-                    @@click="activeTab = 'otp'; loadOtpLogs()"
-                    :class="activeTab === 'otp'
-                        ? 'bg-white text-slate-900 border-slate-200 border-b-white shadow-[0_-2px_6px_-1px_rgba(0,0,0,0.05)]'
-                        : 'text-slate-500 hover:text-slate-700 hover:bg-white/50 border-transparent'"
-                    class="relative flex-shrink-0 py-3 px-5 text-sm font-medium border border-b-0 rounded-t-lg transition-all flex items-center gap-2.5"
-                >
-                    <svg class="w-4 h-4" :class="activeTab === 'otp' ? 'text-amber-600' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                    </svg>
-                    <span>OTP Logs</span>
-                    <span :class="activeTab === 'otp' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'" class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 text-[10px] font-bold rounded-full">{{ $otpLogsCount }}</span>
-                </button>
             </nav>
         </div>
 
         <!-- Tab Content -->
         <div class="p-6">
-            <!-- Shipments Tab -->
-            <div x-show="activeTab === 'shipments'" x-cloak>
+            <!-- Assignments Tab -->
+            <div x-show="activeTab === 'assignments'" x-cloak>
                 <!-- Filters -->
                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-5">
                     <div class="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
                         <div class="relative flex-1 max-w-xs">
                             <input
                                 type="text"
-                                x-model="shipments.search"
-                                @@input.debounce.500ms="loadShipments()"
-                                placeholder="Search shipments..."
+                                x-model="assignments.search"
+                                @@input.debounce.500ms="loadAssignments()"
+                                placeholder="Search assignments..."
                                 class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
                             >
                             <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -270,21 +283,23 @@ $vendorConfig = [
                         </div>
 
                         <select
-                            x-model="shipments.status"
-                            @@change="loadShipments()"
+                            x-model="assignments.status"
+                            @@change="loadAssignments()"
                             class="px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all cursor-pointer"
                         >
                             <option value="">All Statuses</option>
-                            @foreach($statuses as $status)
-                                <option value="{{ $status['value'] }}">{{ $status['label'] }}</option>
-                            @endforeach
+                            <option value="assigned">Assigned</option>
+                            <option value="picked_up">Picked Up</option>
+                            <option value="in_transit">In Transit</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
                         </select>
                     </div>
                 </div>
 
-                <!-- Shipments Table -->
+                <!-- Assignments Table -->
                 <div class="rounded-xl border border-slate-200 bg-white relative overflow-hidden">
-                    <div x-show="shipments.loading" class="absolute inset-0 bg-white/80 z-10 flex items-center justify-center">
+                    <div x-show="assignments.loading" class="absolute inset-0 bg-white/80 z-10 flex items-center justify-center">
                         <svg class="animate-spin w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -296,63 +311,51 @@ $vendorConfig = [
                             <thead class="bg-slate-50/50">
                                 <tr>
                                     <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Shipment #</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Recipient</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Location</th>
-                                    <th class="px-4 py-3 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Items</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Vendor</th>
                                     <th class="px-4 py-3 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Created</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Assigned At</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Completed At</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-transparent divide-y divide-slate-100/50">
-                                <template x-if="shipments.data.length === 0 && !shipments.loading">
+                                <template x-if="assignments.data.length === 0 && !assignments.loading">
                                     <tr>
-                                        <td colspan="6" class="px-4 py-12 text-center">
+                                        <td colspan="5" class="px-4 py-12 text-center">
                                             <div class="flex flex-col items-center justify-center">
                                                 <svg class="w-12 h-12 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                                                 </svg>
-                                                <p class="text-slate-500 text-sm font-medium">No shipments found</p>
-                                                <p class="text-slate-400 text-xs mt-1">This vendor hasn't created any shipments yet</p>
+                                                <p class="text-slate-500 text-sm font-medium">No assignments found</p>
+                                                <p class="text-slate-400 text-xs mt-1">This driver hasn't been assigned any shipments yet</p>
                                             </div>
                                         </td>
                                     </tr>
                                 </template>
 
-                                <template x-for="shipment in shipments.data" :key="shipment.id">
+                                <template x-for="assignment in assignments.data" :key="assignment.id">
                                     <tr class="hover:bg-slate-50/70">
                                         <td class="px-4 py-3 whitespace-nowrap">
-                                            <span class="text-xs font-semibold text-slate-900" x-text="shipment.shipment_number"></span>
+                                            <span class="text-xs font-semibold text-slate-900" x-text="assignment.shipment_number"></span>
                                         </td>
                                         <td class="px-4 py-3 whitespace-nowrap">
-                                            <div>
-                                                <p class="text-xs font-medium text-slate-900" x-text="shipment.recipient_name"></p>
-                                                <p class="text-xs text-slate-500" x-text="shipment.recipient_phone"></p>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-3 whitespace-nowrap">
-                                            <div>
-                                                <p class="text-xs text-slate-600" x-text="shipment.region || '-'"></p>
-                                                <p class="text-xs text-slate-400" x-text="shipment.district || ''"></p>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-center">
-                                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold" x-text="shipment.items_count"></span>
+                                            <span class="text-xs text-slate-600" x-text="assignment.vendor_name || '-'"></span>
                                         </td>
                                         <td class="px-4 py-3 whitespace-nowrap text-center">
                                             <span
                                                 class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
                                                 :class="{
-                                                    'bg-slate-100 text-slate-700': shipment.status === 'draft',
-                                                    'bg-blue-100 text-blue-700': ['submitted', 'invoice_sent', 'invoice_accepted'].includes(shipment.status),
-                                                    'bg-violet-100 text-violet-700': ['pickup_assigned', 'picked_up', 'at_warehouse', 'sorted'].includes(shipment.status),
-                                                    'bg-amber-100 text-amber-700': ['in_transit', 'at_destination', 'out_for_delivery'].includes(shipment.status),
-                                                    'bg-emerald-100 text-emerald-700': shipment.status === 'delivered',
-                                                    'bg-rose-100 text-rose-700': shipment.status === 'cancelled'
+                                                    'bg-blue-100 text-blue-700': assignment.status === 'assigned',
+                                                    'bg-violet-100 text-violet-700': assignment.status === 'picked_up',
+                                                    'bg-amber-100 text-amber-700': assignment.status === 'in_transit',
+                                                    'bg-emerald-100 text-emerald-700': assignment.status === 'delivered',
+                                                    'bg-rose-100 text-rose-700': assignment.status === 'cancelled',
+                                                    'bg-slate-100 text-slate-700': !['assigned','picked_up','in_transit','delivered','cancelled'].includes(assignment.status)
                                                 }"
-                                                x-text="shipment.status_label"
+                                                x-text="assignment.status_label || (assignment.status ? assignment.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '-')"
                                             ></span>
                                         </td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(shipment.created_at)"></td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(assignment.assigned_at)"></td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-600" x-text="assignment.completed_at ? formatDateTime(assignment.completed_at) : '-'"></td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -360,42 +363,42 @@ $vendorConfig = [
                     </div>
 
                     <!-- Pagination -->
-                    <template x-if="shipments.meta.total > 0">
+                    <template x-if="assignments.meta.total > 0">
                         <div class="px-4 py-3 border-t border-slate-200 bg-slate-50/50">
                             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                 <div class="text-xs text-slate-600">
-                                    Showing <span x-text="shipments.meta.from"></span> to <span x-text="shipments.meta.to"></span> of <span x-text="shipments.meta.total"></span> results
+                                    Showing <span x-text="assignments.meta.from"></span> to <span x-text="assignments.meta.to"></span> of <span x-text="assignments.meta.total"></span> results
                                 </div>
                                 <div class="flex items-center gap-1">
                                     <button
-                                        @@click="shipments.page = 1; loadShipments()"
-                                        :disabled="shipments.page === 1"
-                                        :class="shipments.page === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 hover:border-slate-300'"
+                                        @@click="assignments.page = 1; loadAssignments()"
+                                        :disabled="assignments.page === 1"
+                                        :class="assignments.page === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 hover:border-slate-300'"
                                         class="w-8 h-8 border border-slate-200 rounded-md bg-white text-slate-500 flex items-center justify-center transition-all"
                                     >
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/></svg>
                                     </button>
                                     <button
-                                        @@click="shipments.page--; loadShipments()"
-                                        :disabled="shipments.page === 1"
-                                        :class="shipments.page === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 hover:border-slate-300'"
+                                        @@click="assignments.page--; loadAssignments()"
+                                        :disabled="assignments.page === 1"
+                                        :class="assignments.page === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 hover:border-slate-300'"
                                         class="w-8 h-8 border border-slate-200 rounded-md bg-white text-slate-500 flex items-center justify-center transition-all"
                                     >
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                                     </button>
-                                    <span class="px-3 text-xs font-medium text-slate-600">Page <span class="text-slate-900" x-text="shipments.page"></span> of <span x-text="shipments.meta.last_page"></span></span>
+                                    <span class="px-3 text-xs font-medium text-slate-600">Page <span class="text-slate-900" x-text="assignments.page"></span> of <span x-text="assignments.meta.last_page"></span></span>
                                     <button
-                                        @@click="shipments.page++; loadShipments()"
-                                        :disabled="shipments.page === shipments.meta.last_page"
-                                        :class="shipments.page === shipments.meta.last_page ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 hover:border-slate-300'"
+                                        @@click="assignments.page++; loadAssignments()"
+                                        :disabled="assignments.page === assignments.meta.last_page"
+                                        :class="assignments.page === assignments.meta.last_page ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 hover:border-slate-300'"
                                         class="w-8 h-8 border border-slate-200 rounded-md bg-white text-slate-500 flex items-center justify-center transition-all"
                                     >
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                                     </button>
                                     <button
-                                        @@click="shipments.page = shipments.meta.last_page; loadShipments()"
-                                        :disabled="shipments.page === shipments.meta.last_page"
-                                        :class="shipments.page === shipments.meta.last_page ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 hover:border-slate-300'"
+                                        @@click="assignments.page = assignments.meta.last_page; loadAssignments()"
+                                        :disabled="assignments.page === assignments.meta.last_page"
+                                        :class="assignments.page === assignments.meta.last_page ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 hover:border-slate-300'"
                                         class="w-8 h-8 border border-slate-200 rounded-md bg-white text-slate-500 flex items-center justify-center transition-all"
                                     >
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg>
@@ -470,7 +473,7 @@ $vendorConfig = [
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                 </svg>
                                                 <p class="text-slate-500 text-sm font-medium">No activity logs found</p>
-                                                <p class="text-slate-400 text-xs mt-1">Activity will appear here once the vendor uses the app</p>
+                                                <p class="text-slate-400 text-xs mt-1">Activity will appear here once the driver uses the app</p>
                                             </div>
                                         </td>
                                     </tr>
@@ -531,137 +534,6 @@ $vendorConfig = [
                     </template>
                 </div>
             </div>
-
-            <!-- OTP Logs Tab -->
-            <div x-show="activeTab === 'otp'" x-cloak>
-                <!-- Filters -->
-                <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-5">
-                    <div class="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-                        <select
-                            x-model="otp.purpose"
-                            @@change="loadOtpLogs()"
-                            class="px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm text-slate-700 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition-all cursor-pointer"
-                        >
-                            <option value="">All Purposes</option>
-                            <option value="registration">Registration</option>
-                            <option value="login">Login</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- OTP Table -->
-                <div class="rounded-xl border border-slate-200 bg-white relative overflow-hidden">
-                    <div x-show="otp.loading" class="absolute inset-0 bg-white/80 z-10 flex items-center justify-center">
-                        <svg class="animate-spin w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    </div>
-
-                    <div class="overflow-x-auto">
-                        <table class="w-full min-w-[600px] divide-y divide-slate-200 text-sm">
-                            <thead class="bg-slate-50/50">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Code</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Purpose</th>
-                                    <th class="px-4 py-3 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Expires At</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Verified At</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Created</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-transparent divide-y divide-slate-100/50">
-                                <template x-if="otp.data.length === 0 && !otp.loading">
-                                    <tr>
-                                        <td colspan="6" class="px-4 py-12 text-center">
-                                            <div class="flex flex-col items-center justify-center">
-                                                <svg class="w-12 h-12 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                                                </svg>
-                                                <p class="text-slate-500 text-sm font-medium">No OTP logs found</p>
-                                                <p class="text-slate-400 text-xs mt-1">OTP codes will appear here when requested</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </template>
-
-                                <template x-for="log in otp.data" :key="log.id">
-                                    <tr class="hover:bg-slate-50/70">
-                                        <td class="px-4 py-3 whitespace-nowrap">
-                                            <span class="text-sm font-mono font-bold text-slate-900 tracking-wider" x-text="log.code"></span>
-                                        </td>
-                                        <td class="px-4 py-3 whitespace-nowrap">
-                                            <span
-                                                class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
-                                                :class="{
-                                                    'bg-blue-100 text-blue-700': log.purpose === 'registration',
-                                                    'bg-emerald-100 text-emerald-700': log.purpose === 'login'
-                                                }"
-                                                x-text="log.purpose.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())"
-                                            ></span>
-                                        </td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-center">
-                                            <template x-if="log.is_verified">
-                                                <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-700">
-                                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-                                                    </svg>
-                                                    Verified
-                                                </span>
-                                            </template>
-                                            <template x-if="!log.is_verified && log.is_expired">
-                                                <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-rose-100 text-rose-700">
-                                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-                                                    </svg>
-                                                    Expired
-                                                </span>
-                                            </template>
-                                            <template x-if="!log.is_verified && !log.is_expired">
-                                                <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-700">
-                                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
-                                                    </svg>
-                                                    Pending
-                                                </span>
-                                            </template>
-                                        </td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(log.expires_at)"></td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-600" x-text="log.verified_at ? formatDateTime(log.verified_at) : '-'"></td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(log.created_at)"></td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Pagination -->
-                    <template x-if="otp.meta.total > 0">
-                        <div class="px-4 py-3 border-t border-slate-200 bg-slate-50/50">
-                            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                <div class="text-xs text-slate-600">
-                                    Showing <span x-text="otp.meta.from"></span> to <span x-text="otp.meta.to"></span> of <span x-text="otp.meta.total"></span> results
-                                </div>
-                                <div class="flex items-center gap-1">
-                                    <button @@click="otp.page = 1; loadOtpLogs()" :disabled="otp.page === 1" :class="otp.page === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 hover:border-slate-300'" class="w-8 h-8 border border-slate-200 rounded-md bg-white text-slate-500 flex items-center justify-center transition-all">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/></svg>
-                                    </button>
-                                    <button @@click="otp.page--; loadOtpLogs()" :disabled="otp.page === 1" :class="otp.page === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 hover:border-slate-300'" class="w-8 h-8 border border-slate-200 rounded-md bg-white text-slate-500 flex items-center justify-center transition-all">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                                    </button>
-                                    <span class="px-3 text-xs font-medium text-slate-600">Page <span class="text-slate-900" x-text="otp.page"></span> of <span x-text="otp.meta.last_page"></span></span>
-                                    <button @@click="otp.page++; loadOtpLogs()" :disabled="otp.page === otp.meta.last_page" :class="otp.page === otp.meta.last_page ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 hover:border-slate-300'" class="w-8 h-8 border border-slate-200 rounded-md bg-white text-slate-500 flex items-center justify-center transition-all">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                                    </button>
-                                    <button @@click="otp.page = otp.meta.last_page; loadOtpLogs()" :disabled="otp.page === otp.meta.last_page" :class="otp.page === otp.meta.last_page ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 hover:border-slate-300'" class="w-8 h-8 border border-slate-200 rounded-md bg-white text-slate-500 flex items-center justify-center transition-all">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -706,8 +578,8 @@ $vendorConfig = [
                                 </svg>
                             </div>
                             <div>
-                                <h3 class="text-xl font-bold text-slate-900">Edit Vendor</h3>
-                                <p class="text-sm text-slate-500 mt-1">Update vendor information and settings</p>
+                                <h3 class="text-xl font-bold text-slate-900">Edit Driver</h3>
+                                <p class="text-sm text-slate-500 mt-1">Update driver information and settings</p>
                             </div>
                         </div>
                         <button @@click="showEditModal = false" class="flex-shrink-0 rounded-xl p-2 text-slate-400 hover:bg-white hover:text-slate-700 transition-all shadow-sm">
@@ -719,12 +591,12 @@ $vendorConfig = [
                 </div>
 
                 <!-- Body -->
-                <form @@submit.prevent="saveVendor()">
+                <form @@submit.prevent="saveDriver()">
                     <div class="space-y-5 px-6 py-6 max-h-[calc(100vh-240px)] overflow-y-auto">
                         <!-- Name -->
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                Vendor Name <span class="text-rose-500">*</span>
+                                Driver Name <span class="text-rose-500">*</span>
                             </label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -745,32 +617,12 @@ $vendorConfig = [
                             </template>
                         </div>
 
-                        <!-- Business Name -->
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                Business Name <span class="text-slate-400 text-xs font-normal">(Optional)</span>
-                            </label>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                                    </svg>
-                                </div>
-                                <input
-                                    type="text"
-                                    x-model="form.business_name"
-                                    class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all"
-                                    placeholder="Acme Corporation"
-                                >
-                            </div>
-                        </div>
-
                         <!-- Email & Phone Grid -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <!-- Email -->
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                    Email <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                    Email <span class="text-rose-500">*</span>
                                 </label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -782,7 +634,8 @@ $vendorConfig = [
                                         type="email"
                                         x-model="form.email"
                                         class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all"
-                                        placeholder="vendor@example.com"
+                                        placeholder="driver@example.com"
+                                        required
                                     >
                                 </div>
                                 <template x-if="errors.email">
@@ -812,6 +665,71 @@ $vendorConfig = [
                             </div>
                         </div>
 
+                        <!-- Password -->
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                Password <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                            </label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                    </svg>
+                                </div>
+                                <input
+                                    type="password"
+                                    x-model="form.password"
+                                    class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all"
+                                    placeholder="Leave blank to keep current"
+                                >
+                            </div>
+                            <template x-if="errors.password">
+                                <p class="mt-1.5 text-xs text-rose-600" x-text="errors.password[0]"></p>
+                            </template>
+                        </div>
+
+                        <!-- Vehicle Info Grid -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            <!-- Vehicle Type -->
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                    Vehicle Type
+                                </label>
+                                <input
+                                    type="text"
+                                    x-model="form.vehicle_type"
+                                    class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all"
+                                    placeholder="Motorcycle"
+                                >
+                            </div>
+
+                            <!-- Vehicle Number -->
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                    Vehicle Number
+                                </label>
+                                <input
+                                    type="text"
+                                    x-model="form.vehicle_number"
+                                    class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all"
+                                    placeholder="GR-1234-21"
+                                >
+                            </div>
+
+                            <!-- License Number -->
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                    License Number
+                                </label>
+                                <input
+                                    type="text"
+                                    x-model="form.license_number"
+                                    class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all"
+                                    placeholder="DL-123456"
+                                >
+                            </div>
+                        </div>
+
                         <!-- Status Toggle -->
                         <div class="bg-slate-50/50 rounded-2xl p-5 border border-slate-200">
                             <div class="flex items-center justify-between">
@@ -823,7 +741,7 @@ $vendorConfig = [
                                     </div>
                                     <div>
                                         <h4 class="text-sm font-bold text-slate-800">Account Status</h4>
-                                        <p class="text-xs text-slate-500" x-text="form.is_active ? 'Vendor can access portal' : 'Vendor access disabled'"></p>
+                                        <p class="text-xs text-slate-500" x-text="form.is_active ? 'Driver can accept assignments' : 'Driver access disabled'"></p>
                                     </div>
                                 </div>
                                 <button
@@ -904,22 +822,22 @@ $vendorConfig = [
                 <!-- Header -->
                 <div class="p-6 text-center">
                     <div class="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4"
-                         :class="vendor.is_active ? 'bg-amber-100' : 'bg-emerald-100'">
-                        <svg x-show="vendor.is_active" class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                         :class="driver.is_active ? 'bg-amber-100' : 'bg-emerald-100'">
+                        <svg x-show="driver.is_active" class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                         </svg>
-                        <svg x-show="!vendor.is_active" x-cloak class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg x-show="!driver.is_active" x-cloak class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                     </div>
 
-                    <h3 class="text-xl font-bold text-slate-900" x-text="vendor.is_active ? 'Deactivate Vendor?' : 'Activate Vendor?'"></h3>
+                    <h3 class="text-xl font-bold text-slate-900" x-text="driver.is_active ? 'Deactivate Driver?' : 'Activate Driver?'"></h3>
                     <p class="mt-2 text-sm text-slate-600">
-                        <span x-show="vendor.is_active">
-                            Are you sure you want to deactivate <strong x-text="vendor.name"></strong>? They will no longer be able to access the vendor portal.
+                        <span x-show="driver.is_active">
+                            Are you sure you want to deactivate <strong x-text="driver.name"></strong>? They will no longer be able to accept assignments.
                         </span>
-                        <span x-show="!vendor.is_active" x-cloak>
-                            Are you sure you want to activate <strong x-text="vendor.name"></strong>? They will be able to access the vendor portal again.
+                        <span x-show="!driver.is_active" x-cloak>
+                            Are you sure you want to activate <strong x-text="driver.name"></strong>? They will be able to accept assignments again.
                         </span>
                     </p>
                 </div>
@@ -938,7 +856,7 @@ $vendorConfig = [
                         @@click="toggleActive()"
                         :disabled="toggling"
                         class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold rounded-xl transition-all disabled:opacity-50"
-                        :class="vendor.is_active
+                        :class="driver.is_active
                             ? 'bg-amber-500 hover:bg-amber-600 text-white'
                             : 'bg-emerald-500 hover:bg-emerald-600 text-white'"
                     >
@@ -946,7 +864,7 @@ $vendorConfig = [
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span x-text="toggling ? 'Processing...' : (vendor.is_active ? 'Yes, Deactivate' : 'Yes, Activate')"></span>
+                        <span x-text="toggling ? 'Processing...' : (driver.is_active ? 'Yes, Deactivate' : 'Yes, Activate')"></span>
                     </button>
                 </div>
             </div>
@@ -958,18 +876,17 @@ $vendorConfig = [
 
 @push('scripts')
 <script>
-function vendorShow() {
+function driverShow() {
     return {
         config: {},
-        vendor: {},
+        driver: {},
         canManage: false,
-        statuses: [],
 
-        activeTab: 'shipments',
+        activeTab: 'assignments',
         showToggleModal: false,
 
-        // Shipments state
-        shipments: {
+        // Assignments state
+        assignments: {
             data: [],
             meta: { current_page: 1, from: 0, to: 0, total: 0, last_page: 1 },
             loading: false,
@@ -988,15 +905,6 @@ function vendorShow() {
             page: 1
         },
 
-        // OTP logs state
-        otp: {
-            data: [],
-            meta: { current_page: 1, from: 0, to: 0, total: 0, last_page: 1 },
-            loading: false,
-            purpose: '',
-            page: 1
-        },
-
         // Edit modal state
         showEditModal: false,
         saving: false,
@@ -1004,39 +912,41 @@ function vendorShow() {
         errors: {},
         form: {
             name: '',
-            business_name: '',
             email: '',
             phone: '',
+            password: '',
+            vehicle_type: '',
+            vehicle_number: '',
+            license_number: '',
             is_active: true
         },
 
         init() {
-            this.config = window.vendorShowConfig;
-            this.vendor = this.config.vendor;
+            this.config = window.driverShowConfig;
+            this.driver = this.config.driver;
             this.canManage = this.config.canManage;
-            this.statuses = this.config.statuses;
-            this.loadShipments();
+            this.loadAssignments();
         },
 
-        async loadShipments() {
-            this.shipments.loading = true;
+        async loadAssignments() {
+            this.assignments.loading = true;
             try {
                 const params = new URLSearchParams({
-                    page: this.shipments.page,
+                    page: this.assignments.page,
                     per_page: 10,
-                    search: this.shipments.search,
-                    status: this.shipments.status
+                    search: this.assignments.search,
+                    status: this.assignments.status
                 });
 
-                const response = await fetch(`${this.config.shipmentsEndpoint}?${params}`);
+                const response = await fetch(`${this.config.assignmentsEndpoint}?${params}`);
                 const data = await response.json();
 
-                this.shipments.data = data.data;
-                this.shipments.meta = data.meta;
+                this.assignments.data = data.data;
+                this.assignments.meta = data.meta;
             } catch (error) {
-                console.error('Failed to load shipments:', error);
+                console.error('Failed to load assignments:', error);
             } finally {
-                this.shipments.loading = false;
+                this.assignments.loading = false;
             }
         },
 
@@ -1062,44 +972,31 @@ function vendorShow() {
             }
         },
 
-        async loadOtpLogs() {
-            this.otp.loading = true;
-            try {
-                const params = new URLSearchParams({
-                    page: this.otp.page,
-                    per_page: 10,
-                    purpose: this.otp.purpose
-                });
-
-                const response = await fetch(`${this.config.otpLogsEndpoint}?${params}`);
-                const data = await response.json();
-
-                this.otp.data = data.data;
-                this.otp.meta = data.meta;
-            } catch (error) {
-                console.error('Failed to load OTP logs:', error);
-            } finally {
-                this.otp.loading = false;
-            }
-        },
-
         openEditModal() {
             this.form = {
-                name: this.vendor.name,
-                business_name: this.vendor.business_name || '',
-                email: this.vendor.email,
-                phone: this.vendor.phone,
-                is_active: this.vendor.is_active
+                name: this.driver.name,
+                email: this.driver.email,
+                phone: this.driver.phone,
+                password: '',
+                vehicle_type: this.driver.vehicle_type || '',
+                vehicle_number: this.driver.vehicle_number || '',
+                license_number: this.driver.license_number || '',
+                is_active: this.driver.is_active
             };
             this.errors = {};
             this.showEditModal = true;
         },
 
-        async saveVendor() {
+        async saveDriver() {
             this.saving = true;
             this.errors = {};
 
             try {
+                const payload = { ...this.form };
+                if (!payload.password) {
+                    delete payload.password;
+                }
+
                 const response = await fetch(this.config.updateEndpoint, {
                     method: 'PUT',
                     headers: {
@@ -1107,7 +1004,7 @@ function vendorShow() {
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     },
-                    body: JSON.stringify(this.form)
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
@@ -1116,27 +1013,29 @@ function vendorShow() {
                     if (response.status === 422) {
                         this.errors = data.errors || {};
                     } else {
-                        throw new Error(data.message || 'Failed to update vendor');
+                        throw new Error(data.message || 'Failed to update driver');
                     }
                     return;
                 }
 
-                // Update local vendor data
-                this.vendor.name = this.form.name;
-                this.vendor.business_name = this.form.business_name;
-                this.vendor.email = this.form.email;
-                this.vendor.is_active = this.form.is_active;
+                // Update local driver data
+                this.driver.name = this.form.name;
+                this.driver.email = this.form.email;
+                this.driver.vehicle_type = this.form.vehicle_type;
+                this.driver.vehicle_number = this.form.vehicle_number;
+                this.driver.license_number = this.form.license_number;
+                this.driver.is_active = this.form.is_active;
 
                 this.showEditModal = false;
 
                 // Show success notification
                 if (window.showToast) {
-                    window.showToast('Vendor updated successfully', 'success');
+                    window.showToast('Driver updated successfully', 'success');
                 }
             } catch (error) {
                 console.error('Save error:', error);
                 if (window.showToast) {
-                    window.showToast(error.message || 'Failed to update vendor', 'error');
+                    window.showToast(error.message || 'Failed to update driver', 'error');
                 }
             } finally {
                 this.saving = false;
@@ -1162,7 +1061,7 @@ function vendorShow() {
                     throw new Error(data.message || 'Failed to toggle status');
                 }
 
-                this.vendor.is_active = data.is_active;
+                this.driver.is_active = data.is_active;
                 this.showToggleModal = false;
 
                 if (window.showToast) {

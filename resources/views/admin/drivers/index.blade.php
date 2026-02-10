@@ -1,13 +1,13 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Vendor Management')
+@section('title', 'Driver Management')
 @section('breadcrumb-parent', 'Management')
-@section('breadcrumb-current', 'Vendors')
+@section('breadcrumb-current', 'Drivers')
 
 @section('content')
 
-<div class="space-y-6" x-data="vendorsTable" data-vendors-config='@json(["endpoint" => route("admin.vendors.data"), "exportEndpoint" => route("admin.vendors.export"), "storeEndpoint" => route("admin.vendors.store")])'>
-    <!-- Vendors Datatable -->
+<div class="space-y-6" x-data="driversTable" data-drivers-config='@json(["endpoint" => route("admin.drivers.data"), "exportEndpoint" => route("admin.drivers.export"), "storeEndpoint" => route("admin.drivers.store")])'>
+    <!-- Drivers Datatable -->
     <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">
         <!-- Card Header -->
         <div class="px-6 py-5 border-b border-slate-200/50">
@@ -15,15 +15,16 @@
                 <div class="flex items-center gap-3">
                     <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100">
                         <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
                     </div>
                     <div>
-                        <h2 class="text-lg font-semibold text-slate-900">Vendors</h2>
-                        <p class="mt-0.5 text-sm text-slate-500">Manage vendor accounts and their access</p>
+                        <h2 class="text-lg font-semibold text-slate-900">Drivers</h2>
+                        <p class="mt-0.5 text-sm text-slate-500">Manage driver accounts and assignments</p>
                     </div>
                 </div>
-                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="meta.total + ' Total Vendors'">
+                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="meta.total + ' Total Drivers'">
                 </span>
             </div>
         </div>
@@ -38,7 +39,7 @@
                             type="text"
                             x-model="search"
                             @@input.debounce.500ms="loadData()"
-                            placeholder="Search vendors..."
+                            placeholder="Search drivers..."
                             class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400 transition-colors"
                         >
                         <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -189,7 +190,7 @@
                         </div>
                     </div>
 
-                    @if(Auth::guard('admin')->user()->hasPermission('vendors.create'))
+                    @if(Auth::guard('admin')->user()->hasPermission('drivers.create'))
                     <button
                         type="button"
                         @@click="openAddModal()"
@@ -198,7 +199,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
-                        Add Vendor
+                        Add Driver
                     </button>
                     @endif
                 </div>
@@ -224,15 +225,6 @@
                                 </svg>
                             </div>
                         </th>
-                        <th x-show="visibleColumns.business_name" @@click="sort('business_name')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                            <div class="flex items-center">
-                                BUSINESS NAME
-                                <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'business_name' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
-                                </svg>
-                            </div>
-                        </th>
                         <th x-show="visibleColumns.email" @@click="sort('email')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                             <div class="flex items-center">
                                 EMAIL
@@ -251,11 +243,17 @@
                                 </svg>
                             </div>
                         </th>
+                        <th x-show="visibleColumns.vehicle_type" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            VEHICLE TYPE
+                        </th>
                         <th x-show="visibleColumns.status" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             STATUS
                         </th>
-                        <th x-show="visibleColumns.shipments" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            SHIPMENTS
+                        <th x-show="visibleColumns.is_active" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            ACTIVE
+                        </th>
+                        <th x-show="visibleColumns.assignments" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            ASSIGNMENTS
                         </th>
                         <th x-show="visibleColumns.created_at" @@click="sort('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                             <div class="flex items-center">
@@ -272,36 +270,47 @@
                     </tr>
                 </thead>
                 <tbody class="bg-transparent divide-y divide-slate-100/50">
-                    <template x-if="vendors.length === 0 && !loading">
+                    <template x-if="drivers.length === 0 && !loading">
                         <tr>
                             <td :colspan="visibleColumnCount()" class="px-4 py-8 text-center text-gray-500 text-xs">
-                                No vendors found
+                                No drivers found
                             </td>
                         </tr>
                     </template>
 
-                    <template x-for="vendor in vendors" :key="vendor.id">
+                    <template x-for="driver in drivers" :key="driver.id">
                         <tr class="hover:bg-slate-50/70">
-                            <td x-show="visibleColumns.name" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="vendor.name"></td>
-                            <td x-show="visibleColumns.business_name" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="vendor.business_name || '-'"></td>
-                            <td x-show="visibleColumns.email" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="vendor.email"></td>
-                            <td x-show="visibleColumns.phone" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="vendor.phone"></td>
+                            <td x-show="visibleColumns.name" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="driver.name"></td>
+                            <td x-show="visibleColumns.email" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="driver.email"></td>
+                            <td x-show="visibleColumns.phone" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="driver.phone"></td>
+                            <td x-show="visibleColumns.vehicle_type" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="driver.vehicle_type || '-'"></td>
                             <td x-show="visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap text-xs">
                                 <span
                                     class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                    :class="vendor.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
-                                    x-text="vendor.is_active ? 'Active' : 'Inactive'"
+                                    :class="{
+                                        'bg-emerald-100 text-emerald-700': driver.status === 'available',
+                                        'bg-amber-100 text-amber-700': driver.status === 'busy',
+                                        'bg-slate-100 text-slate-600': driver.status === 'offline'
+                                    }"
+                                    x-text="driver.status ? driver.status.charAt(0).toUpperCase() + driver.status.slice(1) : 'Offline'"
                                 ></span>
                             </td>
-                            <td x-show="visibleColumns.shipments" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 text-center" x-text="vendor.shipments_count"></td>
-                            <td x-show="visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(vendor.created_at)"></td>
+                            <td x-show="visibleColumns.is_active" class="px-4 py-2.5 whitespace-nowrap text-xs">
+                                <span
+                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                    :class="driver.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+                                    x-text="driver.is_active ? 'Active' : 'Inactive'"
+                                ></span>
+                            </td>
+                            <td x-show="visibleColumns.assignments" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 text-center" x-text="driver.assignments_count"></td>
+                            <td x-show="visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(driver.created_at)"></td>
                             <td x-show="visibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center text-xs font-medium">
                                 <div class="inline-flex items-center gap-1">
                                     <!-- View Button -->
                                     <a
-                                        :href="'{{ route('admin.vendors.index') }}/' + vendor.id"
+                                        :href="'{{ route('admin.drivers.index') }}/' + driver.id"
                                         class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                        title="View vendor">
+                                        title="View driver">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -309,11 +318,11 @@
                                     </a>
 
                                     <!-- Edit Button -->
-                                    <template x-if="vendor.can_manage">
+                                    <template x-if="driver.can_manage">
                                         <button
-                                            @@click="openEditModal(vendor)"
+                                            @@click="openEditModal(driver)"
                                             class="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                                            title="Edit vendor">
+                                            title="Edit driver">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                             </svg>
@@ -321,12 +330,12 @@
                                     </template>
 
                                     <!-- Toggle Status Button -->
-                                    <template x-if="vendor.can_manage">
+                                    <template x-if="driver.can_manage">
                                         <button
-                                            @@click="toggleVendorStatus(vendor)"
+                                            @@click="toggleDriverStatus(driver)"
                                             class="p-1.5 rounded-lg transition-colors"
-                                            :class="vendor.is_active ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-teal-600 hover:bg-teal-50'"
-                                            :title="vendor.is_active ? 'Deactivate vendor' : 'Activate vendor'">
+                                            :class="driver.is_active ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-teal-600 hover:bg-teal-50'"
+                                            :title="driver.is_active ? 'Deactivate driver' : 'Activate driver'">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
                                             </svg>
@@ -334,11 +343,11 @@
                                     </template>
 
                                     <!-- Delete Button -->
-                                    <template x-if="vendor.can_manage">
+                                    <template x-if="driver.can_manage">
                                         <button
-                                            @@click="openDeleteModal(vendor)"
+                                            @@click="openDeleteModal(driver)"
                                             class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                            title="Delete vendor">
+                                            title="Delete driver">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                             </svg>
@@ -491,13 +500,14 @@
                             <!-- Icon Badge -->
                             <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center shadow-lg shadow-slate-900/20">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                                 </svg>
                             </div>
                             <!-- Title & Description -->
                             <div>
-                                <h3 class="text-xl font-bold text-slate-900" x-text="modalMode === 'add' ? 'Add New Vendor' : (modalMode === 'edit' ? 'Edit Vendor' : 'View Vendor')"></h3>
-                                <p class="text-sm text-slate-500 mt-1" x-text="modalMode === 'add' ? 'Create a new vendor account with contact details' : (modalMode === 'edit' ? 'Update vendor information and settings' : 'View vendor account details')"></p>
+                                <h3 class="text-xl font-bold text-slate-900" x-text="modalMode === 'add' ? 'Add New Driver' : (modalMode === 'edit' ? 'Edit Driver' : 'View Driver')"></h3>
+                                <p class="text-sm text-slate-500 mt-1" x-text="modalMode === 'add' ? 'Create a new driver account with contact details' : (modalMode === 'edit' ? 'Update driver information and settings' : 'View driver account details')"></p>
                             </div>
                         </div>
                         <!-- Close Button -->
@@ -510,12 +520,12 @@
                 </div>
 
                 <!-- Body -->
-                <form @submit.prevent="saveVendor()">
+                <form @submit.prevent="saveDriver()">
                     <div class="space-y-5 px-6 py-6 max-h-[calc(100vh-240px)] overflow-y-auto">
                             <!-- Name -->
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                    Vendor Name <span class="text-rose-500">*</span>
+                                    Driver Name <span class="text-rose-500">*</span>
                                 </label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -542,41 +552,12 @@
                                 </template>
                             </div>
 
-                            <!-- Business Name -->
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                    Business Name <span class="text-slate-400 text-xs font-normal">(Optional)</span>
-                                </label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                                        </svg>
-                                    </div>
-                                    <input
-                                        type="text"
-                                        x-model="form.business_name"
-                                        :disabled="modalMode === 'view'"
-                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
-                                        placeholder="Acme Corporation"
-                                    >
-                                </div>
-                                <template x-if="errors.business_name">
-                                    <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
-                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                                        </svg>
-                                        <span x-text="errors.business_name[0]"></span>
-                                    </p>
-                                </template>
-                            </div>
-
                             <!-- Email & Phone Grid -->
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <!-- Email -->
                                 <div>
                                     <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                        Email <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                        Email <span class="text-rose-500">*</span>
                                     </label>
                                     <div class="relative">
                                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -589,7 +570,8 @@
                                             x-model="form.email"
                                             :disabled="modalMode === 'view'"
                                             class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
-                                            placeholder="vendor@example.com"
+                                            placeholder="driver@example.com"
+                                            required
                                         >
                                     </div>
                                     <template x-if="errors.email">
@@ -634,7 +616,114 @@
                                 </div>
                             </div>
 
-                                            <!-- Status Toggle -->
+                            <!-- Password -->
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                    Password <span x-show="modalMode === 'add'" class="text-rose-500">*</span>
+                                    <span x-show="modalMode === 'edit'" class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                        </svg>
+                                    </div>
+                                    <input
+                                        type="password"
+                                        x-model="form.password"
+                                        :disabled="modalMode === 'view'"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                        :placeholder="modalMode === 'edit' ? 'Leave blank to keep current' : 'Enter password'"
+                                        :required="modalMode === 'add'"
+                                    >
+                                </div>
+                                <template x-if="errors.password">
+                                    <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                        </svg>
+                                        <span x-text="errors.password[0]"></span>
+                                    </p>
+                                </template>
+                            </div>
+
+                            <!-- Vehicle Info Grid -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <!-- Vehicle Type -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                        Vehicle Type <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                    </label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h8m-8 5h4m4.5 2H18l-2-7H8L6 14h.5m11 0a2.5 2.5 0 11-5 0m5 0a2.5 2.5 0 10-5 0m-4.5 0H6m0 0a2.5 2.5 0 11-5 0m5 0a2.5 2.5 0 10-5 0"/>
+                                            </svg>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            x-model="form.vehicle_type"
+                                            :disabled="modalMode === 'view'"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                            placeholder="Motorcycle"
+                                        >
+                                    </div>
+                                    <template x-if="errors.vehicle_type">
+                                        <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                            </svg>
+                                            <span x-text="errors.vehicle_type[0]"></span>
+                                        </p>
+                                    </template>
+                                </div>
+
+                                <!-- Vehicle Number -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                        Vehicle Number <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        x-model="form.vehicle_number"
+                                        :disabled="modalMode === 'view'"
+                                        class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                        placeholder="GR-1234-21"
+                                    >
+                                    <template x-if="errors.vehicle_number">
+                                        <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                            </svg>
+                                            <span x-text="errors.vehicle_number[0]"></span>
+                                        </p>
+                                    </template>
+                                </div>
+
+                                <!-- License Number -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                        License Number <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        x-model="form.license_number"
+                                        :disabled="modalMode === 'view'"
+                                        class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                        placeholder="DL-123456"
+                                    >
+                                    <template x-if="errors.license_number">
+                                        <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                            </svg>
+                                            <span x-text="errors.license_number[0]"></span>
+                                        </p>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Status Toggle -->
                             <div x-show="modalMode !== 'view'" class="bg-slate-50/50 rounded-2xl p-5 border border-slate-200">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-3">
@@ -645,7 +734,7 @@
                                         </div>
                                         <div>
                                             <h4 class="text-sm font-bold text-slate-800">Account Status</h4>
-                                            <p class="text-xs text-slate-500" x-text="form.is_active ? 'Vendor can access portal' : 'Vendor access disabled'"></p>
+                                            <p class="text-xs text-slate-500" x-text="form.is_active ? 'Driver can accept assignments' : 'Driver access disabled'"></p>
                                         </div>
                                     </div>
                                     <button
@@ -710,7 +799,7 @@
                                     <svg x-show="!saving" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                     </svg>
-                                    <span x-text="saving ? 'Saving...' : (modalMode === 'add' ? 'Create Vendor' : 'Save Changes')"></span>
+                                    <span x-text="saving ? 'Saving...' : (modalMode === 'add' ? 'Create Driver' : 'Save Changes')"></span>
                                 </button>
                             </div>
                         </div>
@@ -722,13 +811,13 @@
 
     <!-- Delete Confirmation Modal -->
     <div
-        x-show="$store.vendorsDelete.show"
+        x-show="$store.driversDelete.show"
         x-cloak
         class="fixed inset-0 z-[110] overflow-y-auto"
-        @keydown.escape.window="$store.vendorsDelete.show = false"
+        @keydown.escape.window="$store.driversDelete.show = false"
     >
         <!-- Backdrop -->
-        <div x-show="$store.vendorsDelete.show"
+        <div x-show="$store.driversDelete.show"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
@@ -736,12 +825,12 @@
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
              class="fixed inset-0 bg-slate-600/60 backdrop-blur-[2px]"
-             @click="$store.vendorsDelete.show = false"></div>
+             @click="$store.driversDelete.show = false"></div>
 
         <!-- Modal Content -->
         <div class="flex min-h-full items-center justify-center p-4">
             <div
-                x-show="$store.vendorsDelete.show"
+                x-show="$store.driversDelete.show"
                 x-transition:enter="transition ease-out duration-200"
                 x-transition:enter-start="opacity-0 scale-95"
                 x-transition:enter-end="opacity-100 scale-100"
@@ -759,10 +848,10 @@
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-slate-900">Delete Vendor</h3>
+                            <h3 class="text-lg font-semibold text-slate-900">Delete Driver</h3>
                             <p class="mt-1.5 text-sm text-slate-500 leading-relaxed">
                                 Are you sure you want to delete
-                                <span class="font-semibold text-slate-800" x-text="$store.vendorsDelete.vendor?.name"></span>?
+                                <span class="font-semibold text-slate-800" x-text="$store.driversDelete.driver?.name"></span>?
                                 This action cannot be undone.
                             </p>
                         </div>
@@ -772,19 +861,19 @@
                 <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-5">
                     <button
                         type="button"
-                        @click="$store.vendorsDelete.show = false"
+                        @click="$store.driversDelete.show = false"
                         class="text-sm font-medium text-slate-600 hover:text-slate-800"
                     >
                         Cancel
                     </button>
                     <button
                         type="button"
-                        @click="$store.vendorsDelete.onConfirm && $store.vendorsDelete.onConfirm()"
-                        :disabled="$store.vendorsDelete.deleting"
+                        @click="$store.driversDelete.onConfirm && $store.driversDelete.onConfirm()"
+                        :disabled="$store.driversDelete.deleting"
                         class="inline-flex items-center justify-center px-6 py-2.5 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-full shadow-lg shadow-rose-600/25 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <span x-show="$store.vendorsDelete.deleting">Deleting...</span>
-                        <span x-show="!$store.vendorsDelete.deleting">Delete</span>
+                        <span x-show="$store.driversDelete.deleting">Deleting...</span>
+                        <span x-show="!$store.driversDelete.deleting">Delete</span>
                     </button>
                 </div>
             </div>

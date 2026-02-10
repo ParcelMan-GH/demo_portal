@@ -964,6 +964,16 @@
                             <div id="group-shipment-items">
                                 <!-- Endpoints will be populated by JS -->
                             </div>
+
+                            <!-- Invoices Group -->
+                            <div class="group-header nested" onclick="toggleGroup('invoices')">
+                                <span class="folder-chevron open" id="chevron-invoices">▶</span>
+                                <span>Invoices</span>
+                            </div>
+
+                            <div id="group-invoices">
+                                <!-- Endpoints will be populated by JS -->
+                            </div>
                         </div>
 
                         <!-- Driver Folder -->
@@ -990,6 +1000,16 @@
                             </div>
 
                             <div id="group-driver-profile">
+                                <!-- Endpoints will be populated by JS -->
+                            </div>
+
+                            <!-- Driver Assignments Group -->
+                            <div class="group-header nested" onclick="toggleGroup('driver-assignments')">
+                                <span class="folder-chevron open" id="chevron-driver-assignments">▶</span>
+                                <span>Assignments</span>
+                            </div>
+
+                            <div id="group-driver-assignments">
                                 <!-- Endpoints will be populated by JS -->
                             </div>
                         </div>
@@ -1151,172 +1171,9 @@
         const endpoints = [
             {
                 method: 'POST',
-                url: '/api/v1/auth/vendor/register',
-                name: 'Register',
-                description: 'Register a new vendor account. OTP will be sent to verify the phone number.',
-                auth: false,
-                group: 'auth',
-                fields: [
-                    { name: 'name', type: 'string', required: true, description: 'Vendor\'s full name', example: 'John Doe' },
-                    { name: 'business_name', type: 'string', required: false, description: 'Business name (optional)', example: 'John\'s Delivery' },
-                    { name: 'phone', type: 'string', required: true, description: 'Ghana phone (0244xxx or +233244xxx)', example: '+233244123456' },
-                    { name: 'email', type: 'string', required: false, description: 'Email address (optional)', example: 'john@example.com' },
-                    { name: 'pin', type: 'string', required: true, description: 'Exactly 4 digits', example: '1234' },
-                    { name: 'confirm_pin', type: 'string', required: true, description: 'Must match pin', example: '1234' }
-                ],
-                sampleBody: {
-                    name: 'John Doe',
-                    business_name: 'John\'s Delivery',
-                    phone: '+233244123456',
-                    email: 'john@example.com',
-                    pin: '1234',
-                    confirm_pin: '1234'
-                },
-                exampleResponses: {
-                    '200': {
-                        success: true,
-                        message: 'OTP sent to verify your phone.',
-                        data: { expires_in: 300 }
-                    },
-                    '400': {
-                        success: false,
-                        message: 'This phone is already registered.'
-                    },
-                    '422': {
-                        success: false,
-                        message: 'The pin field must be exactly 4 digits.'
-                    }
-                }
-            },
-            {
-                method: 'POST',
-                url: '/api/v1/auth/vendor/verify-phone',
-                name: 'Verify Phone',
-                description: 'Verify phone number with OTP to complete registration.',
-                auth: false,
-                group: 'auth',
-                fields: [
-                    { name: 'phone', type: 'string', required: true, description: 'Ghana phone (0244xxx or +233244xxx)', example: '+233244123456' },
-                    { name: 'otp', type: 'string', required: true, description: 'Exactly 6 digits sent via SMS', example: '123456' }
-                ],
-                sampleBody: {
-                    phone: '+233244123456',
-                    otp: '123456'
-                },
-                exampleResponses: {
-                    '200': {
-                        success: true,
-                        message: 'Phone verified successfully.',
-                        data: {
-                            user: {
-                                id: 1,
-                                name: 'John Doe',
-                                business_name: 'John\'s Delivery',
-                                phone: '+233244123456',
-                                email: 'john@example.com',
-                                is_phone_verified: true,
-                                is_active: true
-                            },
-                            token: '1|abc123xyz...'
-                        }
-                    },
-                    '400': {
-                        success: false,
-                        message: 'Invalid or expired OTP.'
-                    },
-                    '400_already': {
-                        success: false,
-                        message: 'Phone is already verified.'
-                    }
-                }
-            },
-            {
-                method: 'POST',
-                url: '/api/v1/auth/vendor/resend-otp',
-                name: 'Resend OTP',
-                description: 'Resend OTP for phone verification or PIN reset. Has 60-second cooldown between requests.',
-                auth: false,
-                group: 'auth',
-                fields: [
-                    { name: 'phone', type: 'string', required: true, description: 'Ghana phone (0244xxx or +233244xxx)', example: '+233244123456' },
-                    { name: 'purpose', type: 'string', required: true, description: 'Either "registration" or "pin_reset"', example: 'registration' }
-                ],
-                sampleBody: {
-                    phone: '+233244123456',
-                    purpose: 'registration'
-                },
-                exampleResponses: {
-                    '200': {
-                        success: true,
-                        message: 'OTP sent successfully.',
-                        data: { expires_in: 300 }
-                    },
-                    '422_rate_limited': {
-                        success: false,
-                        message: 'Please wait before requesting another OTP.',
-                        data: { retry_after: 45 }
-                    },
-                    '422_not_found': {
-                        success: false,
-                        message: 'Phone number not found.'
-                    },
-                    '422_already_verified': {
-                        success: false,
-                        message: 'Phone is already verified.'
-                    }
-                }
-            },
-            {
-                method: 'POST',
-                url: '/api/v1/auth/vendor/login',
-                name: 'Login',
-                description: 'Login with phone number and 4-digit PIN.',
-                auth: false,
-                group: 'auth',
-                fields: [
-                    { name: 'phone', type: 'string', required: true, description: 'Ghana phone (0244xxx or +233244xxx)', example: '+233244123456' },
-                    { name: 'pin', type: 'string', required: true, description: 'Exactly 4 digits', example: '1234' }
-                ],
-                sampleBody: {
-                    phone: '+233244123456',
-                    pin: '1234'
-                },
-                exampleResponses: {
-                    '200': {
-                        success: true,
-                        message: 'Login successful.',
-                        data: {
-                            user: {
-                                id: 1,
-                                name: 'John Doe',
-                                business_name: 'John\'s Delivery',
-                                phone: '+233244123456',
-                                email: 'john@example.com',
-                                is_phone_verified: true,
-                                is_active: true
-                            },
-                            token: '2|def456uvw...'
-                        }
-                    },
-                    '400': {
-                        success: false,
-                        message: 'Invalid phone or PIN.'
-                    },
-                    '400_unverified': {
-                        success: false,
-                        message: 'Please verify your phone first.'
-                    },
-                    '400_inactive': {
-                        success: false,
-                        message: 'Your account has been deactivated.'
-                    }
-                }
-            },
-            {
-                method: 'POST',
-                url: '/api/v1/auth/vendor/forgot-pin',
-                name: 'Forgot PIN',
-                description: 'Request OTP to reset PIN. Same response is returned whether phone exists or not (security).',
+                url: '/api/v1/auth/vendor/send-otp',
+                name: 'Send OTP',
+                description: 'Send OTP to any valid Ghana phone number. Works for both login (existing vendors) and registration (new users). Has 60-second cooldown.',
                 auth: false,
                 group: 'auth',
                 fields: [
@@ -1328,58 +1185,101 @@
                 exampleResponses: {
                     '200': {
                         success: true,
-                        message: 'If this phone is registered, an OTP has been sent.',
+                        message: 'OTP sent successfully.',
                         data: { expires_in: 300 }
+                    },
+                    '200_rate_limited': {
+                        success: false,
+                        message: 'Please wait before requesting another OTP.',
+                        data: { retry_after: 45 }
                     }
                 }
             },
             {
                 method: 'POST',
-                url: '/api/v1/auth/vendor/reset-pin',
-                name: 'Reset PIN',
-                description: 'Reset PIN using OTP received via SMS.',
+                url: '/api/v1/auth/vendor/verify-phone',
+                name: 'Verify Phone',
+                description: 'Verify phone number with OTP. If vendor exists, returns user + token for login. If not, returns user_exists: false so client can redirect to registration.',
                 auth: false,
                 group: 'auth',
                 fields: [
                     { name: 'phone', type: 'string', required: true, description: 'Ghana phone (0244xxx or +233244xxx)', example: '+233244123456' },
-                    { name: 'otp', type: 'string', required: true, description: 'Exactly 6 digits sent via SMS', example: '123456' },
-                    { name: 'new_pin', type: 'string', required: true, description: 'New PIN (exactly 4 digits)', example: '5678' },
-                    { name: 'confirm_pin', type: 'string', required: true, description: 'Must match new_pin', example: '5678' }
+                    { name: 'otp', type: 'string', required: true, description: 'Exactly 6 digits sent via SMS', example: '123456' }
                 ],
                 sampleBody: {
                     phone: '+233244123456',
-                    otp: '123456',
-                    new_pin: '5678',
-                    confirm_pin: '5678'
+                    otp: '123456'
+                },
+                exampleResponses: {
+                    '200_existing': {
+                        success: true,
+                        message: 'Login successful.',
+                        data: {
+                            user_exists: true,
+                            user: {
+                                id: 1,
+                                name: 'John Doe',
+                                business_name: 'John\'s Delivery',
+                                phone: '+233244123456',
+                                email: 'john@example.com'
+                            },
+                            token: '1|abc123xyz...'
+                        }
+                    },
+                    '200_new': {
+                        success: true,
+                        message: 'Phone verified. Please complete registration.',
+                        data: {
+                            user_exists: false
+                        }
+                    },
+                    '422': {
+                        success: false,
+                        message: 'Invalid or expired OTP.'
+                    }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/auth/vendor/register',
+                name: 'Register',
+                description: 'Register a new vendor account. Requires a recently verified OTP (within 10 minutes). Call send-otp + verify-phone first.',
+                auth: false,
+                group: 'auth',
+                fields: [
+                    { name: 'name', type: 'string', required: true, description: 'Vendor\'s full name', example: 'John Doe' },
+                    { name: 'business_name', type: 'string', required: false, description: 'Business name (optional)', example: 'John\'s Delivery' },
+                    { name: 'phone', type: 'string', required: true, description: 'Ghana phone (0244xxx or +233244xxx)', example: '+233244123456' },
+                    { name: 'email', type: 'string', required: false, description: 'Email address (optional)', example: 'john@example.com' }
+                ],
+                sampleBody: {
+                    name: 'John Doe',
+                    business_name: 'John\'s Delivery',
+                    phone: '+233244123456',
+                    email: 'john@example.com'
                 },
                 exampleResponses: {
                     '200': {
                         success: true,
-                        message: 'PIN reset successful.',
+                        message: 'Registration successful.',
                         data: {
                             user: {
                                 id: 1,
                                 name: 'John Doe',
                                 business_name: 'John\'s Delivery',
                                 phone: '+233244123456',
-                                email: 'john@example.com',
-                                is_phone_verified: true,
-                                is_active: true
+                                email: 'john@example.com'
                             },
-                            token: '3|ghi789rst...'
+                            token: '2|def456uvw...'
                         }
                     },
-                    '400': {
+                    '422_exists': {
                         success: false,
-                        message: 'Invalid or expired OTP.'
+                        message: 'This phone is already registered.'
                     },
-                    '400_phone': {
+                    '422_expired': {
                         success: false,
-                        message: 'Invalid phone number.'
-                    },
-                    '422': {
-                        success: false,
-                        message: 'The new pin field must be exactly 4 digits.'
+                        message: 'Phone verification expired. Please verify your phone again.'
                     }
                 }
             },
@@ -1423,9 +1323,7 @@
                                 name: 'John Doe',
                                 business_name: 'John\'s Delivery',
                                 phone: '+233244123456',
-                                email: 'john@example.com',
-                                is_phone_verified: true,
-                                is_active: true
+                                email: 'john@example.com'
                             }
                         }
                     },
@@ -1462,9 +1360,7 @@
                                 name: 'John Updated',
                                 business_name: 'New Business Name',
                                 phone: '+233244123456',
-                                email: 'newemail@example.com',
-                                is_phone_verified: true,
-                                is_active: true
+                                email: 'newemail@example.com'
                             }
                         }
                     },
@@ -1475,75 +1371,6 @@
                     '422': {
                         success: false,
                         message: 'The name field is required.'
-                    }
-                }
-            },
-            {
-                method: 'POST',
-                url: '/api/v1/vendor/request-pin-change',
-                name: 'Request PIN Change',
-                description: 'Request OTP to change PIN. OTP will be sent to the vendor\'s registered phone number.',
-                auth: true,
-                group: 'profile',
-                fields: [],
-                sampleBody: {},
-                exampleResponses: {
-                    '200': {
-                        success: true,
-                        message: 'OTP sent to your phone.',
-                        data: { expires_in: 300 }
-                    },
-                    '401': {
-                        success: false,
-                        message: 'Unauthenticated.'
-                    }
-                }
-            },
-            {
-                method: 'PUT',
-                url: '/api/v1/vendor/change-pin',
-                name: 'Change PIN',
-                description: 'Change PIN with OTP verification. Request OTP first using "Request PIN Change" endpoint. All other sessions will be logged out.',
-                auth: true,
-                group: 'profile',
-                fields: [
-                    { name: 'otp', type: 'string', required: true, description: '6-digit OTP sent to phone', example: '123456' },
-                    { name: 'new_pin', type: 'string', required: true, description: 'New 4-digit PIN', example: '5678' },
-                    { name: 'confirm_pin', type: 'string', required: true, description: 'Must match new_pin', example: '5678' }
-                ],
-                sampleBody: {
-                    otp: '123456',
-                    new_pin: '5678',
-                    confirm_pin: '5678'
-                },
-                exampleResponses: {
-                    '200': {
-                        success: true,
-                        message: 'PIN changed successfully.',
-                        data: {
-                            user: {
-                                id: 1,
-                                name: 'John Doe',
-                                business_name: 'John\'s Delivery',
-                                phone: '+233244123456',
-                                email: 'john@example.com',
-                                is_phone_verified: true,
-                                is_active: true
-                            },
-                            token: '4|newtoken123...'
-                        }
-                    },
-                    '401': {
-                        success: false,
-                        message: 'Unauthenticated.'
-                    },
-                    '422_otp': {
-                        success: false,
-                        message: 'Invalid or expired OTP.'
-                    },
-                    '422_validation': {
-                        success: false,
-                        message: 'The new pin field must be exactly 4 digits.'
                     }
                 }
             },
@@ -2345,6 +2172,512 @@
                         data: null
                     }
                 }
+            },
+            // ============ VENDOR INVOICE ENDPOINTS ============
+            {
+                method: 'GET',
+                url: '/api/v1/vendor/invoices',
+                name: 'List Invoices',
+                description: 'Get paginated list of vendor\'s invoices with optional status filter.',
+                auth: true,
+                group: 'invoices',
+                userType: 'vendor',
+                fields: [
+                    { name: 'status', type: 'string', required: false, description: 'Filter by status (e.g. pending, accepted, rejected)', example: 'pending' },
+                    { name: 'per_page', type: 'number', required: false, description: 'Items per page (max 100)', example: '15' }
+                ],
+                sampleBody: null,
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Invoices retrieved successfully.',
+                        data: {
+                            invoices: [
+                                {
+                                    id: 1,
+                                    invoice_number: 'INV-2026-0001',
+                                    shipment_id: 5,
+                                    shipment_number: 'PCM-2026-00005',
+                                    amount: 150.00,
+                                    currency: 'GHS',
+                                    status: 'pending',
+                                    issued_at: '2026-01-28T09:00:00+00:00',
+                                    due_at: '2026-02-28T09:00:00+00:00',
+                                    vendor_notes: null,
+                                    created_at: '2026-01-28T09:00:00+00:00',
+                                    updated_at: '2026-01-28T09:00:00+00:00'
+                                },
+                                {
+                                    id: 2,
+                                    invoice_number: 'INV-2026-0002',
+                                    shipment_id: 8,
+                                    shipment_number: 'PCM-2026-00008',
+                                    amount: 320.50,
+                                    currency: 'GHS',
+                                    status: 'accepted',
+                                    issued_at: '2026-01-25T14:00:00+00:00',
+                                    due_at: '2026-02-25T14:00:00+00:00',
+                                    vendor_notes: 'Approved for payment.',
+                                    created_at: '2026-01-25T14:00:00+00:00',
+                                    updated_at: '2026-01-26T10:00:00+00:00'
+                                }
+                            ],
+                            pagination: {
+                                current_page: 1,
+                                per_page: 15,
+                                total: 2,
+                                last_page: 1
+                            }
+                        }
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    }
+                }
+            },
+            {
+                method: 'GET',
+                url: '/api/v1/vendor/invoices/{id}',
+                name: 'View Invoice',
+                description: 'Get detailed information about a specific invoice.',
+                auth: true,
+                group: 'invoices',
+                userType: 'vendor',
+                urlParams: [
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select an invoice', source: 'invoices', labelField: 'invoice_number', valueField: 'id' }
+                ],
+                fields: [],
+                sampleBody: null,
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Invoice retrieved successfully.',
+                        data: {
+                            invoice: {
+                                id: 1,
+                                invoice_number: 'INV-2026-0001',
+                                shipment_id: 5,
+                                shipment_number: 'PCM-2026-00005',
+                                amount: 150.00,
+                                currency: 'GHS',
+                                status: 'pending',
+                                issued_at: '2026-01-28T09:00:00+00:00',
+                                due_at: '2026-02-28T09:00:00+00:00',
+                                vendor_notes: null,
+                                rejection_reason: null,
+                                items: [
+                                    {
+                                        description: 'Delivery fee - Accra to Tema',
+                                        quantity: 1,
+                                        unit_price: 100.00,
+                                        total: 100.00
+                                    },
+                                    {
+                                        description: 'Insurance surcharge',
+                                        quantity: 1,
+                                        unit_price: 50.00,
+                                        total: 50.00
+                                    }
+                                ],
+                                created_at: '2026-01-28T09:00:00+00:00',
+                                updated_at: '2026-01-28T09:00:00+00:00'
+                            }
+                        }
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    },
+                    '404': {
+                        success: false,
+                        message: 'Invoice not found.'
+                    }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/vendor/invoices/{id}/accept',
+                name: 'Accept Invoice',
+                description: 'Accept an invoice. Optionally include vendor notes.',
+                auth: true,
+                group: 'invoices',
+                userType: 'vendor',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select a pending invoice', source: 'invoices?status=pending', labelField: 'invoice_number', valueField: 'id' }
+                ],
+                fields: [
+                    { name: 'vendor_notes', type: 'string', required: false, description: 'Optional notes from vendor', example: 'Approved for payment.' }
+                ],
+                sampleBody: {
+                    vendor_notes: 'Approved for payment.'
+                },
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Invoice accepted successfully.',
+                        data: {
+                            invoice: {
+                                id: 1,
+                                invoice_number: 'INV-2026-0001',
+                                status: 'accepted',
+                                vendor_notes: 'Approved for payment.',
+                                updated_at: '2026-01-29T10:00:00+00:00'
+                            }
+                        }
+                    },
+                    '400': {
+                        success: false,
+                        message: 'Invoice is not in a pending status.'
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    },
+                    '404': {
+                        success: false,
+                        message: 'Invoice not found.'
+                    }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/vendor/invoices/{id}/reject',
+                name: 'Reject Invoice',
+                description: 'Reject an invoice. A rejection reason is required.',
+                auth: true,
+                group: 'invoices',
+                userType: 'vendor',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select a pending invoice', source: 'invoices?status=pending', labelField: 'invoice_number', valueField: 'id' }
+                ],
+                fields: [
+                    { name: 'rejection_reason', type: 'string', required: true, description: 'Reason for rejecting the invoice', example: 'Incorrect delivery fee amount.' }
+                ],
+                sampleBody: {
+                    rejection_reason: 'Incorrect delivery fee amount.'
+                },
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Invoice rejected successfully.',
+                        data: {
+                            invoice: {
+                                id: 1,
+                                invoice_number: 'INV-2026-0001',
+                                status: 'rejected',
+                                rejection_reason: 'Incorrect delivery fee amount.',
+                                updated_at: '2026-01-29T10:00:00+00:00'
+                            }
+                        }
+                    },
+                    '400': {
+                        success: false,
+                        message: 'Invoice is not in a pending status.'
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    },
+                    '404': {
+                        success: false,
+                        message: 'Invoice not found.'
+                    },
+                    '422': {
+                        success: false,
+                        message: 'The rejection reason field is required.'
+                    }
+                }
+            },
+            // ============ DRIVER ASSIGNMENT ENDPOINTS ============
+            {
+                method: 'GET',
+                url: '/api/v1/driver/assignments',
+                name: 'List Assignments',
+                description: 'Get paginated list of driver\'s assignments with optional status filter.',
+                auth: true,
+                group: 'driver-assignments',
+                userType: 'driver',
+                fields: [
+                    { name: 'status', type: 'string', required: false, description: 'Filter by status (e.g. assigned, en_route, arrived, picked_up)', example: 'assigned' },
+                    { name: 'per_page', type: 'number', required: false, description: 'Items per page (max 100)', example: '15' }
+                ],
+                sampleBody: null,
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Assignments retrieved successfully.',
+                        data: {
+                            assignments: [
+                                {
+                                    id: 1,
+                                    shipment_id: 5,
+                                    shipment_number: 'PCM-2026-00005',
+                                    status: 'assigned',
+                                    pickup_address: '12 Independence Ave, Accra',
+                                    delivery_address: '45 Tema Station Rd, Tema',
+                                    scheduled_at: '2026-02-01T08:00:00+00:00',
+                                    started_at: null,
+                                    arrived_at: null,
+                                    picked_up_at: null,
+                                    created_at: '2026-01-30T12:00:00+00:00',
+                                    updated_at: '2026-01-30T12:00:00+00:00'
+                                },
+                                {
+                                    id: 2,
+                                    shipment_id: 8,
+                                    shipment_number: 'PCM-2026-00008',
+                                    status: 'en_route',
+                                    pickup_address: '8 Ring Road Central, Accra',
+                                    delivery_address: '22 Market St, Kumasi',
+                                    scheduled_at: '2026-02-01T10:00:00+00:00',
+                                    started_at: '2026-02-01T09:45:00+00:00',
+                                    arrived_at: null,
+                                    picked_up_at: null,
+                                    created_at: '2026-01-30T14:00:00+00:00',
+                                    updated_at: '2026-02-01T09:45:00+00:00'
+                                }
+                            ],
+                            pagination: {
+                                current_page: 1,
+                                per_page: 15,
+                                total: 2,
+                                last_page: 1
+                            }
+                        }
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    }
+                }
+            },
+            {
+                method: 'GET',
+                url: '/api/v1/driver/assignments/{id}',
+                name: 'View Assignment',
+                description: 'Get detailed information about a specific assignment.',
+                auth: true,
+                group: 'driver-assignments',
+                userType: 'driver',
+                urlParams: [
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select an assignment', source: 'assignments', labelField: 'shipment_number', valueField: 'id' }
+                ],
+                fields: [],
+                sampleBody: null,
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Assignment retrieved successfully.',
+                        data: {
+                            assignment: {
+                                id: 1,
+                                shipment_id: 5,
+                                shipment_number: 'PCM-2026-00005',
+                                status: 'assigned',
+                                pickup_address: '12 Independence Ave, Accra',
+                                delivery_address: '45 Tema Station Rd, Tema',
+                                pickup_contact: {
+                                    name: 'Kwame Asante',
+                                    phone: '+233244123456'
+                                },
+                                delivery_contact: {
+                                    name: 'Ama Mensah',
+                                    phone: '+233244654321'
+                                },
+                                items: [
+                                    {
+                                        id: 1,
+                                        description: 'Fridge - Samsung 250L',
+                                        quantity: 1,
+                                        tracking_code: 'TRK8A3F2K9X'
+                                    }
+                                ],
+                                scheduled_at: '2026-02-01T08:00:00+00:00',
+                                started_at: null,
+                                arrived_at: null,
+                                picked_up_at: null,
+                                notes: null,
+                                created_at: '2026-01-30T12:00:00+00:00',
+                                updated_at: '2026-01-30T12:00:00+00:00'
+                            }
+                        }
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    },
+                    '404': {
+                        success: false,
+                        message: 'Assignment not found.'
+                    }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/assignments/{id}/en-route',
+                name: 'Start En Route',
+                description: 'Mark assignment as en route. Indicates the driver has started heading to the pickup location.',
+                auth: true,
+                group: 'driver-assignments',
+                userType: 'driver',
+                urlParams: [
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select an assigned assignment', source: 'assignments?status=assigned', labelField: 'shipment_number', valueField: 'id' }
+                ],
+                fields: [],
+                sampleBody: null,
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Assignment status updated to en route.',
+                        data: {
+                            assignment: {
+                                id: 1,
+                                shipment_number: 'PCM-2026-00005',
+                                status: 'en_route',
+                                started_at: '2026-02-01T07:45:00+00:00',
+                                updated_at: '2026-02-01T07:45:00+00:00'
+                            }
+                        }
+                    },
+                    '400': {
+                        success: false,
+                        message: 'Assignment is not in assigned status.'
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    },
+                    '404': {
+                        success: false,
+                        message: 'Assignment not found.'
+                    }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/assignments/{id}/arrive',
+                name: 'Arrive',
+                description: 'Mark that the driver has arrived at the pickup location. Requires current GPS coordinates.',
+                auth: true,
+                group: 'driver-assignments',
+                userType: 'driver',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select an en-route assignment', source: 'assignments?status=en_route', labelField: 'shipment_number', valueField: 'id' }
+                ],
+                fields: [
+                    { name: 'latitude', type: 'string', required: true, description: 'Current GPS latitude', example: '5.6037' },
+                    { name: 'longitude', type: 'string', required: true, description: 'Current GPS longitude', example: '-0.1870' }
+                ],
+                sampleBody: {
+                    latitude: '5.6037',
+                    longitude: '-0.1870'
+                },
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Arrival confirmed at pickup location.',
+                        data: {
+                            assignment: {
+                                id: 1,
+                                shipment_number: 'PCM-2026-00005',
+                                status: 'arrived',
+                                arrived_at: '2026-02-01T08:05:00+00:00',
+                                arrival_latitude: 5.6037,
+                                arrival_longitude: -0.1870,
+                                updated_at: '2026-02-01T08:05:00+00:00'
+                            }
+                        }
+                    },
+                    '400': {
+                        success: false,
+                        message: 'Assignment is not in en_route status.'
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    },
+                    '404': {
+                        success: false,
+                        message: 'Assignment not found.'
+                    },
+                    '422': {
+                        success: false,
+                        message: 'The latitude field is required.'
+                    }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/assignments/{id}/confirm-pickup',
+                name: 'Confirm Pickup',
+                description: 'Confirm that items have been picked up. Requires photos of the items, GPS coordinates, and optional notes.',
+                auth: true,
+                group: 'driver-assignments',
+                userType: 'driver',
+                bodyType: 'formdata',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select an arrived assignment', source: 'assignments?status=arrived', labelField: 'shipment_number', valueField: 'id' }
+                ],
+                fields: [
+                    { name: 'photos[]', type: 'file', required: true, description: 'Photos of picked up items (JPEG/PNG/WebP, max 5MB each)', example: '', multiple: true },
+                    { name: 'latitude', type: 'string', required: true, description: 'Current GPS latitude', example: '5.6037' },
+                    { name: 'longitude', type: 'string', required: true, description: 'Current GPS longitude', example: '-0.1870' },
+                    { name: 'notes', type: 'string', required: false, description: 'Optional pickup notes', example: 'All items in good condition.' }
+                ],
+                sampleBody: null,
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Pickup confirmed successfully.',
+                        data: {
+                            assignment: {
+                                id: 1,
+                                shipment_number: 'PCM-2026-00005',
+                                status: 'picked_up',
+                                picked_up_at: '2026-02-01T08:15:00+00:00',
+                                pickup_latitude: 5.6037,
+                                pickup_longitude: -0.1870,
+                                notes: 'All items in good condition.',
+                                photos: [
+                                    {
+                                        id: 1,
+                                        url: 'https://gateway.storjshare.io/shaxi/demo/assignments/1/pickup_1706860500_abc123.jpg?X-Amz-Signature=...',
+                                        original_name: 'item-photo-1.jpg',
+                                        size: 198400
+                                    },
+                                    {
+                                        id: 2,
+                                        url: 'https://gateway.storjshare.io/shaxi/demo/assignments/1/pickup_1706860501_def456.jpg?X-Amz-Signature=...',
+                                        original_name: 'item-photo-2.jpg',
+                                        size: 215300
+                                    }
+                                ],
+                                updated_at: '2026-02-01T08:15:00+00:00'
+                            }
+                        }
+                    },
+                    '400': {
+                        success: false,
+                        message: 'Assignment is not in arrived status.'
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    },
+                    '404': {
+                        success: false,
+                        message: 'Assignment not found.'
+                    },
+                    '422': {
+                        success: false,
+                        message: 'The photos field is required.'
+                    }
+                }
             }
         ];
 
@@ -2369,6 +2702,8 @@
             const shipmentItemsContainer = document.getElementById('group-shipment-items');
             const driverAuthContainer = document.getElementById('group-driver-auth');
             const driverProfileContainer = document.getElementById('group-driver-profile');
+            const invoicesContainer = document.getElementById('group-invoices');
+            const driverAssignmentsContainer = document.getElementById('group-driver-assignments');
             authContainer.innerHTML = '';
             profileContainer.innerHTML = '';
             locationContainer.innerHTML = '';
@@ -2376,6 +2711,8 @@
             shipmentItemsContainer.innerHTML = '';
             driverAuthContainer.innerHTML = '';
             driverProfileContainer.innerHTML = '';
+            invoicesContainer.innerHTML = '';
+            driverAssignmentsContainer.innerHTML = '';
 
             endpoints.forEach((ep, index) => {
                 const div = document.createElement('div');
@@ -2402,6 +2739,10 @@
                     driverAuthContainer.appendChild(div);
                 } else if (ep.group === 'driver-profile') {
                     driverProfileContainer.appendChild(div);
+                } else if (ep.group === 'invoices') {
+                    invoicesContainer.appendChild(div);
+                } else if (ep.group === 'driver-assignments') {
+                    driverAssignmentsContainer.appendChild(div);
                 } else {
                     authContainer.appendChild(div);
                 }
@@ -2481,11 +2822,17 @@
             } else if (selectedEndpoint.group === 'shipment-items') {
                 groupName = 'Shipment Items';
                 folderName = 'Vendor';
+            } else if (selectedEndpoint.group === 'invoices') {
+                groupName = 'Invoices';
+                folderName = 'Vendor';
             } else if (selectedEndpoint.group === 'driver-auth') {
                 groupName = 'Auth';
                 folderName = 'Driver';
             } else if (selectedEndpoint.group === 'driver-profile') {
                 groupName = 'Profile';
+                folderName = 'Driver';
+            } else if (selectedEndpoint.group === 'driver-assignments') {
+                groupName = 'Assignments';
                 folderName = 'Driver';
             }
             document.getElementById('breadcrumbGroup').textContent = folderName + ' / ' + groupName;

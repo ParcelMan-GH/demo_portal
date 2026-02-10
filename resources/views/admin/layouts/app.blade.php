@@ -77,7 +77,7 @@
                 @endhasPermission
 
                 @hasPermission('shipments.view')
-                <a href="{{ route('admin.dashboard') }}"
+                <a href="{{ route('admin.shipments.index') }}"
                    class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.shipments.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
@@ -93,7 +93,7 @@
                 @endhasPermission
 
                 @hasPermission('drivers.view')
-                <a href="{{ route('admin.dashboard') }}"
+                <a href="{{ route('admin.drivers.index') }}"
                    class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.drivers.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
@@ -133,8 +133,8 @@
                     </div>
                 </div>
 
-                @hasPermission('settings.view')
-                <a href="{{ route('admin.dashboard') }}"
+                @hasPermission('warehouses.view')
+                <a href="{{ route('admin.warehouses.index') }}"
                    class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.warehouses.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">

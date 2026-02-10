@@ -25,17 +25,6 @@ class RegisterRequest extends FormRequest
                 }
             }],
             'email' => ['nullable', 'email', 'max:255'],
-            'pin' => ['required', 'string', 'size:4', 'regex:/^\d{4}$/'],
-            'confirm_pin' => ['required', 'same:pin'],
-        ];
-    }
-
-    public function messages(): array
-    {
-        return [
-            'pin.size' => 'PIN must be exactly 4 digits.',
-            'pin.regex' => 'PIN must contain only digits.',
-            'confirm_pin.same' => 'PIN confirmation does not match.',
         ];
     }
 

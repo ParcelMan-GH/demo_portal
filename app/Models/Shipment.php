@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Shipment extends Model
@@ -134,6 +135,46 @@ class Shipment extends Model
     public function items(): HasMany
     {
         return $this->hasMany(ShipmentItem::class);
+    }
+
+    /**
+     * Get the invoice for this shipment.
+     */
+    public function invoice(): HasOne
+    {
+        return $this->hasOne(Invoice::class);
+    }
+
+    /**
+     * Get the latest pickup assignment for this shipment.
+     */
+    public function pickupAssignment(): HasOne
+    {
+        return $this->hasOne(PickupAssignment::class)->latestOfMany();
+    }
+
+    /**
+     * Get all pickup assignments for this shipment.
+     */
+    public function pickupAssignments(): HasMany
+    {
+        return $this->hasMany(PickupAssignment::class);
+    }
+
+    /**
+     * Check if shipment can be invoiced.
+     */
+    public function canBeInvoiced(): bool
+    {
+        return $this->status === ShipmentStatus::SUBMITTED;
+    }
+
+    /**
+     * Check if shipment can have a driver assigned.
+     */
+    public function canBeAssigned(): bool
+    {
+        return $this->status === ShipmentStatus::INVOICE_ACCEPTED;
     }
 
     /**

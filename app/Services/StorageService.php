@@ -140,7 +140,7 @@ class StorageService
             return $this->getSignedUrl($path);
         }
 
-        return $this->getDisk()->url($path);
+        return url($this->getDisk()->url($path));
     }
 
     /**
