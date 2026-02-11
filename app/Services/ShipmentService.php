@@ -114,6 +114,7 @@ class ShipmentService
 
         $rows = $this->transformShipments($shipments, [
             'include_pickup_details' => $includePickupDetails,
+            'include_legacy_delivery_aliases' => false,
         ]);
         $count = count($rows);
         $hasMore = ($offset + $count) < $total;
@@ -412,6 +413,7 @@ class ShipmentService
     private function transformShipment(Shipment $shipment, array $options = []): array
     {
         $includePickupDetails = (bool) ($options['include_pickup_details'] ?? false);
+        $includeLegacyDeliveryAliases = (bool) ($options['include_legacy_delivery_aliases'] ?? false);
         $pickupAssignment = $shipment->relationLoaded('pickupAssignment')
             ? $shipment->pickupAssignment
             : null;
@@ -483,18 +485,24 @@ class ShipmentService
             $invoiceHistory = [$this->transformInvoiceForApi($shipment->invoice, $shipment)];
         }
 
-        return [
+        $payload = [
             'id' => $shipment->id,
             'shipment_number' => $shipment->shipment_number,
             'status' => $shipment->status->value,
             'destination_mode' => $shipment->destination_mode->value,
+        ];
 
-            // Compatibility fields used by some admin/API tester views.
-            'recipient_name' => $shipment->recipient_name,
-            'recipient_phone' => $shipment->recipient_phone,
-            'location' => $shipment->formatted_location,
-            'delivery_instructions' => $shipment->delivery_instructions,
+        if ($includeLegacyDeliveryAliases) {
+            // Legacy compatibility aliases for older consumers.
+            $payload = array_merge($payload, [
+                'recipient_name' => $shipment->recipient_name,
+                'recipient_phone' => $shipment->recipient_phone,
+                'location' => $shipment->formatted_location,
+                'delivery_instructions' => $shipment->delivery_instructions,
+            ]);
+        }
 
+        return array_merge($payload, [
             'pickup' => [
                 'contact_name' => $shipment->pickup_contact_name,
                 'contact_phone' => $shipment->pickup_contact_phone,
@@ -546,7 +554,7 @@ class ShipmentService
             ], $includePickupDetails ? [
                 'include_details' => true,
             ] : []) : null,
-        ];
+        ]);
     }
 
     private function transformShipments(iterable $shipments, array $options = []): array
