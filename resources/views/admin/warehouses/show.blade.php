@@ -5,6 +5,9 @@
 @section('breadcrumb-current', $warehouse->name)
 
 @php
+$warehouseTypeValue = $warehouse->type?->value;
+$warehouseTypeLabel = $warehouse->type?->label() ?? 'Unknown';
+
 $warehouseConfig = [
     'warehouse' => $warehouse,
     'updateEndpoint' => route('admin.warehouses.update', $warehouse),
@@ -112,13 +115,13 @@ $warehouseConfig = [
                                     {{ $warehouse->is_active ? 'Active' : 'Inactive' }}
                                 </span>
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold
-                                    @if($warehouse->type === 'origin') bg-blue-500/20 text-blue-300
-                                    @elseif($warehouse->type === 'destination') bg-violet-500/20 text-violet-300
-                                    @elseif($warehouse->type === 'both') bg-emerald-500/20 text-emerald-300
+                                    @if($warehouseTypeValue === 'origin') bg-blue-500/20 text-blue-300
+                                    @elseif($warehouseTypeValue === 'destination') bg-violet-500/20 text-violet-300
+                                    @elseif($warehouseTypeValue === 'both') bg-emerald-500/20 text-emerald-300
                                     @else bg-slate-500/20 text-slate-300
                                     @endif
                                 ">
-                                    {{ ucfirst($warehouse->type ?? 'Unknown') }}
+                                    {{ $warehouseTypeLabel }}
                                 </span>
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-500/20 text-slate-300">
                                     {{ $warehouse->created_at->format('M d, Y') }}
@@ -179,7 +182,7 @@ $warehouseConfig = [
                                     </svg>
                                 </div>
                                 <div>
-                                    <p class="text-lg font-bold text-violet-400 leading-none">{{ ucfirst($warehouse->type ?? 'N/A') }}</p>
+                                    <p class="text-lg font-bold text-violet-400 leading-none">{{ $warehouseTypeLabel }}</p>
                                     <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Type</p>
                                 </div>
                             </div>
@@ -250,13 +253,13 @@ $warehouseConfig = [
                 <div class="space-y-1">
                     <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Type</p>
                     <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold
-                        @if($warehouse->type === 'origin') bg-blue-100 text-blue-700
-                        @elseif($warehouse->type === 'destination') bg-violet-100 text-violet-700
-                        @elseif($warehouse->type === 'both') bg-emerald-100 text-emerald-700
+                        @if($warehouseTypeValue === 'origin') bg-blue-100 text-blue-700
+                        @elseif($warehouseTypeValue === 'destination') bg-violet-100 text-violet-700
+                        @elseif($warehouseTypeValue === 'both') bg-emerald-100 text-emerald-700
                         @else bg-slate-100 text-slate-700
                         @endif
                     ">
-                        {{ ucfirst($warehouse->type ?? 'Unknown') }}
+                        {{ $warehouseTypeLabel }}
                     </span>
                 </div>
 

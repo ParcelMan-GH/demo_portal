@@ -28,8 +28,9 @@ function buildShipmentsTable(config) {
         columns: [
             { key: 'shipment_number', label: 'Shipment #' },
             { key: 'vendor', label: 'Vendor' },
-            { key: 'recipient', label: 'Recipient' },
-            { key: 'location', label: 'Location' },
+            { key: 'destination_mode', label: 'Destination Mode' },
+            { key: 'destination', label: 'Destination' },
+            { key: 'location', label: 'Delivery Location' },
             { key: 'items', label: 'Items' },
             { key: 'status', label: 'Status' },
             { key: 'submitted_at', label: 'Submitted At' },
@@ -38,7 +39,8 @@ function buildShipmentsTable(config) {
         visibleColumns: {
             shipment_number: true,
             vendor: true,
-            recipient: true,
+            destination_mode: true,
+            destination: true,
             location: true,
             items: true,
             status: true,

@@ -75,7 +75,24 @@ class ShipmentItemImage extends Model
             'url' => $url,
             'original_name' => $this->original_name,
             'size' => $this->size,
+            'size_human' => $this->formatSize((int) $this->size),
             'expires_at' => $expiresAt,
         ];
+    }
+
+    /**
+     * Convert bytes to a human-readable size string.
+     */
+    private function formatSize(int $bytes): string
+    {
+        if ($bytes <= 0) {
+            return '0 B';
+        }
+
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $power = min((int) floor(log($bytes, 1024)), count($units) - 1);
+        $value = $bytes / (1024 ** $power);
+
+        return number_format($value, 2).' '.$units[$power];
     }
 }

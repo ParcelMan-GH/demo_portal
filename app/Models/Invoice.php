@@ -25,10 +25,12 @@ class Invoice extends Model
         'notes',
         'vendor_notes',
         'rejection_reason',
+        'cancel_reason',
         'created_by',
         'sent_at',
         'accepted_at',
         'rejected_at',
+        'cancelled_at',
     ];
 
     protected $casts = [
@@ -41,6 +43,7 @@ class Invoice extends Model
         'sent_at' => 'datetime',
         'accepted_at' => 'datetime',
         'rejected_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     protected static function boot()
@@ -64,7 +67,14 @@ class Invoice extends Model
 
     public static function generateInvoiceNumber(): string
     {
-        $prefix = PlatformSetting::getValue('invoice.number_prefix', 'INV');
+        $rawPrefix = (string) PlatformSetting::getValue('invoice_prefix', 'INV-');
+        $prefix = rtrim(trim($rawPrefix), '-');
+        $prefix = $prefix !== '' ? $prefix : 'INV';
+
+        $startNumber = (int) PlatformSetting::getValue('invoice_start_number', 1000);
+        $startNumber = $startNumber > 0 ? $startNumber : 1000;
+        $numberLength = max(5, strlen((string) $startNumber));
+
         $year = date('Y');
 
         $lastInvoice = static::withTrashed()
@@ -77,10 +87,10 @@ class Invoice extends Model
             $lastNumber = (int) end($parts);
             $nextNumber = $lastNumber + 1;
         } else {
-            $nextNumber = 1;
+            $nextNumber = $startNumber;
         }
 
-        return sprintf('%s-%s-%05d', $prefix, $year, $nextNumber);
+        return sprintf('%s-%s-%0' . $numberLength . 'd', $prefix, $year, $nextNumber);
     }
 
     public function shipment(): BelongsTo

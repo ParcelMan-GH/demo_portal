@@ -609,19 +609,47 @@
         .token-status.warning { background: #fff3e0; color: #e65100; }
 
         /* Headers Table */
-        .headers-table { width: 100%; border-collapse: collapse; }
+        .headers-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
 
         .headers-table th, .headers-table td {
             padding: 8px;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
+            vertical-align: top;
+            overflow-wrap: anywhere;
         }
+
+        .headers-table th:first-child,
+        .headers-table td:first-child { width: 34%; }
+
+        .headers-table th:last-child,
+        .headers-table td:last-child { width: 66%; }
 
         .headers-table th {
             font-size: 11px;
             font-weight: 500;
             color: var(--text-secondary);
             text-transform: uppercase;
+        }
+
+        .form-notice {
+            padding: 10px 12px;
+            border: 1px solid #cfe2ff;
+            background: #f4f8ff;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            color: #1f3b73;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        .form-notice-title {
+            font-weight: 600;
+            margin-right: 6px;
         }
 
         .headers-table input {
@@ -1003,10 +1031,10 @@
                                 <!-- Endpoints will be populated by JS -->
                             </div>
 
-                            <!-- Driver Assignments Group -->
+                            <!-- Driver Pickups Group -->
                             <div class="group-header nested" onclick="toggleGroup('driver-assignments')">
                                 <span class="folder-chevron open" id="chevron-driver-assignments">▶</span>
-                                <span>Assignments</span>
+                                <span>Pickups</span>
                             </div>
 
                             <div id="group-driver-assignments">
@@ -1080,12 +1108,24 @@
 
                         <!-- Params Tab -->
                         <div id="tab-params" class="hidden">
-                            <div class="docs-section">
-                                <div class="docs-section-title">URL Parameters</div>
-                                <p class="docs-hint">These parameters are part of the URL path</p>
+                            <div id="urlParamsSection" class="hidden">
+                                <div class="docs-section">
+                                    <div class="docs-section-title">URL Parameters</div>
+                                    <p class="docs-hint">These parameters are part of the URL path</p>
+                                </div>
+                                <div id="urlParamsContainer">
+                                    <!-- URL params will be rendered here -->
+                                </div>
                             </div>
-                            <div id="urlParamsContainer">
-                                <!-- URL params will be rendered here -->
+
+                            <div id="queryParamsSection" class="hidden" style="margin-top: 14px;">
+                                <div class="docs-section">
+                                    <div class="docs-section-title">Query Parameters</div>
+                                    <p class="docs-hint">These parameters are appended to the URL as filters</p>
+                                </div>
+                                <div id="queryParamsContainer">
+                                    <!-- Query params will be rendered here -->
+                                </div>
                             </div>
                         </div>
 
@@ -1672,16 +1712,20 @@
                 method: 'GET',
                 url: '/api/v1/vendor/shipments',
                 name: 'List Shipments',
-                description: 'Get paginated list of vendor\'s shipments with optional filters.',
+                description: 'Get vendor shipments with filtering using offset/limit pagination (same structure as List Invoices).',
                 auth: true,
                 group: 'shipments',
                 userType: 'vendor',
                 fields: [
-                    { name: 'status', type: 'string', required: false, description: 'Filter by status', example: 'draft' },
-                    { name: 'search', type: 'string', required: false, description: 'Search by shipment number, name, or phone', example: 'PCM-2026' },
-                    { name: 'from_date', type: 'string', required: false, description: 'Filter from date (Y-m-d)', example: '2026-01-01' },
-                    { name: 'to_date', type: 'string', required: false, description: 'Filter to date (Y-m-d)', example: '2026-12-31' },
-                    { name: 'per_page', type: 'number', required: false, description: 'Items per page (max 100)', example: '15' }
+                    { name: 'search', type: 'string', required: false, description: 'Search by shipment number, recipient, pickup contact, or item details', example: 'PCM-2026' },
+                    { name: 'from_date', type: 'date', required: false, description: 'Created date from (YYYY-MM-DD)', example: '2026-01-01' },
+                    { name: 'to_date', type: 'date', required: false, description: 'Created date to (YYYY-MM-DD)', example: '2026-12-31' },
+                    { name: 'status', queryName: 'status[]', type: 'multiselect', required: false, description: 'Shipment statuses (array)', options: ['draft', 'submitted', 'invoice_sent', 'invoice_accepted', 'pickup_assigned', 'picked_up', 'at_warehouse', 'sorted', 'in_transit', 'at_destination', 'out_for_delivery', 'delivered', 'cancelled'], example: 'status[]=submitted&status[]=invoice_sent' },
+                    { name: 'include', type: 'enum', required: false, description: 'Optional includes. Use `pickup_details` to include item-level pickup confirmations/photos in each shipment item.', options: ['pickup_details'], example: 'pickup_details' },
+                    { name: 'limit', type: 'number', required: false, description: 'Number of items to return (max 100)', example: '15' },
+                    { name: 'offset', type: 'number', required: false, description: 'Number of items to skip', example: '0' },
+                    { name: 'sort_by', type: 'enum', required: false, description: 'Sort field. Allowed: id, shipment_number, status, destination_mode, delivery_recipient_name, pickup_contact_name, submitted_at, created_at, updated_at', options: ['created_at', 'updated_at', 'id', 'shipment_number', 'status', 'destination_mode', 'delivery_recipient_name', 'pickup_contact_name', 'submitted_at'] },
+                    { name: 'sort_order', type: 'enum', required: false, description: 'Sort direction', options: ['asc', 'desc'] }
                 ],
                 sampleBody: null,
                 exampleResponses: {
@@ -1691,20 +1735,267 @@
                         data: {
                             shipments: [
                                 {
-                                    id: 1,
-                                    shipment_number: 'PCM-2026-00001',
+                                    id: 2,
+                                    shipment_number: 'PCM-2026-00002',
+                                    status: 'invoice_accepted',
+                                    destination_mode: 'single',
+                                    recipient_name: 'Ama Mensah',
+                                    recipient_phone: '+233241234567',
+                                    location: {
+                                        type: 'dropdown',
+                                        region: 'Greater Accra',
+                                        region_id: 1,
+                                        district: 'Accra Metropolitan',
+                                        district_id: 1,
+                                        town: 'Osu',
+                                        latitude: null,
+                                        longitude: null,
+                                        gh_post_address: null,
+                                        landmark: 'Near the market'
+                                    },
+                                    delivery_instructions: 'Call before delivery',
+                                    pickup: {
+                                        contact_name: 'Kwame Mensah',
+                                        contact_phone: '+233244123456',
+                                        location: {
+                                            type: 'dropdown',
+                                            region: 'Greater Accra',
+                                            region_id: 1,
+                                            district: 'Accra Metropolitan',
+                                            district_id: 1,
+                                            town: 'Labone',
+                                            latitude: null,
+                                            longitude: null,
+                                            gh_post_address: null,
+                                            landmark: 'Blue gate'
+                                        },
+                                        instructions: 'Pickup from reception'
+                                    },
+                                    delivery: {
+                                        recipient_name: 'Ama Mensah',
+                                        recipient_phone: '+233241234567',
+                                        location: {
+                                            type: 'dropdown',
+                                            region: 'Greater Accra',
+                                            region_id: 1,
+                                            district: 'Accra Metropolitan',
+                                            district_id: 1,
+                                            town: 'Osu',
+                                            latitude: null,
+                                            longitude: null,
+                                            gh_post_address: null,
+                                            landmark: 'Near the market'
+                                        },
+                                        instructions: 'Call before delivery'
+                                    },
+                                    items: [
+                                        {
+                                            id: 21,
+                                            description: '55-inch TV',
+                                            quantity: 1,
+                                            status: 'pending',
+                                            tracking_code: 'TRK8A3F2K9X',
+                                            delivery: null,
+                                            images: [
+                                                'https://gateway.storjshare.io/shaxi/demo/shipments/2/items/21/1706284800_abc123.jpg?X-Amz-Signature=...'
+                                            ],
+                                            created_at: '2026-02-10T11:20:00+00:00',
+                                            updated_at: '2026-02-10T11:20:00+00:00'
+                                        }
+                                    ],
+                                    can_edit: false,
+                                    can_delete: false,
+                                    can_submit: false,
+                                    submitted_at: '2026-02-10T11:30:00+00:00',
+                                    created_at: '2026-02-10T11:14:37+00:00',
+                                    updated_at: '2026-02-10T14:54:13+00:00',
+                                    invoice: {
+                                        id: 12,
+                                        invoice_number: 'INV-2026-01000',
+                                        shipment_id: 2,
+                                        shipment_number: 'PCM-2026-00002',
+                                        status: 'accepted',
+                                        pickup_fee: 50.0,
+                                        transport_fee: 120.0,
+                                        handling_fee: 20.0,
+                                        other_fee: 8.0,
+                                        total_amount: 198.0,
+                                        currency: 'GHS',
+                                        notes: 'Fragile items',
+                                        vendor_notes: 'Proceed with pickup',
+                                        rejection_reason: null,
+                                        cancel_reason: null,
+                                        is_active: true,
+                                        sent_at: '2026-02-10T12:00:00+00:00',
+                                        accepted_at: '2026-02-10T13:24:00+00:00',
+                                        rejected_at: null,
+                                        cancelled_at: null,
+                                        created_at: '2026-02-10T11:40:00+00:00',
+                                        updated_at: '2026-02-10T13:24:00+00:00'
+                                    },
+                                    invoice_history: [
+                                        {
+                                            id: 11,
+                                            invoice_number: 'INV-2026-00999',
+                                            shipment_id: 2,
+                                            shipment_number: 'PCM-2026-00002',
+                                            status: 'rejected',
+                                            pickup_fee: 45.0,
+                                            transport_fee: 115.0,
+                                            handling_fee: 20.0,
+                                            other_fee: 8.0,
+                                            total_amount: 188.0,
+                                            currency: 'GHS',
+                                            notes: 'Initial invoice',
+                                            vendor_notes: null,
+                                            rejection_reason: 'Transport fee mismatch',
+                                            cancel_reason: null,
+                                            is_active: false,
+                                            sent_at: '2026-02-10T10:10:00+00:00',
+                                            accepted_at: null,
+                                            rejected_at: '2026-02-10T10:45:00+00:00',
+                                            cancelled_at: null,
+                                            created_at: '2026-02-10T10:00:00+00:00',
+                                            updated_at: '2026-02-10T10:45:00+00:00'
+                                        },
+                                        {
+                                            id: 12,
+                                            invoice_number: 'INV-2026-01000',
+                                            shipment_id: 2,
+                                            shipment_number: 'PCM-2026-00002',
+                                            status: 'accepted',
+                                            pickup_fee: 50.0,
+                                            transport_fee: 120.0,
+                                            handling_fee: 20.0,
+                                            other_fee: 8.0,
+                                            total_amount: 198.0,
+                                            currency: 'GHS',
+                                            notes: 'Revised invoice',
+                                            vendor_notes: 'Proceed with pickup',
+                                            rejection_reason: null,
+                                            cancel_reason: null,
+                                            is_active: true,
+                                            sent_at: '2026-02-10T12:00:00+00:00',
+                                            accepted_at: '2026-02-10T13:24:00+00:00',
+                                            rejected_at: null,
+                                            cancelled_at: null,
+                                            created_at: '2026-02-10T11:40:00+00:00',
+                                            updated_at: '2026-02-10T13:24:00+00:00'
+                                        }
+                                    ],
+                                    pickup_assignment: {
+                                        id: 7,
+                                        status: 'en_route',
+                                        status_label: 'En Route',
+                                        driver_name: 'Kojo Driver',
+                                        driver_phone: '+233245000001',
+                                        driver: {
+                                            id: 4,
+                                            name: 'Kojo Driver',
+                                            phone: '+233245000001',
+                                            vehicle_type: 'van',
+                                            vehicle_number: 'GR-1234-24'
+                                        },
+                                        timeline: {
+                                            assigned: { at: '2026-02-10T15:00:00+00:00' },
+                                            en_route: { at: '2026-02-10T15:10:00+00:00' },
+                                            arrived_pickup: { at: null, latitude: null, longitude: null },
+                                            picked_up: { at: null },
+                                            arrived_warehouse: { at: null, warehouse: null },
+                                            received: { at: null, warehouse: null, received_by_user_id: null, notes: null },
+                                            completed: { at: null },
+                                            cancelled: { at: null, reason: null }
+                                        }
+                                    }
+                                },
+                                {
+                                    id: 3,
+                                    shipment_number: 'PCM-2026-00003',
                                     status: 'draft',
-                                    status_label: 'Draft',
-                                    recipient_name: 'John Mensah',
-                                    recipient_phone: '+233244123456',
-                                    location: { type: 'dropdown', region: 'Greater Accra', district: 'Accra Metropolitan', town: 'Osu' },
+                                    destination_mode: 'per_item',
+                                    recipient_name: 'Multiple recipients',
+                                    recipient_phone: 'Multiple numbers',
+                                    location: {
+                                        type: 'multiple',
+                                        region: null,
+                                        region_id: null,
+                                        district: null,
+                                        district_id: null,
+                                        town: null,
+                                        latitude: null,
+                                        longitude: null,
+                                        gh_post_address: null,
+                                        landmark: null
+                                    },
+                                    delivery_instructions: null,
+                                    pickup: {
+                                        contact_name: 'Yaw Asante',
+                                        contact_phone: '+233247000333',
+                                        location: {
+                                            type: 'coordinates',
+                                            region: null,
+                                            region_id: null,
+                                            district: null,
+                                            district_id: null,
+                                            town: null,
+                                            latitude: '5.59130000',
+                                            longitude: '-0.18640000',
+                                            gh_post_address: null,
+                                            landmark: 'Near police station'
+                                        },
+                                        instructions: null
+                                    },
+                                    delivery: null,
+                                    items: [
+                                        {
+                                            id: 31,
+                                            description: 'Boxed blender',
+                                            quantity: 1,
+                                            status: 'pending',
+                                            tracking_code: 'TRK2F5G8H1J',
+                                            delivery: {
+                                                recipient_name: 'Kofi Boateng',
+                                                recipient_phone: '+233241111111',
+                                                location: {
+                                                    type: 'gh_post',
+                                                    region: null,
+                                                    region_id: null,
+                                                    district: null,
+                                                    district_id: null,
+                                                    town: null,
+                                                    latitude: null,
+                                                    longitude: null,
+                                                    gh_post_address: 'GA-234-8891',
+                                                    landmark: 'Opposite fuel station'
+                                                },
+                                                instructions: 'Leave with security'
+                                            },
+                                            images: [],
+                                            created_at: '2026-02-10T18:12:00+00:00',
+                                            updated_at: '2026-02-10T18:12:00+00:00'
+                                        }
+                                    ],
                                     can_edit: true,
                                     can_delete: true,
-                                    can_submit: false,
-                                    items_count: 2
+                                    can_submit: true,
+                                    submitted_at: null,
+                                    created_at: '2026-02-10T18:10:00+00:00',
+                                    updated_at: '2026-02-10T18:12:00+00:00',
+                                    invoice: null,
+                                    invoice_history: [],
+                                    pickup_assignment: null
                                 }
                             ],
-                            pagination: { current_page: 1, last_page: 1, per_page: 15, total: 1 }
+                            pagination: {
+                                offset: 0,
+                                limit: 15,
+                                total: 2,
+                                has_more: false,
+                                next_offset: null,
+                                current_page: 1,
+                                last_page: 1,
+                                per_page: 15
+                            }
                         }
                     }
                 }
@@ -1713,29 +2004,44 @@
                 method: 'POST',
                 url: '/api/v1/vendor/shipments',
                 name: 'Create Shipment',
-                description: 'Create a new draft shipment. At least one location method required: dropdown (region+district), coordinates (lat+lng), or Ghana Post.',
+                description: 'Create a draft shipment with pickup details and destination mode. Use single mode for one shared destination, or per_item mode to capture destination on each item.',
                 auth: true,
                 group: 'shipments',
                 userType: 'vendor',
                 bodyType: 'formdata',
                 useFormInputs: true,
                 fields: [
-                    { name: 'recipient_name', type: 'string', required: true, description: 'Recipient full name', example: 'John Mensah' },
-                    { name: 'recipient_phone', type: 'string', required: true, description: 'Phone number (international format)', example: '+233244123456' },
-                    { name: 'recipient_phone_confirm', type: 'string', required: true, description: 'Confirm phone (must match)', example: '+233244123456' },
-                    { name: '_location_method', type: 'enum', uiOnly: true, required: false, description: 'Choose location input method (UI only - not sent to API)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' } },
-                    { name: 'region_id', type: 'dropdown', required: false, description: 'Select region', source: 'regions', labelField: 'name', valueField: 'id', example: '1', showWhen: { field: '_location_method', value: 'dropdown' } },
-                    { name: 'district_id', type: 'dropdown', required: false, description: 'Select district', dependsOn: 'region_id', example: '1', showWhen: { field: '_location_method', value: 'dropdown' } },
-                    { name: 'town', type: 'string', required: false, description: 'Town/area name', example: 'Osu Oxford Street', showWhen: { field: '_location_method', value: 'dropdown' } },
-                    { name: 'latitude', type: 'number', required: false, description: 'GPS latitude (-90 to 90)', example: '5.5913', showWhen: { field: '_location_method', value: 'coordinates' } },
-                    { name: 'longitude', type: 'number', required: false, description: 'GPS longitude (-180 to 180)', example: '-0.1864', showWhen: { field: '_location_method', value: 'coordinates' } },
-                    { name: 'gh_post_address', type: 'string', required: false, description: 'Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_location_method', value: 'gh_post' } },
-                    { name: 'landmark', type: 'string', required: false, description: 'Nearby landmark', example: 'Near the big church' },
-                    { name: 'delivery_instructions', type: 'string', required: false, description: 'Special delivery instructions', example: 'Call before delivery' }
+                    { name: 'destination_mode', type: 'enum', required: true, description: 'Destination mode', options: ['single', 'per_item'], labels: { single: 'Single destination for all items', per_item: 'Each item has its own destination' } },
+
+                    { name: 'pickup_contact_name', type: 'string', required: true, description: 'Pickup contact full name', example: 'Kwame Mensah' },
+                    { name: 'pickup_contact_phone', type: 'string', required: true, description: 'Pickup contact phone number', example: '+233244123456' },
+                    { name: 'pickup_contact_phone_confirm', type: 'string', required: true, description: 'Confirm pickup phone (must match)', example: '+233244123456' },
+                    { name: '_pickup_location_method', type: 'enum', uiOnly: true, required: false, description: 'Pickup location input method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' } },
+                    { name: 'pickup_region_id', type: 'dropdown', required: false, description: 'Pickup region', source: 'regions', labelField: 'name', valueField: 'id', example: '1', showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: 'pickup_district_id', type: 'dropdown', required: false, description: 'Pickup district', dependsOn: 'pickup_region_id', example: '1', showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: 'pickup_town', type: 'string', required: false, description: 'Pickup town/area', example: 'Osu Oxford Street', showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: 'pickup_latitude', type: 'number', required: false, description: 'Pickup GPS latitude (-90 to 90)', example: '5.5913', showWhen: { field: '_pickup_location_method', value: 'coordinates' } },
+                    { name: 'pickup_longitude', type: 'number', required: false, description: 'Pickup GPS longitude (-180 to 180)', example: '-0.1864', showWhen: { field: '_pickup_location_method', value: 'coordinates' } },
+                    { name: 'pickup_gh_post_address', type: 'string', required: false, description: 'Pickup Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_pickup_location_method', value: 'gh_post' } },
+                    { name: 'pickup_landmark', type: 'string', required: false, description: 'Pickup landmark', example: 'Near the big church' },
+                    { name: 'pickup_instructions', type: 'string', required: false, description: 'Pickup instructions', example: 'Call before arrival' },
+
+                    { name: 'delivery_recipient_name', type: 'string', required: false, description: 'Delivery recipient full name (single mode only)', example: 'Ama Mensah', showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: 'delivery_recipient_phone', type: 'string', required: false, description: 'Delivery recipient phone (single mode only)', example: '+233241234567', showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: 'delivery_recipient_phone_confirm', type: 'string', required: false, description: 'Confirm delivery phone (single mode only)', example: '+233241234567', showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: '_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Delivery location input method (single mode only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: 'delivery_region_id', type: 'dropdown', required: false, description: 'Delivery region', source: 'regions', labelField: 'name', valueField: 'id', example: '1', showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_district_id', type: 'dropdown', required: false, description: 'Delivery district', dependsOn: 'delivery_region_id', example: '1', showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_town', type: 'string', required: false, description: 'Delivery town/area', example: 'Tema', showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_latitude', type: 'number', required: false, description: 'Delivery GPS latitude (-90 to 90)', example: '5.6037', showWhen: { field: '_delivery_location_method', value: 'coordinates' } },
+                    { name: 'delivery_longitude', type: 'number', required: false, description: 'Delivery GPS longitude (-180 to 180)', example: '-0.1870', showWhen: { field: '_delivery_location_method', value: 'coordinates' } },
+                    { name: 'delivery_gh_post_address', type: 'string', required: false, description: 'Delivery Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_delivery_location_method', value: 'gh_post' } },
+                    { name: 'delivery_landmark', type: 'string', required: false, description: 'Delivery landmark', example: 'Near the market', showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: 'delivery_instructions', type: 'string', required: false, description: 'Delivery instructions', example: 'Call before delivery', showWhen: { field: 'destination_mode', value: 'single' } }
                 ],
                 sampleBody: null,
                 exampleResponses: {
-                    '201': {
+                    '201_single': {
                         success: true,
                         message: 'Shipment created successfully.',
                         data: {
@@ -1743,25 +2049,121 @@
                                 id: 1,
                                 shipment_number: 'PCM-2026-00001',
                                 status: 'draft',
-                                recipient_name: 'John Mensah',
-                                recipient_phone: '+233244123456',
+                                destination_mode: 'single',
+                                recipient_name: 'Ama Mensah',
+                                recipient_phone: '+233241234567',
                                 location: {
                                     type: 'dropdown',
                                     region: 'Greater Accra',
                                     region_id: 1,
                                     district: 'Accra Metropolitan',
                                     district_id: 1,
-                                    town: 'Osu Oxford Street',
+                                    town: 'Osu',
                                     latitude: null,
                                     longitude: null,
                                     gh_post_address: null,
-                                    landmark: 'Near the big church'
+                                    landmark: 'Near the market'
                                 },
                                 delivery_instructions: 'Call before delivery',
+                                pickup: {
+                                    contact_name: 'Kwame Mensah',
+                                    contact_phone: '+233244123456',
+                                    location: {
+                                        type: 'dropdown',
+                                        region: 'Greater Accra',
+                                        region_id: 1,
+                                        district: 'Accra Metropolitan',
+                                        district_id: 1,
+                                        town: 'Labone',
+                                        latitude: null,
+                                        longitude: null,
+                                        gh_post_address: null,
+                                        landmark: 'Blue gate'
+                                    },
+                                    instructions: 'Pickup from reception'
+                                },
+                                delivery: {
+                                    recipient_name: 'Ama Mensah',
+                                    recipient_phone: '+233241234567',
+                                    location: {
+                                        type: 'dropdown',
+                                        region: 'Greater Accra',
+                                        region_id: 1,
+                                        district: 'Accra Metropolitan',
+                                        district_id: 1,
+                                        town: 'Osu',
+                                        latitude: null,
+                                        longitude: null,
+                                        gh_post_address: null,
+                                        landmark: 'Near the market'
+                                    },
+                                    instructions: 'Call before delivery'
+                                },
                                 items: [],
+                                can_edit: true,
+                                can_delete: true,
+                                can_submit: false,
                                 submitted_at: null,
-                                created_at: '2026-01-27T10:30:00+00:00',
-                                updated_at: '2026-01-27T10:30:00+00:00'
+                                created_at: '2026-02-10T11:14:37+00:00',
+                                updated_at: '2026-02-10T11:14:37+00:00',
+                                invoice: null,
+                                invoice_history: [],
+                                pickup_assignment: null
+                            }
+                        }
+                    },
+                    '201_per_item': {
+                        success: true,
+                        message: 'Shipment created successfully.',
+                        data: {
+                            shipment: {
+                                id: 2,
+                                shipment_number: 'PCM-2026-00002',
+                                status: 'draft',
+                                destination_mode: 'per_item',
+                                recipient_name: null,
+                                recipient_phone: null,
+                                location: {
+                                    type: 'multiple',
+                                    region: null,
+                                    region_id: null,
+                                    district: null,
+                                    district_id: null,
+                                    town: null,
+                                    latitude: null,
+                                    longitude: null,
+                                    gh_post_address: null,
+                                    landmark: null
+                                },
+                                delivery_instructions: null,
+                                pickup: {
+                                    contact_name: 'Yaw Asante',
+                                    contact_phone: '+233247000333',
+                                    location: {
+                                        type: 'coordinates',
+                                        region: null,
+                                        region_id: null,
+                                        district: null,
+                                        district_id: null,
+                                        town: null,
+                                        latitude: '5.59130000',
+                                        longitude: '-0.18640000',
+                                        gh_post_address: null,
+                                        landmark: 'Near police station'
+                                    },
+                                    instructions: null
+                                },
+                                delivery: null,
+                                items: [],
+                                can_edit: true,
+                                can_delete: true,
+                                can_submit: false,
+                                submitted_at: null,
+                                created_at: '2026-02-10T18:10:00+00:00',
+                                updated_at: '2026-02-10T18:10:00+00:00',
+                                invoice: null,
+                                invoice_history: [],
+                                pickup_assignment: null
                             }
                         }
                     },
@@ -1791,46 +2193,178 @@
                         message: 'Shipment retrieved successfully.',
                         data: {
                             shipment: {
-                                id: 1,
-                                shipment_number: 'PCM-2026-00001',
-                                status: 'draft',
-                                recipient_name: 'John Mensah',
-                                recipient_phone: '+233244123456',
+                                id: 2,
+                                shipment_number: 'PCM-2026-00002',
+                                status: 'invoice_accepted',
+                                destination_mode: 'single',
+                                recipient_name: 'Ama Mensah',
+                                recipient_phone: '+233241234567',
                                 location: {
                                     type: 'dropdown',
                                     region: 'Greater Accra',
                                     region_id: 1,
                                     district: 'Accra Metropolitan',
                                     district_id: 1,
-                                    town: 'Osu Oxford Street',
+                                    town: 'Osu',
                                     latitude: null,
                                     longitude: null,
                                     gh_post_address: null,
-                                    landmark: 'Near the big church'
+                                    landmark: 'Near the market'
                                 },
                                 delivery_instructions: 'Call before delivery',
+                                pickup: {
+                                    contact_name: 'Kwame Mensah',
+                                    contact_phone: '+233244123456',
+                                    location: {
+                                        type: 'dropdown',
+                                        region: 'Greater Accra',
+                                        region_id: 1,
+                                        district: 'Accra Metropolitan',
+                                        district_id: 1,
+                                        town: 'Labone',
+                                        latitude: null,
+                                        longitude: null,
+                                        gh_post_address: null,
+                                        landmark: 'Blue gate'
+                                    },
+                                    instructions: 'Pickup from reception'
+                                },
+                                delivery: {
+                                    recipient_name: 'Ama Mensah',
+                                    recipient_phone: '+233241234567',
+                                    location: {
+                                        type: 'dropdown',
+                                        region: 'Greater Accra',
+                                        region_id: 1,
+                                        district: 'Accra Metropolitan',
+                                        district_id: 1,
+                                        town: 'Osu',
+                                        latitude: null,
+                                        longitude: null,
+                                        gh_post_address: null,
+                                        landmark: 'Near the market'
+                                    },
+                                    instructions: 'Call before delivery'
+                                },
                                 items: [
                                     {
-                                        id: 1,
-                                        description: 'Fridge',
-                                        quantity: 2,
+                                        id: 21,
+                                        description: '55-inch TV',
+                                        quantity: 1,
                                         status: 'pending',
                                         tracking_code: 'TRK8A3F2K9X',
+                                        delivery: null,
                                         images: [
-                                            {
-                                                id: 1,
-                                                url: 'https://gateway.storjshare.io/shaxi/demo/shipments/1/items/1/image.jpg?X-Amz-Signature=...',
-                                                original_name: 'fridge.jpg',
-                                                expires_at: '2026-01-27T11:30:00+00:00'
-                                            }
+                                            'https://gateway.storjshare.io/shaxi/demo/shipments/2/items/21/1706284800_abc123.jpg?X-Amz-Signature=...'
                                         ],
-                                        created_at: '2026-01-27T10:35:00+00:00',
-                                        updated_at: '2026-01-27T10:35:00+00:00'
+                                        created_at: '2026-02-10T11:20:00+00:00',
+                                        updated_at: '2026-02-10T11:20:00+00:00'
                                     }
                                 ],
-                                submitted_at: null,
-                                created_at: '2026-01-27T10:30:00+00:00',
-                                updated_at: '2026-01-27T10:35:00+00:00'
+                                can_edit: false,
+                                can_delete: false,
+                                can_submit: false,
+                                invoice: {
+                                    id: 12,
+                                    invoice_number: 'INV-2026-01000',
+                                    shipment_id: 2,
+                                    shipment_number: 'PCM-2026-00002',
+                                    status: 'accepted',
+                                    pickup_fee: 50.0,
+                                    transport_fee: 120.0,
+                                    handling_fee: 20.0,
+                                    other_fee: 8.0,
+                                    total_amount: 198.0,
+                                    currency: 'GHS',
+                                    notes: 'Fragile items',
+                                    vendor_notes: 'Proceed with pickup',
+                                    rejection_reason: null,
+                                    cancel_reason: null,
+                                    is_active: true,
+                                    sent_at: '2026-02-10T12:00:00+00:00',
+                                    accepted_at: '2026-02-10T13:24:00+00:00',
+                                    rejected_at: null,
+                                    cancelled_at: null,
+                                    created_at: '2026-02-10T11:40:00+00:00',
+                                    updated_at: '2026-02-10T13:24:00+00:00'
+                                },
+                                invoice_history: [
+                                    {
+                                        id: 11,
+                                        invoice_number: 'INV-2026-00999',
+                                        shipment_id: 2,
+                                        shipment_number: 'PCM-2026-00002',
+                                        status: 'rejected',
+                                        pickup_fee: 45.0,
+                                        transport_fee: 115.0,
+                                        handling_fee: 20.0,
+                                        other_fee: 8.0,
+                                        total_amount: 188.0,
+                                        currency: 'GHS',
+                                        notes: 'Initial invoice',
+                                        vendor_notes: null,
+                                        rejection_reason: 'Transport fee mismatch',
+                                        cancel_reason: null,
+                                        is_active: false,
+                                        sent_at: '2026-02-10T10:10:00+00:00',
+                                        accepted_at: null,
+                                        rejected_at: '2026-02-10T10:45:00+00:00',
+                                        cancelled_at: null,
+                                        created_at: '2026-02-10T10:00:00+00:00',
+                                        updated_at: '2026-02-10T10:45:00+00:00'
+                                    },
+                                    {
+                                        id: 12,
+                                        invoice_number: 'INV-2026-01000',
+                                        shipment_id: 2,
+                                        shipment_number: 'PCM-2026-00002',
+                                        status: 'accepted',
+                                        pickup_fee: 50.0,
+                                        transport_fee: 120.0,
+                                        handling_fee: 20.0,
+                                        other_fee: 8.0,
+                                        total_amount: 198.0,
+                                        currency: 'GHS',
+                                        notes: 'Revised invoice',
+                                        vendor_notes: 'Proceed with pickup',
+                                        rejection_reason: null,
+                                        cancel_reason: null,
+                                        is_active: true,
+                                        sent_at: '2026-02-10T12:00:00+00:00',
+                                        accepted_at: '2026-02-10T13:24:00+00:00',
+                                        rejected_at: null,
+                                        cancelled_at: null,
+                                        created_at: '2026-02-10T11:40:00+00:00',
+                                        updated_at: '2026-02-10T13:24:00+00:00'
+                                    }
+                                ],
+                                pickup_assignment: {
+                                    id: 7,
+                                    status: 'en_route',
+                                    status_label: 'En Route',
+                                    driver_name: 'Kojo Driver',
+                                    driver_phone: '+233245000001',
+                                    driver: {
+                                        id: 4,
+                                        name: 'Kojo Driver',
+                                        phone: '+233245000001',
+                                        vehicle_type: 'van',
+                                        vehicle_number: 'GR-1234-24'
+                                    },
+                                    timeline: {
+                                        assigned: { at: '2026-02-10T15:00:00+00:00' },
+                                        en_route: { at: '2026-02-10T15:10:00+00:00' },
+                                        arrived_pickup: { at: null, latitude: null, longitude: null },
+                                        picked_up: { at: null },
+                                        arrived_warehouse: { at: null, warehouse: null },
+                                        received: { at: null, warehouse: null, received_by_user_id: null, notes: null },
+                                        completed: { at: null },
+                                        cancelled: { at: null, reason: null }
+                                    }
+                                },
+                                submitted_at: '2026-02-10T11:30:00+00:00',
+                                created_at: '2026-02-10T11:14:37+00:00',
+                                updated_at: '2026-02-10T14:54:13+00:00'
                             }
                         }
                     }
@@ -1840,7 +2374,7 @@
                 method: 'PUT',
                 url: '/api/v1/vendor/shipments/{shipment}',
                 name: 'Update Shipment',
-                description: 'Update a draft shipment. Only draft shipments can be edited. All fields are optional.',
+                description: 'Update a draft shipment. Pickup details are shipment-level. Shared delivery fields are only allowed in single mode.',
                 auth: true,
                 group: 'shipments',
                 userType: 'vendor',
@@ -1850,18 +2384,33 @@
                     { name: 'shipment', type: 'dropdown', required: true, description: 'Select draft shipment', source: 'shipments?status=draft', labelField: 'shipment_number', valueField: 'id', onSelect: 'prefillShipmentData' }
                 ],
                 fields: [
-                    { name: 'recipient_name', type: 'string', required: false, description: 'Recipient full name', example: 'John Mensah Updated' },
-                    { name: 'recipient_phone', type: 'string', required: false, description: 'Phone number (international format)', example: '+233244123456' },
-                    { name: 'recipient_phone_confirm', type: 'string', required: false, description: 'Confirm phone (required if changing phone)', example: '+233244123456' },
-                    { name: '_location_method', type: 'enum', uiOnly: true, required: false, description: 'Choose location input method (UI only - not sent to API)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' } },
-                    { name: 'region_id', type: 'dropdown', required: false, description: 'Select region', source: 'regions', labelField: 'name', valueField: 'id', example: '1', showWhen: { field: '_location_method', value: 'dropdown' } },
-                    { name: 'district_id', type: 'dropdown', required: false, description: 'Select district', dependsOn: 'region_id', example: '1', showWhen: { field: '_location_method', value: 'dropdown' } },
-                    { name: 'town', type: 'string', required: false, description: 'Town/area name', example: 'Osu East', showWhen: { field: '_location_method', value: 'dropdown' } },
-                    { name: 'latitude', type: 'number', required: false, description: 'GPS latitude (-90 to 90)', example: '5.5913', showWhen: { field: '_location_method', value: 'coordinates' } },
-                    { name: 'longitude', type: 'number', required: false, description: 'GPS longitude (-180 to 180)', example: '-0.1864', showWhen: { field: '_location_method', value: 'coordinates' } },
-                    { name: 'gh_post_address', type: 'string', required: false, description: 'Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_location_method', value: 'gh_post' } },
-                    { name: 'landmark', type: 'string', required: false, description: 'Nearby landmark', example: 'Near the big church' },
-                    { name: 'delivery_instructions', type: 'string', required: false, description: 'Special delivery instructions', example: 'Call before delivery' }
+                    { name: 'destination_mode', type: 'enum', required: false, description: 'Destination mode', options: ['single', 'per_item'], labels: { single: 'Single destination for all items', per_item: 'Each item has its own destination' } },
+
+                    { name: 'pickup_contact_name', type: 'string', required: false, description: 'Pickup contact full name', example: 'Kwame Mensah' },
+                    { name: 'pickup_contact_phone', type: 'string', required: false, description: 'Pickup contact phone number', example: '+233244123456' },
+                    { name: 'pickup_contact_phone_confirm', type: 'string', required: false, description: 'Confirm pickup phone (required if changing)', example: '+233244123456' },
+                    { name: '_pickup_location_method', type: 'enum', uiOnly: true, required: false, description: 'Pickup location input method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' } },
+                    { name: 'pickup_region_id', type: 'dropdown', required: false, description: 'Pickup region', source: 'regions', labelField: 'name', valueField: 'id', example: '1', showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: 'pickup_district_id', type: 'dropdown', required: false, description: 'Pickup district', dependsOn: 'pickup_region_id', example: '1', showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: 'pickup_town', type: 'string', required: false, description: 'Pickup town/area', example: 'Osu East', showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: 'pickup_latitude', type: 'number', required: false, description: 'Pickup GPS latitude (-90 to 90)', example: '5.5913', showWhen: { field: '_pickup_location_method', value: 'coordinates' } },
+                    { name: 'pickup_longitude', type: 'number', required: false, description: 'Pickup GPS longitude (-180 to 180)', example: '-0.1864', showWhen: { field: '_pickup_location_method', value: 'coordinates' } },
+                    { name: 'pickup_gh_post_address', type: 'string', required: false, description: 'Pickup Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_pickup_location_method', value: 'gh_post' } },
+                    { name: 'pickup_landmark', type: 'string', required: false, description: 'Pickup landmark', example: 'Near the big church' },
+                    { name: 'pickup_instructions', type: 'string', required: false, description: 'Pickup instructions', example: 'Call before arrival' },
+
+                    { name: 'delivery_recipient_name', type: 'string', required: false, description: 'Delivery recipient full name (single mode only)', example: 'Ama Mensah', showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: 'delivery_recipient_phone', type: 'string', required: false, description: 'Delivery recipient phone (single mode only)', example: '+233241234567', showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: 'delivery_recipient_phone_confirm', type: 'string', required: false, description: 'Confirm delivery phone (required if changing)', example: '+233241234567', showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: '_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Delivery location input method (single mode only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: 'delivery_region_id', type: 'dropdown', required: false, description: 'Delivery region', source: 'regions', labelField: 'name', valueField: 'id', example: '1', showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_district_id', type: 'dropdown', required: false, description: 'Delivery district', dependsOn: 'delivery_region_id', example: '1', showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_town', type: 'string', required: false, description: 'Delivery town/area', example: 'Tema', showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_latitude', type: 'number', required: false, description: 'Delivery GPS latitude (-90 to 90)', example: '5.6037', showWhen: { field: '_delivery_location_method', value: 'coordinates' } },
+                    { name: 'delivery_longitude', type: 'number', required: false, description: 'Delivery GPS longitude (-180 to 180)', example: '-0.1870', showWhen: { field: '_delivery_location_method', value: 'coordinates' } },
+                    { name: 'delivery_gh_post_address', type: 'string', required: false, description: 'Delivery Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_delivery_location_method', value: 'gh_post' } },
+                    { name: 'delivery_landmark', type: 'string', required: false, description: 'Delivery landmark', example: 'Near the market', showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: 'delivery_instructions', type: 'string', required: false, description: 'Delivery instructions', example: 'Call before delivery', showWhen: { field: 'destination_mode', value: 'single' } }
                 ],
                 sampleBody: null,
                 exampleResponses: {
@@ -2002,24 +2551,38 @@
                 method: 'POST',
                 url: '/api/v1/vendor/shipments/{shipment}/items',
                 name: 'Add Item',
-                description: 'Add an item to a draft shipment.',
+                description: 'Add an item to a draft shipment. Optional: upload item images in the same request using `images[]`. If shipment is per_item mode, recipient and delivery location are required on the item.',
                 auth: true,
                 group: 'shipment-items',
                 userType: 'vendor',
                 bodyType: 'formdata',
                 useFormInputs: true,
                 urlParams: [
-                    { name: 'shipment', type: 'dropdown', required: true, description: 'Select draft shipment', source: 'shipments?status=draft', labelField: 'shipment_number', valueField: 'id' }
+                    { name: 'shipment', type: 'dropdown', required: true, description: 'Select draft shipment', source: 'shipments?status=draft', labelField: 'shipment_number', valueField: 'id', onSelect: 'handleItemShipmentSelection' }
                 ],
                 fields: [
                     { name: 'description', type: 'string', required: true, description: 'Item description', example: 'Fridge - Samsung 250L' },
-                    { name: 'quantity', type: 'number', required: false, description: 'Quantity (default 1)', example: '2' }
+                    { name: 'quantity', type: 'number', required: false, description: 'Quantity (default 1)', example: '2' },
+                    { name: 'images[]', type: 'file', required: false, description: 'Optional item images (select multiple, JPEG/PNG/WebP, max 5MB each)', example: '', multiple: true },
+                    { name: '_item_delivery_mode', type: 'enum', uiOnly: true, required: false, readOnly: true, noticeOnly: true, description: 'Auto-detected from selected shipment destination mode', options: ['single', 'per_item'], labels: { single: 'Single destination shipment', per_item: 'Per-item destination shipment' } },
+                    { name: 'delivery_recipient_name', type: 'string', required: false, description: 'Item recipient name (required for per_item mode)', example: 'Ama Mensah', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: 'delivery_recipient_phone', type: 'string', required: false, description: 'Item recipient phone (required for per_item mode)', example: '+233241234567', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: 'delivery_recipient_phone_confirm', type: 'string', required: false, description: 'Confirm item recipient phone', example: '+233241234567', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: '_item_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Item delivery location method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: 'delivery_region_id', type: 'dropdown', required: false, description: 'Item delivery region', source: 'regions', labelField: 'name', valueField: 'id', showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_district_id', type: 'dropdown', required: false, description: 'Item delivery district', dependsOn: 'delivery_region_id', showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_town', type: 'string', required: false, description: 'Item delivery town/area', example: 'Tema', showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_latitude', type: 'number', required: false, description: 'Item delivery GPS latitude', example: '5.6037', showWhen: { field: '_item_delivery_location_method', value: 'coordinates' } },
+                    { name: 'delivery_longitude', type: 'number', required: false, description: 'Item delivery GPS longitude', example: '-0.1870', showWhen: { field: '_item_delivery_location_method', value: 'coordinates' } },
+                    { name: 'delivery_gh_post_address', type: 'string', required: false, description: 'Item delivery Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_item_delivery_location_method', value: 'gh_post' } },
+                    { name: 'delivery_landmark', type: 'string', required: false, description: 'Item delivery landmark', example: 'Near the market', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: 'delivery_instructions', type: 'string', required: false, description: 'Item delivery instructions', example: 'Leave with reception', showWhen: { field: '_item_delivery_mode', value: 'per_item' } }
                 ],
                 sampleBody: null,
                 exampleResponses: {
                     '201': {
                         success: true,
-                        message: 'Item added successfully.',
+                        message: 'Item added and 1 image(s) uploaded successfully.',
                         data: {
                             item: {
                                 id: 1,
@@ -2027,7 +2590,16 @@
                                 quantity: 2,
                                 status: 'pending',
                                 tracking_code: 'TRK8A3F2K9X',
-                                images: [],
+                                images: [
+                                    {
+                                        id: 1,
+                                        url: 'https://gateway.storjshare.io/shaxi/demo/shipments/1/items/1/1706284800_abc123.jpg?X-Amz-Signature=...',
+                                        original_name: 'fridge-front.jpg',
+                                        size: 245760,
+                                        size_human: '240.00 KB',
+                                        expires_at: '2026-01-27T11:00:00Z'
+                                    }
+                                ],
                                 created_at: '2026-01-27T10:35:00+00:00',
                                 updated_at: '2026-01-27T10:35:00+00:00'
                             }
@@ -2043,25 +2615,40 @@
                 method: 'PUT',
                 url: '/api/v1/vendor/shipments/{shipment}/items/{item}',
                 name: 'Update Item',
-                description: 'Update an item in a draft shipment.',
+                description: 'Update an item in a draft shipment. Optional: upload new images (`images[]`) and remove existing images (`remove_image_ids[]` as array). In per_item mode, keep item-level recipient and delivery location complete.',
                 auth: true,
                 group: 'shipment-items',
                 userType: 'vendor',
                 bodyType: 'formdata',
                 useFormInputs: true,
                 urlParams: [
-                    { name: 'shipment', type: 'dropdown', required: true, description: 'Select draft shipment', source: 'shipments?status=draft', labelField: 'shipment_number', valueField: 'id' },
+                    { name: 'shipment', type: 'dropdown', required: true, description: 'Select draft shipment', source: 'shipments?status=draft', labelField: 'shipment_number', valueField: 'id', onSelect: 'handleItemShipmentSelection' },
                     { name: 'item', type: 'dropdown', required: true, description: 'Select item', dependsOn: 'shipment', labelField: 'description', valueField: 'id', onSelect: 'prefillItemData' }
                 ],
                 fields: [
                     { name: 'description', type: 'string', required: false, description: 'Item description', example: 'Fridge - Samsung 300L' },
-                    { name: 'quantity', type: 'number', required: false, description: 'Quantity', example: '3' }
+                    { name: 'quantity', type: 'number', required: false, description: 'Quantity', example: '3' },
+                    { name: 'images[]', type: 'file', required: false, description: 'Optional new images to upload (select multiple, JPEG/PNG/WebP, max 5MB each)', example: '', multiple: true },
+                    { name: 'remove_image_ids[]', type: 'multiselect', required: false, hideUntilPopulated: true, description: 'Optional existing images to remove (multi-select)', options: [] },
+                    { name: '_item_delivery_mode', type: 'enum', uiOnly: true, required: false, readOnly: true, noticeOnly: true, description: 'Auto-detected from selected shipment destination mode', options: ['single', 'per_item'], labels: { single: 'Single destination shipment', per_item: 'Per-item destination shipment' } },
+                    { name: 'delivery_recipient_name', type: 'string', required: false, description: 'Item recipient name (per_item mode)', example: 'Ama Mensah', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: 'delivery_recipient_phone', type: 'string', required: false, description: 'Item recipient phone (per_item mode)', example: '+233241234567', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: 'delivery_recipient_phone_confirm', type: 'string', required: false, description: 'Confirm item recipient phone', example: '+233241234567', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: '_item_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Item delivery location method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: 'delivery_region_id', type: 'dropdown', required: false, description: 'Item delivery region', source: 'regions', labelField: 'name', valueField: 'id', showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_district_id', type: 'dropdown', required: false, description: 'Item delivery district', dependsOn: 'delivery_region_id', showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_town', type: 'string', required: false, description: 'Item delivery town/area', example: 'Tema', showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_latitude', type: 'number', required: false, description: 'Item delivery GPS latitude', example: '5.6037', showWhen: { field: '_item_delivery_location_method', value: 'coordinates' } },
+                    { name: 'delivery_longitude', type: 'number', required: false, description: 'Item delivery GPS longitude', example: '-0.1870', showWhen: { field: '_item_delivery_location_method', value: 'coordinates' } },
+                    { name: 'delivery_gh_post_address', type: 'string', required: false, description: 'Item delivery Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_item_delivery_location_method', value: 'gh_post' } },
+                    { name: 'delivery_landmark', type: 'string', required: false, description: 'Item delivery landmark', example: 'Near the market', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: 'delivery_instructions', type: 'string', required: false, description: 'Item delivery instructions', example: 'Leave with reception', showWhen: { field: '_item_delivery_mode', value: 'per_item' } }
                 ],
                 sampleBody: null,
                 exampleResponses: {
                     '200': {
                         success: true,
-                        message: 'Item updated successfully.',
+                        message: 'Item updated successfully. 1 image(s) removed and 1 image(s) uploaded.',
                         data: {
                             item: {
                                 id: 1,
@@ -2069,7 +2656,16 @@
                                 quantity: 3,
                                 status: 'pending',
                                 tracking_code: 'TRK8A3F2K9X',
-                                images: [],
+                                images: [
+                                    {
+                                        id: 3,
+                                        url: 'https://gateway.storjshare.io/shaxi/demo/shipments/1/items/1/1706284900_ghi789.jpg?X-Amz-Signature=...',
+                                        original_name: 'fridge-new.jpg',
+                                        size: 289000,
+                                        size_human: '282.23 KB',
+                                        expires_at: '2026-01-27T11:30:00Z'
+                                    }
+                                ],
                                 created_at: '2026-01-27T10:35:00+00:00',
                                 updated_at: '2026-01-27T10:40:00+00:00'
                             }
@@ -2103,7 +2699,7 @@
                 method: 'POST',
                 url: '/api/v1/vendor/shipments/{shipment}/items/{item}/images',
                 name: 'Upload Images',
-                description: 'Upload one or multiple images for a shipment item. Max 5 images per item. Supports JPEG, PNG, WebP. Max 5MB per file.',
+                description: 'Upload one or multiple images for a shipment item. Max 5 images per item. Supports JPEG, PNG, WebP. Max 5MB per file. Response includes both raw bytes (`size`) and readable size (`size_human`).',
                 auth: true,
                 group: 'shipment-items',
                 userType: 'vendor',
@@ -2128,6 +2724,7 @@
                                     url: 'https://gateway.storjshare.io/shaxi/demo/shipments/1/items/1/1706284800_abc123.jpg?X-Amz-Signature=...',
                                     original_name: 'fridge-front.jpg',
                                     size: 245760,
+                                    size_human: '240.00 KB',
                                     expires_at: '2026-01-27T11:00:00Z'
                                 },
                                 {
@@ -2135,6 +2732,7 @@
                                     url: 'https://gateway.storjshare.io/shaxi/demo/shipments/1/items/1/1706284801_def456.jpg?X-Amz-Signature=...',
                                     original_name: 'fridge-inside.jpg',
                                     size: 312450,
+                                    size_human: '305.13 KB',
                                     expires_at: '2026-01-27T11:00:00Z'
                                 }
                             ]
@@ -2178,13 +2776,22 @@
                 method: 'GET',
                 url: '/api/v1/vendor/invoices',
                 name: 'List Invoices',
-                description: 'Get paginated list of vendor\'s invoices with optional status filter.',
+                description: 'Get vendor invoices with filtering. Vendor-visible statuses: sent, accepted, rejected, cancelled. Active statuses: pending, sent, accepted.',
                 auth: true,
                 group: 'invoices',
                 userType: 'vendor',
                 fields: [
-                    { name: 'status', type: 'string', required: false, description: 'Filter by status (e.g. pending, accepted, rejected)', example: 'pending' },
-                    { name: 'per_page', type: 'number', required: false, description: 'Items per page (max 100)', example: '15' }
+                    { name: 'shipment_id', type: 'dropdown', required: false, description: 'Filter by shipment ID', source: 'shipments?per_page=100', labelField: 'shipment_number', valueField: 'id' },
+                    { name: 'invoice_number', type: 'dropdown', required: false, description: 'Filter by invoice number. If shipment_id is selected, this list is scoped to that shipment.', source: 'invoices?limit=100', labelField: 'invoice_number', valueField: 'invoice_number', dependsOn: 'shipment_id', dependsOnQueryKey: 'shipment_id', allowWithoutParent: true },
+                    { name: 'search', type: 'string', required: false, description: 'Search across invoice number, shipment number, status, notes, rejection reason, and cancel reason', example: 'INV-2026-0001' },
+                    { name: 'from_date', type: 'date', required: false, description: 'Created date from (YYYY-MM-DD)', example: '2026-02-01' },
+                    { name: 'to_date', type: 'date', required: false, description: 'Created date to (YYYY-MM-DD)', example: '2026-02-10' },
+                    { name: 'status', queryName: 'status[]', type: 'multiselect', required: false, description: 'Invoice statuses (array). Allowed: pending, sent, accepted, rejected, cancelled', options: ['pending', 'sent', 'accepted', 'rejected', 'cancelled'], example: 'status[]=sent&status[]=accepted' },
+                    { name: 'is_active', type: 'enum', required: false, description: 'Filter active invoices only. Active (system) = pending, sent, accepted. Vendor-visible active = sent, accepted.', options: ['1', '0'], labels: { '1': 'Yes', '0': 'No' } },
+                    { name: 'limit', type: 'number', required: false, description: 'Number of items to return (max 100)', example: '15' },
+                    { name: 'offset', type: 'number', required: false, description: 'Number of items to skip', example: '0' },
+                    { name: 'sort_by', type: 'enum', required: false, description: 'Sort field. Allowed: id, invoice_number, status, pickup_fee, transport_fee, handling_fee, other_fee, total_amount, sent_at, accepted_at, rejected_at, cancelled_at, created_at, updated_at', options: ['created_at', 'updated_at', 'id', 'invoice_number', 'status', 'pickup_fee', 'transport_fee', 'handling_fee', 'other_fee', 'total_amount', 'sent_at', 'accepted_at', 'rejected_at', 'cancelled_at'] },
+                    { name: 'sort_order', type: 'enum', required: false, description: 'Sort direction', options: ['asc', 'desc'] }
                 ],
                 sampleBody: null,
                 exampleResponses: {
@@ -2198,12 +2805,22 @@
                                     invoice_number: 'INV-2026-0001',
                                     shipment_id: 5,
                                     shipment_number: 'PCM-2026-00005',
-                                    amount: 150.00,
+                                    status: 'sent',
+                                    pickup_fee: 50.0,
+                                    transport_fee: 80.0,
+                                    handling_fee: 20.0,
+                                    other_fee: 0.0,
+                                    total_amount: 150.0,
                                     currency: 'GHS',
-                                    status: 'pending',
-                                    issued_at: '2026-01-28T09:00:00+00:00',
-                                    due_at: '2026-02-28T09:00:00+00:00',
+                                    notes: 'Fragile items',
                                     vendor_notes: null,
+                                    rejection_reason: null,
+                                    cancel_reason: null,
+                                    is_active: true,
+                                    sent_at: '2026-02-05T09:10:00+00:00',
+                                    accepted_at: null,
+                                    rejected_at: null,
+                                    cancelled_at: null,
                                     created_at: '2026-01-28T09:00:00+00:00',
                                     updated_at: '2026-01-28T09:00:00+00:00'
                                 },
@@ -2212,21 +2829,35 @@
                                     invoice_number: 'INV-2026-0002',
                                     shipment_id: 8,
                                     shipment_number: 'PCM-2026-00008',
-                                    amount: 320.50,
-                                    currency: 'GHS',
                                     status: 'accepted',
-                                    issued_at: '2026-01-25T14:00:00+00:00',
-                                    due_at: '2026-02-25T14:00:00+00:00',
+                                    pickup_fee: 100.0,
+                                    transport_fee: 180.0,
+                                    handling_fee: 40.5,
+                                    other_fee: 0.0,
+                                    total_amount: 320.5,
+                                    currency: 'GHS',
+                                    notes: null,
                                     vendor_notes: 'Approved for payment.',
+                                    rejection_reason: null,
+                                    cancel_reason: null,
+                                    is_active: true,
+                                    sent_at: '2026-01-25T14:00:00+00:00',
+                                    accepted_at: '2026-01-26T10:00:00+00:00',
+                                    rejected_at: null,
+                                    cancelled_at: null,
                                     created_at: '2026-01-25T14:00:00+00:00',
                                     updated_at: '2026-01-26T10:00:00+00:00'
                                 }
                             ],
                             pagination: {
-                                current_page: 1,
-                                per_page: 15,
+                                offset: 0,
+                                limit: 15,
                                 total: 2,
-                                last_page: 1
+                                has_more: false,
+                                next_offset: null,
+                                current_page: 1,
+                                last_page: 1,
+                                per_page: 15
                             }
                         }
                     },
@@ -2238,16 +2869,17 @@
             },
             {
                 method: 'GET',
-                url: '/api/v1/vendor/invoices/{id}',
+                url: '/api/v1/vendor/invoices/view',
                 name: 'View Invoice',
-                description: 'Get detailed information about a specific invoice.',
+                description: 'Get a specific invoice by shipment_id and/or invoice_id.',
                 auth: true,
                 group: 'invoices',
                 userType: 'vendor',
-                urlParams: [
-                    { name: 'id', type: 'dropdown', required: true, description: 'Select an invoice', source: 'invoices', labelField: 'invoice_number', valueField: 'id' }
+                urlParams: [],
+                fields: [
+                    { name: 'shipment_id', type: 'dropdown', required: false, description: 'Optional: select shipment to fetch its linked invoice', source: 'shipments?per_page=100', labelField: 'shipment_number', valueField: 'id' },
+                    { name: 'invoice_id', type: 'dropdown', required: false, description: 'Optional: select invoice directly. If shipment_id is selected, options are filtered by shipment.', source: 'invoices?limit=100', labelField: 'invoice_number', valueField: 'id', dependsOn: 'shipment_id', dependsOnQueryKey: 'shipment_id', allowWithoutParent: true }
                 ],
-                fields: [],
                 sampleBody: null,
                 exampleResponses: {
                     '200': {
@@ -2259,29 +2891,34 @@
                                 invoice_number: 'INV-2026-0001',
                                 shipment_id: 5,
                                 shipment_number: 'PCM-2026-00005',
-                                amount: 150.00,
-                                currency: 'GHS',
                                 status: 'pending',
-                                issued_at: '2026-01-28T09:00:00+00:00',
-                                due_at: '2026-02-28T09:00:00+00:00',
+                                pickup_fee: 50.0,
+                                transport_fee: 80.0,
+                                handling_fee: 20.0,
+                                other_fee: 0.0,
+                                total_amount: 150.0,
+                                currency: 'GHS',
+                                notes: 'Fragile items',
                                 vendor_notes: null,
                                 rejection_reason: null,
-                                items: [
-                                    {
-                                        description: 'Delivery fee - Accra to Tema',
-                                        quantity: 1,
-                                        unit_price: 100.00,
-                                        total: 100.00
-                                    },
-                                    {
-                                        description: 'Insurance surcharge',
-                                        quantity: 1,
-                                        unit_price: 50.00,
-                                        total: 50.00
-                                    }
-                                ],
+                                cancel_reason: null,
+                                is_active: true,
+                                sent_at: null,
+                                accepted_at: null,
+                                rejected_at: null,
+                                cancelled_at: null,
                                 created_at: '2026-01-28T09:00:00+00:00',
-                                updated_at: '2026-01-28T09:00:00+00:00'
+                                updated_at: '2026-01-28T09:00:00+00:00',
+                                shipment: {
+                                    id: 5,
+                                    shipment_number: 'PCM-2026-00005',
+                                    status: 'invoice_sent',
+                                    recipient_name: 'Ama Mensah',
+                                    recipient_phone: '+233241234567',
+                                    town: 'Tema',
+                                    landmark: 'Community 1',
+                                    created_at: '2026-01-27T08:00:00+00:00'
+                                }
                             }
                         }
                     },
@@ -2292,6 +2929,14 @@
                     '404': {
                         success: false,
                         message: 'Invoice not found.'
+                    },
+                    '422': {
+                        success: false,
+                        message: 'Either shipment_id or invoice_id is required.',
+                        errors: {
+                            shipment_id: ['Provide shipment_id or invoice_id.'],
+                            invoice_id: ['Provide shipment_id or invoice_id.']
+                        }
                     }
                 }
             },
@@ -2305,7 +2950,7 @@
                 userType: 'vendor',
                 useFormInputs: true,
                 urlParams: [
-                    { name: 'id', type: 'dropdown', required: true, description: 'Select a pending invoice', source: 'invoices?status=pending', labelField: 'invoice_number', valueField: 'id' }
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select a sent invoice', source: 'invoices?status=sent&limit=100', labelField: 'invoice_number', valueField: 'id' }
                 ],
                 fields: [
                     { name: 'vendor_notes', type: 'string', required: false, description: 'Optional notes from vendor', example: 'Approved for payment.' }
@@ -2321,15 +2966,42 @@
                             invoice: {
                                 id: 1,
                                 invoice_number: 'INV-2026-0001',
+                                shipment_id: 5,
+                                shipment_number: 'PCM-2026-00005',
                                 status: 'accepted',
+                                pickup_fee: 50.0,
+                                transport_fee: 80.0,
+                                handling_fee: 20.0,
+                                other_fee: 0.0,
+                                total_amount: 150.0,
+                                currency: 'GHS',
+                                notes: 'Fragile items',
                                 vendor_notes: 'Approved for payment.',
-                                updated_at: '2026-01-29T10:00:00+00:00'
+                                rejection_reason: null,
+                                cancel_reason: null,
+                                is_active: true,
+                                sent_at: '2026-01-28T09:10:00+00:00',
+                                accepted_at: '2026-01-29T10:00:00+00:00',
+                                rejected_at: null,
+                                cancelled_at: null,
+                                created_at: '2026-01-28T09:00:00+00:00',
+                                updated_at: '2026-01-29T10:00:00+00:00',
+                                shipment: {
+                                    id: 5,
+                                    shipment_number: 'PCM-2026-00005',
+                                    status: 'invoice_accepted',
+                                    recipient_name: 'Ama Mensah',
+                                    recipient_phone: '+233241234567',
+                                    town: 'Tema',
+                                    landmark: 'Community 1',
+                                    created_at: '2026-01-27T08:00:00+00:00'
+                                }
                             }
                         }
                     },
                     '400': {
                         success: false,
-                        message: 'Invoice is not in a pending status.'
+                        message: 'Only sent invoices can be accepted.'
                     },
                     '401': {
                         success: false,
@@ -2351,7 +3023,7 @@
                 userType: 'vendor',
                 useFormInputs: true,
                 urlParams: [
-                    { name: 'id', type: 'dropdown', required: true, description: 'Select a pending invoice', source: 'invoices?status=pending', labelField: 'invoice_number', valueField: 'id' }
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select a sent invoice', source: 'invoices?status=sent&limit=100', labelField: 'invoice_number', valueField: 'id' }
                 ],
                 fields: [
                     { name: 'rejection_reason', type: 'string', required: true, description: 'Reason for rejecting the invoice', example: 'Incorrect delivery fee amount.' }
@@ -2367,15 +3039,42 @@
                             invoice: {
                                 id: 1,
                                 invoice_number: 'INV-2026-0001',
+                                shipment_id: 5,
+                                shipment_number: 'PCM-2026-00005',
                                 status: 'rejected',
+                                pickup_fee: 50.0,
+                                transport_fee: 80.0,
+                                handling_fee: 20.0,
+                                other_fee: 0.0,
+                                total_amount: 150.0,
+                                currency: 'GHS',
+                                notes: 'Fragile items',
+                                vendor_notes: null,
                                 rejection_reason: 'Incorrect delivery fee amount.',
-                                updated_at: '2026-01-29T10:00:00+00:00'
+                                cancel_reason: null,
+                                is_active: false,
+                                sent_at: '2026-01-28T09:10:00+00:00',
+                                accepted_at: null,
+                                rejected_at: '2026-01-29T10:00:00+00:00',
+                                cancelled_at: null,
+                                created_at: '2026-01-28T09:00:00+00:00',
+                                updated_at: '2026-01-29T10:00:00+00:00',
+                                shipment: {
+                                    id: 5,
+                                    shipment_number: 'PCM-2026-00005',
+                                    status: 'submitted',
+                                    recipient_name: 'Ama Mensah',
+                                    recipient_phone: '+233241234567',
+                                    town: 'Tema',
+                                    landmark: 'Community 1',
+                                    created_at: '2026-01-27T08:00:00+00:00'
+                                }
                             }
                         }
                     },
                     '400': {
                         success: false,
-                        message: 'Invoice is not in a pending status.'
+                        message: 'Only sent invoices can be rejected.'
                     },
                     '401': {
                         success: false,
@@ -2391,37 +3090,87 @@
                     }
                 }
             },
-            // ============ DRIVER ASSIGNMENT ENDPOINTS ============
+            // ============ DRIVER PICKUP ENDPOINTS ============
             {
                 method: 'GET',
-                url: '/api/v1/driver/assignments',
-                name: 'List Assignments',
-                description: 'Get paginated list of driver\'s assignments with optional status filter.',
+                url: '/api/v1/driver/pickups',
+                name: 'List Pickups',
+                description: 'Get driver pickups with filtering and pagination structure aligned with Vendor Invoices List.',
                 auth: true,
                 group: 'driver-assignments',
                 userType: 'driver',
                 fields: [
-                    { name: 'status', type: 'string', required: false, description: 'Filter by status (e.g. assigned, en_route, arrived, picked_up)', example: 'assigned' },
-                    { name: 'per_page', type: 'number', required: false, description: 'Items per page (max 100)', example: '15' }
+                    { name: 'shipment_id', type: 'dropdown', required: false, description: 'Filter by shipment ID (shipments assigned to this driver)', source: 'pickups?limit=100', labelField: 'shipment_number', valueField: 'shipment_id', uniqueBy: 'shipment_id' },
+                    { name: 'status', queryName: 'status[]', type: 'multiselect', required: false, description: 'Pickup statuses (array). Allowed: assigned, en_route, arrived, picking_up, completed, cancelled', options: ['assigned', 'en_route', 'arrived', 'picking_up', 'completed', 'cancelled'], example: 'status[]=assigned&status[]=en_route' },
+                    { name: 'search', type: 'string', required: false, description: 'Search by shipment number, pickup contact, item details, status, notes, vendor', example: 'PCM-2026' },
+                    { name: 'from_date', type: 'date', required: false, description: 'Created date from (YYYY-MM-DD)', example: '2026-01-01' },
+                    { name: 'to_date', type: 'date', required: false, description: 'Created date to (YYYY-MM-DD)', example: '2026-12-31' },
+                    { name: 'limit', type: 'number', required: false, description: 'Number of items to return (max 100)', example: '15' },
+                    { name: 'offset', type: 'number', required: false, description: 'Number of items to skip', example: '0' },
+                    { name: 'sort_by', type: 'enum', required: false, description: 'Sort field. Allowed: id, shipment_id, status, assigned_at, en_route_at, arrived_at, picked_up_at, completed_at, cancelled_at, created_at, updated_at', options: ['created_at', 'updated_at', 'id', 'shipment_id', 'status', 'assigned_at', 'en_route_at', 'arrived_at', 'picked_up_at', 'completed_at', 'cancelled_at'] },
+                    { name: 'sort_order', type: 'enum', required: false, description: 'Sort direction', options: ['asc', 'desc'] }
                 ],
                 sampleBody: null,
                 exampleResponses: {
                     '200': {
                         success: true,
-                        message: 'Assignments retrieved successfully.',
+                        message: 'Pickups retrieved successfully.',
                         data: {
-                            assignments: [
+                            pickups: [
                                 {
                                     id: 1,
                                     shipment_id: 5,
                                     shipment_number: 'PCM-2026-00005',
                                     status: 'assigned',
-                                    pickup_address: '12 Independence Ave, Accra',
-                                    delivery_address: '45 Tema Station Rd, Tema',
-                                    scheduled_at: '2026-02-01T08:00:00+00:00',
-                                    started_at: null,
-                                    arrived_at: null,
-                                    picked_up_at: null,
+                                    cancellation_reason: null,
+                                    notes: 'Handle with care',
+                                    timeline: {
+                                        assigned: { at: '2026-02-01T08:00:00+00:00' },
+                                        en_route: { at: null },
+                                        arrived_pickup: { at: null, latitude: null, longitude: null },
+                                        picked_up: { at: null },
+                                        arrived_warehouse: { at: null, warehouse: null },
+                                        received: { at: null, warehouse: null, received_by_user_id: null, notes: null },
+                                        completed: { at: null },
+                                        cancelled: { at: null, reason: null }
+                                    },
+                                    shipment: {
+                                        id: 5,
+                                        shipment_number: 'PCM-2026-00005',
+                                        status: 'invoice_accepted',
+                                        vendor_name: 'Acme Stores',
+                                        pickup: {
+                                            contact_name: 'Kwame Asante',
+                                            contact_phone: '+233244123456',
+                                            location: {
+                                                region: 'Greater Accra',
+                                                district: 'Accra Metropolitan',
+                                                town: 'Labone',
+                                                latitude: null,
+                                                longitude: null,
+                                                gh_post_address: null,
+                                                landmark: 'Blue gate'
+                                            },
+                                            instructions: 'Pickup from reception'
+                                        },
+                                        items: [
+                                            {
+                                                id: 1,
+                                                description: 'Fridge - Samsung 250L',
+                                                quantity: 1,
+                                                status: 'pending',
+                                                tracking_code: 'TRK8A3F2K9X',
+                                                images: [
+                                                    'https://gateway.storjshare.io/shaxi/demo/shipments/5/items/1/1706860200_img.jpg?X-Amz-Signature=...'
+                                                ],
+                                                created_at: '2026-01-31T07:45:00+00:00',
+                                                updated_at: '2026-01-31T07:45:00+00:00'
+                                            }
+                                        ],
+                                        submitted_at: '2026-01-31T08:00:00+00:00',
+                                        created_at: '2026-01-31T07:30:00+00:00',
+                                        updated_at: '2026-02-01T08:00:00+00:00'
+                                    },
                                     created_at: '2026-01-30T12:00:00+00:00',
                                     updated_at: '2026-01-30T12:00:00+00:00'
                                 },
@@ -2430,21 +3179,66 @@
                                     shipment_id: 8,
                                     shipment_number: 'PCM-2026-00008',
                                     status: 'en_route',
-                                    pickup_address: '8 Ring Road Central, Accra',
-                                    delivery_address: '22 Market St, Kumasi',
-                                    scheduled_at: '2026-02-01T10:00:00+00:00',
-                                    started_at: '2026-02-01T09:45:00+00:00',
-                                    arrived_at: null,
-                                    picked_up_at: null,
+                                    cancellation_reason: null,
+                                    notes: null,
+                                    timeline: {
+                                        assigned: { at: '2026-02-01T09:30:00+00:00' },
+                                        en_route: { at: '2026-02-01T09:45:00+00:00' },
+                                        arrived_pickup: { at: null, latitude: null, longitude: null },
+                                        picked_up: { at: null },
+                                        arrived_warehouse: { at: null, warehouse: null },
+                                        received: { at: null, warehouse: null, received_by_user_id: null, notes: null },
+                                        completed: { at: null },
+                                        cancelled: { at: null, reason: null }
+                                    },
+                                    shipment: {
+                                        id: 8,
+                                        shipment_number: 'PCM-2026-00008',
+                                        status: 'pickup_assigned',
+                                        vendor_name: 'Acme Stores',
+                                        pickup: {
+                                            contact_name: 'Kofi Owusu',
+                                            contact_phone: '+233245667788',
+                                            location: {
+                                                region: null,
+                                                district: null,
+                                                town: 'Community 1',
+                                                latitude: '5.60370000',
+                                                longitude: '-0.18700000',
+                                                gh_post_address: null,
+                                                landmark: 'Market Circle'
+                                            },
+                                            instructions: null
+                                        },
+                                        items: [
+                                            {
+                                                id: 9,
+                                                description: 'Boxed blender',
+                                                quantity: 2,
+                                                status: 'pending',
+                                                tracking_code: null,
+                                                images: [],
+                                                created_at: '2026-01-30T13:40:00+00:00',
+                                                updated_at: '2026-01-30T13:40:00+00:00'
+                                            }
+                                        ],
+                                        submitted_at: '2026-01-30T13:30:00+00:00',
+                                        created_at: '2026-01-30T13:10:00+00:00',
+                                        updated_at: '2026-01-30T13:30:00+00:00'
+                                    },
                                     created_at: '2026-01-30T14:00:00+00:00',
                                     updated_at: '2026-02-01T09:45:00+00:00'
                                 }
                             ],
                             pagination: {
-                                current_page: 1,
-                                per_page: 15,
+                                offset: 0,
+                                limit: 15,
                                 total: 2,
-                                last_page: 1
+                                has_more: false,
+                                next_offset: null,
+                                current_page: 1,
+                                last_page: 1,
+                                per_page: 15
                             }
                         }
                     },
@@ -2456,50 +3250,85 @@
             },
             {
                 method: 'GET',
-                url: '/api/v1/driver/assignments/{id}',
-                name: 'View Assignment',
-                description: 'Get detailed information about a specific assignment.',
+                url: '/api/v1/driver/pickups/{id}',
+                name: 'View Pickup',
+                description: 'Get detailed information about a specific pickup.',
                 auth: true,
                 group: 'driver-assignments',
                 userType: 'driver',
                 urlParams: [
-                    { name: 'id', type: 'dropdown', required: true, description: 'Select an assignment', source: 'assignments', labelField: 'shipment_number', valueField: 'id' }
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select a pickup', source: 'pickups', labelField: 'shipment_number', valueField: 'id' }
                 ],
                 fields: [],
                 sampleBody: null,
                 exampleResponses: {
                     '200': {
                         success: true,
-                        message: 'Assignment retrieved successfully.',
+                        message: 'Pickup retrieved successfully.',
                         data: {
-                            assignment: {
+                            pickup: {
                                 id: 1,
                                 shipment_id: 5,
                                 shipment_number: 'PCM-2026-00005',
                                 status: 'assigned',
-                                pickup_address: '12 Independence Ave, Accra',
-                                delivery_address: '45 Tema Station Rd, Tema',
-                                pickup_contact: {
-                                    name: 'Kwame Asante',
-                                    phone: '+233244123456'
+                                cancellation_reason: null,
+                                notes: 'Handle with care',
+                                pickup_latitude: null,
+                                pickup_longitude: null,
+                                timeline: {
+                                    assigned: { at: '2026-02-01T08:00:00+00:00' },
+                                    en_route: { at: null },
+                                    arrived_pickup: { at: null, latitude: null, longitude: null },
+                                    picked_up: { at: null },
+                                    arrived_warehouse: { at: null, warehouse: null },
+                                    received: { at: null, warehouse: null, received_by_user_id: null, notes: null },
+                                    completed: { at: null },
+                                    cancelled: { at: null, reason: null }
                                 },
-                                delivery_contact: {
-                                    name: 'Ama Mensah',
-                                    phone: '+233244654321'
+                                shipment: {
+                                    id: 5,
+                                    shipment_number: 'PCM-2026-00005',
+                                    status: 'invoice_accepted',
+                                    vendor_name: 'Acme Stores',
+                                    pickup: {
+                                        contact_name: 'Kwame Asante',
+                                        contact_phone: '+233244123456',
+                                        location: {
+                                            region: 'Greater Accra',
+                                            district: 'Accra Metropolitan',
+                                            town: 'Labone',
+                                            latitude: null,
+                                            longitude: null,
+                                            gh_post_address: null,
+                                            landmark: 'Blue gate'
+                                        },
+                                        instructions: 'Pickup from reception'
+                                    },
+                                    items: [
+                                        {
+                                            id: 1,
+                                            description: 'Fridge - Samsung 250L',
+                                            quantity: 1,
+                                            status: 'pending',
+                                            tracking_code: 'TRK8A3F2K9X',
+                                            images: [
+                                                {
+                                                    id: 1,
+                                                    url: 'https://gateway.storjshare.io/shaxi/demo/shipments/5/items/1/1706860200_img.jpg?X-Amz-Signature=...',
+                                                    original_name: 'fridge.jpg',
+                                                    size: 198400,
+                                                    size_human: '193.75 KB',
+                                                    expires_at: '2026-02-01T09:00:00+00:00'
+                                                }
+                                            ],
+                                            created_at: '2026-01-31T07:45:00+00:00',
+                                            updated_at: '2026-01-31T07:45:00+00:00'
+                                        }
+                                    ],
+                                    submitted_at: '2026-01-31T08:00:00+00:00',
+                                    created_at: '2026-01-31T07:30:00+00:00',
+                                    updated_at: '2026-02-01T08:00:00+00:00'
                                 },
-                                items: [
-                                    {
-                                        id: 1,
-                                        description: 'Fridge - Samsung 250L',
-                                        quantity: 1,
-                                        tracking_code: 'TRK8A3F2K9X'
-                                    }
-                                ],
-                                scheduled_at: '2026-02-01T08:00:00+00:00',
-                                started_at: null,
-                                arrived_at: null,
-                                picked_up_at: null,
-                                notes: null,
                                 created_at: '2026-01-30T12:00:00+00:00',
                                 updated_at: '2026-01-30T12:00:00+00:00'
                             }
@@ -2511,34 +3340,87 @@
                     },
                     '404': {
                         success: false,
-                        message: 'Assignment not found.'
+                        message: 'Pickup not found.'
                     }
                 }
             },
             {
                 method: 'POST',
-                url: '/api/v1/driver/assignments/{id}/en-route',
+                url: '/api/v1/driver/pickups/{id}/en-route',
                 name: 'Start En Route',
-                description: 'Mark assignment as en route. Indicates the driver has started heading to the pickup location.',
+                description: 'Mark pickup as en route. Indicates the driver has started heading to the pickup location.',
                 auth: true,
                 group: 'driver-assignments',
                 userType: 'driver',
                 urlParams: [
-                    { name: 'id', type: 'dropdown', required: true, description: 'Select an assigned assignment', source: 'assignments?status=assigned', labelField: 'shipment_number', valueField: 'id' }
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select an assigned pickup', source: 'pickups?status=assigned', labelField: 'shipment_number', valueField: 'id' }
                 ],
                 fields: [],
                 sampleBody: null,
                 exampleResponses: {
                     '200': {
                         success: true,
-                        message: 'Assignment status updated to en route.',
+                        message: 'Driver is now en route.',
                         data: {
                             assignment: {
                                 id: 1,
+                                shipment_id: 5,
                                 shipment_number: 'PCM-2026-00005',
                                 status: 'en_route',
-                                started_at: '2026-02-01T07:45:00+00:00',
-                                updated_at: '2026-02-01T07:45:00+00:00'
+                                cancellation_reason: null,
+                                notes: 'Handle with care',
+                                pickup_latitude: null,
+                                pickup_longitude: null,
+                                timeline: {
+                                    assigned: { at: '2026-02-01T08:00:00+00:00' },
+                                    en_route: { at: '2026-02-01T08:10:00+00:00' },
+                                    arrived_pickup: { at: null, latitude: null, longitude: null },
+                                    picked_up: { at: null },
+                                    arrived_warehouse: { at: null, warehouse: null },
+                                    received: { at: null, warehouse: null, received_by_user_id: null, notes: null },
+                                    completed: { at: null },
+                                    cancelled: { at: null, reason: null }
+                                },
+                                target_warehouse: null,
+                                shipment: {
+                                    id: 5,
+                                    shipment_number: 'PCM-2026-00005',
+                                    status: 'invoice_accepted',
+                                    vendor_name: 'Acme Stores',
+                                    pickup: {
+                                        contact_name: 'Kwame Asante',
+                                        contact_phone: '+233244123456',
+                                        location: {
+                                            region: 'Greater Accra',
+                                            district: 'Accra Metropolitan',
+                                            town: 'Labone',
+                                            latitude: null,
+                                            longitude: null,
+                                            gh_post_address: null,
+                                            landmark: 'Blue gate'
+                                        },
+                                        instructions: 'Pickup from reception'
+                                    },
+                                    items: [
+                                        {
+                                            id: 1,
+                                            description: 'Fridge - Samsung 250L',
+                                            quantity: 1,
+                                            status: 'pending',
+                                            tracking_code: 'TRK8A3F2K9X',
+                                            images: [
+                                                'https://gateway.storjshare.io/shaxi/demo/shipments/5/items/1/1706860200_img.jpg?X-Amz-Signature=...'
+                                            ],
+                                            created_at: '2026-01-31T07:45:00+00:00',
+                                            updated_at: '2026-01-31T07:45:00+00:00'
+                                        }
+                                    ],
+                                    submitted_at: '2026-01-31T08:00:00+00:00',
+                                    created_at: '2026-01-31T07:30:00+00:00',
+                                    updated_at: '2026-02-01T08:00:00+00:00'
+                                },
+                                created_at: '2026-01-30T12:00:00+00:00',
+                                updated_at: '2026-02-01T08:10:00+00:00'
                             }
                         }
                     },
@@ -2552,25 +3434,25 @@
                     },
                     '404': {
                         success: false,
-                        message: 'Assignment not found.'
+                        message: 'Pickup not found.'
                     }
                 }
             },
             {
                 method: 'POST',
-                url: '/api/v1/driver/assignments/{id}/arrive',
+                url: '/api/v1/driver/pickups/{id}/arrive',
                 name: 'Arrive',
-                description: 'Mark that the driver has arrived at the pickup location. Requires current GPS coordinates.',
+                description: 'Mark that the driver has arrived at the pickup location for this pickup. Requires current GPS coordinates.',
                 auth: true,
                 group: 'driver-assignments',
                 userType: 'driver',
                 useFormInputs: true,
                 urlParams: [
-                    { name: 'id', type: 'dropdown', required: true, description: 'Select an en-route assignment', source: 'assignments?status=en_route', labelField: 'shipment_number', valueField: 'id' }
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select an en-route pickup', source: 'pickups?status=en_route', labelField: 'shipment_number', valueField: 'id' }
                 ],
                 fields: [
-                    { name: 'latitude', type: 'string', required: true, description: 'Current GPS latitude', example: '5.6037' },
-                    { name: 'longitude', type: 'string', required: true, description: 'Current GPS longitude', example: '-0.1870' }
+                    { name: 'latitude', type: 'string', required: true, description: 'Current GPS latitude (-90 to 90)', example: '5.6037' },
+                    { name: 'longitude', type: 'string', required: true, description: 'Current GPS longitude (-180 to 180)', example: '-0.1870' }
                 ],
                 sampleBody: {
                     latitude: '5.6037',
@@ -2579,22 +3461,73 @@
                 exampleResponses: {
                     '200': {
                         success: true,
-                        message: 'Arrival confirmed at pickup location.',
+                        message: 'Driver has arrived.',
                         data: {
                             assignment: {
                                 id: 1,
+                                shipment_id: 5,
                                 shipment_number: 'PCM-2026-00005',
                                 status: 'arrived',
-                                arrived_at: '2026-02-01T08:05:00+00:00',
-                                arrival_latitude: 5.6037,
-                                arrival_longitude: -0.1870,
-                                updated_at: '2026-02-01T08:05:00+00:00'
+                                cancellation_reason: null,
+                                notes: 'Handle with care',
+                                pickup_latitude: 5.6037,
+                                pickup_longitude: -0.1870,
+                                timeline: {
+                                    assigned: { at: '2026-02-01T08:00:00+00:00' },
+                                    en_route: { at: '2026-02-01T08:10:00+00:00' },
+                                    arrived_pickup: { at: '2026-02-01T08:15:00+00:00', latitude: 5.6037, longitude: -0.1870 },
+                                    picked_up: { at: null },
+                                    arrived_warehouse: { at: null, warehouse: null },
+                                    received: { at: null, warehouse: null, received_by_user_id: null, notes: null },
+                                    completed: { at: null },
+                                    cancelled: { at: null, reason: null }
+                                },
+                                target_warehouse: null,
+                                shipment: {
+                                    id: 5,
+                                    shipment_number: 'PCM-2026-00005',
+                                    status: 'invoice_accepted',
+                                    vendor_name: 'Acme Stores',
+                                    pickup: {
+                                        contact_name: 'Kwame Asante',
+                                        contact_phone: '+233244123456',
+                                        location: {
+                                            region: 'Greater Accra',
+                                            district: 'Accra Metropolitan',
+                                            town: 'Labone',
+                                            latitude: null,
+                                            longitude: null,
+                                            gh_post_address: null,
+                                            landmark: 'Blue gate'
+                                        },
+                                        instructions: 'Pickup from reception'
+                                    },
+                                    items: [
+                                        {
+                                            id: 1,
+                                            description: 'Fridge - Samsung 250L',
+                                            quantity: 1,
+                                            status: 'pending',
+                                            tracking_code: 'TRK8A3F2K9X',
+                                            images: [
+                                                'https://gateway.storjshare.io/shaxi/demo/shipments/5/items/1/1706860200_img.jpg?X-Amz-Signature=...'
+                                            ],
+                                            created_at: '2026-01-31T07:45:00+00:00',
+                                            updated_at: '2026-01-31T07:45:00+00:00'
+                                        }
+                                    ],
+                                    submitted_at: '2026-01-31T08:00:00+00:00',
+                                    created_at: '2026-01-31T07:30:00+00:00',
+                                    updated_at: '2026-02-01T08:00:00+00:00'
+                                },
+                                created_at: '2026-01-30T12:00:00+00:00',
+                                updated_at: '2026-02-01T08:15:00+00:00'
                             }
                         }
                     },
                     '400': {
                         success: false,
-                        message: 'Assignment is not in en_route status.'
+                        message: 'Driver must be en route to arrive.'
                     },
                     '401': {
                         success: false,
@@ -2602,7 +3535,7 @@
                     },
                     '404': {
                         success: false,
-                        message: 'Assignment not found.'
+                        message: 'Pickup not found.'
                     },
                     '422': {
                         success: false,
@@ -2612,58 +3545,122 @@
             },
             {
                 method: 'POST',
-                url: '/api/v1/driver/assignments/{id}/confirm-pickup',
-                name: 'Confirm Pickup',
-                description: 'Confirm that items have been picked up. Requires photos of the items, GPS coordinates, and optional notes.',
+                url: '/api/v1/driver/pickups/{shipment_id}/items/{item}/confirm',
+                name: 'Confirm Pickup Item',
+                description: 'Confirm or update one shipment item before pickup finalization. You can upload additional photos and/or remove existing uploaded photos with remove_photo_ids[].',
                 auth: true,
                 group: 'driver-assignments',
                 userType: 'driver',
                 bodyType: 'formdata',
                 useFormInputs: true,
                 urlParams: [
-                    { name: 'id', type: 'dropdown', required: true, description: 'Select an arrived assignment', source: 'assignments?status=arrived', labelField: 'shipment_number', valueField: 'id' }
+                    { name: 'shipment_id', type: 'dropdown', required: true, description: 'Select a pickup to confirm/update item', source: 'pickups?status=arrived,picking_up', labelField: 'shipment_number', valueField: 'id' },
+                    { name: 'item', type: 'dropdown', required: true, description: 'Select shipment item under chosen pickup', dependsOn: 'shipment_id', labelField: 'display_name', valueField: 'id', onSelect: 'prefillPickupConfirmItemData' }
                 ],
                 fields: [
-                    { name: 'photos[]', type: 'file', required: true, description: 'Photos of picked up items (JPEG/PNG/WebP, max 5MB each)', example: '', multiple: true },
-                    { name: 'latitude', type: 'string', required: true, description: 'Current GPS latitude', example: '5.6037' },
-                    { name: 'longitude', type: 'string', required: true, description: 'Current GPS longitude', example: '-0.1870' },
-                    { name: 'notes', type: 'string', required: false, description: 'Optional pickup notes', example: 'All items in good condition.' }
+                    { name: 'confirmed_quantity', type: 'number', required: true, description: 'Quantity physically picked for this item', example: '1' },
+                    { name: 'notes', type: 'string', required: false, description: 'Optional item-level pickup notes', example: 'Box sealed and counted' },
+                    { name: 'remove_photo_ids[]', type: 'multiselect', required: false, hideUntilPopulated: true, description: 'Optional existing pickup photos to remove (multi-select)', options: [] },
+                    { name: 'photos[]', type: 'file', required: false, description: 'Optional additional item proof photos (JPEG/PNG/WebP, max 10MB each)', example: '', multiple: true }
                 ],
                 sampleBody: null,
                 exampleResponses: {
                     '200': {
                         success: true,
-                        message: 'Pickup confirmed successfully.',
+                        message: 'Pickup item confirmed successfully.',
                         data: {
                             assignment: {
                                 id: 1,
+                                shipment_id: 5,
                                 shipment_number: 'PCM-2026-00005',
-                                status: 'picked_up',
-                                picked_up_at: '2026-02-01T08:15:00+00:00',
+                                status: 'picking_up',
+                                cancellation_reason: null,
+                                notes: 'Handle with care',
                                 pickup_latitude: 5.6037,
                                 pickup_longitude: -0.1870,
-                                notes: 'All items in good condition.',
-                                photos: [
-                                    {
-                                        id: 1,
-                                        url: 'https://gateway.storjshare.io/shaxi/demo/assignments/1/pickup_1706860500_abc123.jpg?X-Amz-Signature=...',
-                                        original_name: 'item-photo-1.jpg',
-                                        size: 198400
+                                timeline: {
+                                    assigned: { at: '2026-02-01T08:00:00+00:00' },
+                                    en_route: { at: '2026-02-01T08:10:00+00:00' },
+                                    arrived_pickup: { at: '2026-02-01T08:15:00+00:00', latitude: 5.6037, longitude: -0.1870 },
+                                    picked_up: { at: null },
+                                    arrived_warehouse: { at: null, warehouse: null },
+                                    received: { at: null, warehouse: null, received_by_user_id: null, notes: null },
+                                    completed: { at: null },
+                                    cancelled: { at: null, reason: null }
+                                },
+                                target_warehouse: null,
+                                shipment: {
+                                    id: 5,
+                                    shipment_number: 'PCM-2026-00005',
+                                    status: 'pickup_assigned',
+                                    vendor_name: 'Acme Stores',
+                                    pickup: {
+                                        contact_name: 'Kwame Asante',
+                                        contact_phone: '+233244123456',
+                                        location: {
+                                            region: 'Greater Accra',
+                                            district: 'Accra Metropolitan',
+                                            town: 'Labone',
+                                            latitude: null,
+                                            longitude: null,
+                                            gh_post_address: null,
+                                            landmark: 'Blue gate'
+                                        },
+                                        instructions: 'Pickup from reception'
                                     },
-                                    {
-                                        id: 2,
-                                        url: 'https://gateway.storjshare.io/shaxi/demo/assignments/1/pickup_1706860501_def456.jpg?X-Amz-Signature=...',
-                                        original_name: 'item-photo-2.jpg',
-                                        size: 215300
-                                    }
-                                ],
-                                updated_at: '2026-02-01T08:15:00+00:00'
+                                    items: [
+                                        {
+                                            id: 1,
+                                            description: 'Fridge - Samsung 250L',
+                                            quantity: 1,
+                                            status: 'picked_up',
+                                            tracking_code: 'TRK8A3F2K9X',
+                                            images: [
+                                                'https://gateway.storjshare.io/shaxi/demo/shipments/5/items/1/1706860200_img.jpg?X-Amz-Signature=...'
+                                            ],
+                                            pickup_confirmation: {
+                                                expected_quantity: 1,
+                                                confirmed_quantity: 1,
+                                                missing_quantity: 0,
+                                                extra_quantity: 0,
+                                                is_exact_match: true,
+                                                notes: 'Box sealed',
+                                                confirmed_at: '2026-02-01T08:20:00+00:00',
+                                                photos: [
+                                                    {
+                                                        id: 1,
+                                                        url: 'https://gateway.storjshare.io/shaxi/demo/assignments/1/pickup_1706860500_abc123.jpg?X-Amz-Signature=...',
+                                                        original_name: 'item-photo-1.jpg',
+                                                        size: 198400,
+                                                        size_human: '193.75 KB',
+                                                        created_at: '2026-02-01T08:20:00+00:00'
+                                                    },
+                                                    {
+                                                        id: 2,
+                                                        url: 'https://gateway.storjshare.io/shaxi/demo/assignments/1/pickup_1706860501_def456.jpg?X-Amz-Signature=...',
+                                                        original_name: 'item-photo-2.jpg',
+                                                        size: 215300,
+                                                        size_human: '210.25 KB',
+                                                        created_at: '2026-02-01T08:20:00+00:00'
+                                                    }
+                                                ]
+                                            },
+                                            created_at: '2026-01-31T07:45:00+00:00',
+                                            updated_at: '2026-01-31T07:45:00+00:00'
+                                        }
+                                    ],
+                                    submitted_at: '2026-01-31T08:00:00+00:00',
+                                    created_at: '2026-01-31T07:30:00+00:00',
+                                    updated_at: '2026-02-01T08:00:00+00:00'
+                                },
+                                created_at: '2026-01-30T12:00:00+00:00',
+                                updated_at: '2026-02-01T08:20:00+00:00'
                             }
                         }
                     },
                     '400': {
                         success: false,
-                        message: 'Assignment is not in arrived status.'
+                        message: 'Driver must have arrived to confirm an item.'
                     },
                     '401': {
                         success: false,
@@ -2671,11 +3668,135 @@
                     },
                     '404': {
                         success: false,
-                        message: 'Assignment not found.'
+                        message: 'Pickup not found.'
                     },
                     '422': {
                         success: false,
-                        message: 'The photos field is required.'
+                        message: 'The confirmed quantity field is required.'
+                    }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/pickups/{id}/confirm-pickup',
+                name: 'Finalize Pickup',
+                description: 'Finalize pickup after all shipment items have been confirmed.',
+                auth: true,
+                group: 'driver-assignments',
+                userType: 'driver',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'id', type: 'dropdown', required: true, description: 'Select a pickup in picking_up status', source: 'pickups?status=picking_up', labelField: 'shipment_number', valueField: 'id' }
+                ],
+                fields: [
+                    { name: 'latitude', type: 'string', required: false, description: 'Optional final pickup latitude (-90 to 90)', example: '5.6037' },
+                    { name: 'longitude', type: 'string', required: false, description: 'Optional final pickup longitude (-180 to 180)', example: '-0.1870' },
+                    { name: 'notes', type: 'string', required: false, description: 'Optional pickup completion notes', example: 'All items confirmed and loaded.' }
+                ],
+                sampleBody: {
+                    notes: 'All items confirmed and loaded.'
+                },
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Pickup finalized successfully.',
+                        data: {
+                            assignment: {
+                                id: 1,
+                                shipment_id: 5,
+                                shipment_number: 'PCM-2026-00005',
+                                status: 'completed',
+                                cancellation_reason: null,
+                                notes: 'All items confirmed and loaded.',
+                                pickup_latitude: 5.6037,
+                                pickup_longitude: -0.1870,
+                                timeline: {
+                                    assigned: { at: '2026-02-01T08:00:00+00:00' },
+                                    en_route: { at: '2026-02-01T08:10:00+00:00' },
+                                    arrived_pickup: { at: '2026-02-01T08:15:00+00:00', latitude: 5.6037, longitude: -0.1870 },
+                                    picked_up: { at: '2026-02-01T08:25:00+00:00' },
+                                    arrived_warehouse: { at: null, warehouse: null },
+                                    received: { at: null, warehouse: null, received_by_user_id: null, notes: null },
+                                    completed: { at: '2026-02-01T08:25:00+00:00' },
+                                    cancelled: { at: null, reason: null }
+                                },
+                                target_warehouse: null,
+                                shipment: {
+                                    id: 5,
+                                    shipment_number: 'PCM-2026-00005',
+                                    status: 'picked_up',
+                                    vendor_name: 'Acme Stores',
+                                    pickup: {
+                                        contact_name: 'Kwame Asante',
+                                        contact_phone: '+233244123456',
+                                        location: {
+                                            region: 'Greater Accra',
+                                            district: 'Accra Metropolitan',
+                                            town: 'Labone',
+                                            latitude: null,
+                                            longitude: null,
+                                            gh_post_address: null,
+                                            landmark: 'Blue gate'
+                                        },
+                                        instructions: 'Pickup from reception'
+                                    },
+                                    items: [
+                                        {
+                                            id: 1,
+                                            description: 'Fridge - Samsung 250L',
+                                            quantity: 1,
+                                            status: 'picked_up',
+                                            tracking_code: 'TRK8A3F2K9X',
+                                            images: [
+                                                'https://gateway.storjshare.io/shaxi/demo/shipments/5/items/1/1706860200_img.jpg?X-Amz-Signature=...'
+                                            ],
+                                            pickup_confirmation: {
+                                                expected_quantity: 1,
+                                                confirmed_quantity: 1,
+                                                missing_quantity: 0,
+                                                extra_quantity: 0,
+                                                is_exact_match: true,
+                                                notes: 'Box sealed',
+                                                confirmed_at: '2026-02-01T08:20:00+00:00',
+                                                photos: [
+                                                    {
+                                                        id: 1,
+                                                        url: 'https://gateway.storjshare.io/shaxi/demo/assignments/1/pickup_1706860500_abc123.jpg?X-Amz-Signature=...',
+                                                        original_name: 'item-photo-1.jpg',
+                                                        size: 198400,
+                                                        size_human: '193.75 KB',
+                                                        created_at: '2026-02-01T08:20:00+00:00'
+                                                    }
+                                                ]
+                                            },
+                                            created_at: '2026-01-31T07:45:00+00:00',
+                                            updated_at: '2026-02-01T08:25:00+00:00'
+                                        }
+                                    ],
+                                    submitted_at: '2026-01-31T08:00:00+00:00',
+                                    created_at: '2026-01-31T07:30:00+00:00',
+                                    updated_at: '2026-02-01T08:25:00+00:00'
+                                },
+                                created_at: '2026-01-30T12:00:00+00:00',
+                                updated_at: '2026-02-01T08:25:00+00:00'
+                            }
+                        }
+                    },
+                    '400': {
+                        success: false,
+                        message: 'All shipment items must be confirmed before finalizing pickup.'
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    },
+                    '404': {
+                        success: false,
+                        message: 'Pickup not found.'
+                    },
+                    '422': {
+                        success: false,
+                        message: 'The longitude field is required when latitude is present.'
                     }
                 }
             }
@@ -2685,6 +3806,7 @@
         let selectedEndpoint = null;
         let responseData = null;
         let selectedExampleStatus = null;
+        let vendorProfileCache = null;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -2832,7 +3954,7 @@
                 groupName = 'Profile';
                 folderName = 'Driver';
             } else if (selectedEndpoint.group === 'driver-assignments') {
-                groupName = 'Assignments';
+                groupName = 'Pickups';
                 folderName = 'Driver';
             }
             document.getElementById('breadcrumbGroup').textContent = folderName + ' / ' + groupName;
@@ -2843,12 +3965,17 @@
             document.getElementById('endpointDesc').textContent = selectedEndpoint.description;
             document.getElementById('sendBtn').disabled = false;
 
-            // Handle URL params tab visibility and rendering
+            // Handle params tab visibility and rendering
             const paramsTabBtn = document.getElementById('paramsTabBtn');
-            if (selectedEndpoint.urlParams && selectedEndpoint.urlParams.length > 0) {
+            const hasUrlParams = selectedEndpoint.urlParams && selectedEndpoint.urlParams.length > 0;
+            const hasQueryParams = selectedEndpoint.method === 'GET'
+                && selectedEndpoint.fields
+                && selectedEndpoint.fields.length > 0;
+
+            if (hasUrlParams || hasQueryParams) {
                 paramsTabBtn.classList.remove('hidden');
-                renderUrlParams(selectedEndpoint.urlParams);
-                // Auto-switch to params tab when endpoint has URL params
+                await renderParamsTab(selectedEndpoint);
+                // Auto-switch to params tab when endpoint has request params
                 switchTab('request', 'params');
             } else {
                 paramsTabBtn.classList.add('hidden');
@@ -2865,6 +3992,10 @@
                 formContainer.classList.remove('hidden');
                 jsonEditor.classList.add('hidden');
                 await renderFormInputs(selectedEndpoint.fields, selectedEndpoint.sampleBody);
+
+                if (selectedEndpoint.method === 'POST' && selectedEndpoint.url === '/api/v1/vendor/shipments') {
+                    await prefillCreateShipmentFromVendorProfile();
+                }
             } else {
                 // Use JSON editor
                 formContainer.classList.add('hidden');
@@ -2880,6 +4011,31 @@
 
             // Clear response area
             clearResponse();
+        }
+
+        async function renderParamsTab(endpoint) {
+            const urlParamsSection = document.getElementById('urlParamsSection');
+            const queryParamsSection = document.getElementById('queryParamsSection');
+            const hasUrlParams = endpoint.urlParams && endpoint.urlParams.length > 0;
+            const hasQueryParams = endpoint.method === 'GET'
+                && endpoint.fields
+                && endpoint.fields.length > 0;
+
+            if (hasUrlParams) {
+                urlParamsSection.classList.remove('hidden');
+                await renderUrlParams(endpoint.urlParams);
+            } else {
+                urlParamsSection.classList.add('hidden');
+                document.getElementById('urlParamsContainer').innerHTML = '';
+            }
+
+            if (hasQueryParams) {
+                queryParamsSection.classList.remove('hidden');
+                await renderQueryParams(endpoint.fields);
+            } else {
+                queryParamsSection.classList.add('hidden');
+                document.getElementById('queryParamsContainer').innerHTML = '';
+            }
         }
 
         // Clear response area
@@ -3010,34 +4166,70 @@
             }
         }
 
-        // Get status label with badge
-        function getStatusLabel(status) {
-            const cleanStatus = status.replace(/_.*/, ''); // Remove suffix like _already, _phone, etc
-            const statusNum = parseInt(cleanStatus);
+        function toTitleCase(value) {
+            return value
+                .split(' ')
+                .filter(Boolean)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
 
-            let label = status;
-            let type = 'success';
+        function formatStatusVariantLabel(variantRaw) {
+            if (!variantRaw) return '';
 
-            if (statusNum >= 200 && statusNum < 300) {
-                type = 'success';
-                label = `${cleanStatus} Success`;
-            } else if (statusNum >= 400 && statusNum < 500) {
-                type = 'error';
-                // Add description based on suffix
-                if (status.includes('_already')) label = `${cleanStatus} Already Verified`;
-                else if (status.includes('_unverified')) label = `${cleanStatus} Unverified`;
-                else if (status.includes('_inactive')) label = `${cleanStatus} Inactive`;
-                else if (status.includes('_phone')) label = `${cleanStatus} Invalid Phone`;
-                else label = `${cleanStatus} Error`;
-            } else if (statusNum === 401) {
-                type = 'warning';
-                label = '401 Unauthenticated';
-            } else if (statusNum === 422) {
-                type = 'warning';
-                label = '422 Validation Error';
+            const knownLabels = {
+                already: 'Already Verified',
+                unverified: 'Unverified',
+                inactive: 'Inactive',
+                phone: 'Invalid Phone',
+                single: 'Single Destination',
+                per_item: 'Per Item Destination',
+            };
+
+            if (knownLabels[variantRaw]) {
+                return knownLabels[variantRaw];
             }
 
-            return label;
+            return toTitleCase(variantRaw.replace(/[_-]+/g, ' '));
+        }
+
+        // Get status label for example response selector
+        function getStatusLabel(status) {
+            const [statusCode, ...variantParts] = status.split('_');
+            const statusNum = parseInt(statusCode, 10);
+            const variantRaw = variantParts.join('_');
+            const variantLabel = formatStatusVariantLabel(variantRaw);
+            const variantSuffix = variantLabel ? ` - ${variantLabel}` : '';
+
+            if (Number.isNaN(statusNum)) {
+                return status;
+            }
+
+            if (statusNum === 401) {
+                return `401 Unauthenticated${variantSuffix}`;
+            }
+
+            if (statusNum === 422) {
+                return `422 Validation Error${variantSuffix}`;
+            }
+
+            if (statusNum >= 200 && statusNum < 300) {
+                return `${statusCode} Success${variantSuffix}`;
+            }
+
+            if (statusNum >= 400 && statusNum < 500) {
+                if (variantRaw === 'already') return `${statusCode} Already Verified`;
+                if (variantRaw === 'unverified') return `${statusCode} Unverified`;
+                if (variantRaw === 'inactive') return `${statusCode} Inactive`;
+                if (variantRaw === 'phone') return `${statusCode} Invalid Phone`;
+                return `${statusCode} Error${variantSuffix}`;
+            }
+
+            if (statusNum >= 500) {
+                return `${statusCode} Server Error${variantSuffix}`;
+            }
+
+            return `${statusCode}${variantSuffix}`;
         }
 
         // Update example response display
@@ -3174,15 +4366,16 @@
 
                 if (param.type === 'dropdown') {
                     const isDependent = param.dependsOn ? true : false;
-                    const disabled = isDependent ? 'disabled' : '';
-                    const initialText = isDependent ? `-- Select ${param.dependsOn} first --` : '-- Loading... --';
+                    const disableByDependency = isDependent && !param.allowWithoutParent;
+                    const disabled = disableByDependency ? 'disabled' : '';
+                    const initialText = disableByDependency ? `-- Select ${param.dependsOn} first --` : '-- Loading... --';
 
                     html += `<div style="display: flex; gap: 8px; align-items: center;">
                         <select id="url-param-${param.name}" class="form-input" style="flex: 1;" ${disabled} onchange="onUrlParamChange('${param.name}')">
                             <option value="">${initialText}</option>
                         </select>`;
 
-                    if (!isDependent && param.source) {
+                    if (param.source) {
                         html += `<button type="button" onclick="refreshDropdown('${param.name}', '${param.source}')" style="padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; background: #fff; cursor: pointer; font-size: 12px;" title="Refresh options">↻</button>`;
                     }
 
@@ -3197,9 +4390,9 @@
             html += '</tbody></table>';
             container.innerHTML = html;
 
-            // Load dropdown options asynchronously (only for non-dependent dropdowns)
+            // Load dropdown options asynchronously
             for (const param of urlParams) {
-                if (param.type === 'dropdown' && param.source && !param.dependsOn) {
+                if (param.type === 'dropdown' && param.source && (!param.dependsOn || param.allowWithoutParent)) {
                     await loadDropdownOptions(param);
                 }
             }
@@ -3210,65 +4403,153 @@
             const select = document.getElementById('url-param-' + param.name);
             if (!select) return;
 
-            // Check cache first
-            if (dataSourceCache[param.source]) {
-                populateDropdown(select, dataSourceCache[param.source], param);
-                return;
-            }
-
-            // Determine API endpoint based on source
-            let apiUrl = '';
-            let dataKey = '';
-            if (param.source === 'regions') {
-                apiUrl = '{{ url('') }}/api/v1/vendor/regions';
-                dataKey = 'regions';
-            } else if (param.source.startsWith('shipments')) {
-                apiUrl = '{{ url('') }}/api/v1/vendor/' + param.source;
-                dataKey = 'shipments';
-            }
-
-            if (!apiUrl) {
-                select.innerHTML = '<option value="">-- Error: Unknown source --</option>';
-                return;
-            }
-
-            // Get token
-            const token = localStorage.getItem('parcelman_vendor_token');
-            if (!token) {
-                select.innerHTML = '<option value="">-- Please login first --</option>';
-                return;
-            }
-
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': 'Bearer ' + token
-                    }
-                });
-
-                const data = await response.json();
-
-                if (data.success && data.data) {
-                    // Cache the data - use dataKey if specified, otherwise use param.source
-                    const cacheKey = param.source;
-                    const items = data.data[dataKey] || data.data.shipments || [];
-                    dataSourceCache[cacheKey] = items;
-                    populateDropdown(select, items, param);
-                } else {
-                    select.innerHTML = '<option value="">-- Error loading data --</option>';
-                }
+                const items = await fetchSourceItems(param.source);
+                populateDropdown(select, items, param);
             } catch (error) {
                 console.error('Error loading dropdown options:', error);
                 select.innerHTML = '<option value="">-- Error: ' + error.message + ' --</option>';
             }
         }
 
+        function getSourceDataKey(source) {
+            const baseSource = String(source || '').split('?')[0];
+            if (baseSource === 'regions') return 'regions';
+            if (baseSource.startsWith('shipments')) return 'shipments';
+            if (baseSource.startsWith('invoices')) return 'invoices';
+            if (baseSource.startsWith('pickups')) return 'pickups';
+            return baseSource;
+        }
+
+        function getSourceApiUrl(source) {
+            if (!source) return '';
+            if (source === 'regions') {
+                return '{{ url('') }}/api/v1/vendor/regions';
+            }
+            if (String(source).startsWith('assignments') || String(source).startsWith('pickups')) {
+                return '{{ url('') }}/api/v1/driver/' + source;
+            }
+            return '{{ url('') }}/api/v1/vendor/' + source;
+        }
+
+        async function fetchSourceItems(source) {
+            if (!source) {
+                throw new Error('Unknown source');
+            }
+
+            if (dataSourceCache[source]) {
+                return dataSourceCache[source];
+            }
+
+            const apiUrl = getSourceApiUrl(source);
+            if (!apiUrl) {
+                throw new Error('Unknown source');
+            }
+
+            const token = getActiveToken();
+            if (!token) {
+                throw new Error('Please login first');
+            }
+
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                }
+            });
+
+            const data = await response.json();
+            if (!response.ok || !data.success || !data.data) {
+                throw new Error(data.message || 'Error loading data');
+            }
+
+            const dataKey = getSourceDataKey(source);
+            const items = data.data[dataKey] || [];
+            dataSourceCache[source] = items;
+
+            return items;
+        }
+
+        async function fetchVendorProfile() {
+            if (vendorProfileCache) {
+                return vendorProfileCache;
+            }
+
+            const token = getActiveToken();
+            if (!token) {
+                return null;
+            }
+
+            const response = await fetch('{{ url('') }}/api/v1/vendor/profile', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                }
+            });
+
+            const data = await response.json();
+            if (!response.ok || !data.success || !data.data || !data.data.user) {
+                return null;
+            }
+
+            vendorProfileCache = data.data.user;
+            return vendorProfileCache;
+        }
+
+        async function prefillCreateShipmentFromVendorProfile() {
+            try {
+                const profile = await fetchVendorProfile();
+                if (!profile) {
+                    return;
+                }
+
+                const pickupName = String(profile.name || profile.business_name || '').trim();
+                const pickupPhone = String(profile.phone || '').trim();
+
+                const setIfEmpty = (fieldId, value) => {
+                    if (!value) return;
+                    const input = document.getElementById(fieldId);
+                    if (!input) return;
+
+                    if (String(input.value || '').trim() === '') {
+                        input.value = value;
+                    }
+                };
+
+                setIfEmpty('form-field-pickup_contact_name', pickupName);
+                setIfEmpty('form-field-pickup_contact_phone', pickupPhone);
+                setIfEmpty('form-field-pickup_contact_phone_confirm', pickupPhone);
+            } catch (error) {
+                console.error('Error prefilling vendor shipment fields:', error);
+            }
+        }
+
         // Populate dropdown with options
         function populateDropdown(select, items, param) {
+            let listItems = Array.isArray(items) ? items : [];
+
+            if (param && param.uniqueBy) {
+                const seenKeys = new Set();
+                listItems = listItems.filter(item => {
+                    const keyValue = item?.[param.uniqueBy];
+                    if (keyValue === undefined || keyValue === null || keyValue === '') {
+                        return false;
+                    }
+
+                    const key = String(keyValue);
+                    if (seenKeys.has(key)) {
+                        return false;
+                    }
+
+                    seenKeys.add(key);
+                    return true;
+                });
+            }
+
             let html = '<option value="">-- Select ' + param.name + ' --</option>';
-            items.forEach(item => {
+            listItems.forEach(item => {
                 const value = item[param.valueField];
                 const label = item[param.labelField];
                 html += `<option value="${value}" data-item='${JSON.stringify(item).replace(/'/g, "&apos;")}'>${label}</option>`;
@@ -3293,37 +4574,285 @@
             }
         }
 
+        // Render query parameters (for GET endpoints)
+        async function renderQueryParams(fields) {
+            const container = document.getElementById('queryParamsContainer');
+            if (!container) return;
+
+            let html = '<table class="headers-table"><thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>';
+
+            fields.forEach(field => {
+                html += `<tr>
+                    <td>
+                        <span style="font-family: 'SF Mono', Monaco, monospace; color: #0066b8;">${field.name}</span>
+                        ${field.required ? '<span style="color: #c62828; font-size: 10px; margin-left: 4px;">*</span>' : ''}
+                        <br><small style="color: #888;">${field.description || ''}</small>
+                    </td>
+                    <td>`;
+
+                if (field.type === 'dropdown') {
+                    const shouldDisable = field.dependsOn && !field.allowWithoutParent;
+                    const initialText = shouldDisable
+                        ? `-- Select ${field.dependsOn} first --`
+                        : '-- Loading... --';
+
+                    html += `<div style="display: flex; gap: 8px; align-items: center;">
+                        <select id="query-param-${field.name}" class="form-input" ${shouldDisable ? 'disabled' : ''} onchange="onQueryParamChange('${field.name}')">
+                            <option value="">${initialText}</option>
+                        </select>`;
+
+                    if (field.source) {
+                        html += `<button type="button" onclick="refreshQueryDropdown('${field.name}')" style="padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; background: #fff; cursor: pointer; font-size: 12px;" title="Refresh options">↻</button>`;
+                    }
+
+                    html += `</div>`;
+                } else if (field.type === 'multiselect' && field.options) {
+                    const size = Math.min(Math.max(field.options.length, 3), 6);
+                    html += `<select id="query-param-${field.name}" class="form-input" multiple size="${size}" onchange="updateUrlWithParams()">`;
+                    field.options.forEach(opt => {
+                        const label = field.labels && field.labels[opt] ? field.labels[opt] : opt;
+                        html += `<option value="${opt}">${label}</option>`;
+                    });
+                    html += '</select>';
+                } else if (field.type === 'enum' && field.options) {
+                    html += `<select id="query-param-${field.name}" class="form-input" onchange="updateUrlWithParams()">
+                        <option value="">-- Select --</option>`;
+                    field.options.forEach(opt => {
+                        const label = field.labels && field.labels[opt] ? field.labels[opt] : opt;
+                        html += `<option value="${opt}">${label}</option>`;
+                    });
+                    html += '</select>';
+                } else {
+                    if (field.type === 'date') {
+                        html += `<input
+                            type="text"
+                            id="query-param-${field.name}"
+                            class="form-input"
+                            placeholder="YYYY-MM-DD"
+                            onfocus="activateDateInput(this)"
+                            onblur="deactivateDateInput(this)"
+                            oninput="updateUrlWithParams()"
+                        >`;
+                    } else {
+                        const inputType = field.type === 'number' ? 'number' : 'text';
+                        const placeholder = field.example ? `e.g. ${field.example}` : `Enter ${field.name}`;
+                        html += `<input
+                            type="${inputType}"
+                            id="query-param-${field.name}"
+                            class="form-input"
+                            placeholder="${placeholder}"
+                            oninput="updateUrlWithParams()"
+                        >`;
+                    }
+                }
+
+                html += `</td></tr>`;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+
+            for (const field of fields) {
+                if (field.type === 'dropdown' && field.source && (!field.dependsOn || field.allowWithoutParent)) {
+                    await loadQueryDropdownOptions(field);
+                }
+            }
+
+            updateUrlWithParams();
+        }
+
+        function buildQueryParamSource(field) {
+            if (!field || !field.source) return null;
+            if (!field.dependsOn) return field.source;
+
+            const parentInput = document.getElementById('query-param-' + field.dependsOn);
+            const parentValue = parentInput ? String(parentInput.value ?? '').trim() : '';
+
+            if (!parentValue) {
+                return field.allowWithoutParent ? field.source : null;
+            }
+
+            const queryKey = field.dependsOnQueryKey || field.dependsOn;
+            const separator = field.source.includes('?') ? '&' : '?';
+
+            return `${field.source}${separator}${encodeURIComponent(queryKey)}=${encodeURIComponent(parentValue)}`;
+        }
+
+        async function loadQueryDropdownOptions(field) {
+            const select = document.getElementById('query-param-' + field.name);
+            if (!select) return;
+
+            const source = buildQueryParamSource(field);
+            if (!source) {
+                select.disabled = true;
+                select.innerHTML = `<option value="">-- Select ${field.dependsOn} first --</option>`;
+                return;
+            }
+
+            const previousValue = select.value;
+            select.disabled = false;
+            select.innerHTML = '<option value="">-- Loading... --</option>';
+
+            try {
+                const items = await fetchSourceItems(source);
+                populateDropdown(select, items, field);
+
+                const hasPrevious = Array.from(select.options).some(opt => opt.value === previousValue);
+                if (hasPrevious) {
+                    select.value = previousValue;
+                } else {
+                    select.value = '';
+                }
+            } catch (error) {
+                select.innerHTML = '<option value="">-- Error: ' + error.message + ' --</option>';
+            }
+
+            updateUrlWithParams();
+        }
+
+        async function onQueryParamChange(fieldName) {
+            updateUrlWithParams();
+
+            if (!selectedEndpoint || !selectedEndpoint.fields) return;
+
+            const dependentFields = selectedEndpoint.fields.filter(field => field.dependsOn === fieldName);
+            for (const dependentField of dependentFields) {
+                if (dependentField.type === 'dropdown' && dependentField.source) {
+                    await loadQueryDropdownOptions(dependentField);
+                }
+            }
+        }
+
+        async function refreshQueryDropdown(fieldName) {
+            if (!selectedEndpoint || !selectedEndpoint.fields) return;
+
+            const field = selectedEndpoint.fields.find(f => f.name === fieldName);
+            if (!field || !field.source) return;
+            const baseSource = String(field.source).split('?')[0];
+
+            Object.keys(dataSourceCache).forEach(cacheKey => {
+                const cacheBaseSource = String(cacheKey).split('?')[0];
+                if (cacheKey === field.source || cacheBaseSource === baseSource) {
+                    delete dataSourceCache[cacheKey];
+                }
+            });
+
+            await loadQueryDropdownOptions(field);
+            showToast('Options refreshed');
+        }
+
         // Refresh a specific dropdown
         async function refreshDropdown(paramName, source) {
-            // Clear cache for this source
-            delete dataSourceCache[source];
-
             // Find the param config
             if (!selectedEndpoint || !selectedEndpoint.urlParams) return;
             const param = selectedEndpoint.urlParams.find(p => p.name === paramName);
             if (param) {
+                const baseSource = String(source || param.source || '').split('?')[0];
+                Object.keys(dataSourceCache).forEach(cacheKey => {
+                    const cacheBaseSource = String(cacheKey).split('?')[0];
+                    if (cacheKey === source || cacheKey === param.source || cacheBaseSource === baseSource) {
+                        delete dataSourceCache[cacheKey];
+                    }
+                });
+
                 const select = document.getElementById('url-param-' + paramName);
                 if (select) {
                     select.innerHTML = '<option value="">-- Loading... --</option>';
                 }
-                await loadDropdownOptions(param);
+
+                if (param.dependsOn) {
+                    const parentSelect = document.getElementById('url-param-' + param.dependsOn);
+                    const parentValue = parentSelect ? parentSelect.value : '';
+                    await loadDependentUrlDropdown(param, param.dependsOn, parentValue);
+                } else {
+                    await loadDropdownOptions(param);
+                }
+
                 showToast('Options refreshed');
             }
         }
 
+        function activateDateInput(input) {
+            if (!input) return;
+            const currentValue = input.value;
+            input.type = 'date';
+            input.value = currentValue;
+            if (typeof input.showPicker === 'function') {
+                input.showPicker();
+            }
+        }
+
+        function deactivateDateInput(input) {
+            if (!input) return;
+            const currentValue = input.value;
+            input.type = 'text';
+            input.value = currentValue;
+            updateUrlWithParams();
+        }
+
+        function encodeQueryKey(key) {
+            return encodeURIComponent(key)
+                .replace(/%5B/gi, '[')
+                .replace(/%5D/gi, ']');
+        }
+
         // Update URL input when params change
         function updateUrlWithParams() {
-            if (!selectedEndpoint || !selectedEndpoint.urlParams) return;
+            if (!selectedEndpoint) return;
 
             let url = selectedEndpoint.url;
-            selectedEndpoint.urlParams.forEach(param => {
-                const input = document.getElementById('url-param-' + param.name);
-                if (input && input.value) {
-                    url = url.replace('{' + param.name + '}', input.value);
-                }
-            });
+            const queryPairs = [];
 
-            document.getElementById('urlInput').value = '{{ url('') }}' + url;
+            if (selectedEndpoint.urlParams && selectedEndpoint.urlParams.length > 0) {
+                selectedEndpoint.urlParams.forEach(param => {
+                    const input = document.getElementById('url-param-' + param.name);
+                    if (input && input.value) {
+                        url = url.replace('{' + param.name + '}', input.value);
+                    }
+                });
+            }
+
+            if (selectedEndpoint.method === 'GET' && selectedEndpoint.fields && selectedEndpoint.fields.length > 0) {
+                selectedEndpoint.fields.forEach(field => {
+                    const input = document.getElementById('query-param-' + field.name);
+                    if (!input) return;
+
+                    const queryKey = field.queryName || (field.type === 'multiselect' ? `${field.name}[]` : field.name);
+
+                    if (field.type === 'multiselect') {
+                        const selectedValues = Array.from(input.selectedOptions || [])
+                            .map(option => String(option.value ?? '').trim())
+                            .filter(value => value !== '');
+
+                        selectedValues.forEach(value => {
+                            queryPairs.push(`${encodeQueryKey(queryKey)}=${encodeURIComponent(value)}`);
+                        });
+                        return;
+                    }
+
+                    const rawValue = input.value ?? '';
+                    const value = typeof rawValue === 'string' ? rawValue.trim() : String(rawValue);
+                    if (value !== '') {
+                        queryPairs.push(`${encodeQueryKey(queryKey)}=${encodeURIComponent(value)}`);
+                    }
+                });
+            }
+
+            const queryString = queryPairs.length > 0 ? '?' + queryPairs.join('&') : '';
+            document.getElementById('urlInput').value = '{{ url('') }}' + url + queryString;
+        }
+
+        function buildDependentUrlParamSource(param, parentParamName, parentValue) {
+            if (!param || !param.source) return null;
+
+            const normalizedParentValue = String(parentValue ?? '').trim();
+            if (normalizedParentValue === '') {
+                return param.allowWithoutParent ? param.source : null;
+            }
+
+            const queryKey = param.dependsOnQueryKey || parentParamName;
+            const separator = param.source.includes('?') ? '&' : '?';
+            return `${param.source}${separator}${encodeURIComponent(queryKey)}=${encodeURIComponent(normalizedParentValue)}`;
         }
 
         // Handle URL param dropdown change
@@ -3338,17 +4867,32 @@
             const select = document.getElementById('url-param-' + paramName);
             const selectedValue = select ? select.value : null;
 
+            if (
+                selectedEndpoint.group === 'driver-assignments' &&
+                selectedEndpoint.name === 'Confirm Pickup Item' &&
+                (paramName === 'shipment_id' || paramName === 'item')
+            ) {
+                if (paramName === 'shipment_id' || !selectedValue) {
+                    resetPickupConfirmItemForm();
+                }
+            }
+
             if (!selectedValue) {
                 // Clear dependent dropdowns
-                selectedEndpoint.urlParams.forEach(param => {
+                const dependentParams = selectedEndpoint.urlParams.filter(p => p.dependsOn === paramName);
+                for (const param of dependentParams) {
                     if (param.dependsOn === paramName) {
-                        const dependentSelect = document.getElementById('url-param-' + param.name);
-                        if (dependentSelect) {
-                            dependentSelect.disabled = true;
-                            dependentSelect.innerHTML = `<option value="">-- Select ${paramName} first --</option>`;
+                        if (param.source && param.allowWithoutParent) {
+                            await loadDependentUrlDropdown(param, paramName, '');
+                        } else {
+                            const dependentSelect = document.getElementById('url-param-' + param.name);
+                            if (dependentSelect) {
+                                dependentSelect.disabled = true;
+                                dependentSelect.innerHTML = `<option value="">-- Select ${paramName} first --</option>`;
+                            }
                         }
                     }
-                });
+                }
                 return;
             }
 
@@ -3363,6 +4907,34 @@
         async function loadDependentUrlDropdown(param, parentParamName, parentValue) {
             const select = document.getElementById('url-param-' + param.name);
             if (!select) return;
+
+            const source = buildDependentUrlParamSource(param, parentParamName, parentValue);
+            if (source) {
+                select.disabled = false;
+                select.innerHTML = '<option value="">-- Loading... --</option>';
+                const previousValue = select.value;
+
+                try {
+                    const items = await fetchSourceItems(source);
+                    populateDropdown(select, items, param);
+
+                    const hasPrevious = Array.from(select.options).some(opt => opt.value === previousValue);
+                    if (hasPrevious && previousValue) {
+                        select.value = previousValue;
+                    } else if (param.autoSelectFirst && select.options.length > 1) {
+                        // Option index 0 is the placeholder.
+                        select.value = select.options[1].value;
+                    } else {
+                        select.value = '';
+                    }
+                    updateUrlWithParams();
+                } catch (error) {
+                    console.error('Error loading dependent dropdown:', error);
+                    select.innerHTML = '<option value="">-- Error loading --</option>';
+                }
+
+                return;
+            }
 
             select.disabled = false;
             select.innerHTML = '<option value="">-- Loading... --</option>';
@@ -3385,6 +4957,25 @@
                         const data = await response.json();
                         if (data.success && data.data && data.data.shipment && data.data.shipment.items) {
                             items = data.data.shipment.items;
+                        }
+                    }
+                } else if (parentParamName === 'shipment_id' && param.name === 'item' && selectedEndpoint && selectedEndpoint.group === 'driver-assignments') {
+                    // Fetch pickup details to get shipment items for driver pickup item confirmation.
+                    const response = await fetch('{{ url('') }}/api/v1/driver/pickups/' + parentValue, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'Authorization': 'Bearer ' + token
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const pickupItems = data?.data?.pickup?.shipment?.items;
+                        if (Array.isArray(pickupItems)) {
+                            items = pickupItems.map(item => ({
+                                ...item,
+                                display_name: `${item.description || ('Item #' + item.id)} (qty: ${item.quantity ?? 0})`
+                            }));
                         }
                     }
                 } else if (parentParamName === 'item' && param.name === 'image') {
@@ -3451,28 +5042,205 @@
         function prefillItemData(item, param) {
             if (!item || !item.id) return;
 
-            // Prefill description
             const descriptionInput = document.getElementById('form-field-description');
             if (descriptionInput) descriptionInput.value = item.description || '';
 
-            // Prefill quantity
             const quantityInput = document.getElementById('form-field-quantity');
             if (quantityInput) quantityInput.value = item.quantity || '1';
 
+            const removeImagesRow = document.getElementById('form-row-remove_image_ids[]');
+            const removeImagesInput = document.getElementById('form-field-remove_image_ids[]');
+            if (removeImagesInput) {
+                const images = Array.isArray(item.images) ? item.images : [];
+                if (images.length > 0) {
+                    let optionsHtml = '';
+                    images.forEach((image) => {
+                        const imageSize = image.size_human || (image.size ? `${image.size} B` : 'size n/a');
+                        const label = `${image.original_name || 'image'} (${imageSize})`;
+                        optionsHtml += `<option value="${image.id}">${label}</option>`;
+                    });
+                    removeImagesInput.innerHTML = optionsHtml;
+                    removeImagesInput.selectedIndex = -1;
+                    if (removeImagesRow) removeImagesRow.style.display = '';
+                } else {
+                    removeImagesInput.innerHTML = '';
+                    if (removeImagesRow) removeImagesRow.style.display = 'none';
+                }
+            }
+
+            const modeInput = document.getElementById('form-field-_item_delivery_mode');
+            const inferredMode = item.delivery ? 'per_item' : (modeInput ? modeInput.value || 'single' : 'single');
+            if (modeInput) {
+                modeInput.value = inferredMode;
+                modeInput.dispatchEvent(new Event('change'));
+            }
+
+            if (inferredMode === 'per_item' && item.delivery) {
+                const recipientNameInput = document.getElementById('form-field-delivery_recipient_name');
+                if (recipientNameInput) recipientNameInput.value = item.delivery.recipient_name || '';
+
+                const recipientPhoneInput = document.getElementById('form-field-delivery_recipient_phone');
+                if (recipientPhoneInput) recipientPhoneInput.value = item.delivery.recipient_phone || '';
+
+                const recipientPhoneConfirmInput = document.getElementById('form-field-delivery_recipient_phone_confirm');
+                if (recipientPhoneConfirmInput) recipientPhoneConfirmInput.value = item.delivery.recipient_phone || '';
+
+                const itemLocationMethodInput = document.getElementById('form-field-_item_delivery_location_method');
+                if (itemLocationMethodInput && item.delivery.location) {
+                    itemLocationMethodInput.value = item.delivery.location.type || '';
+                    itemLocationMethodInput.dispatchEvent(new Event('change'));
+                }
+
+                const deliveryRegionInput = document.getElementById('form-field-delivery_region_id');
+                if (deliveryRegionInput && item.delivery.location?.region_id) {
+                    deliveryRegionInput.value = item.delivery.location.region_id;
+                    deliveryRegionInput.dispatchEvent(new Event('change'));
+                }
+
+                setTimeout(() => {
+                    const deliveryDistrictInput = document.getElementById('form-field-delivery_district_id');
+                    if (deliveryDistrictInput && item.delivery.location?.district_id) {
+                        deliveryDistrictInput.value = item.delivery.location.district_id;
+                    }
+                }, 350);
+
+                const deliveryTownInput = document.getElementById('form-field-delivery_town');
+                if (deliveryTownInput) deliveryTownInput.value = item.delivery.location?.town || '';
+
+                const deliveryLatitudeInput = document.getElementById('form-field-delivery_latitude');
+                if (deliveryLatitudeInput) deliveryLatitudeInput.value = item.delivery.location?.latitude || '';
+
+                const deliveryLongitudeInput = document.getElementById('form-field-delivery_longitude');
+                if (deliveryLongitudeInput) deliveryLongitudeInput.value = item.delivery.location?.longitude || '';
+
+                const deliveryGhPostInput = document.getElementById('form-field-delivery_gh_post_address');
+                if (deliveryGhPostInput) deliveryGhPostInput.value = item.delivery.location?.gh_post_address || '';
+
+                const deliveryLandmarkInput = document.getElementById('form-field-delivery_landmark');
+                if (deliveryLandmarkInput) deliveryLandmarkInput.value = item.delivery.location?.landmark || '';
+
+                const deliveryInstructionsInput = document.getElementById('form-field-delivery_instructions');
+                if (deliveryInstructionsInput) deliveryInstructionsInput.value = item.delivery.instructions || '';
+            }
+
             showToast('Item data prefilled successfully');
+        }
+
+        function resetPickupConfirmItemForm() {
+            const removePhotosRow = document.getElementById('form-row-remove_photo_ids[]');
+            const removePhotosInput = document.getElementById('form-field-remove_photo_ids[]');
+            if (removePhotosInput) {
+                removePhotosInput.innerHTML = '';
+                removePhotosInput.selectedIndex = -1;
+            }
+            if (removePhotosRow) {
+                removePhotosRow.style.display = 'none';
+            }
+
+            const confirmedQtyInput = document.getElementById('form-field-confirmed_quantity');
+            if (confirmedQtyInput) {
+                confirmedQtyInput.value = '';
+            }
+
+            const notesInput = document.getElementById('form-field-notes');
+            if (notesInput) {
+                notesInput.value = '';
+            }
+        }
+
+        function prefillPickupConfirmItemData(item, param) {
+            if (!item || !item.id) {
+                resetPickupConfirmItemForm();
+                return;
+            }
+
+            const confirmation = item.pickup_confirmation || null;
+
+            const confirmedQtyInput = document.getElementById('form-field-confirmed_quantity');
+            if (confirmedQtyInput) {
+                if (confirmation && confirmation.confirmed_quantity !== null && confirmation.confirmed_quantity !== undefined) {
+                    confirmedQtyInput.value = String(confirmation.confirmed_quantity);
+                } else if (item.quantity !== null && item.quantity !== undefined) {
+                    confirmedQtyInput.value = String(item.quantity);
+                } else {
+                    confirmedQtyInput.value = '';
+                }
+            }
+
+            const notesInput = document.getElementById('form-field-notes');
+            if (notesInput) {
+                notesInput.value = confirmation && confirmation.notes ? confirmation.notes : '';
+            }
+
+            const removePhotosRow = document.getElementById('form-row-remove_photo_ids[]');
+            const removePhotosInput = document.getElementById('form-field-remove_photo_ids[]');
+            if (!removePhotosInput) {
+                return;
+            }
+
+            const photos = Array.isArray(confirmation?.photos) ? confirmation.photos : [];
+            if (photos.length > 0) {
+                let optionsHtml = '';
+                photos.forEach((photo) => {
+                    const photoSize = photo.size_human || (photo.size ? `${photo.size} B` : 'size n/a');
+                    const label = `${photo.original_name || 'photo'} (${photoSize})`;
+                    optionsHtml += `<option value="${photo.id}">${label}</option>`;
+                });
+                removePhotosInput.innerHTML = optionsHtml;
+                removePhotosInput.selectedIndex = -1;
+                if (removePhotosRow) {
+                    removePhotosRow.style.display = '';
+                }
+            } else {
+                removePhotosInput.innerHTML = '';
+                if (removePhotosRow) {
+                    removePhotosRow.style.display = 'none';
+                }
+            }
         }
 
         // Render form inputs for endpoints with useFormInputs: true
         async function renderFormInputs(fields, sampleBody) {
             const container = document.getElementById('formInputsContainer');
+            const notices = [];
+            let hiddenNoticeControls = '';
             let html = '<table class="headers-table"><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>';
 
             fields.forEach(field => {
                 const value = sampleBody ? (sampleBody[field.name] || '') : '';
+                const disabledAttr = (field.readOnly || field.readonly || field.disabled) ? 'disabled' : '';
+                const optionLabel = field.labels && value ? (field.labels[value] || value) : (value || 'Not detected yet');
+
+                if (field.noticeOnly) {
+                    const noticeTitle = field.name.replace(/_/g, ' ');
+                    notices.push(`
+                        <div class="form-notice" id="form-notice-${field.name}">
+                            <span class="form-notice-title">${noticeTitle}</span>
+                            <span id="form-notice-value-${field.name}">${optionLabel}</span><br>
+                            <small>${field.description || ''}</small>
+                        </div>
+                    `);
+
+                    if (field.type === 'enum' && field.options) {
+                        let hiddenControl = `<select id="form-field-${field.name}" ${disabledAttr}>`;
+                        hiddenControl += '<option value="">-- Select --</option>';
+                        field.options.forEach(opt => {
+                            const selected = opt === value ? 'selected' : '';
+                            const label = field.labels && field.labels[opt] ? field.labels[opt] : opt;
+                            hiddenControl += `<option value="${opt}" ${selected}>${label}</option>`;
+                        });
+                        hiddenControl += '</select>';
+                        hiddenNoticeControls += hiddenControl;
+                    } else {
+                        hiddenNoticeControls += `<input type="text" id="form-field-${field.name}" value="${value}" ${disabledAttr}>`;
+                    }
+
+                    return;
+                }
 
                 // Add data attributes for conditional visibility
                 const showWhenAttr = field.showWhen ? `data-show-when-field="${field.showWhen.field}" data-show-when-value="${field.showWhen.value}"` : '';
-                const initiallyHidden = field.showWhen ? 'style="display: none;"' : '';
+                const initiallyHidden = (field.showWhen || field.hideUntilPopulated) ? 'style="display: none;"' : '';
 
                 html += `<tr id="form-row-${field.name}" ${showWhenAttr} ${initiallyHidden}>
                     <td>
@@ -3485,7 +5253,7 @@
 
                 if (field.type === 'enum' && field.options) {
                     // Render dropdown for enum fields with optional labels
-                    html += `<select id="form-field-${field.name}" class="form-input" style="width: 100%;">
+                    html += `<select id="form-field-${field.name}" class="form-input" style="width: 100%;" ${disabledAttr}>
                         <option value="">-- Select --</option>`;
                     field.options.forEach(opt => {
                         const selected = opt === value ? 'selected' : '';
@@ -3493,10 +5261,19 @@
                         html += `<option value="${opt}" ${selected}>${label}</option>`;
                     });
                     html += `</select>`;
+                } else if (field.type === 'multiselect') {
+                    const size = Math.min(Math.max((field.options || []).length || 3, 3), 8);
+                    html += `<select id="form-field-${field.name}" class="form-input" multiple size="${size}" style="width: 100%;" ${disabledAttr}>`;
+                    (field.options || []).forEach(opt => {
+                        const optionValue = typeof opt === 'object' ? opt.value : opt;
+                        const optionLabelText = typeof opt === 'object' ? opt.label : opt;
+                        html += `<option value="${optionValue}">${optionLabelText}</option>`;
+                    });
+                    html += `</select>`;
                 } else if (field.type === 'dropdown') {
                     // Render dropdown for API-loaded fields with refresh button
                     html += `<div style="display: flex; gap: 4px; align-items: center;">
-                        <select id="form-field-${field.name}" class="form-input" style="flex: 1;">
+                        <select id="form-field-${field.name}" class="form-input" style="flex: 1;" ${disabledAttr}>
                             <option value="">-- Select --</option>
                         </select>`;
                     if (!field.dependsOn) {
@@ -3508,17 +5285,19 @@
                     // Render file input
                     const multipleAttr = field.multiple ? 'multiple' : '';
                     const acceptAttr = field.accept || 'image/jpeg,image/png,image/webp';
-                    html += `<input type="file" id="form-field-${field.name}" class="form-input" ${multipleAttr} accept="${acceptAttr}">`;
+                    html += `<input type="file" id="form-field-${field.name}" class="form-input" ${multipleAttr} accept="${acceptAttr}" ${disabledAttr}>`;
                 } else {
                     // Render text input for other fields
-                    html += `<input type="text" id="form-field-${field.name}" class="form-input" value="${value}" placeholder="${field.example || ''}">`;
+                    html += `<input type="text" id="form-field-${field.name}" class="form-input" value="${value}" placeholder="${field.example || ''}" ${disabledAttr}>`;
                 }
 
                 html += `</td></tr>`;
             });
 
             html += '</tbody></table>';
-            container.innerHTML = html;
+            const noticeHtml = notices.length > 0 ? notices.join('') : '';
+            const hiddenControlsHtml = hiddenNoticeControls ? `<div style="display: none;">${hiddenNoticeControls}</div>` : '';
+            container.innerHTML = noticeHtml + hiddenControlsHtml + html;
 
             // Initialize dependent dropdowns as disabled
             initializeDependentDropdowns(fields);
@@ -3548,30 +5327,108 @@
 
         // Setup conditional visibility for form fields
         function setupConditionalVisibility(fields) {
-            // Find control fields (fields that other fields depend on)
-            const controlFields = fields.filter(f => fields.some(other => other.showWhen && other.showWhen.field === f.name));
+            const controlFieldNames = [...new Set(
+                fields
+                    .filter(f => f.showWhen && f.showWhen.field)
+                    .map(f => f.showWhen.field)
+            )];
 
-            controlFields.forEach(controlField => {
-                const select = document.getElementById('form-field-' + controlField.name);
-                if (select) {
-                    select.addEventListener('change', () => {
-                        toggleConditionalFields(controlField.name, select.value);
+            controlFieldNames.forEach(controlFieldName => {
+                const input = document.getElementById('form-field-' + controlFieldName);
+                if (input) {
+                    input.addEventListener('change', () => {
+                        applyConditionalVisibility(fields);
+                        updateFormNoticeValue(controlFieldName, fields);
                     });
                 }
+            });
+
+            fields
+                .filter(field => field.noticeOnly)
+                .forEach(field => {
+                    updateFormNoticeValue(field.name, fields);
+                });
+
+            applyConditionalVisibility(fields);
+        }
+
+        function updateFormNoticeValue(fieldName, fields) {
+            const noticeValue = document.getElementById('form-notice-value-' + fieldName);
+            if (!noticeValue) {
+                return;
+            }
+
+            const input = document.getElementById('form-field-' + fieldName);
+            if (!input) {
+                noticeValue.textContent = 'Not detected yet';
+                return;
+            }
+
+            const fieldConfig = Array.isArray(fields)
+                ? fields.find(field => field.name === fieldName)
+                : null;
+
+            let displayValue = '';
+            if (fieldConfig && fieldConfig.type === 'enum' && fieldConfig.labels && input.value) {
+                displayValue = fieldConfig.labels[input.value] || input.value;
+            } else if (input.tagName === 'SELECT') {
+                const selectedOption = input.options[input.selectedIndex];
+                displayValue = selectedOption ? selectedOption.text : '';
+            } else {
+                displayValue = input.value || '';
+            }
+
+            noticeValue.textContent = displayValue || 'Not detected yet';
+        }
+
+        function isFormFieldVisible(fieldName, visited = new Set()) {
+            if (visited.has(fieldName)) {
+                return true;
+            }
+
+            const row = document.getElementById('form-row-' + fieldName);
+            if (!row) {
+                return true;
+            }
+
+            const controlFieldName = row.getAttribute('data-show-when-field');
+            const expectedValue = row.getAttribute('data-show-when-value');
+
+            if (!controlFieldName) {
+                return true;
+            }
+
+            visited.add(fieldName);
+            const isControlVisible = isFormFieldVisible(controlFieldName, visited);
+            visited.delete(fieldName);
+
+            if (!isControlVisible) {
+                return false;
+            }
+
+            const controlInput = document.getElementById('form-field-' + controlFieldName);
+            if (!controlInput) {
+                return false;
+            }
+
+            return String(controlInput.value ?? '') === String(expectedValue ?? '');
+        }
+
+        function applyConditionalVisibility(fields) {
+            fields.forEach(field => {
+                const row = document.getElementById('form-row-' + field.name);
+                if (!row || !row.hasAttribute('data-show-when-field')) {
+                    return;
+                }
+
+                row.style.display = isFormFieldVisible(field.name) ? '' : 'none';
             });
         }
 
         // Toggle visibility of fields based on control field value
         function toggleConditionalFields(controlFieldName, value) {
-            const rows = document.querySelectorAll(`[data-show-when-field="${controlFieldName}"]`);
-            rows.forEach(row => {
-                const expectedValue = row.getAttribute('data-show-when-value');
-                if (value === expectedValue) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
+            if (!selectedEndpoint || !selectedEndpoint.fields) return;
+            applyConditionalVisibility(selectedEndpoint.fields);
         }
 
         // Load dropdown options from API for form fields
@@ -3586,26 +5443,10 @@
             }
 
             try {
-                const token = getActiveToken();
-                const apiUrl = '{{ url('') }}/api/v1/vendor/' + field.source;
-
-                const response = await fetch(apiUrl, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': token ? 'Bearer ' + token : ''
-                    }
-                });
-
-                if (!response.ok) {
-                    select.innerHTML = '<option value="">-- Error loading --</option>';
-                    return;
-                }
-
-                const data = await response.json();
-                dataSourceCache[field.source] = data.data[field.source] || [];
-                populateFormDropdown(select, dataSourceCache[field.source], field);
+                const items = await fetchSourceItems(field.source);
+                populateFormDropdown(select, items, field);
             } catch (error) {
-                select.innerHTML = '<option value="">-- Error loading --</option>';
+                select.innerHTML = '<option value="">-- Error: ' + error.message + ' --</option>';
             }
         }
 
@@ -3709,7 +5550,6 @@
             if (!shipment || !shipment.id) return;
 
             try {
-                // Fetch full shipment details
                 const token = getActiveToken();
                 const response = await fetch('{{ url('') }}/api/v1/vendor/shipments/' + shipment.id, {
                     method: 'GET',
@@ -3724,66 +5564,105 @@
                 if (data.success && data.data && data.data.shipment) {
                     const shipmentData = data.data.shipment;
 
-                    // Prefill recipient fields
-                    const recipientNameInput = document.getElementById('form-field-recipient_name');
-                    if (recipientNameInput) recipientNameInput.value = shipmentData.recipient_name || '';
-
-                    const recipientPhoneInput = document.getElementById('form-field-recipient_phone');
-                    if (recipientPhoneInput) recipientPhoneInput.value = shipmentData.recipient_phone || '';
-
-                    const recipientPhoneConfirmInput = document.getElementById('form-field-recipient_phone_confirm');
-                    if (recipientPhoneConfirmInput) recipientPhoneConfirmInput.value = shipmentData.recipient_phone || '';
-
-                    // Prefill location method
-                    const locationMethodSelect = document.getElementById('form-field-_location_method');
-                    if (locationMethodSelect && shipmentData.location) {
-                        locationMethodSelect.value = shipmentData.location.type || '';
-
-                        // Trigger conditional field visibility
-                        const changeEvent = new Event('change');
-                        locationMethodSelect.dispatchEvent(changeEvent);
-
-                        // Wait for conditional fields to show
-                        setTimeout(() => {
-                            // Prefill based on location type
-                            if (shipmentData.location.type === 'dropdown') {
-                                const regionSelect = document.getElementById('form-field-region_id');
-                                if (regionSelect && shipmentData.location.region_id) {
-                                    regionSelect.value = shipmentData.location.region_id;
-                                    // Trigger region change to load districts
-                                    regionSelect.dispatchEvent(new Event('change'));
-
-                                    // Wait for districts to load, then set district
-                                    setTimeout(() => {
-                                        const districtSelect = document.getElementById('form-field-district_id');
-                                        if (districtSelect && shipmentData.location.district_id) {
-                                            districtSelect.value = shipmentData.location.district_id;
-                                        }
-                                    }, 500);
-                                }
-
-                                const townInput = document.getElementById('form-field-town');
-                                if (townInput) townInput.value = shipmentData.location.town || '';
-                            } else if (shipmentData.location.type === 'coordinates') {
-                                const latInput = document.getElementById('form-field-latitude');
-                                if (latInput) latInput.value = shipmentData.location.latitude || '';
-
-                                const lngInput = document.getElementById('form-field-longitude');
-                                if (lngInput) lngInput.value = shipmentData.location.longitude || '';
-                            } else if (shipmentData.location.type === 'gh_post') {
-                                const ghPostInput = document.getElementById('form-field-gh_post_address');
-                                if (ghPostInput) ghPostInput.value = shipmentData.location.gh_post_address || '';
-                            }
-
-                            // Prefill common location fields
-                            const landmarkInput = document.getElementById('form-field-landmark');
-                            if (landmarkInput) landmarkInput.value = shipmentData.location.landmark || '';
-                        }, 100);
+                    const destinationModeInput = document.getElementById('form-field-destination_mode');
+                    if (destinationModeInput) {
+                        destinationModeInput.value = shipmentData.destination_mode || 'single';
+                        destinationModeInput.dispatchEvent(new Event('change'));
                     }
 
-                    // Prefill delivery instructions
-                    const deliveryInstructionsInput = document.getElementById('form-field-delivery_instructions');
-                    if (deliveryInstructionsInput) deliveryInstructionsInput.value = shipmentData.delivery_instructions || '';
+                    const pickupContactNameInput = document.getElementById('form-field-pickup_contact_name');
+                    if (pickupContactNameInput) pickupContactNameInput.value = shipmentData.pickup?.contact_name || '';
+
+                    const pickupContactPhoneInput = document.getElementById('form-field-pickup_contact_phone');
+                    if (pickupContactPhoneInput) pickupContactPhoneInput.value = shipmentData.pickup?.contact_phone || '';
+
+                    const pickupContactPhoneConfirmInput = document.getElementById('form-field-pickup_contact_phone_confirm');
+                    if (pickupContactPhoneConfirmInput) pickupContactPhoneConfirmInput.value = shipmentData.pickup?.contact_phone || '';
+
+                    const pickupLocationMethodInput = document.getElementById('form-field-_pickup_location_method');
+                    if (pickupLocationMethodInput && shipmentData.pickup?.location) {
+                        pickupLocationMethodInput.value = shipmentData.pickup.location.type || '';
+                        pickupLocationMethodInput.dispatchEvent(new Event('change'));
+                    }
+
+                    const pickupRegionInput = document.getElementById('form-field-pickup_region_id');
+                    if (pickupRegionInput && shipmentData.pickup?.location?.region_id) {
+                        pickupRegionInput.value = shipmentData.pickup.location.region_id;
+                        pickupRegionInput.dispatchEvent(new Event('change'));
+                    }
+
+                    setTimeout(() => {
+                        const pickupDistrictInput = document.getElementById('form-field-pickup_district_id');
+                        if (pickupDistrictInput && shipmentData.pickup?.location?.district_id) {
+                            pickupDistrictInput.value = shipmentData.pickup.location.district_id;
+                        }
+                    }, 350);
+
+                    const pickupTownInput = document.getElementById('form-field-pickup_town');
+                    if (pickupTownInput) pickupTownInput.value = shipmentData.pickup?.location?.town || '';
+
+                    const pickupLatitudeInput = document.getElementById('form-field-pickup_latitude');
+                    if (pickupLatitudeInput) pickupLatitudeInput.value = shipmentData.pickup?.location?.latitude || '';
+
+                    const pickupLongitudeInput = document.getElementById('form-field-pickup_longitude');
+                    if (pickupLongitudeInput) pickupLongitudeInput.value = shipmentData.pickup?.location?.longitude || '';
+
+                    const pickupGhPostInput = document.getElementById('form-field-pickup_gh_post_address');
+                    if (pickupGhPostInput) pickupGhPostInput.value = shipmentData.pickup?.location?.gh_post_address || '';
+
+                    const pickupLandmarkInput = document.getElementById('form-field-pickup_landmark');
+                    if (pickupLandmarkInput) pickupLandmarkInput.value = shipmentData.pickup?.location?.landmark || '';
+
+                    const pickupInstructionsInput = document.getElementById('form-field-pickup_instructions');
+                    if (pickupInstructionsInput) pickupInstructionsInput.value = shipmentData.pickup?.instructions || '';
+
+                    if (shipmentData.destination_mode === 'single' && shipmentData.delivery) {
+                        const deliveryRecipientNameInput = document.getElementById('form-field-delivery_recipient_name');
+                        if (deliveryRecipientNameInput) deliveryRecipientNameInput.value = shipmentData.delivery.recipient_name || '';
+
+                        const deliveryRecipientPhoneInput = document.getElementById('form-field-delivery_recipient_phone');
+                        if (deliveryRecipientPhoneInput) deliveryRecipientPhoneInput.value = shipmentData.delivery.recipient_phone || '';
+
+                        const deliveryRecipientPhoneConfirmInput = document.getElementById('form-field-delivery_recipient_phone_confirm');
+                        if (deliveryRecipientPhoneConfirmInput) deliveryRecipientPhoneConfirmInput.value = shipmentData.delivery.recipient_phone || '';
+
+                        const deliveryLocationMethodInput = document.getElementById('form-field-_delivery_location_method');
+                        if (deliveryLocationMethodInput && shipmentData.delivery.location) {
+                            deliveryLocationMethodInput.value = shipmentData.delivery.location.type || '';
+                            deliveryLocationMethodInput.dispatchEvent(new Event('change'));
+                        }
+
+                        const deliveryRegionInput = document.getElementById('form-field-delivery_region_id');
+                        if (deliveryRegionInput && shipmentData.delivery.location?.region_id) {
+                            deliveryRegionInput.value = shipmentData.delivery.location.region_id;
+                            deliveryRegionInput.dispatchEvent(new Event('change'));
+                        }
+
+                        setTimeout(() => {
+                            const deliveryDistrictInput = document.getElementById('form-field-delivery_district_id');
+                            if (deliveryDistrictInput && shipmentData.delivery.location?.district_id) {
+                                deliveryDistrictInput.value = shipmentData.delivery.location.district_id;
+                            }
+                        }, 350);
+
+                        const deliveryTownInput = document.getElementById('form-field-delivery_town');
+                        if (deliveryTownInput) deliveryTownInput.value = shipmentData.delivery.location?.town || '';
+
+                        const deliveryLatitudeInput = document.getElementById('form-field-delivery_latitude');
+                        if (deliveryLatitudeInput) deliveryLatitudeInput.value = shipmentData.delivery.location?.latitude || '';
+
+                        const deliveryLongitudeInput = document.getElementById('form-field-delivery_longitude');
+                        if (deliveryLongitudeInput) deliveryLongitudeInput.value = shipmentData.delivery.location?.longitude || '';
+
+                        const deliveryGhPostInput = document.getElementById('form-field-delivery_gh_post_address');
+                        if (deliveryGhPostInput) deliveryGhPostInput.value = shipmentData.delivery.location?.gh_post_address || '';
+
+                        const deliveryLandmarkInput = document.getElementById('form-field-delivery_landmark');
+                        if (deliveryLandmarkInput) deliveryLandmarkInput.value = shipmentData.delivery.location?.landmark || '';
+
+                        const deliveryInstructionsInput = document.getElementById('form-field-delivery_instructions');
+                        if (deliveryInstructionsInput) deliveryInstructionsInput.value = shipmentData.delivery.instructions || '';
+                    }
 
                     showToast('Shipment data prefilled successfully');
                 } else {
@@ -3792,6 +5671,35 @@
             } catch (error) {
                 console.error('Error prefilling shipment data:', error);
                 showToast('Error loading shipment details', 'error');
+            }
+        }
+
+        async function handleItemShipmentSelection(shipment, param) {
+            if (!shipment || !shipment.id) return;
+
+            try {
+                const token = getActiveToken();
+                const response = await fetch('{{ url('') }}/api/v1/vendor/shipments/' + shipment.id, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+
+                const data = await response.json();
+                if (!data.success || !data.data || !data.data.shipment) {
+                    return;
+                }
+
+                const mode = data.data.shipment.destination_mode || 'single';
+                const modeInput = document.getElementById('form-field-_item_delivery_mode');
+                if (modeInput) {
+                    modeInput.value = mode;
+                    modeInput.dispatchEvent(new Event('change'));
+                }
+            } catch (error) {
+                console.error('Error loading shipment mode:', error);
             }
         }
 
@@ -3805,6 +5713,9 @@
                 // Skip UI-only fields (not sent to API)
                 if (field.uiOnly) return;
 
+                const row = document.getElementById('form-row-' + field.name);
+                if (row && row.style.display === 'none') return;
+
                 const input = document.getElementById('form-field-' + field.name);
 
                 if (input && field.type === 'file') {
@@ -3815,7 +5726,18 @@
                             multiple: field.multiple || false
                         };
                     }
-                } else if (input && input.value.trim()) {
+                } else if (input && input.tagName === 'SELECT' && input.multiple) {
+                    const selectedValues = Array.from(input.selectedOptions || [])
+                        .map(option => String(option.value ?? '').trim())
+                        .filter(value => value !== '');
+
+                    if (selectedValues.length > 0) {
+                        const normalizedFieldName = field.name.endsWith('[]')
+                            ? field.name.slice(0, -2)
+                            : field.name;
+                        body[normalizedFieldName] = selectedValues;
+                    }
+                } else if (input && String(input.value ?? '').trim()) {
                     // Handle regular inputs
                     body[field.name] = input.value.trim();
                 }
@@ -3831,6 +5753,7 @@
             // Validate URL params are filled
             if (selectedEndpoint.urlParams && selectedEndpoint.urlParams.length > 0) {
                 for (const param of selectedEndpoint.urlParams) {
+                    if (!param.required) continue;
                     const input = document.getElementById('url-param-' + param.name);
                     if (!input || !input.value) {
                         showToast('Please select a ' + param.name + ' first');
@@ -3879,7 +5802,16 @@
 
                         // Append regular form fields
                         Object.keys(formInputs).forEach(key => {
-                            formData.append(key, formInputs[key]);
+                            const value = formInputs[key];
+
+                            if (Array.isArray(value)) {
+                                value.forEach((entry) => {
+                                    formData.append(key + '[]', entry);
+                                });
+                                return;
+                            }
+
+                            formData.append(key, value);
                         });
 
                         // Append file fields
@@ -3948,6 +5880,7 @@
                 if (selectedEndpoint.url.includes('/logout') && responseData.success) {
                     const userType = getCurrentUserType();
                     localStorage.removeItem('parcelman_' + userType + '_token');
+                    vendorProfileCache = null;
                     document.getElementById('bearerToken').value = '';
                     updateTokenDisplay();
                     showToast(userType + '_token cleared!');
@@ -4032,6 +5965,7 @@
             localStorage.setItem('parcelman_' + userType + '_token', token);
             // Clear data source cache when token changes (user logged in/out)
             dataSourceCache = {};
+            vendorProfileCache = null;
             loadCurrentToken();
         }
 
@@ -4044,6 +5978,7 @@
             } else {
                 localStorage.removeItem('parcelman_' + userType + '_token');
             }
+            vendorProfileCache = null;
             updateTokenDisplay();
         }
 

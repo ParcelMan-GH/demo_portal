@@ -6,7 +6,18 @@
 
 @section('content')
 
-<div class="space-y-6" x-data="warehousesTable" data-warehouses-config='@json(["endpoint" => route("admin.warehouses.data"), "exportEndpoint" => route("admin.warehouses.export"), "storeEndpoint" => route("admin.warehouses.store"), "regionsEndpoint" => "/api/v1/vendor/regions"])'>
+@php
+    $warehousesConfig = [
+        'endpoint' => route('admin.warehouses.data'),
+        'exportEndpoint' => route('admin.warehouses.export'),
+        'storeEndpoint' => route('admin.warehouses.store'),
+        'regionsEndpoint' => route('admin.warehouses.regions'),
+        'districtsEndpointTemplate' => route('admin.warehouses.districts', ['region' => '__REGION__']),
+        'showEndpointTemplate' => route('admin.warehouses.show.json', ['warehouse' => '__ID__']),
+    ];
+@endphp
+
+<div class="space-y-6" x-data="warehousesTable" data-warehouses-config='@json($warehousesConfig)'>
     <!-- Warehouses Datatable -->
     <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">
         <!-- Card Header -->

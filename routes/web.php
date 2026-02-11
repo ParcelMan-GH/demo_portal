@@ -83,8 +83,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Pickup Assignment Management
         Route::get('available-drivers', [PickupAssignmentController::class, 'availableDrivers'])->name('assignments.available-drivers');
+        Route::get('available-warehouses', [PickupAssignmentController::class, 'availableWarehouses'])->name('assignments.available-warehouses');
         Route::post('shipments/{shipment}/assign-driver', [PickupAssignmentController::class, 'assign'])->name('assignments.assign');
         Route::post('assignments/{pickupAssignment}/cancel', [PickupAssignmentController::class, 'cancel'])->name('assignments.cancel');
+        Route::post('assignments/{pickupAssignment}/receive', [PickupAssignmentController::class, 'receive'])->name('assignments.receive');
 
         // Driver Management
         Route::get('drivers', [DriverController::class, 'index'])->name('drivers.index');
@@ -102,6 +104,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Warehouse Management
         Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
         Route::get('warehouses-data', [WarehouseController::class, 'data'])->name('warehouses.data');
+        Route::get('warehouses-regions', [WarehouseController::class, 'regions'])->name('warehouses.regions');
+        Route::get('warehouses-regions/{region}/districts', [WarehouseController::class, 'districts'])->name('warehouses.districts');
         Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
         Route::get('warehouses/{warehouse}', [WarehouseController::class, 'showPage'])->name('warehouses.show');
         Route::get('warehouses/{warehouse}/json', [WarehouseController::class, 'show'])->name('warehouses.show.json');

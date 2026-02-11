@@ -18,8 +18,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             PlatformSettingsSeeder::class,
             GhanaLocationsSeeder::class,
-            RoleSeeder::class,
             PermissionSeeder::class,
+            RoleSeeder::class,
             SuperAdminSeeder::class,
             DriversSeeder::class,
             ShipmentSettingsSeeder::class,

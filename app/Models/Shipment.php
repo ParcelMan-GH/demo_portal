@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\InvoiceStatus;
+use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentStatus;
 use App\Helpers\PhoneHelper;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,16 +26,28 @@ class Shipment extends Model
         'vendor_id',
         'shipment_number',
         'status',
-        'recipient_name',
-        'recipient_phone',
-        'region_id',
-        'district_id',
-        'town',
-        'latitude',
-        'longitude',
-        'gh_post_address',
+        'destination_mode',
+        'current_invoice_id',
+        'pickup_contact_name',
+        'pickup_contact_phone',
+        'pickup_region_id',
+        'pickup_district_id',
+        'pickup_town',
+        'pickup_latitude',
+        'pickup_longitude',
+        'pickup_gh_post_address',
+        'pickup_landmark',
+        'pickup_instructions',
+        'delivery_recipient_name',
+        'delivery_recipient_phone',
+        'delivery_region_id',
+        'delivery_district_id',
+        'delivery_town',
+        'delivery_latitude',
+        'delivery_longitude',
+        'delivery_gh_post_address',
+        'delivery_landmark',
         'delivery_instructions',
-        'landmark',
         'submitted_at',
         'cancelled_at',
         'cancellation_reason',
@@ -46,8 +60,11 @@ class Shipment extends Model
      */
     protected $casts = [
         'status' => ShipmentStatus::class,
-        'latitude' => 'decimal:8',
-        'longitude' => 'decimal:8',
+        'destination_mode' => ShipmentDestinationMode::class,
+        'pickup_latitude' => 'decimal:8',
+        'pickup_longitude' => 'decimal:8',
+        'delivery_latitude' => 'decimal:8',
+        'delivery_longitude' => 'decimal:8',
         'submitted_at' => 'datetime',
         'cancelled_at' => 'datetime',
     ];
@@ -64,18 +81,27 @@ class Shipment extends Model
                 $shipment->shipment_number = static::generateShipmentNumber();
             }
 
-            // Format phone number
-            if (!empty($shipment->recipient_phone)) {
-                $shipment->recipient_phone = PhoneHelper::format($shipment->recipient_phone);
+            if (empty($shipment->destination_mode)) {
+                $shipment->destination_mode = ShipmentDestinationMode::SINGLE;
             }
+
+            self::formatPhoneFields($shipment);
         });
 
         static::updating(function ($shipment) {
-            // Format phone number on update
-            if ($shipment->isDirty('recipient_phone') && !empty($shipment->recipient_phone)) {
-                $shipment->recipient_phone = PhoneHelper::format($shipment->recipient_phone);
-            }
+            self::formatPhoneFields($shipment);
         });
+    }
+
+    private static function formatPhoneFields(self $shipment): void
+    {
+        if (!empty($shipment->pickup_contact_phone)) {
+            $shipment->pickup_contact_phone = PhoneHelper::format($shipment->pickup_contact_phone);
+        }
+
+        if (!empty($shipment->delivery_recipient_phone)) {
+            $shipment->delivery_recipient_phone = PhoneHelper::format($shipment->delivery_recipient_phone);
+        }
     }
 
     /**
@@ -118,7 +144,7 @@ class Shipment extends Model
      */
     public function region(): BelongsTo
     {
-        return $this->belongsTo(Region::class);
+        return $this->belongsTo(Region::class, 'delivery_region_id');
     }
 
     /**
@@ -126,7 +152,27 @@ class Shipment extends Model
      */
     public function district(): BelongsTo
     {
-        return $this->belongsTo(District::class);
+        return $this->belongsTo(District::class, 'delivery_district_id');
+    }
+
+    public function pickupRegion(): BelongsTo
+    {
+        return $this->belongsTo(Region::class, 'pickup_region_id');
+    }
+
+    public function pickupDistrict(): BelongsTo
+    {
+        return $this->belongsTo(District::class, 'pickup_district_id');
+    }
+
+    public function deliveryRegion(): BelongsTo
+    {
+        return $this->belongsTo(Region::class, 'delivery_region_id');
+    }
+
+    public function deliveryDistrict(): BelongsTo
+    {
+        return $this->belongsTo(District::class, 'delivery_district_id');
     }
 
     /**
@@ -140,9 +186,25 @@ class Shipment extends Model
     /**
      * Get the invoice for this shipment.
      */
-    public function invoice(): HasOne
+    public function invoice(): BelongsTo
     {
-        return $this->hasOne(Invoice::class);
+        return $this->belongsTo(Invoice::class, 'current_invoice_id');
+    }
+
+    /**
+     * Get the current active invoice for this shipment.
+     */
+    public function currentInvoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class, 'current_invoice_id');
+    }
+
+    /**
+     * Get invoice history for this shipment.
+     */
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class)->latest('id');
     }
 
     /**
@@ -166,7 +228,10 @@ class Shipment extends Model
      */
     public function canBeInvoiced(): bool
     {
-        return $this->status === ShipmentStatus::SUBMITTED;
+        return $this->status === ShipmentStatus::SUBMITTED
+            && !$this->invoices()
+                ->whereIn('status', InvoiceStatus::activeValues())
+                ->exists();
     }
 
     /**
@@ -209,16 +274,150 @@ class Shipment extends Model
         return $this->status->canBeCancelled();
     }
 
+    public function isSingleDestination(): bool
+    {
+        return $this->destination_mode === ShipmentDestinationMode::SINGLE;
+    }
+
+    public function isPerItemDestination(): bool
+    {
+        return $this->destination_mode === ShipmentDestinationMode::PER_ITEM;
+    }
+
+    public function getRecipientNameAttribute(): ?string
+    {
+        if ($this->isSingleDestination()) {
+            return $this->delivery_recipient_name;
+        }
+
+        $names = $this->relationLoaded('items')
+            ? $this->items->pluck('delivery_recipient_name')->filter()->unique()->values()
+            : $this->items()->whereNotNull('delivery_recipient_name')->distinct()->pluck('delivery_recipient_name');
+
+        if ($names->isEmpty()) {
+            return null;
+        }
+
+        if ($names->count() === 1) {
+            return (string) $names->first();
+        }
+
+        return 'Multiple recipients';
+    }
+
+    public function getRecipientPhoneAttribute(): ?string
+    {
+        if ($this->isSingleDestination()) {
+            return $this->delivery_recipient_phone;
+        }
+
+        $phones = $this->relationLoaded('items')
+            ? $this->items->pluck('delivery_recipient_phone')->filter()->unique()->values()
+            : $this->items()->whereNotNull('delivery_recipient_phone')->distinct()->pluck('delivery_recipient_phone');
+
+        if ($phones->isEmpty()) {
+            return null;
+        }
+
+        if ($phones->count() === 1) {
+            return (string) $phones->first();
+        }
+
+        return 'Multiple numbers';
+    }
+
+    public function getTownAttribute(): ?string
+    {
+        return $this->delivery_town;
+    }
+
+    public function getLandmarkAttribute(): ?string
+    {
+        return $this->delivery_landmark;
+    }
+
+    public function getRegionIdAttribute(): ?int
+    {
+        return $this->delivery_region_id;
+    }
+
+    public function getDistrictIdAttribute(): ?int
+    {
+        return $this->delivery_district_id;
+    }
+
+    public function getLatitudeAttribute(): ?string
+    {
+        return $this->delivery_latitude;
+    }
+
+    public function getLongitudeAttribute(): ?string
+    {
+        return $this->delivery_longitude;
+    }
+
+    public function getGhPostAddressAttribute(): ?string
+    {
+        return $this->delivery_gh_post_address;
+    }
+
+    /**
+     * Get the pickup location type.
+     */
+    public function getPickupLocationTypeAttribute(): string
+    {
+        if ($this->pickup_region_id && $this->pickup_district_id) {
+            return 'dropdown';
+        }
+
+        if ($this->pickup_latitude && $this->pickup_longitude) {
+            return 'coordinates';
+        }
+
+        if ($this->pickup_gh_post_address) {
+            return 'gh_post';
+        }
+
+        return 'unknown';
+    }
+
+    /**
+     * Get formatted pickup location array.
+     */
+    public function getFormattedPickupLocationAttribute(): array
+    {
+        return [
+            'type' => $this->pickup_location_type,
+            'region' => $this->pickupRegion?->name,
+            'region_id' => $this->pickup_region_id,
+            'district' => $this->pickupDistrict?->name,
+            'district_id' => $this->pickup_district_id,
+            'town' => $this->pickup_town,
+            'latitude' => $this->pickup_latitude,
+            'longitude' => $this->pickup_longitude,
+            'gh_post_address' => $this->pickup_gh_post_address,
+            'landmark' => $this->pickup_landmark,
+        ];
+    }
+
     /**
      * Get the location type.
      */
     public function getLocationTypeAttribute(): string
     {
-        if ($this->region_id && $this->district_id) {
+        if ($this->isPerItemDestination()) {
+            return 'multiple';
+        }
+
+        if ($this->delivery_region_id && $this->delivery_district_id) {
             return 'dropdown';
-        } elseif ($this->latitude && $this->longitude) {
+        }
+
+        if ($this->delivery_latitude && $this->delivery_longitude) {
             return 'coordinates';
-        } elseif ($this->gh_post_address) {
+        }
+
+        if ($this->delivery_gh_post_address) {
             return 'gh_post';
         }
 
@@ -230,17 +429,32 @@ class Shipment extends Model
      */
     public function getFormattedLocationAttribute(): array
     {
+        if ($this->isPerItemDestination()) {
+            return [
+                'type' => 'multiple',
+                'region' => null,
+                'region_id' => null,
+                'district' => null,
+                'district_id' => null,
+                'town' => null,
+                'latitude' => null,
+                'longitude' => null,
+                'gh_post_address' => null,
+                'landmark' => null,
+            ];
+        }
+
         return [
             'type' => $this->location_type,
-            'region' => $this->region?->name,
-            'region_id' => $this->region_id,
-            'district' => $this->district?->name,
-            'district_id' => $this->district_id,
-            'town' => $this->town,
-            'latitude' => $this->latitude,
-            'longitude' => $this->longitude,
-            'gh_post_address' => $this->gh_post_address,
-            'landmark' => $this->landmark,
+            'region' => $this->deliveryRegion?->name,
+            'region_id' => $this->delivery_region_id,
+            'district' => $this->deliveryDistrict?->name,
+            'district_id' => $this->delivery_district_id,
+            'town' => $this->delivery_town,
+            'latitude' => $this->delivery_latitude,
+            'longitude' => $this->delivery_longitude,
+            'gh_post_address' => $this->delivery_gh_post_address,
+            'landmark' => $this->delivery_landmark,
         ];
     }
 }

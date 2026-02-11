@@ -84,8 +84,12 @@ class VendorController extends Controller
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('shipment_number', 'like', "%{$search}%")
-                    ->orWhere('recipient_name', 'like', "%{$search}%")
-                    ->orWhere('recipient_phone', 'like', "%{$search}%");
+                    ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                    ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
+                    ->orWhereHas('items', function ($itemQuery) use ($search) {
+                        $itemQuery->where('delivery_recipient_name', 'like', "%{$search}%")
+                            ->orWhere('delivery_recipient_phone', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -105,7 +109,11 @@ class VendorController extends Controller
         // Sorting
         $sortBy = $request->get('sort', 'created_at');
         $sortDirection = $request->get('direction', 'desc');
-        $allowedSorts = ['shipment_number', 'recipient_name', 'status', 'created_at'];
+        $allowedSorts = ['shipment_number', 'delivery_recipient_name', 'status', 'created_at'];
+
+        if ($sortBy === 'recipient_name') {
+            $sortBy = 'delivery_recipient_name';
+        }
 
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortDirection);

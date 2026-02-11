@@ -31,4 +31,32 @@ enum InvoiceStatus: string
             self::cases()
         );
     }
+
+    public function isActive(): bool
+    {
+        return in_array($this, self::activeStatuses(), true);
+    }
+
+    /**
+     * @return array<int, self>
+     */
+    public static function activeStatuses(): array
+    {
+        return [
+            self::PENDING,
+            self::SENT,
+            self::ACCEPTED,
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function activeValues(): array
+    {
+        return array_map(
+            fn(self $status) => $status->value,
+            self::activeStatuses()
+        );
+    }
 }

@@ -106,18 +106,24 @@ class DriverController extends Controller
         $this->authorizePermission('drivers.view');
 
         // Assignment statistics
-        $totalAssignments = $driver->pickupAssignments()->count();
-        $completedAssignments = $driver->pickupAssignments()->where('status', 'completed')->count();
+        $assignmentsCount = $driver->pickupAssignments()->count();
+        $completedCount = $driver->pickupAssignments()->where('status', 'completed')->count();
         $activeAssignment = $driver->activeAssignment;
-        $lastLogin = $driver->activityLogs()->where('action', 'login')->latest('created_at')->first();
+        $lastLogin = $driver->activityLogs()->where('action', 'driver_login')->latest('created_at')->first();
+        $activityLogsCount = $driver->activityLogs()->count();
 
         $canManage = Auth::guard('admin')->user()->hasPermission('drivers.edit');
 
         return view('admin.drivers.show', [
             'driver' => $driver,
+            'assignmentsCount' => $assignmentsCount,
+            'completedCount' => $completedCount,
+            'activityLogsCount' => $activityLogsCount,
+            'activeAssignment' => $activeAssignment,
+            'lastLogin' => $lastLogin,
             'stats' => [
-                'total_assignments' => $totalAssignments,
-                'completed_assignments' => $completedAssignments,
+                'total_assignments' => $assignmentsCount,
+                'completed_assignments' => $completedCount,
                 'active_assignment' => $activeAssignment,
                 'last_login' => $lastLogin,
             ],
@@ -141,7 +147,7 @@ class DriverController extends Controller
                 }
             }, 'unique:drivers,phone'],
             'password' => ['required', 'string', 'min:8'],
-            'vehicle_type' => ['nullable', 'string', 'max:255'],
+            'vehicle_type' => ['nullable', Rule::in(['motorcycle', 'car', 'van', 'truck'])],
             'vehicle_number' => ['nullable', 'string', 'max:255'],
             'license_number' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
@@ -154,7 +160,7 @@ class DriverController extends Controller
         $driver->email = $validated['email'];
         $driver->phone = $phone;
         $driver->password = Hash::make($validated['password']);
-        $driver->vehicle_type = $validated['vehicle_type'] ?? null;
+        $driver->vehicle_type = $validated['vehicle_type'] ?? 'motorcycle';
         $driver->vehicle_number = $validated['vehicle_number'] ?? null;
         $driver->license_number = $validated['license_number'] ?? null;
         $driver->is_active = $validated['is_active'] ?? true;
@@ -177,16 +183,24 @@ class DriverController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('drivers')->ignore($driver->id)],
+            'phone' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
+                if (!PhoneHelper::isValid($value)) {
+                    $fail('Please enter a valid Ghana phone number.');
+                }
+            }, Rule::unique('drivers')->ignore($driver->id)],
             'password' => ['nullable', 'string', 'min:8'],
-            'vehicle_type' => ['nullable', 'string', 'max:255'],
+            'vehicle_type' => ['nullable', Rule::in(['motorcycle', 'car', 'van', 'truck'])],
             'vehicle_number' => ['nullable', 'string', 'max:255'],
             'license_number' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
         ]);
 
+        $phone = PhoneHelper::format($validated['phone']);
+
         $driver->name = $validated['name'];
         $driver->email = $validated['email'];
-        $driver->vehicle_type = $validated['vehicle_type'] ?? null;
+        $driver->phone = $phone;
+        $driver->vehicle_type = $validated['vehicle_type'] ?? $driver->vehicle_type;
         $driver->vehicle_number = $validated['vehicle_number'] ?? null;
         $driver->license_number = $validated['license_number'] ?? null;
         $driver->is_active = $validated['is_active'] ?? $driver->is_active;
@@ -309,7 +323,10 @@ class DriverController extends Controller
                     ->orWhere('notes', 'like', "%{$search}%")
                     ->orWhereHas('shipment', function ($sq) use ($search) {
                         $sq->where('shipment_number', 'like', "%{$search}%")
-                            ->orWhere('recipient_name', 'like', "%{$search}%");
+                            ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                            ->orWhereHas('items', function ($itemQuery) use ($search) {
+                                $itemQuery->where('delivery_recipient_name', 'like', "%{$search}%");
+                            });
                     });
             });
         }

@@ -7,6 +7,9 @@ function buildWarehousesTable(config) {
         endpoint: config.endpoint,
         exportEndpoint: config.exportEndpoint,
         storeEndpoint: config.storeEndpoint,
+        regionsEndpoint: config.regionsEndpoint || '',
+        districtsEndpointTemplate: config.districtsEndpointTemplate || '',
+        showEndpointTemplate: config.showEndpointTemplate || '',
         csrfToken: config.csrfToken,
         warehouses: [],
         meta: {
@@ -84,8 +87,10 @@ function buildWarehousesTable(config) {
         },
 
         async loadRegions() {
+            if (!this.regionsEndpoint) return;
+
             try {
-                const response = await fetch('/api/v1/vendor/regions', {
+                const response = await fetch(this.regionsEndpoint, {
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
@@ -95,7 +100,7 @@ function buildWarehousesTable(config) {
                 if (!response.ok) throw new Error('Failed to fetch regions');
 
                 const result = await response.json();
-                this.regions = result.data || result;
+                this.regions = Array.isArray(result.data) ? result.data : (Array.isArray(result) ? result : []);
             } catch (error) {
                 console.error('Error loading regions:', error);
             }
@@ -110,7 +115,15 @@ function buildWarehousesTable(config) {
 
             this.loadingDistricts = true;
             try {
-                const response = await fetch(`/api/v1/vendor/regions/${regionId}/districts`, {
+                const endpoint = this.districtsEndpointTemplate
+                    ? this.districtsEndpointTemplate.replace('__REGION__', regionId)
+                    : '';
+
+                if (!endpoint) {
+                    throw new Error('Districts endpoint is not configured');
+                }
+
+                const response = await fetch(endpoint, {
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
@@ -120,7 +133,7 @@ function buildWarehousesTable(config) {
                 if (!response.ok) throw new Error('Failed to fetch districts');
 
                 const result = await response.json();
-                this.districts = result.data || result;
+                this.districts = Array.isArray(result.data) ? result.data : (Array.isArray(result) ? result : []);
             } catch (error) {
                 console.error('Error loading districts:', error);
             } finally {
@@ -327,24 +340,14 @@ function buildWarehousesTable(config) {
             this.modalMode = 'edit';
             this.editingWarehouseId = warehouse.id;
             this.errors = {};
-            this.form = {
-                name: warehouse.name,
-                code: warehouse.code || '',
-                type: warehouse.type || 'both',
-                address: warehouse.address || '',
-                region_id: warehouse.region_id || '',
-                district_id: warehouse.district_id || '',
-                contact_phone: warehouse.contact_phone || '',
-                contact_email: warehouse.contact_email || '',
-                capacity: warehouse.capacity || '',
-                is_active: warehouse.is_active,
-            };
 
-            // Load districts if a region is set
-            if (this.form.region_id) {
-                this.loadingDistricts = true;
+            let warehouseData = warehouse;
+
+            // Fetch full details if table row does not include location IDs.
+            if ((warehouse.region_id === undefined || warehouse.district_id === undefined) && this.showEndpointTemplate) {
                 try {
-                    const response = await fetch(`/api/v1/vendor/regions/${this.form.region_id}/districts`, {
+                    const endpoint = this.showEndpointTemplate.replace('__ID__', warehouse.id);
+                    const response = await fetch(endpoint, {
                         headers: {
                             'Accept': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest',
@@ -353,7 +356,50 @@ function buildWarehousesTable(config) {
 
                     if (response.ok) {
                         const result = await response.json();
-                        this.districts = result.data || result;
+                        if (result.warehouse) {
+                            warehouseData = { ...warehouse, ...result.warehouse };
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading warehouse details:', error);
+                }
+            }
+
+            this.form = {
+                name: warehouseData.name,
+                code: warehouseData.code || '',
+                type: warehouseData.type || 'both',
+                address: warehouseData.address || '',
+                region_id: warehouseData.region_id || '',
+                district_id: warehouseData.district_id || '',
+                contact_phone: warehouseData.contact_phone || '',
+                contact_email: warehouseData.contact_email || '',
+                capacity: warehouseData.capacity || '',
+                is_active: warehouseData.is_active,
+            };
+
+            // Load districts if a region is set
+            if (this.form.region_id) {
+                this.loadingDistricts = true;
+                try {
+                    const endpoint = this.districtsEndpointTemplate
+                        ? this.districtsEndpointTemplate.replace('__REGION__', this.form.region_id)
+                        : '';
+
+                    if (!endpoint) {
+                        throw new Error('Districts endpoint is not configured');
+                    }
+
+                    const response = await fetch(endpoint, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        this.districts = Array.isArray(result.data) ? result.data : (Array.isArray(result) ? result : []);
                     }
                 } catch (error) {
                     console.error('Error loading districts:', error);

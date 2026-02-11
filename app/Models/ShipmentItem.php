@@ -22,6 +22,16 @@ class ShipmentItem extends Model
         'shipment_id',
         'description',
         'quantity',
+        'delivery_recipient_name',
+        'delivery_recipient_phone',
+        'delivery_region_id',
+        'delivery_district_id',
+        'delivery_town',
+        'delivery_latitude',
+        'delivery_longitude',
+        'delivery_gh_post_address',
+        'delivery_landmark',
+        'delivery_instructions',
         'status',
         'tracking_code',
     ];
@@ -33,6 +43,8 @@ class ShipmentItem extends Model
      */
     protected $casts = [
         'quantity' => 'integer',
+        'delivery_latitude' => 'decimal:8',
+        'delivery_longitude' => 'decimal:8',
         'status' => ItemStatus::class,
     ];
 
@@ -93,11 +105,59 @@ class ShipmentItem extends Model
         return $this->hasMany(ShipmentItemImage::class)->orderBy('sort_order');
     }
 
+    public function deliveryRegion(): BelongsTo
+    {
+        return $this->belongsTo(Region::class, 'delivery_region_id');
+    }
+
+    public function deliveryDistrict(): BelongsTo
+    {
+        return $this->belongsTo(District::class, 'delivery_district_id');
+    }
+
     /**
      * Get the tracking history for this item.
      */
     public function tracking(): HasMany
     {
         return $this->hasMany(ShipmentItemTracking::class)->orderBy('created_at', 'desc');
+    }
+
+    public function pickupConfirmations(): HasMany
+    {
+        return $this->hasMany(PickupItemConfirmation::class);
+    }
+
+    public function getDeliveryLocationTypeAttribute(): string
+    {
+        if ($this->delivery_region_id && $this->delivery_district_id) {
+            return 'dropdown';
+        }
+
+        if ($this->delivery_latitude && $this->delivery_longitude) {
+            return 'coordinates';
+        }
+
+        if ($this->delivery_gh_post_address) {
+            return 'gh_post';
+        }
+
+        return 'unknown';
+    }
+
+    public function getFormattedDeliveryLocationAttribute(): array
+    {
+        return [
+            'type' => $this->delivery_location_type,
+            'region' => $this->deliveryRegion?->name,
+            'region_id' => $this->delivery_region_id,
+            'district' => $this->deliveryDistrict?->name,
+            'district_id' => $this->delivery_district_id,
+            'town' => $this->delivery_town,
+            'latitude' => $this->delivery_latitude,
+            'longitude' => $this->delivery_longitude,
+            'gh_post_address' => $this->delivery_gh_post_address,
+            'landmark' => $this->delivery_landmark,
+        ];
     }
 }

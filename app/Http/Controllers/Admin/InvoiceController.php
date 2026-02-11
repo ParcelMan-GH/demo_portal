@@ -17,7 +17,7 @@ class InvoiceController extends Controller
     ) {}
 
     /**
-     * Create and immediately send an invoice for a shipment.
+     * Create an invoice for a shipment (optionally send immediately).
      */
     public function store(Request $request, Shipment $shipment)
     {
@@ -29,21 +29,15 @@ class InvoiceController extends Controller
             'handling_fee' => ['required', 'numeric', 'min:0'],
             'other_fee' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
+            'send_now' => ['nullable', 'boolean'],
         ]);
 
         $admin = Auth::guard('admin')->user();
+        $sendNow = (bool) ($validated['send_now'] ?? false);
 
-        $result = $this->invoiceService->create($shipment, $validated, $admin);
+        $result = $this->invoiceService->create($shipment, $validated, $admin, $sendNow);
 
-        if (!$result['success']) {
-            return response()->json($result, 422);
-        }
-
-        // Send the invoice immediately after creation
-        $invoice = $result['data']['invoice'];
-        $sendResult = $this->invoiceService->send($invoice);
-
-        return response()->json($sendResult, $sendResult['success'] ? 200 : 422);
+        return response()->json($result, $result['success'] ? 200 : 422);
     }
 
     /**
@@ -106,11 +100,15 @@ class InvoiceController extends Controller
     /**
      * Cancel an invoice.
      */
-    public function cancel(Invoice $invoice)
+    public function cancel(Request $request, Invoice $invoice)
     {
         $this->authorizePermission('invoices.delete');
 
-        $result = $this->invoiceService->cancel($invoice);
+        $validated = $request->validate([
+            'cancel_reason' => ['nullable', 'string'],
+        ]);
+
+        $result = $this->invoiceService->cancel($invoice, $validated['cancel_reason'] ?? null);
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }

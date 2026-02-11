@@ -205,11 +205,14 @@
                         <th x-show="visibleColumns.vendor" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             VENDOR
                         </th>
-                        <th x-show="visibleColumns.recipient" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            RECIPIENT
+                        <th x-show="visibleColumns.destination_mode" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            DEST. MODE
+                        </th>
+                        <th x-show="visibleColumns.destination" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            DESTINATION
                         </th>
                         <th x-show="visibleColumns.location" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            LOCATION
+                            DELIVERY LOCATION
                         </th>
                         <th x-show="visibleColumns.items" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             ITEMS
@@ -252,13 +255,19 @@
                                 <div class="text-xs font-semibold text-slate-900" x-text="shipment.vendor_name"></div>
                                 <div class="text-[10px] text-slate-500" x-text="shipment.vendor_business"></div>
                             </td>
-                            <td x-show="visibleColumns.recipient" class="px-4 py-2.5 whitespace-nowrap">
-                                <div class="text-xs font-semibold text-slate-900" x-text="shipment.recipient_name"></div>
-                                <div class="text-[10px] text-slate-500" x-text="shipment.recipient_phone"></div>
+                            <td x-show="visibleColumns.destination_mode" class="px-4 py-2.5 whitespace-nowrap">
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                      :class="shipment.destination_mode === 'per_item' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'"
+                                      x-text="shipment.destination_mode_label">
+                                </span>
+                            </td>
+                            <td x-show="visibleColumns.destination" class="px-4 py-2.5 whitespace-nowrap">
+                                <div class="text-xs font-semibold text-slate-900" x-text="shipment.destination_summary_title"></div>
+                                <div class="text-[10px] text-slate-500" x-text="shipment.destination_summary_subtitle"></div>
                             </td>
                             <td x-show="visibleColumns.location" class="px-4 py-2.5 whitespace-nowrap">
-                                <div class="text-xs text-slate-900" x-text="shipment.region"></div>
-                                <div class="text-[10px] text-slate-500" x-text="shipment.district"></div>
+                                <div class="text-xs text-slate-900" x-text="shipment.delivery_location_title"></div>
+                                <div class="text-[10px] text-slate-500" x-text="shipment.delivery_location_subtitle"></div>
                             </td>
                             <td x-show="visibleColumns.items" class="px-4 py-2.5 whitespace-nowrap text-center">
                                 <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-[10px] font-semibold text-slate-700" x-text="shipment.items_count"></span>

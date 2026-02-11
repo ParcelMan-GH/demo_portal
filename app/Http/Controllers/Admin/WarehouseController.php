@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\WarehouseType;
 use App\Exports\WarehousesExport;
 use App\Http\Controllers\Controller;
+use App\Models\Region;
 use App\Models\Warehouse;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -88,6 +89,8 @@ class WarehouseController extends Controller
                     'address' => $warehouse->address,
                     'region' => $warehouse->region?->name,
                     'district' => $warehouse->district?->name,
+                    'region_id' => $warehouse->region_id,
+                    'district_id' => $warehouse->district_id,
                     'contact_phone' => $warehouse->contact_phone,
                     'contact_email' => $warehouse->contact_email,
                     'capacity' => $warehouse->capacity,
@@ -339,6 +342,35 @@ class WarehouseController extends Controller
             'generatedAt' => now()->format('F d, Y H:i:s'),
         ]);
         return $pdf->download($filename);
+    }
+
+    /**
+     * Get regions for warehouse forms.
+     */
+    public function regions()
+    {
+        $this->authorizePermission('warehouses.view');
+
+        return response()->json([
+            'success' => true,
+            'data' => Region::orderBy('name')
+                ->get(['id', 'name']),
+        ]);
+    }
+
+    /**
+     * Get districts for a region.
+     */
+    public function districts(Region $region)
+    {
+        $this->authorizePermission('warehouses.view');
+
+        return response()->json([
+            'success' => true,
+            'data' => $region->districts()
+                ->orderBy('name')
+                ->get(['id', 'name']),
+        ]);
     }
 
     /**

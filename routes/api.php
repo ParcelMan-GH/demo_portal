@@ -60,6 +60,7 @@ Route::prefix('v1/vendor')->middleware('auth:sanctum')->group(function () {
 
     // Invoice endpoints
     Route::get('invoices', [VendorInvoiceController::class, 'index']);
+    Route::get('invoices/view', [VendorInvoiceController::class, 'showByFilter']);
     Route::get('invoices/{invoice}', [VendorInvoiceController::class, 'show']);
     Route::post('invoices/{invoice}/accept', [VendorInvoiceController::class, 'accept']);
     Route::post('invoices/{invoice}/reject', [VendorInvoiceController::class, 'reject']);
@@ -76,11 +77,12 @@ Route::prefix('v1/driver')->group(function () {
         Route::put('profile', [DriverProfileController::class, 'update']);
         Route::put('change-password', [DriverProfileController::class, 'changePassword']);
 
-        // Assignment endpoints
-        Route::get('assignments', [DriverAssignmentController::class, 'index']);
-        Route::get('assignments/{assignment}', [DriverAssignmentController::class, 'show']);
-        Route::post('assignments/{assignment}/en-route', [DriverAssignmentController::class, 'startEnRoute']);
-        Route::post('assignments/{assignment}/arrive', [DriverAssignmentController::class, 'arrive']);
-        Route::post('assignments/{assignment}/confirm-pickup', [DriverAssignmentController::class, 'confirmPickup']);
+        // Pickup endpoints
+        Route::get('pickups', [DriverAssignmentController::class, 'index']);
+        Route::get('pickups/{assignment}', [DriverAssignmentController::class, 'show']);
+        Route::post('pickups/{assignment}/en-route', [DriverAssignmentController::class, 'startEnRoute']);
+        Route::post('pickups/{assignment}/arrive', [DriverAssignmentController::class, 'arrive']);
+        Route::post('pickups/{assignment}/items/{item}/confirm', [DriverAssignmentController::class, 'confirmPickupItem']);
+        Route::post('pickups/{assignment}/confirm-pickup', [DriverAssignmentController::class, 'confirmPickup']);
     });
 });
