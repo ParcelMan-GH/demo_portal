@@ -206,11 +206,8 @@ class PickupAssignmentService
 
             $confirmedAt = now();
 
-            if ($assignment->status === PickupAssignmentStatus::ARRIVED) {
-                $assignment->update([
-                    'status' => PickupAssignmentStatus::PICKING_UP,
-                ]);
-            }
+            // Keep assignment in ARRIVED while item confirmations are in progress.
+            // Driver must explicitly finalize pickup to move assignment forward.
 
             PickupItemConfirmation::query()->updateOrCreate([
                 'pickup_assignment_id' => $assignment->id,

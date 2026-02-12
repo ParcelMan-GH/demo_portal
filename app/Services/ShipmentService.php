@@ -181,13 +181,17 @@ class ShipmentService
             'pickupAssignment.driver',
             'pickupAssignment.targetWarehouse',
             'pickupAssignment.receivedWarehouse',
+            'pickupAssignment.itemConfirmations',
+            'pickupAssignment.photos',
         ]);
 
         return [
             'success' => true,
             'message' => 'Shipment retrieved successfully.',
             'data' => [
-                'shipment' => $this->transformShipment($shipment),
+                'shipment' => $this->transformShipment($shipment, [
+                    'include_pickup_details' => true,
+                ]),
             ],
         ];
     }

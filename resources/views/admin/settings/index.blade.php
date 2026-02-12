@@ -76,7 +76,7 @@
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Activity Logs</span>
                     </div>
                     <div class="space-y-1">
-                        @foreach(['email-logs' => $tabs['email-logs'], 'sms-logs' => $tabs['sms-logs']] as $key => $tab)
+                        @foreach(['email-logs' => $tabs['email-logs'], 'sms-logs' => $tabs['sms-logs'], 'otp-logs' => $tabs['otp-logs']] as $key => $tab)
                         <a href="{{ route('admin.settings.index', ['tab' => $key]) }}"
                            class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 {{ $activeTab === $key ? 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg shadow-slate-900/25' : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900' }}">
                             <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 {{ $activeTab === $key ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-slate-200' }}">
@@ -142,7 +142,7 @@
                             <p class="text-sm text-slate-500 font-medium mt-0.5">Configure your {{ strtolower($tabs[$activeTab]['label']) }} settings</p>
                         </div>
                     </div>
-                    @if(!in_array($activeTab, ['health', 'logs', 'email-logs', 'sms-logs', 'email-templates']))
+                    @if(!in_array($activeTab, ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'email-templates']))
                     <button type="button"
                             @@click="saveSettings()"
                             :disabled="saving"
@@ -212,6 +212,7 @@ window.settingsConfig = {
     logsClearEndpoint: @json(route('admin.settings.logs.clear')),
     emailLogsDataEndpoint: @json(route('admin.settings.email-logs.data')),
     smsLogsDataEndpoint: @json(route('admin.settings.sms-logs.data')),
+    otpLogsDataEndpoint: @json(route('admin.settings.otp-logs.data')),
     testEmailEndpoint: @json(route('admin.settings.test-email')),
     testSmsEndpoint: @json(route('admin.settings.test-sms')),
     clearCacheEndpoint: @json(route('admin.settings.clear-cache')),

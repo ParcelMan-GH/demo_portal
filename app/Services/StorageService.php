@@ -135,12 +135,23 @@ class StorageService
     public function getUrl(string $path): string
     {
         $driver = $this->getDriver();
+        $disk = $this->getDisk();
 
         if ($driver === 's3') {
             return $this->getSignedUrl($path);
         }
 
-        return url($this->getDisk()->url($path));
+        // Local/private files are served through signed temporary URLs.
+        if (method_exists($disk, 'temporaryUrl')) {
+            try {
+                $expiry = (int) PlatformSetting::getValue('storage.local.signed_url_expiry', 60);
+                return $disk->temporaryUrl($path, now()->addMinutes($expiry));
+            } catch (\Throwable) {
+                // Fallback below if temporary URLs are unavailable in current environment.
+            }
+        }
+
+        return url($disk->url($path));
     }
 
     /**

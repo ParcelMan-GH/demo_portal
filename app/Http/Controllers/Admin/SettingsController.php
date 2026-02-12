@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\OtpCode;
 use App\Models\PlatformSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,6 +28,7 @@ class SettingsController extends Controller
         'email-templates' => ['label' => 'Email Templates', 'icon' => 'template'],
         'email-logs' => ['label' => 'Email Logs', 'icon' => 'inbox'],
         'sms-logs' => ['label' => 'SMS Logs', 'icon' => 'phone'],
+        'otp-logs' => ['label' => 'OTP Logs', 'icon' => 'chat'],
         'push' => ['label' => 'Push Notifications', 'icon' => 'bell'],
         'health' => ['label' => 'System Health', 'icon' => 'heart'],
         'logs' => ['label' => 'System Logs', 'icon' => 'terminal'],
@@ -550,6 +552,63 @@ class SettingsController extends Controller
                 'last_page' => 1,
                 'from' => 0,
                 'to' => 0,
+            ],
+        ]);
+    }
+
+    /**
+     * Get OTP logs data.
+     */
+    public function otpLogsData(Request $request): JsonResponse
+    {
+        $query = OtpCode::query();
+
+        if ($search = trim((string) $request->get('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('phone', 'like', "%{$search}%")
+                    ->orWhere('purpose', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        if ($purpose = trim((string) $request->get('purpose', ''))) {
+            $query->where('purpose', $purpose);
+        }
+
+        if ($dateFrom = $request->get('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo = $request->get('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        $query->orderByDesc('created_at');
+
+        $perPage = min(max((int) $request->get('per_page', 25), 1), 100);
+        $logs = $query->paginate($perPage);
+
+        return response()->json([
+            'data' => $logs->map(function ($log) {
+                return [
+                    'id' => $log->id,
+                    'phone' => $log->phone,
+                    'code' => $log->code,
+                    'purpose' => $log->purpose,
+                    'expires_at' => $log->expires_at?->format('Y-m-d H:i:s'),
+                    'verified_at' => $log->verified_at?->format('Y-m-d H:i:s'),
+                    'is_verified' => $log->verified_at !== null,
+                    'is_expired' => $log->expires_at?->isPast() ?? false,
+                    'created_at' => $log->created_at?->format('Y-m-d H:i:s'),
+                ];
+            }),
+            'meta' => [
+                'total' => $logs->total(),
+                'per_page' => $logs->perPage(),
+                'current_page' => $logs->currentPage(),
+                'last_page' => $logs->lastPage(),
+                'from' => $logs->firstItem() ?? 0,
+                'to' => $logs->lastItem() ?? 0,
             ],
         ]);
     }

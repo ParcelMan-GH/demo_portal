@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\OtpCode;
-use Illuminate\Support\Facades\Log;
 
 class OtpService
 {
@@ -41,14 +40,6 @@ class OtpService
         // Send SMS
         $message = "Your Parcelman code is {$code}";
         $sent = $this->smsService->send($phone, $message);
-
-        // Log for development (remove in production or use proper logging)
-        Log::info('OTP generated', [
-            'phone' => $phone,
-            'purpose' => $purpose,
-            'code' => $code, // Remove in production!
-            'sms_sent' => $sent,
-        ]);
 
         return $code;
     }

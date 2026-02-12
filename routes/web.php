@@ -14,7 +14,73 @@ use App\Http\Controllers\Admin\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    return view('web.landing');
+})->name('web.landing');
+
+Route::prefix('vendor')->name('web.vendor.')->group(function () {
+    Route::get('login', function () {
+        return view('web.vendor.login');
+    })->name('login');
+
+    Route::get('home', function () {
+        return view('web.vendor.home');
+    })->name('home');
+
+    Route::get('profile', function () {
+        return view('web.vendor.profile');
+    })->name('profile');
+
+    Route::prefix('shipments')->name('shipments.')->group(function () {
+        Route::get('/', function () {
+            return view('web.vendor.shipments.index');
+        })->name('index');
+
+        Route::get('create', function () {
+            return view('web.vendor.shipments.create');
+        })->name('create');
+
+        Route::get('{shipment}/edit', function ($shipment) {
+            return view('web.vendor.shipments.edit', ['shipmentId' => $shipment]);
+        })->name('edit');
+
+        Route::get('{shipment}', function ($shipment) {
+            return view('web.vendor.shipments.show', ['shipmentId' => $shipment]);
+        })->name('show');
+    });
+
+    Route::prefix('invoices')->name('invoices.')->group(function () {
+        Route::get('/', function () {
+            return view('web.vendor.invoices.index');
+        })->name('index');
+
+        Route::get('{invoice}', function ($invoice) {
+            return view('web.vendor.invoices.show', ['invoiceId' => $invoice]);
+        })->name('show');
+    });
+});
+
+Route::prefix('driver')->name('web.driver.')->group(function () {
+    Route::get('login', function () {
+        return view('web.driver.login');
+    })->name('login');
+
+    Route::get('home', function () {
+        return view('web.driver.home');
+    })->name('home');
+
+    Route::get('profile', function () {
+        return view('web.driver.profile');
+    })->name('profile');
+
+    Route::prefix('pickups')->name('pickups.')->group(function () {
+        Route::get('/', function () {
+            return view('web.driver.pickups.index');
+        })->name('index');
+
+        Route::get('{pickup}', function ($pickup) {
+            return view('web.driver.pickups.show', ['pickupId' => $pickup]);
+        })->name('show');
+    });
 });
 
 // API Tester (no auth required)
@@ -124,6 +190,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('settings/logs-export', [SettingsController::class, 'exportLogs'])->name('settings.logs.export');
         Route::get('settings/email-logs-data', [SettingsController::class, 'emailLogsData'])->name('settings.email-logs.data');
         Route::get('settings/sms-logs-data', [SettingsController::class, 'smsLogsData'])->name('settings.sms-logs.data');
+        Route::get('settings/otp-logs-data', [SettingsController::class, 'otpLogsData'])->name('settings.otp-logs.data');
         Route::post('settings/test-email', [SettingsController::class, 'testEmail'])->name('settings.test-email');
         Route::post('settings/test-sms', [SettingsController::class, 'testSms'])->name('settings.test-sms');
         Route::post('settings/clear-cache', [SettingsController::class, 'clearCache'])->name('settings.clear-cache');
