@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use App\Enums\WarehouseType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Warehouse extends Model
@@ -15,7 +15,6 @@ class Warehouse extends Model
     protected $fillable = [
         'name',
         'code',
-        'type',
         'address',
         'region_id',
         'district_id',
@@ -28,7 +27,6 @@ class Warehouse extends Model
     ];
 
     protected $casts = [
-        'type' => WarehouseType::class,
         'is_active' => 'boolean',
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
@@ -71,5 +69,15 @@ class Warehouse extends Model
     public function district(): BelongsTo
     {
         return $this->belongsTo(District::class);
+    }
+
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class);
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AdminAuditLog::class);
     }
 }

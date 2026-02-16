@@ -1,5 +1,10 @@
 @extends('admin.layouts.app')
 
+@php
+    $isWarehouseScope = ($roleScope ?? ($role->is_warehouse_role ? 'warehouse' : 'system')) === 'warehouse';
+    $rolesIndexRoute = $isWarehouseScope ? route('admin.roles.warehouse.index') : route('admin.roles.index');
+@endphp
+
 @section('title', $role->name)
 
 @section('breadcrumb-parent', 'Roles & Permissions')
@@ -8,16 +13,16 @@
 @section('content')
     <div class="mb-6 flex items-center justify-between">
         <div>
-            <a href="{{ route('admin.roles.index') }}" class="text-blue-600 hover:text-blue-800 flex items-center">
+            <a href="{{ $rolesIndexRoute }}" class="text-blue-600 hover:text-blue-800 flex items-center">
                 <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                 </svg>
-                Back to Roles
+                {{ $isWarehouseScope ? 'Back to Warehouse Roles' : 'Back to System Roles' }}
             </a>
         </div>
         <div class="flex items-center space-x-4">
             @hasPermission('roles.edit')
-                <a href="{{ route('admin.roles.edit', $role) }}"
+                <a href="{{ route('admin.roles.edit', ['role' => $role, 'scope' => $isWarehouseScope ? 'warehouse' : 'system']) }}"
                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
                     Edit Role
                 </a>
@@ -25,7 +30,7 @@
 
             @hasPermission('roles.delete')
                 @if(!$role->is_system_role)
-                    <form action="{{ route('admin.roles.destroy', $role) }}"
+                    <form action="{{ route('admin.roles.destroy', ['role' => $role, 'scope' => $isWarehouseScope ? 'warehouse' : 'system']) }}"
                           method="POST"
                           onsubmit="return confirm('Are you sure you want to delete this role?');">
                         @csrf

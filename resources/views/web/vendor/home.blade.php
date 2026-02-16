@@ -1,75 +1,140 @@
-@extends('web.layouts.portal')
+@extends('web.layouts.vendor')
 
-@section('title', 'Vendor Home')
+@section('title', 'Dashboard')
+@section('page-title', 'Dashboard')
 
 @section('content')
-<main class="mx-auto min-h-screen w-full max-w-6xl px-6 py-10" x-data="vendorHomePage()">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-orange-200">Vendor Portal</p>
-            <h1 class="mt-1 text-3xl font-extrabold text-white">Vendor Home</h1>
+<div x-data="vendorHomePage()">
+    {{-- Loading --}}
+    <div x-show="loading" class="flex items-center justify-center py-20">
+        <div class="text-center">
+            <svg class="mx-auto h-8 w-8 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <p class="mt-3 text-sm text-slate-500">Loading dashboard...</p>
         </div>
-        <div class="flex gap-3">
-            <a href="{{ route('web.vendor.shipments.index') }}" class="rounded-xl border border-emerald-300/30 bg-emerald-500/15 px-4 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-500/25">
-                My Shipments
+    </div>
+
+    <div x-show="!loading && error" x-cloak class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700" x-text="error"></div>
+
+    <div x-show="!loading && profile" x-cloak class="space-y-6">
+        {{-- Welcome --}}
+        <div class="vendor-card overflow-hidden">
+            <div class="bg-slate-800 px-6 py-5">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Welcome back, <span x-text="profile?.name || 'Vendor'"></span>!</h2>
+                        <p class="mt-1 text-sm text-slate-300">Manage your shipments and invoices from here.</p>
+                    </div>
+                    <a href="{{ route('web.vendor.shipments.create') }}" class="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        New Shipment
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        {{-- Quick links --}}
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <a href="{{ route('web.vendor.shipments.index') }}" class="vendor-card p-4 transition hover:shadow-md">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    </div>
+                    <div>
+                        <div class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Shipments</div>
+                        <div class="text-lg font-bold text-slate-900">View All</div>
+                    </div>
+                </div>
             </a>
-            <a href="{{ route('web.vendor.invoices.index') }}" class="rounded-xl border border-sky-300/30 bg-sky-500/15 px-4 py-2 text-sm font-semibold text-sky-100 hover:bg-sky-500/25">
-                My Invoices
+            <a href="{{ route('web.vendor.shipments.create') }}" class="vendor-card p-4 transition hover:shadow-md">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 text-green-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </div>
+                    <div>
+                        <div class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Create</div>
+                        <div class="text-lg font-bold text-slate-900">New Shipment</div>
+                    </div>
+                </div>
             </a>
-            <a href="{{ route('web.vendor.profile') }}" class="rounded-xl border border-orange-300/30 bg-orange-500/15 px-4 py-2 text-sm font-semibold text-orange-100 hover:bg-orange-500/25">
-                Update Profile
+            <a href="{{ route('web.vendor.invoices.index') }}" class="vendor-card p-4 transition hover:shadow-md">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                    </div>
+                    <div>
+                        <div class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Invoices</div>
+                        <div class="text-lg font-bold text-slate-900">View All</div>
+                    </div>
+                </div>
             </a>
-            <a href="{{ route('web.landing') }}" class="rounded-xl border border-slate-200/20 bg-slate-900/70 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-800">
-                Portal
-            </a>
-            <button type="button" @click="logout()" class="rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-400">
-                Logout
+            <button type="button" @click="logout()" class="vendor-card p-4 text-left transition hover:shadow-md">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 text-red-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    </div>
+                    <div>
+                        <div class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Account</div>
+                        <div class="text-lg font-bold text-slate-900">Logout</div>
+                    </div>
+                </div>
             </button>
         </div>
+
+        {{-- Profile --}}
+        <div class="grid gap-6 lg:grid-cols-3">
+            <div class="vendor-card p-5 lg:col-span-2">
+                <h3 class="border-b border-gray-100 pb-3 text-sm font-bold text-slate-900">Profile Information</h3>
+                <dl class="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <dt class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Full Name</dt>
+                        <dd class="mt-1 text-sm font-semibold text-slate-900" x-text="profile?.name || '-'"></dd>
+                    </div>
+                    <div>
+                        <dt class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Business Name</dt>
+                        <dd class="mt-1 text-sm font-semibold text-slate-900" x-text="profile?.business_name || '-'"></dd>
+                    </div>
+                    <div>
+                        <dt class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Phone</dt>
+                        <dd class="mt-1 text-sm font-semibold text-slate-900" x-text="profile?.phone || '-'"></dd>
+                    </div>
+                    <div>
+                        <dt class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Email</dt>
+                        <dd class="mt-1 text-sm font-semibold text-slate-900" x-text="profile?.email || '-'"></dd>
+                    </div>
+                </dl>
+            </div>
+
+            <div class="vendor-card p-5">
+                <h3 class="border-b border-gray-100 pb-3 text-sm font-bold text-slate-900">Update Profile</h3>
+                <div class="mt-3" x-show="profileAlert" x-cloak>
+                    <div class="rounded-lg px-3 py-2 text-xs font-medium"
+                         :class="{ 'bg-green-50 text-green-700': profileAlert?.type === 'success', 'bg-red-50 text-red-700': profileAlert?.type === 'error' }"
+                         x-text="profileAlert?.message"></div>
+                </div>
+                <form class="mt-3 space-y-3" @submit.prevent="updateProfile()">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Name</label>
+                        <input x-model="profileForm.name" type="text" class="vendor-input">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Business Name</label>
+                        <input x-model="profileForm.business_name" type="text" class="vendor-input">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Email</label>
+                        <input x-model="profileForm.email" type="email" class="vendor-input">
+                    </div>
+                    <button type="submit" :disabled="profileSaving"
+                            class="w-full rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60">
+                        <span x-show="!profileSaving">Save Changes</span>
+                        <span x-show="profileSaving" x-cloak>Saving...</span>
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
-
-    <div class="mt-6 grid gap-6 lg:grid-cols-3">
-        <section class="rounded-3xl border border-slate-200/15 bg-slate-900/75 p-6 backdrop-blur-xl lg:col-span-2">
-            <h2 class="text-lg font-bold text-white">Profile Overview</h2>
-
-            <div x-show="loading" class="mt-4 text-sm text-slate-300">Loading profile...</div>
-            <div x-show="!loading && error" x-cloak class="mt-4 rounded-xl border border-rose-300/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100" x-text="error"></div>
-
-            <dl x-show="!loading && profile" x-cloak class="mt-4 grid gap-3 text-sm text-slate-200 sm:grid-cols-2">
-                <div>
-                    <dt class="text-xs uppercase tracking-[0.12em] text-slate-400">Name</dt>
-                    <dd class="mt-1 font-semibold text-white" x-text="profile?.name || '-'"></dd>
-                </div>
-                <div>
-                    <dt class="text-xs uppercase tracking-[0.12em] text-slate-400">Business</dt>
-                    <dd class="mt-1 font-semibold text-white" x-text="profile?.business_name || '-'"></dd>
-                </div>
-                <div>
-                    <dt class="text-xs uppercase tracking-[0.12em] text-slate-400">Phone</dt>
-                    <dd class="mt-1 font-semibold text-white" x-text="profile?.phone || '-'"></dd>
-                </div>
-                <div>
-                    <dt class="text-xs uppercase tracking-[0.12em] text-slate-400">Email</dt>
-                    <dd class="mt-1 font-semibold text-white" x-text="profile?.email || '-'"></dd>
-                </div>
-            </dl>
-        </section>
-
-        <section class="rounded-3xl border border-orange-300/25 bg-orange-500/10 p-6">
-            <h2 class="text-sm font-semibold uppercase tracking-[0.12em] text-orange-100">Session</h2>
-            <p class="mt-3 text-sm text-orange-100">You are signed in as a vendor user.</p>
-        </section>
-    </div>
-
-    <section class="mt-6 rounded-3xl border border-slate-200/15 bg-slate-900/75 p-6 backdrop-blur-xl">
-        <h2 class="text-sm font-semibold uppercase tracking-[0.12em] text-slate-200">Quick Links</h2>
-        <ul class="mt-3 space-y-2 text-sm text-slate-300">
-            <li><a href="{{ route('web.vendor.shipments.index') }}" class="text-emerald-200 hover:text-white">Manage Shipments</a></li>
-            <li><a href="{{ route('web.vendor.shipments.create') }}" class="text-emerald-200 hover:text-white">Create Shipment</a></li>
-            <li><a href="{{ route('web.vendor.invoices.index') }}" class="text-sky-200 hover:text-white">Manage Invoices</a></li>
-            <li><a href="{{ route('web.vendor.profile') }}" class="text-orange-200 hover:text-white">Profile & Account Settings</a></li>
-            <li>Pickup tracking (next phase)</li>
-        </ul>
-    </section>
-</main>
+</div>
 @endsection

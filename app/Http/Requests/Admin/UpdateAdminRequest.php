@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\Role;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -42,8 +43,10 @@ class UpdateAdminRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'email', Rule::unique('users')->ignore($adminId)],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
-            'roles' => ['nullable', 'array'],
+            'role_id' => ['nullable', 'exists:roles,id'],
+            'roles' => ['nullable', 'array', 'max:1'],
             'roles.*' => ['exists:roles,id'],
+            'warehouse_id' => ['nullable', 'exists:warehouses,id'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
@@ -61,7 +64,50 @@ class UpdateAdminRequest extends FormRequest
             if ($this->has('is_active') && !$this->boolean('is_active') && $currentAdmin->id === $targetAdmin->id) {
                 $validator->errors()->add('is_active', 'You cannot deactivate yourself.');
             }
+
+            // Warehouse-scoped users can only receive warehouse roles.
+            $selectedRoleId = $this->selectedRoleId();
+            if (!$selectedRoleId) {
+                return;
+            }
+
+            $warehouseId = $this->input('warehouse_id', $targetAdmin->warehouse_id);
+
+            if ($warehouseId) {
+                $isWarehouseRole = Role::query()
+                    ->whereKey($selectedRoleId)
+                    ->warehouseRoles()
+                    ->exists();
+
+                if (!$isWarehouseRole) {
+                    $validator->errors()->add('role_id', 'Warehouse users can only be assigned warehouse roles.');
+                }
+                return;
+            }
+
+            $isWarehouseRole = Role::query()
+                ->whereKey($selectedRoleId)
+                ->warehouseRoles()
+                ->exists();
+
+            if ($isWarehouseRole) {
+                $validator->errors()->add('role_id', 'System users cannot be assigned warehouse roles.');
+            }
         });
+    }
+
+    private function selectedRoleId(): ?int
+    {
+        if ($this->filled('role_id')) {
+            return (int) $this->input('role_id');
+        }
+
+        $roles = array_values(array_filter((array) $this->input('roles')));
+        if (empty($roles)) {
+            return null;
+        }
+
+        return (int) $roles[0];
     }
 
     /**

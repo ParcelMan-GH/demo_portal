@@ -1,0 +1,865 @@
+/**
+ * Admin shipment show page Alpine component
+ * Extracted from Blade inline scripts and bundled via Vite.
+ */
+
+function shipmentShow() {
+    return {
+        config: {},
+        shipment: {},
+        canManage: false,
+        invoice: null,
+        invoiceHistory: [],
+        assignment: null,
+        assignmentHistory: [],
+        assignmentUiError: '',
+        assignmentActionLoading: false,
+
+        activeTab: 'overview',
+
+        // Items state
+        items: {
+            data: [],
+            loading: false
+        },
+
+        // Invoice form state
+        invoiceForm: {
+            pickup_fee: '',
+            transport_fee: '',
+            handling_fee: '',
+            other_fee: '',
+            notes: '',
+            send_now: false,
+            submitting: false
+        },
+        invoiceModalOpen: false,
+        invoiceDetailModalOpen: false,
+        invoiceDetail: null,
+        invoiceUiError: '',
+        invoiceTable: {
+            search: '',
+            statusFilter: '',
+            statusFilterLabel: 'All statuses',
+            sortBy: 'created_at',
+            sortDirection: 'desc',
+            page: 1,
+            perPage: 10,
+            columns: [
+                { key: 'invoice_number', label: 'Invoice Number' },
+                { key: 'status', label: 'Status' },
+                { key: 'is_active', label: 'Active' },
+                { key: 'total_amount', label: 'Total' },
+                { key: 'created_at', label: 'Created' },
+                { key: 'actions', label: 'Actions' },
+            ],
+            visibleColumns: {
+                invoice_number: true,
+                status: true,
+                is_active: true,
+                total_amount: true,
+                created_at: true,
+                actions: true,
+            }
+        },
+
+        // Assignment form state
+        assignmentForm: {
+            driver_id: '',
+            target_warehouse_id: '',
+            notes: '',
+            submitting: false,
+            loadingDrivers: false,
+            loadingWarehouses: false
+        },
+
+        // Available drivers
+        availableDrivers: [],
+        availableWarehouses: [],
+
+        // Tracking state
+        tracking: {
+            data: [],
+            loading: false
+        },
+
+        shipmentDestinationMode() {
+            const mode = this.shipment?.destination_mode;
+            if (!mode) return 'single';
+            if (typeof mode === 'string') return mode;
+            if (typeof mode === 'object' && mode.value) return mode.value;
+            return 'single';
+        },
+
+        isPerItemMode() {
+            return this.shipmentDestinationMode() === 'per_item';
+        },
+
+        shipmentDestinationModeLabel() {
+            return this.isPerItemMode() ? 'Per Item Destination' : 'Single Destination';
+        },
+
+        shipmentDestinationModeBadgeClass() {
+            return this.isPerItemMode()
+                ? 'bg-violet-100 text-violet-700'
+                : 'bg-sky-100 text-sky-700';
+        },
+
+        pickupLocationSummary() {
+            if (this.shipment?.pickup_region_id && this.shipment?.pickup_district_id) {
+                const parts = [
+                    this.shipment?.pickup_region?.name,
+                    this.shipment?.pickup_district?.name,
+                    this.shipment?.pickup_town
+                ].filter(Boolean);
+                if (parts.length > 0) return parts.join(', ');
+            }
+
+            if (this.shipment?.pickup_latitude && this.shipment?.pickup_longitude) {
+                return `${this.shipment.pickup_latitude}, ${this.shipment.pickup_longitude}`;
+            }
+
+            if (this.shipment?.pickup_gh_post_address) {
+                return this.shipment.pickup_gh_post_address;
+            }
+
+            return '-';
+        },
+
+        deliveryLocationSummary() {
+            if (this.shipment?.delivery_region_id && this.shipment?.delivery_district_id) {
+                const parts = [
+                    this.shipment?.delivery_region?.name,
+                    this.shipment?.delivery_district?.name,
+                    this.shipment?.delivery_town
+                ].filter(Boolean);
+                if (parts.length > 0) return parts.join(', ');
+            }
+
+            if (this.shipment?.delivery_latitude && this.shipment?.delivery_longitude) {
+                return `${this.shipment.delivery_latitude}, ${this.shipment.delivery_longitude}`;
+            }
+
+            if (this.shipment?.delivery_gh_post_address) {
+                return this.shipment.delivery_gh_post_address;
+            }
+
+            return '-';
+        },
+
+        itemDestinationTitle(item) {
+            if (!item) return '-';
+            if (this.isPerItemMode()) {
+                return item.delivery_recipient_name || '-';
+            }
+            return this.shipment?.delivery_recipient_name || '-';
+        },
+
+        itemDestinationSubtitle(item) {
+            if (!item) return '-';
+            if (this.isPerItemMode()) {
+                return item.delivery_recipient_phone || '-';
+            }
+            return this.shipment?.delivery_recipient_phone || '-';
+        },
+
+        itemLocationTitle(item) {
+            if (!item) return '-';
+            if (this.isPerItemMode()) {
+                return item.delivery_location_title || '-';
+            }
+            return this.shipment?.delivery_region?.name || 'Shared shipment destination';
+        },
+
+        itemLocationSubtitle(item) {
+            if (!item) return '-';
+            if (this.isPerItemMode()) {
+                return item.delivery_location_subtitle || '-';
+            }
+
+            const shared = [
+                this.shipment?.delivery_district?.name,
+                this.shipment?.delivery_town
+            ].filter(Boolean).join(', ');
+
+            return shared || '-';
+        },
+
+        init() {
+            this.config = window.shipmentShowConfig;
+            this.shipment = this.config.shipment;
+            this.canManage = this.config.canManage;
+            this.invoice = this.config.invoice;
+            this.invoiceHistory = this.config.invoiceHistory || [];
+            if (!this.invoice && this.invoiceHistory.length > 0) {
+                const activeInvoice = this.invoiceHistory.find(row => !!row.is_active);
+                this.invoice = activeInvoice || this.invoiceHistory[0];
+            }
+            this.assignment = this.config.assignment;
+            this.assignmentHistory = this.config.assignmentHistory || [];
+            this.loadItems();
+        },
+
+        async loadItems() {
+            this.items.loading = true;
+            try {
+                const response = await fetch(this.config.itemsEndpoint);
+                const data = await response.json();
+                this.items.data = data.data || data;
+            } catch (error) {
+                console.error('Failed to load items:', error);
+            } finally {
+                this.items.loading = false;
+            }
+        },
+
+        async loadTracking() {
+            this.tracking.loading = true;
+            try {
+                const response = await fetch(this.config.trackingEndpoint);
+                const data = await response.json();
+                this.tracking.data = data.data || data;
+            } catch (error) {
+                console.error('Failed to load tracking:', error);
+            } finally {
+                this.tracking.loading = false;
+            }
+        },
+
+        activeStatuses() {
+            return ['pending', 'sent', 'accepted'];
+        },
+
+        hasActiveInvoice() {
+            return this.invoiceHistory.some(row => this.activeStatuses().includes(row.status));
+        },
+
+        canCreateInvoice() {
+            return this.canManage && this.shipment.status === 'submitted' && !this.hasActiveInvoice();
+        },
+
+        activeInvoiceBlockReason() {
+            if (this.shipment.status !== 'submitted') {
+                return 'Invoice can only be created when shipment is in submitted status.';
+            }
+            if (this.hasActiveInvoice()) {
+                return 'Shipment already has an active invoice (pending, sent, or accepted).';
+            }
+            return '';
+        },
+
+        activeInvoice() {
+            return this.invoiceHistory.find(row => this.activeStatuses().includes(row.status)) || null;
+        },
+
+        openCreateInvoiceModal() {
+            this.invoiceUiError = '';
+            if (!this.canCreateInvoice()) {
+                this.invoiceUiError = this.activeInvoiceBlockReason() || 'Cannot create invoice right now.';
+                if (window.showToast && this.invoiceUiError) {
+                    window.showToast(this.invoiceUiError, 'error');
+                }
+                return;
+            }
+            this.invoiceModalOpen = true;
+        },
+
+        closeCreateInvoiceModal() {
+            this.invoiceModalOpen = false;
+        },
+
+        openInvoiceDetailModal(invoiceId = null) {
+            const targetInvoice = invoiceId
+                ? this.invoiceHistory.find(row => Number(row.id) === Number(invoiceId))
+                : (this.activeInvoice() || this.invoice);
+
+            if (!targetInvoice) {
+                return;
+            }
+
+            this.invoice = targetInvoice;
+            this.invoiceDetail = targetInvoice;
+            this.invoiceDetailModalOpen = true;
+        },
+
+        openActiveInvoiceModal() {
+            const active = this.activeInvoice();
+            if (active) {
+                this.openInvoiceDetailModal(active.id);
+            }
+        },
+
+        closeInvoiceDetailModal() {
+            this.invoiceDetailModalOpen = false;
+        },
+
+        setInvoiceStatusFilter(value) {
+            this.invoiceTable.statusFilter = value;
+            this.invoiceTable.statusFilterLabel = value ? value.charAt(0).toUpperCase() + value.slice(1) : 'All statuses';
+            this.invoiceTable.page = 1;
+        },
+
+        toggleInvoiceColumn(key) {
+            if (!(key in this.invoiceTable.visibleColumns)) return;
+            const enabledCount = Object.values(this.invoiceTable.visibleColumns).filter(Boolean).length;
+            if (this.invoiceTable.visibleColumns[key] && enabledCount <= 1) {
+                return;
+            }
+            this.invoiceTable.visibleColumns[key] = !this.invoiceTable.visibleColumns[key];
+        },
+
+        visibleInvoiceColumnCount() {
+            return Object.values(this.invoiceTable.visibleColumns).filter(Boolean).length;
+        },
+
+        filteredInvoiceRows() {
+            let rows = Array.isArray(this.invoiceHistory) ? [...this.invoiceHistory] : [];
+
+            const search = (this.invoiceTable.search || '').trim().toLowerCase();
+            if (search) {
+                rows = rows.filter(row => {
+                    const haystacks = [
+                        row.invoice_number,
+                        row.status,
+                        row.status_label,
+                        row.notes,
+                        row.vendor_notes,
+                        row.rejection_reason,
+                        row.cancel_reason,
+                    ];
+                    return haystacks.some(value => (value || '').toString().toLowerCase().includes(search));
+                });
+            }
+
+            if (this.invoiceTable.statusFilter) {
+                rows = rows.filter(row => row.status === this.invoiceTable.statusFilter);
+            }
+
+            const direction = this.invoiceTable.sortDirection === 'asc' ? 1 : -1;
+            const sortBy = this.invoiceTable.sortBy;
+            rows.sort((a, b) => {
+                const aValue = a?.[sortBy];
+                const bValue = b?.[sortBy];
+
+                if (sortBy === 'created_at') {
+                    const aDate = aValue ? new Date(aValue).getTime() : 0;
+                    const bDate = bValue ? new Date(bValue).getTime() : 0;
+                    return aDate > bDate ? direction : -direction;
+                }
+
+                if (sortBy === 'total_amount') {
+                    const aNum = Number(aValue ?? 0);
+                    const bNum = Number(bValue ?? 0);
+                    if (aNum === bNum) return 0;
+                    return aNum > bNum ? direction : -direction;
+                }
+
+                const aText = (aValue || '').toString().toLowerCase();
+                const bText = (bValue || '').toString().toLowerCase();
+                if (aText === bText) return 0;
+                return aText > bText ? direction : -direction;
+            });
+
+            return rows;
+        },
+
+        paginatedInvoiceRows() {
+            const rows = this.filteredInvoiceRows();
+            const totalPages = Math.max(1, Math.ceil(rows.length / this.invoiceTable.perPage));
+            if (this.invoiceTable.page > totalPages) {
+                this.invoiceTable.page = totalPages;
+            }
+            const start = (this.invoiceTable.page - 1) * this.invoiceTable.perPage;
+            return rows.slice(start, start + this.invoiceTable.perPage);
+        },
+
+        invoiceMeta() {
+            const rows = this.filteredInvoiceRows();
+            const total = rows.length;
+            const lastPage = Math.max(1, Math.ceil(total / this.invoiceTable.perPage));
+            const page = Math.min(this.invoiceTable.page, lastPage);
+            const from = total === 0 ? 0 : ((page - 1) * this.invoiceTable.perPage) + 1;
+            const to = Math.min(page * this.invoiceTable.perPage, total);
+
+            return { total, page, lastPage, from, to };
+        },
+
+        sortInvoice(field) {
+            if (this.invoiceTable.sortBy === field) {
+                this.invoiceTable.sortDirection = this.invoiceTable.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.invoiceTable.sortBy = field;
+                this.invoiceTable.sortDirection = 'asc';
+            }
+            this.invoiceTable.page = 1;
+        },
+
+        invoiceFirstPage() {
+            this.invoiceTable.page = 1;
+        },
+
+        invoicePreviousPage() {
+            this.invoiceTable.page = Math.max(1, this.invoiceTable.page - 1);
+        },
+
+        invoiceNextPage() {
+            const meta = this.invoiceMeta();
+            this.invoiceTable.page = Math.min(meta.lastPage, this.invoiceTable.page + 1);
+        },
+
+        invoiceLastPage() {
+            this.invoiceTable.page = this.invoiceMeta().lastPage;
+        },
+
+        viewInvoice(invoiceId) {
+            const selected = this.invoiceHistory.find(row => Number(row.id) === Number(invoiceId));
+            if (selected) {
+                this.invoice = selected;
+                this.invoiceDetail = selected;
+                this.invoiceDetailModalOpen = true;
+            }
+        },
+
+        invoiceStatusClass(status) {
+            if (status === 'pending' || status === 'sent') return 'bg-amber-100 text-amber-700';
+            if (status === 'accepted') return 'bg-emerald-100 text-emerald-700';
+            if (status === 'rejected') return 'bg-rose-100 text-rose-700';
+            return 'bg-slate-100 text-slate-700';
+        },
+
+        exportInvoiceData(format) {
+            const rows = this.filteredInvoiceRows();
+            if (format === 'csv') {
+                const header = ['Invoice Number', 'Status', 'Is Active', 'Total Amount', 'Created At'];
+                const lines = rows.map(row => [
+                    row.invoice_number,
+                    row.status_label || row.status,
+                    row.is_active ? 'Yes' : 'No',
+                    row.total_amount ?? 0,
+                    row.created_at || '',
+                ]);
+                const csv = [header, ...lines]
+                    .map(columns => columns.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
+                    .join('\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `shipment-${this.shipment.id}-invoices.csv`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+                return;
+            }
+
+            if (format === 'json') {
+                const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `shipment-${this.shipment.id}-invoices.json`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+                return;
+            }
+
+            if (format === 'print') {
+                window.print();
+            }
+        },
+
+        async createInvoice() {
+            this.invoiceUiError = '';
+            if (!this.canCreateInvoice()) {
+                this.invoiceUiError = this.activeInvoiceBlockReason() || 'Cannot create invoice right now.';
+                if (window.showToast) {
+                    window.showToast(this.invoiceUiError, 'error');
+                }
+                return;
+            }
+
+            this.invoiceForm.submitting = true;
+            try {
+                const response = await fetch(this.config.invoiceStoreEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        pickup_fee: this.invoiceForm.pickup_fee,
+                        transport_fee: this.invoiceForm.transport_fee,
+                        handling_fee: this.invoiceForm.handling_fee,
+                        other_fee: this.invoiceForm.other_fee,
+                        notes: this.invoiceForm.notes,
+                        send_now: this.invoiceForm.send_now ? 1 : 0
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to create invoice');
+                }
+
+                if (window.showToast) {
+                    window.showToast('Invoice created successfully', 'success');
+                }
+
+                this.closeCreateInvoiceModal();
+                // Reload page to reflect changes
+                window.location.reload();
+            } catch (error) {
+                console.error('Create invoice error:', error);
+                this.invoiceUiError = error.message || 'Failed to create invoice';
+                if (window.showToast) {
+                    window.showToast(error.message || 'Failed to create invoice', 'error');
+                }
+            } finally {
+                this.invoiceForm.submitting = false;
+            }
+        },
+
+        buildInvoiceEndpoint(template, invoiceId) {
+            return (template || '').replace('__INVOICE__', invoiceId);
+        },
+
+        async sendInvoice(invoiceId = null) {
+            const targetId = invoiceId || this.invoice?.id;
+            if (!targetId) return;
+
+            try {
+                const endpoint = this.buildInvoiceEndpoint(this.config.invoiceSendEndpointTemplate, targetId);
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to send invoice');
+                }
+
+                if (window.showToast) {
+                    window.showToast(data.message || 'Invoice sent to vendor', 'success');
+                }
+                window.location.reload();
+            } catch (error) {
+                this.invoiceUiError = error.message || 'Failed to send invoice';
+                if (window.showToast) {
+                    window.showToast(error.message || 'Failed to send invoice', 'error');
+                }
+            }
+        },
+
+        async cancelInvoice(invoiceId = null) {
+            const targetId = invoiceId || this.invoice?.id;
+            if (!targetId) return;
+
+            const reason = window.prompt('Optional cancellation reason:');
+            if (reason === null) return;
+
+            try {
+                const endpoint = this.buildInvoiceEndpoint(this.config.invoiceCancelEndpointTemplate, targetId);
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        cancel_reason: reason || null
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to cancel invoice');
+                }
+
+                if (window.showToast) {
+                    window.showToast(data.message || 'Invoice cancelled', 'success');
+                }
+                window.location.reload();
+            } catch (error) {
+                this.invoiceUiError = error.message || 'Failed to cancel invoice';
+                if (window.showToast) {
+                    window.showToast(error.message || 'Failed to cancel invoice', 'error');
+                }
+            }
+        },
+
+        async loadAvailableDrivers() {
+            this.assignmentForm.loadingDrivers = true;
+            try {
+                const endpoint = new URL(this.config.availableDriversEndpoint, window.location.origin);
+                endpoint.searchParams.set('assignment_type', 'pickup');
+                const response = await fetch(endpoint.toString());
+                const data = await response.json();
+                this.availableDrivers = data.data || data;
+            } catch (error) {
+                console.error('Failed to load available drivers:', error);
+            } finally {
+                this.assignmentForm.loadingDrivers = false;
+            }
+        },
+
+        async loadAvailableWarehouses() {
+            this.assignmentForm.loadingWarehouses = true;
+            try {
+                const response = await fetch(this.config.availableWarehousesEndpoint);
+                const data = await response.json();
+                this.availableWarehouses = data.data || data;
+            } catch (error) {
+                console.error('Failed to load available warehouses:', error);
+            } finally {
+                this.assignmentForm.loadingWarehouses = false;
+            }
+        },
+
+        async loadAssignmentDependencies() {
+            await Promise.all([
+                this.loadAvailableDrivers(),
+                this.loadAvailableWarehouses(),
+            ]);
+        },
+
+        canUnassignCurrentAssignment() {
+            if (!this.assignment) {
+                return false;
+            }
+
+            if (this.assignment.cancelled_at || this.assignment.completed_at || this.assignment.picked_up_at) {
+                return false;
+            }
+
+            return this.assignment.status !== 'cancelled' && this.assignment.status !== 'completed';
+        },
+
+        canReceiveCurrentAssignment() {
+            if (!this.assignment) {
+                return false;
+            }
+
+            if (this.assignment.cancelled_at || this.assignment.received_at) {
+                return false;
+            }
+
+            return Boolean(this.assignment.picked_up_at || this.assignment.completed_at);
+        },
+
+        assignmentStatusClass(status) {
+            if (['assigned', 'pending'].includes(status)) return 'bg-amber-100 text-amber-700';
+            if (['en_route', 'arrived'].includes(status)) return 'bg-blue-100 text-blue-700';
+            if (['picking_up', 'completed'].includes(status)) return 'bg-emerald-100 text-emerald-700';
+            if (status === 'cancelled') return 'bg-rose-100 text-rose-700';
+            return 'bg-slate-100 text-slate-700';
+        },
+
+        buildAssignmentEndpoint(template, assignmentId) {
+            return (template || '').replace('__ASSIGNMENT__', assignmentId);
+        },
+
+        async unassignDriver() {
+            if (!this.assignment || !this.assignment.id || !this.canUnassignCurrentAssignment()) {
+                return;
+            }
+
+            const reason = window.prompt('Provide reason for unassignment:');
+            if (reason === null) return;
+
+            if (!reason.trim()) {
+                if (window.showToast) {
+                    window.showToast('Unassignment reason is required.', 'error');
+                }
+                return;
+            }
+
+            this.assignmentActionLoading = true;
+            this.assignmentUiError = '';
+            try {
+                const endpoint = this.buildAssignmentEndpoint(this.config.cancelAssignmentEndpointTemplate, this.assignment.id);
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        cancellation_reason: reason.trim()
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to unassign driver');
+                }
+
+                if (window.showToast) {
+                    window.showToast(data.message || 'Driver unassigned successfully', 'success');
+                }
+
+                window.location.reload();
+            } catch (error) {
+                this.assignmentUiError = error.message || 'Failed to unassign driver';
+                if (window.showToast) {
+                    window.showToast(this.assignmentUiError, 'error');
+                }
+            } finally {
+                this.assignmentActionLoading = false;
+            }
+        },
+
+        async receiveAtWarehouse() {
+            if (!this.assignment || !this.assignment.id || !this.canReceiveCurrentAssignment()) {
+                return;
+            }
+
+            let receivedWarehouseId = this.assignment.target_warehouse_id || null;
+            if (!receivedWarehouseId) {
+                const warehouseInput = window.prompt('Enter receiving warehouse ID (this assignment has no target warehouse):');
+                if (warehouseInput === null) return;
+                const parsed = Number.parseInt(warehouseInput, 10);
+                if (!Number.isInteger(parsed) || parsed <= 0) {
+                    if (window.showToast) {
+                        window.showToast('A valid receiving warehouse ID is required.', 'error');
+                    }
+                    return;
+                }
+                receivedWarehouseId = parsed;
+            }
+
+            const receiveNotes = window.prompt('Optional receive notes (warehouse check):');
+            if (receiveNotes === null) return;
+
+            this.assignmentActionLoading = true;
+            this.assignmentUiError = '';
+            try {
+                const endpoint = this.buildAssignmentEndpoint(this.config.receiveAssignmentEndpointTemplate, this.assignment.id);
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        received_warehouse_id: receivedWarehouseId,
+                        receive_notes: receiveNotes.trim() || null
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to mark pickup as received');
+                }
+
+                if (window.showToast) {
+                    window.showToast(data.message || 'Pickup received at warehouse', 'success');
+                }
+
+                window.location.reload();
+            } catch (error) {
+                this.assignmentUiError = error.message || 'Failed to mark pickup as received';
+                if (window.showToast) {
+                    window.showToast(this.assignmentUiError, 'error');
+                }
+            } finally {
+                this.assignmentActionLoading = false;
+            }
+        },
+
+        async assignDriver() {
+            this.assignmentForm.submitting = true;
+            try {
+                const response = await fetch(this.config.assignDriverEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        driver_id: this.assignmentForm.driver_id,
+                        target_warehouse_id: this.assignmentForm.target_warehouse_id,
+                        notes: this.assignmentForm.notes
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to assign driver');
+                }
+
+                if (window.showToast) {
+                    window.showToast('Driver assigned successfully', 'success');
+                }
+
+                // Reload page to reflect changes
+                window.location.reload();
+            } catch (error) {
+                console.error('Assign driver error:', error);
+                if (window.showToast) {
+                    window.showToast(error.message || 'Failed to assign driver', 'error');
+                }
+            } finally {
+                this.assignmentForm.submitting = false;
+            }
+        },
+
+        formatDateTime(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        },
+
+        formatMoney(amount, currency = 'GHS') {
+            const value = Number(amount ?? 0);
+            if (Number.isNaN(value)) {
+                return `0.00 ${currency || 'GHS'}`;
+            }
+            return `${value.toFixed(2)} ${currency || 'GHS'}`;
+        }
+    };
+}
+
+function getShipmentShowConfig() {
+    const container = document.querySelector('[data-shipment-show-config]');
+    if (!container) return null;
+
+    const rawConfig = container.getAttribute('data-shipment-show-config');
+    if (!rawConfig) return null;
+
+    try {
+        return JSON.parse(rawConfig);
+    } catch (error) {
+        console.error('Invalid shipment show config JSON:', error);
+        return null;
+    }
+}
+
+function registerShipmentShowPage() {
+    if (!window.Alpine) return;
+
+    const config = getShipmentShowConfig();
+    if (!config) return;
+
+    window.shipmentShowConfig = config;
+    Alpine.data('shipmentShow', shipmentShow);
+}
+
+if (window.Alpine) {
+    registerShipmentShowPage();
+} else {
+    document.addEventListener('alpine:init', registerShipmentShowPage);
+}

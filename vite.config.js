@@ -7,8 +7,11 @@ export default defineConfig({
         laravel({
             input: [
                 'resources/css/app.css',
+                'resources/css/pages/api-tester.css',
+                'resources/css/pages/vendor-portal.css',
                 'resources/js/app.js',
                 'resources/js/admin/app.js',
+                'resources/js/admin/modules/auth/login.js',
             ],
             refresh: true,
         }),

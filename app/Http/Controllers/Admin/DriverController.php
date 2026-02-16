@@ -6,7 +6,7 @@ use App\Exports\DriversExport;
 use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\GenericPdfExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -83,6 +83,7 @@ class DriverController extends Controller
                     'license_number' => $driver->license_number,
                     'status' => $driver->status,
                     'is_active' => $driver->is_active,
+                    'task_capabilities' => $driver->getCapabilities(),
                     'assignments_count' => $driver->pickupAssignments()->count(),
                     'created_at' => $driver->created_at->format('Y-m-d H:i:s'),
                     'can_manage' => $canManage,
@@ -150,10 +151,13 @@ class DriverController extends Controller
             'vehicle_type' => ['nullable', Rule::in(['motorcycle', 'car', 'van', 'truck'])],
             'vehicle_number' => ['nullable', 'string', 'max:255'],
             'license_number' => ['nullable', 'string', 'max:255'],
+            'task_capabilities' => ['required', 'array', 'min:1'],
+            'task_capabilities.*' => ['string', Rule::in(Driver::CAPABILITIES)],
             'is_active' => ['boolean'],
         ]);
 
         $phone = PhoneHelper::format($validated['phone']);
+        $taskCapabilities = $this->normalizeTaskCapabilities($validated['task_capabilities'] ?? []);
 
         $driver = new Driver();
         $driver->name = $validated['name'];
@@ -163,6 +167,7 @@ class DriverController extends Controller
         $driver->vehicle_type = $validated['vehicle_type'] ?? 'motorcycle';
         $driver->vehicle_number = $validated['vehicle_number'] ?? null;
         $driver->license_number = $validated['license_number'] ?? null;
+        $driver->task_capabilities = $taskCapabilities;
         $driver->is_active = $validated['is_active'] ?? true;
         $driver->save();
 
@@ -192,6 +197,8 @@ class DriverController extends Controller
             'vehicle_type' => ['nullable', Rule::in(['motorcycle', 'car', 'van', 'truck'])],
             'vehicle_number' => ['nullable', 'string', 'max:255'],
             'license_number' => ['nullable', 'string', 'max:255'],
+            'task_capabilities' => ['nullable', 'array', 'min:1'],
+            'task_capabilities.*' => ['string', Rule::in(Driver::CAPABILITIES)],
             'is_active' => ['boolean'],
         ]);
 
@@ -203,6 +210,9 @@ class DriverController extends Controller
         $driver->vehicle_type = $validated['vehicle_type'] ?? $driver->vehicle_type;
         $driver->vehicle_number = $validated['vehicle_number'] ?? null;
         $driver->license_number = $validated['license_number'] ?? null;
+        if (array_key_exists('task_capabilities', $validated)) {
+            $driver->task_capabilities = $this->normalizeTaskCapabilities($validated['task_capabilities'] ?? []);
+        }
         $driver->is_active = $validated['is_active'] ?? $driver->is_active;
 
         if (!empty($validated['password'])) {
@@ -288,6 +298,7 @@ class DriverController extends Controller
                 'Phone' => $driver->phone,
                 'Vehicle Type' => $driver->vehicle_type,
                 'Vehicle Number' => $driver->vehicle_number,
+                'Capabilities' => implode(', ', $driver->getCapabilities()),
                 'Status' => $driver->status,
                 'Active' => $driver->is_active ? 'Active' : 'Inactive',
                 'Created At' => $driver->created_at->format('Y-m-d H:i:s'),
@@ -467,11 +478,7 @@ class DriverController extends Controller
     private function exportPDF(array $rows)
     {
         $filename = 'drivers_' . date('Y-m-d_His') . '.pdf';
-        $pdf = Pdf::loadView('admin.drivers.export-pdf', [
-            'rows' => $rows,
-            'generatedAt' => now()->format('F d, Y H:i:s'),
-        ]);
-        return $pdf->download($filename);
+        return GenericPdfExporter::download($rows, $filename, 'Drivers List');
     }
 
     /**
@@ -482,5 +489,21 @@ class DriverController extends Controller
         if (!Auth::guard('admin')->user()->hasPermission($permission)) {
             abort(403, 'Unauthorized action.');
         }
+    }
+
+    /**
+     * @param array<int, mixed> $capabilities
+     * @return array<int, string>
+     */
+    protected function normalizeTaskCapabilities(array $capabilities): array
+    {
+        $normalized = array_values(array_unique(array_filter(array_map(
+            static fn ($value) => is_string($value) ? strtolower(trim($value)) : null,
+            $capabilities
+        ), static fn ($value) => in_array($value, Driver::CAPABILITIES, true))));
+
+        return !empty($normalized)
+            ? $normalized
+            : [Driver::CAPABILITY_PICKUP];
     }
 }

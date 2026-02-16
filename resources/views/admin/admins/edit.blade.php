@@ -22,7 +22,33 @@
                 <p class="text-sm text-gray-600">Update information for {{ $admin->name }}</p>
             </div>
 
-            <form action="{{ route('admin.admins.update', $admin) }}" method="POST" class="p-6" x-data="{ showPassword: false, changePassword: false }">
+            <form
+                action="{{ route('admin.admins.update', $admin) }}"
+                method="POST"
+                class="p-6"
+                x-data="{
+                    showPassword: false,
+                    changePassword: false,
+                    hasWarehouse: {{ old('warehouse_id', $admin->warehouse_id) ? 'true' : 'false' }},
+                    syncRoleScope() {
+                        this.$root.querySelectorAll('[data-role-item]').forEach((item) => {
+                            const isWarehouseRole = item.dataset.warehouseRole === '1';
+                            const input = item.querySelector('[data-role-input]');
+                            if (this.hasWarehouse && !isWarehouseRole && input) {
+                                input.checked = false;
+                            }
+                        });
+                    },
+                    handleWarehouseChange(event) {
+                        this.hasWarehouse = Boolean(event.target.value);
+                        this.syncRoleScope();
+                    },
+                    init() {
+                        this.syncRoleScope();
+                    }
+                }"
+                x-init="init()"
+            >
                 @csrf
                 @method('PUT')
 
@@ -64,20 +90,52 @@
 
                 <!-- Roles -->
                 <div class="mb-4">
+                    <label for="warehouse_id" class="block text-sm font-medium text-gray-700 mb-1">
+                        Warehouse (Optional)
+                    </label>
+                    <select
+                        id="warehouse_id"
+                        name="warehouse_id"
+                        @@change="handleWarehouseChange($event)"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('warehouse_id') border-red-500 @enderror"
+                    >
+                        <option value="">No warehouse (HQ user)</option>
+                        @foreach($warehouses as $warehouse)
+                            <option value="{{ $warehouse->id }}" {{ (string) old('warehouse_id', $admin->warehouse_id) === (string) $warehouse->id ? 'selected' : '' }}>
+                                {{ $warehouse->name }} ({{ $warehouse->code }})
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('warehouse_id')
+                        <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <!-- Role -->
+                <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Assigned Roles
+                        Assigned Role
                     </label>
 
                     @if($admin->id !== Auth::guard('admin')->id())
+                        <p x-show="hasWarehouse" class="mb-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                            Warehouse selected: only warehouse roles can be assigned.
+                        </p>
                         <div class="space-y-2 max-h-64 overflow-y-auto border border-gray-300 rounded-md p-3">
                             @forelse($roles as $role)
-                                <label class="flex items-center">
+                                <label
+                                    class="flex items-center"
+                                    data-role-item
+                                    data-warehouse-role="{{ $role->is_warehouse_role ? '1' : '0' }}"
+                                x-show="!hasWarehouse || {{ $role->is_warehouse_role ? 'true' : 'false' }}"
+                                >
                                     <input
-                                        type="checkbox"
-                                        name="roles[]"
+                                        type="radio"
+                                        name="role_id"
+                                        data-role-input
                                         value="{{ $role->id }}"
-                                        {{ $admin->roles->contains($role->id) ? 'checked' : '' }}
-                                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                        {{ (string) old('role_id', old('roles.0', optional($admin->roles->first())->id)) === (string) $role->id ? 'checked' : '' }}
+                                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                                     >
                                     <span class="ml-2 text-sm text-gray-700">
                                         {{ $role->name }}
@@ -90,7 +148,10 @@
                                 <p class="text-sm text-gray-500 italic">No roles available</p>
                             @endforelse
                         </div>
-                        <p class="mt-1 text-xs text-gray-500">Select one or more roles for this user</p>
+                        <p class="mt-1 text-xs text-gray-500">Select exactly one role for this user</p>
+                        @error('role_id')
+                            <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
+                        @enderror
                         @error('roles')
                             <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
                         @enderror

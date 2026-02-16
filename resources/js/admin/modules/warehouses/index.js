@@ -1,3 +1,5 @@
+import './view.js';
+
 /**
  * Warehouses page Alpine component
  */
@@ -21,8 +23,6 @@ function buildWarehousesTable(config) {
         },
         loading: false,
         search: '',
-        typeFilter: '',
-        typeFilterName: 'All types',
         statusFilter: '',
         statusFilterName: 'All statuses',
         createdFrom: '',
@@ -34,11 +34,10 @@ function buildWarehousesTable(config) {
         columns: [
             { key: 'name', label: 'Name' },
             { key: 'code', label: 'Code' },
-            { key: 'type', label: 'Type' },
             { key: 'region', label: 'Region' },
             { key: 'district', label: 'District' },
             { key: 'contact_phone', label: 'Contact Phone' },
-            { key: 'capacity', label: 'Capacity' },
+            { key: 'capacity', label: 'Capacity (m³)' },
             { key: 'is_active', label: 'Status' },
             { key: 'created_at', label: 'Created At' },
             { key: 'actions', label: 'Actions' },
@@ -46,7 +45,6 @@ function buildWarehousesTable(config) {
         visibleColumns: {
             name: true,
             code: true,
-            type: true,
             region: true,
             district: true,
             contact_phone: true,
@@ -65,7 +63,6 @@ function buildWarehousesTable(config) {
         form: {
             name: '',
             code: '',
-            type: 'both',
             address: '',
             region_id: '',
             district_id: '',
@@ -152,7 +149,6 @@ function buildWarehousesTable(config) {
                 });
 
                 if (this.search) params.append('search', this.search);
-                if (this.typeFilter) params.append('type', this.typeFilter);
                 if (this.statusFilter) params.append('status', this.statusFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
@@ -324,7 +320,6 @@ function buildWarehousesTable(config) {
             this.form = {
                 name: '',
                 code: '',
-                type: 'both',
                 address: '',
                 region_id: '',
                 district_id: '',
@@ -368,7 +363,6 @@ function buildWarehousesTable(config) {
             this.form = {
                 name: warehouseData.name,
                 code: warehouseData.code || '',
-                type: warehouseData.type || 'both',
                 address: warehouseData.address || '',
                 region_id: warehouseData.region_id || '',
                 district_id: warehouseData.district_id || '',
@@ -420,7 +414,6 @@ function buildWarehousesTable(config) {
             this.form = {
                 name: warehouse.name,
                 code: warehouse.code || '',
-                type: warehouse.type || 'both',
                 address: warehouse.address || '',
                 region_id: warehouse.region_id || '',
                 district_id: warehouse.district_id || '',
@@ -543,7 +536,6 @@ function buildWarehousesTable(config) {
             try {
                 const params = new URLSearchParams();
                 if (this.search) params.append('search', this.search);
-                if (this.typeFilter) params.append('type', this.typeFilter);
                 if (this.statusFilter) params.append('status', this.statusFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
@@ -578,7 +570,6 @@ function buildWarehousesTable(config) {
             try {
                 const params = new URLSearchParams();
                 if (this.search) params.append('search', this.search);
-                if (this.typeFilter) params.append('type', this.typeFilter);
                 if (this.statusFilter) params.append('status', this.statusFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
@@ -771,3 +762,4 @@ if (window.Alpine) {
 } else {
     document.addEventListener('alpine:init', registerWarehousesTable);
 }
+

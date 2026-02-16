@@ -1,29 +1,34 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Create Role')
+@php
+    $isWarehouseScope = ($roleScope ?? 'system') === 'warehouse';
+@endphp
+
+@section('title', $isWarehouseScope ? 'Create Warehouse Role' : 'Create Role')
 
 @section('breadcrumb-parent', 'Roles & Permissions')
-@section('breadcrumb-current', 'Create Role')
+@section('breadcrumb-current', $isWarehouseScope ? 'Create Warehouse Role' : 'Create Role')
 
 @section('content')
     <div class="mb-6">
-        <a href="{{ route('admin.roles.index') }}" class="text-blue-600 hover:text-blue-800 flex items-center">
+        <a href="{{ $isWarehouseScope ? route('admin.roles.warehouse.index') : route('admin.roles.index') }}" class="text-blue-600 hover:text-blue-800 flex items-center">
             <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
             </svg>
-            Back to Roles
+            {{ $isWarehouseScope ? 'Back to Warehouse Roles' : 'Back to System Roles' }}
         </a>
     </div>
 
     <div class="max-w-3xl">
         <div class="bg-white rounded-lg shadow">
             <div class="px-6 py-4 border-b border-gray-200">
-                <h1 class="text-xl font-semibold text-gray-900">Create New Role</h1>
-                <p class="text-sm text-gray-600">Define a new role with specific permissions</p>
+                <h1 class="text-xl font-semibold text-gray-900">{{ $isWarehouseScope ? 'Create New Warehouse Role' : 'Create New Role' }}</h1>
+                <p class="text-sm text-gray-600">{{ $isWarehouseScope ? 'Define a warehouse-scoped role with specific permissions' : 'Define a new role with specific permissions' }}</p>
             </div>
 
             <form action="{{ route('admin.roles.store') }}" method="POST" class="p-6">
                 @csrf
+                <input type="hidden" name="scope" value="{{ $isWarehouseScope ? 'warehouse' : 'system' }}">
 
                 <!-- Role Name -->
                 <div class="mb-6">
@@ -156,7 +161,7 @@
 
                 <!-- Submit Buttons -->
                 <div class="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
-                    <a href="{{ route('admin.roles.index') }}"
+                    <a href="{{ $isWarehouseScope ? route('admin.roles.warehouse.index') : route('admin.roles.index') }}"
                        class="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
                         Cancel
                     </a>

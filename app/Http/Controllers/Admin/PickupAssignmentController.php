@@ -10,6 +10,7 @@ use App\Models\Warehouse;
 use App\Services\PickupAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class PickupAssignmentController extends Controller
 {
@@ -24,9 +25,15 @@ class PickupAssignmentController extends Controller
     {
         $this->authorizePermission('shipments.assign_driver');
 
-        $vehicleType = $request->get('vehicle_type');
+        $validated = $request->validate([
+            'vehicle_type' => ['nullable', Rule::in(['motorcycle', 'car', 'van', 'truck'])],
+            'assignment_type' => ['nullable', Rule::in(Driver::CAPABILITIES)],
+        ]);
 
-        $drivers = $this->pickupAssignmentService->getAvailableDrivers($vehicleType);
+        $drivers = $this->pickupAssignmentService->getAvailableDrivers(
+            $validated['vehicle_type'] ?? null,
+            $validated['assignment_type'] ?? Driver::CAPABILITY_PICKUP
+        );
 
         return response()->json([
             'data' => $drivers,
@@ -42,9 +49,8 @@ class PickupAssignmentController extends Controller
 
         $warehouses = Warehouse::query()
             ->where('is_active', true)
-            ->whereIn('type', ['origin', 'both'])
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'type']);
+            ->get(['id', 'name', 'code']);
 
         return response()->json([
             'data' => $warehouses,

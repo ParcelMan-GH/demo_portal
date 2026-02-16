@@ -8,7 +8,7 @@ use App\Enums\ShipmentStatus;
 use App\Exports\ShipmentsExport;
 use App\Http\Controllers\Controller;
 use App\Models\Shipment;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\GenericPdfExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Facades\Excel;
@@ -482,11 +482,9 @@ class ShipmentController extends Controller
         }
 
         if ($format === 'pdf') {
-            $pdf = Pdf::loadView('admin.shipments.export-pdf', [
-                'rows' => $rows,
-                'generatedAt' => now()->format('F d, Y H:i:s'),
-            ]);
-            return $pdf->download('shipments_' . date('Y-m-d_His') . '.pdf');
+            $filename = 'shipments_' . date('Y-m-d_His') . '.pdf';
+
+            return GenericPdfExporter::download($rows, $filename, 'Shipments List');
         }
 
         return response()->json(['data' => $rows]);

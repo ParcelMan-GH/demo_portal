@@ -11,9 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
-    <style>
-        [x-cloak] { display: none !important; }
-    </style>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
     <div class="relative min-h-screen overflow-hidden">
@@ -26,3 +23,4 @@
     </div>
 </body>
 </html>
+

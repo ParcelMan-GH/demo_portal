@@ -1,18 +1,26 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Roles & Permissions')
+@php
+    $isWarehouseScope = ($roleScope ?? 'system') === 'warehouse';
+    $pageTitle = $isWarehouseScope ? 'Warehouse Roles' : 'System Roles';
+    $pageDescription = $isWarehouseScope
+        ? 'Manage warehouse-specific roles and permissions'
+        : 'Manage system roles and their permissions';
+@endphp
+
+@section('title', $pageTitle)
 
 @section('breadcrumb-parent', 'Roles & Permissions')
-@section('breadcrumb-current', 'All Roles')
+@section('breadcrumb-current', $pageTitle)
 
 @section('content')
     <div class="mb-6 flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-semibold text-gray-900">Roles & Permissions</h1>
-            <p class="text-gray-600 mt-1">Manage system roles and their permissions</p>
+            <h1 class="text-2xl font-semibold text-gray-900">{{ $pageTitle }}</h1>
+            <p class="text-gray-600 mt-1">{{ $pageDescription }}</p>
         </div>
         @hasPermission('roles.create')
-            <a href="{{ route('admin.roles.create') }}"
+            <a href="{{ route('admin.roles.create', ['scope' => $isWarehouseScope ? 'warehouse' : 'system']) }}"
                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
                 Create New Role
             </a>
@@ -67,6 +75,10 @@
                                 <span class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
                                     System
                                 </span>
+                            @elseif($role->is_warehouse_role)
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-cyan-100 text-cyan-800">
+                                    Warehouse
+                                </span>
                             @else
                                 <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
                                     Custom
@@ -85,17 +97,17 @@
                             @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                            <a href="{{ route('admin.roles.show', $role) }}"
+                            <a href="{{ route('admin.roles.show', ['role' => $role, 'scope' => $isWarehouseScope ? 'warehouse' : 'system']) }}"
                                class="text-blue-600 hover:text-blue-900">View</a>
 
                             @hasPermission('roles.edit')
-                                <a href="{{ route('admin.roles.edit', $role) }}"
+                                <a href="{{ route('admin.roles.edit', ['role' => $role, 'scope' => $isWarehouseScope ? 'warehouse' : 'system']) }}"
                                    class="text-indigo-600 hover:text-indigo-900">Edit</a>
                             @endhasPermission
 
                             @hasPermission('roles.delete')
                                 @if(!$role->is_system_role)
-                                    <form action="{{ route('admin.roles.destroy', $role) }}"
+                                    <form action="{{ route('admin.roles.destroy', ['role' => $role, 'scope' => $isWarehouseScope ? 'warehouse' : 'system']) }}"
                                           method="POST"
                                           class="inline"
                                           onsubmit="return confirm('Are you sure you want to delete this role?');">
@@ -123,10 +135,9 @@
         </table>
     </div>
 
-    <!-- Pagination -->
     @if($roles->hasPages())
         <div class="mt-4">
-            {{ $roles->links() }}
+            {{ $roles->appends(['scope' => $isWarehouseScope ? 'warehouse' : 'system'])->links() }}
         </div>
     @endif
 @endsection

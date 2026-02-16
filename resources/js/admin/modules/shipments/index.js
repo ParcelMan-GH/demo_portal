@@ -1,3 +1,5 @@
+import './view.js';
+
 /**
  * Shipments page Alpine component
  */
@@ -449,3 +451,4 @@ if (window.Alpine) {
 } else {
     document.addEventListener('alpine:init', registerShipmentsTable);
 }
+

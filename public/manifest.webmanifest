@@ -1,0 +1,23 @@
+{
+    "name": "Parcelman Vendor Portal",
+    "short_name": "Parcelman",
+    "description": "Manage your shipments and invoices on the go",
+    "start_url": "/vendor/home",
+    "scope": "/vendor/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#f97316",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/favicon.jpg",
+            "sizes": "192x192",
+            "type": "image/jpeg"
+        },
+        {
+            "src": "/favicon.jpg",
+            "sizes": "512x512",
+            "type": "image/jpeg"
+        }
+    ]
+}

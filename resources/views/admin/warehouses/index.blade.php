@@ -31,7 +31,7 @@
                     </div>
                     <div>
                         <h2 class="text-lg font-semibold text-slate-900">Warehouses</h2>
-                        <p class="mt-0.5 text-sm text-slate-500">Manage warehouse locations and capacity</p>
+                        <p class="mt-0.5 text-sm text-slate-500">Manage warehouse locations and capacity (m&sup3;)</p>
                     </div>
                 </div>
                 <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="meta.total + ' Total Warehouses'">
@@ -42,7 +42,7 @@
         <!-- Table Controls -->
         <div class="p-6 pb-0">
             <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <!-- Search + Type + Status + Date Range -->
+                <!-- Search + Status + Date Range -->
                 <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
                     <div class="relative flex-1 max-w-xs">
                         <input
@@ -55,53 +55,6 @@
                         <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
-                    </div>
-
-                    <!-- Type Filter -->
-                    <div x-data="{ open: false }" class="relative w-full sm:w-56">
-                        <button
-                            type="button"
-                            @@click="open = !open"
-                            class="w-full inline-flex items-center justify-between px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors"
-                        >
-                            <span x-text="typeFilterName || 'All types'"></span>
-                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                            </svg>
-                        </button>
-
-                        <div
-                            x-show="open"
-                            @@click.away="open = false"
-                            x-transition
-                            class="absolute right-0 mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/85 shadow-2xl p-2 z-50 backdrop-blur-xl"
-                            style="display: none;"
-                        >
-                            <button
-                                type="button"
-                                @@click="typeFilter = ''; typeFilterName = 'All types'; loadData(); open = false"
-                                class="w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                                :class="typeFilter === '' ? 'bg-white/70 shadow-sm' : ''"
-                            >
-                                <svg x-show="typeFilter === ''" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>All types</span>
-                            </button>
-                            @foreach($types as $type)
-                            <button
-                                type="button"
-                                @@click="typeFilter = '{{ $type['value'] }}'; typeFilterName = '{{ $type['label'] }}'; loadData(); open = false"
-                                class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                                :class="typeFilter === '{{ $type['value'] }}' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''"
-                            >
-                                <svg x-show="typeFilter === '{{ $type['value'] }}'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>{{ $type['label'] }}</span>
-                            </button>
-                            @endforeach
-                        </div>
                     </div>
 
                     <!-- Status Filter -->
@@ -292,9 +245,6 @@
                                 </svg>
                             </div>
                         </th>
-                        <th x-show="visibleColumns.type" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            TYPE
-                        </th>
                         <th x-show="visibleColumns.region" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             REGION
                         </th>
@@ -305,7 +255,7 @@
                             CONTACT PHONE
                         </th>
                         <th x-show="visibleColumns.capacity" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            CAPACITY
+                            CAPACITY (M&sup3;)
                         </th>
                         <th x-show="visibleColumns.status" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             STATUS
@@ -337,21 +287,10 @@
                         <tr class="hover:bg-slate-50/70">
                             <td x-show="visibleColumns.name" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="warehouse.name"></td>
                             <td x-show="visibleColumns.code" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 font-mono" x-text="warehouse.code || '-'"></td>
-                            <td x-show="visibleColumns.type" class="px-4 py-2.5 whitespace-nowrap text-xs">
-                                <span
-                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                    :class="{
-                                        'bg-blue-100 text-blue-700': warehouse.type === 'origin',
-                                        'bg-violet-100 text-violet-700': warehouse.type === 'destination',
-                                        'bg-emerald-100 text-emerald-700': warehouse.type === 'both'
-                                    }"
-                                    x-text="warehouse.type ? warehouse.type.charAt(0).toUpperCase() + warehouse.type.slice(1) : '-'"
-                                ></span>
-                            </td>
                             <td x-show="visibleColumns.region" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="warehouse.region || '-'"></td>
                             <td x-show="visibleColumns.district" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="warehouse.district || '-'"></td>
                             <td x-show="visibleColumns.contact_phone" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="warehouse.contact_phone || '-'"></td>
-                            <td x-show="visibleColumns.capacity" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 text-center" x-text="warehouse.capacity || '-'"></td>
+                            <td x-show="visibleColumns.capacity" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 text-center" x-text="warehouse.capacity ? warehouse.capacity + ' m\u00B3' : '-'"></td>
                             <td x-show="visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap text-xs">
                                 <span
                                     class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
@@ -607,8 +546,8 @@
                                 </template>
                             </div>
 
-                            <!-- Code & Type Grid -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <!-- Code -->
+                            <div class="grid grid-cols-1 gap-5">
                                 <!-- Code -->
                                 <div>
                                     <label class="block text-sm font-semibold text-slate-700 mb-2">
@@ -638,38 +577,6 @@
                                     </template>
                                 </div>
 
-                                <!-- Type -->
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                        Type <span class="text-rose-500">*</span>
-                                    </label>
-                                    <div class="relative">
-                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                            </svg>
-                                        </div>
-                                        <select
-                                            x-model="form.type"
-                                            :disabled="modalMode === 'view'"
-                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 transition-all disabled:bg-slate-50 disabled:text-slate-500 appearance-none cursor-pointer"
-                                            required
-                                        >
-                                            <option value="">Select type</option>
-                                            <option value="origin">Origin</option>
-                                            <option value="destination">Destination</option>
-                                            <option value="both">Both</option>
-                                        </select>
-                                    </div>
-                                    <template x-if="errors.type">
-                                        <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
-                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                                            </svg>
-                                            <span x-text="errors.type[0]"></span>
-                                        </p>
-                                    </template>
-                                </div>
                             </div>
 
                             <!-- Address -->
@@ -836,7 +743,7 @@
                             <!-- Capacity -->
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                    Capacity <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                    Capacity (m&sup3;) <span class="text-slate-400 text-xs font-normal">(Optional)</span>
                                 </label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

@@ -6,9 +6,11 @@ use App\Exports\UsersExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CreateAdminRequest;
 use App\Http\Requests\Admin\UpdateAdminRequest;
+use App\Models\AdminAuditLog;
 use App\Models\Role;
 use App\Models\User;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\Warehouse;
+use App\Support\GenericPdfExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,7 +26,10 @@ class AdminController extends Controller
      */
     public function index(): View
     {
-        $roles = Role::active()->get();
+        $roles = Role::active()
+            ->where('is_warehouse_role', false)
+            ->orderBy('name')
+            ->get();
         return view('admin.admins.index', compact('roles'));
     }
 
@@ -37,9 +42,11 @@ class AdminController extends Controller
 
         // Base query
         if ($currentUser->isSuperAdmin()) {
-            $query = User::with(['creator', 'roles']);
+            $query = User::whereNull('warehouse_id')
+                ->with(['creator', 'roles']);
         } else {
             $query = User::where('created_by_user_id', $currentUser->id)
+                ->whereNull('warehouse_id')
                 ->with(['creator', 'roles']);
         }
 
@@ -47,7 +54,10 @@ class AdminController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhereHas('roles', function ($roleQuery) use ($search) {
+                      $roleQuery->where('roles.name', 'like', "%{$search}%");
+                  });
             });
         }
 
@@ -97,16 +107,21 @@ class AdminController extends Controller
                 'name' => $admin->name,
                 'email' => $admin->email,
                 'avatar' => strtoupper(substr($admin->name, 0, 1)),
-                'roles' => $admin->roles->map(fn($r) => ['id' => $r->id, 'name' => $r->name]),
+                'roles' => $admin->roles->map(fn($r) => [
+                    'id' => $r->id,
+                    'name' => $r->name,
+                ]),
                 'is_active' => $admin->is_active,
                 'creator' => $admin->creator?->name ?? 'System',
                 'created_at' => $admin->created_at->format('d/m/Y, H:i:s'),
                 'last_login_at' => $admin->last_login_at?->diffForHumans() ?? 'Never',
                 'can_manage' => $currentUser->canManage($admin),
+                'can_delete' => $currentUser->hasPermission('users.delete') && $currentUser->canManage($admin) && $admin->id !== $currentUser->id,
                 'is_self' => $admin->id === $currentUser->id,
                 'view_url' => route('admin.admins.show', $admin),
                 'edit_url' => route('admin.admins.edit', $admin),
                 'toggle_url' => route('admin.admins.toggle-active', $admin),
+                'delete_url' => route('admin.admins.destroy', $admin),
             ];
         });
 
@@ -131,9 +146,11 @@ class AdminController extends Controller
         $currentUser = Auth::guard('admin')->user();
 
         if ($currentUser->isSuperAdmin()) {
-            $query = User::with(['creator', 'roles']);
+            $query = User::whereNull('warehouse_id')
+                ->with(['creator', 'roles']);
         } else {
             $query = User::where('created_by_user_id', $currentUser->id)
+                ->whereNull('warehouse_id')
                 ->with(['creator', 'roles']);
         }
 
@@ -141,7 +158,10 @@ class AdminController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhereHas('roles', function ($roleQuery) use ($search) {
+                      $roleQuery->where('roles.name', 'like', "%{$search}%");
+                  });
             });
         }
 
@@ -199,17 +219,13 @@ class AdminController extends Controller
     private function exportPDF(array $rows)
     {
         $filename = 'users_' . date('Y-m-d_His') . '.pdf';
-        $pdf = Pdf::loadView('admin.admins.export-pdf', [
-            'rows' => $rows,
-            'generatedAt' => now()->format('F d, Y H:i:s'),
-        ]);
-        return $pdf->download($filename);
+        return GenericPdfExporter::download($rows, $filename, 'Users List');
     }
 
     /**
      * Show the form for creating a new user.
      */
-    public function create(): View|RedirectResponse
+    public function create(Request $request): View|RedirectResponse
     {
         $currentUser = Auth::guard('admin')->user();
 
@@ -219,8 +235,17 @@ class AdminController extends Controller
         }
 
         $roles = Role::active()->get();
+        $warehouses = Warehouse::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code']);
 
-        return view('admin.admins.create', compact('roles'));
+        $selectedWarehouseId = $request->integer('warehouse_id') ?: null;
+        if ($selectedWarehouseId && !$warehouses->contains('id', $selectedWarehouseId)) {
+            $selectedWarehouseId = null;
+        }
+
+        return view('admin.admins.create', compact('roles', 'warehouses', 'selectedWarehouseId'));
     }
 
     /**
@@ -236,11 +261,12 @@ class AdminController extends Controller
             'password' => Hash::make($request->password),
             'is_active' => $request->boolean('is_active', true),
             'created_by_user_id' => $currentUser->id,
+            'warehouse_id' => $request->input('warehouse_id'),
         ]);
 
-        // Assign selected roles
-        if ($request->has('roles')) {
-            $admin->syncRoles($request->roles);
+        $roleId = $this->resolveRequestedRoleId($request);
+        if ($roleId) {
+            $admin->syncRoles([$roleId]);
         }
 
         if ($request->expectsJson()) {
@@ -258,7 +284,7 @@ class AdminController extends Controller
     /**
      * Display the specified user.
      */
-    public function show(User $admin): View|RedirectResponse
+    public function show(Request $request, User $admin): View|RedirectResponse
     {
         $currentUser = Auth::guard('admin')->user();
 
@@ -268,9 +294,15 @@ class AdminController extends Controller
                 ->with('error', 'You do not have permission to view this user.');
         }
 
-        $admin->load(['roles.permissions', 'creator']);
+        $admin->load(['roles.permissions', 'creator', 'warehouse', 'createdUsers.roles']);
+        $auditLogs = AdminAuditLog::query()
+            ->with(['warehouse:id,name'])
+            ->where('user_id', $admin->id)
+            ->orderByDesc('created_at')
+            ->paginate(15, ['*'], 'logs_page')
+            ->withQueryString();
 
-        return view('admin.admins.show', compact('admin'));
+        return view('admin.admins.show', compact('admin', 'auditLogs'));
     }
 
     /**
@@ -287,8 +319,12 @@ class AdminController extends Controller
         }
 
         $roles = Role::active()->get();
+        $warehouses = Warehouse::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code']);
 
-        return view('admin.admins.edit', compact('admin', 'roles'));
+        return view('admin.admins.edit', compact('admin', 'roles', 'warehouses'));
     }
 
     /**
@@ -296,7 +332,7 @@ class AdminController extends Controller
      */
     public function update(UpdateAdminRequest $request, User $admin): RedirectResponse|JsonResponse
     {
-        $data = $request->only(['name', 'email', 'is_active']);
+        $data = $request->only(['name', 'email', 'is_active', 'warehouse_id']);
 
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
@@ -305,8 +341,11 @@ class AdminController extends Controller
         $admin->update($data);
 
         // Sync roles if provided and if user is not updating themselves
-        if ($request->has('roles') && $admin->id !== Auth::guard('admin')->id()) {
-            $admin->syncRoles($request->roles);
+        if ($admin->id !== Auth::guard('admin')->id()) {
+            $roleId = $this->resolveRequestedRoleId($request);
+            if ($roleId) {
+                $admin->syncRoles([$roleId]);
+            }
         }
 
         if ($request->expectsJson()) {
@@ -324,25 +363,90 @@ class AdminController extends Controller
     /**
      * Toggle the active status of the specified user.
      */
-    public function toggleActive(User $admin): RedirectResponse
+    public function toggleActive(Request $request, User $admin): RedirectResponse|JsonResponse
     {
         $currentUser = Auth::guard('admin')->user();
 
         // Cannot toggle your own status
         if ($admin->id === $currentUser->id) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You cannot change your own active status.',
+                ], 422);
+            }
             return back()->with('error', 'You cannot change your own active status.');
         }
 
         // Check permission
         if (!$currentUser->canManage($admin)) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to modify this user.',
+                ], 403);
+            }
             return back()->with('error', 'You do not have permission to modify this user.');
         }
 
         $admin->update(['is_active' => !$admin->is_active]);
 
         $status = $admin->is_active ? 'activated' : 'deactivated';
+        $message = "User {$status} successfully.";
 
-        return back()->with('success', "User {$status} successfully.");
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => [
+                    'id' => $admin->id,
+                    'is_active' => $admin->is_active,
+                ],
+            ]);
+        }
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Remove the specified user.
+     */
+    public function destroy(Request $request, User $admin): RedirectResponse|JsonResponse
+    {
+        $currentUser = Auth::guard('admin')->user();
+
+        if ($admin->id === $currentUser->id) {
+            $message = 'You cannot delete your own account.';
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => $message], 422);
+            }
+            return back()->with('error', $message);
+        }
+
+        if (!$currentUser->hasPermission('users.delete')) {
+            $message = 'You do not have permission to delete users.';
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => $message], 403);
+            }
+            return back()->with('error', $message);
+        }
+
+        if (!$currentUser->canManage($admin)) {
+            $message = 'You do not have permission to delete this user.';
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => $message], 403);
+            }
+            return back()->with('error', $message);
+        }
+
+        $admin->delete();
+
+        $message = 'User deleted successfully.';
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => $message]);
+        }
+
+        return redirect()->route('admin.admins.index')->with('success', $message);
     }
 
     /**
@@ -358,12 +462,36 @@ class AdminController extends Controller
         }
 
         $validated = $request->validate([
-            'roles' => ['required', 'array'],
+            'role_id' => ['nullable', 'exists:roles,id'],
+            'roles' => ['nullable', 'array', 'max:1'],
             'roles.*' => ['exists:roles,id'],
         ]);
 
-        $admin->syncRoles($validated['roles']);
+        $roleId = $validated['role_id'] ?? null;
+        if (!$roleId && !empty($validated['roles'])) {
+            $roleId = (int) $validated['roles'][0];
+        }
 
-        return back()->with('success', 'Roles assigned successfully.');
+        if (!$roleId) {
+            return back()->with('error', 'A single role is required.');
+        }
+
+        $admin->syncRoles([(int) $roleId]);
+
+        return back()->with('success', 'Role assigned successfully.');
+    }
+
+    private function resolveRequestedRoleId(Request $request): ?int
+    {
+        if ($request->filled('role_id')) {
+            return (int) $request->input('role_id');
+        }
+
+        $roles = array_values(array_filter((array) $request->input('roles', [])));
+        if (empty($roles)) {
+            return null;
+        }
+
+        return (int) $roles[0];
     }
 }

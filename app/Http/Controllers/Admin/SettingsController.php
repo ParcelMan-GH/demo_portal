@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminAuditLog;
 use App\Models\OtpCode;
 use App\Models\PlatformSetting;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +30,7 @@ class SettingsController extends Controller
         'email-logs' => ['label' => 'Email Logs', 'icon' => 'inbox'],
         'sms-logs' => ['label' => 'SMS Logs', 'icon' => 'phone'],
         'otp-logs' => ['label' => 'OTP Logs', 'icon' => 'chat'],
+        'admin-audit-logs' => ['label' => 'Admin Audit Logs', 'icon' => 'shield'],
         'push' => ['label' => 'Push Notifications', 'icon' => 'bell'],
         'health' => ['label' => 'System Health', 'icon' => 'heart'],
         'logs' => ['label' => 'System Logs', 'icon' => 'terminal'],
@@ -614,6 +616,117 @@ class SettingsController extends Controller
     }
 
     /**
+     * Get admin and warehouse user audit logs data.
+     */
+    public function adminAuditLogsData(Request $request): JsonResponse
+    {
+        $query = $this->buildAdminAuditLogsQuery($request);
+        $perPage = min(max((int) $request->get('per_page', 25), 1), 100);
+        $logs = $query->paginate($perPage);
+
+        return response()->json([
+            'data' => $logs->map(function (AdminAuditLog $log) {
+                return [
+                    'id' => $log->id,
+                    'created_at' => $log->created_at?->format('Y-m-d H:i:s'),
+                    'scope' => $log->scope ?: 'system',
+                    'action_type' => $log->action_type,
+                    'action' => $log->action,
+                    'description' => $log->description,
+                    'method' => $log->method,
+                    'route_name' => $log->route_name,
+                    'url' => $log->url,
+                    'status_code' => $log->status_code,
+                    'duration_ms' => $log->duration_ms,
+                    'ip_address' => $log->ip_address,
+                    'actor' => [
+                        'id' => $log->user?->id,
+                        'name' => $log->user?->name ?? 'Unknown',
+                        'email' => $log->user?->email,
+                        'role' => $log->user?->roles?->first()?->name,
+                        'warehouse_id' => $log->warehouse_id,
+                        'warehouse_name' => $log->warehouse?->name,
+                    ],
+                    'metadata' => $log->metadata ?? [],
+                ];
+            }),
+            'meta' => [
+                'total' => $logs->total(),
+                'per_page' => $logs->perPage(),
+                'current_page' => $logs->currentPage(),
+                'last_page' => $logs->lastPage(),
+                'from' => $logs->firstItem() ?? 0,
+                'to' => $logs->lastItem() ?? 0,
+            ],
+        ]);
+    }
+
+    /**
+     * Export admin audit logs in JSON/CSV format.
+     */
+    public function adminAuditLogsExport(Request $request)
+    {
+        $format = strtolower((string) $request->get('format', 'json'));
+        $rows = $this->buildAdminAuditLogsQuery($request)
+            ->limit(5000)
+            ->get()
+            ->map(function (AdminAuditLog $log) {
+                return [
+                    'id' => $log->id,
+                    'created_at' => $log->created_at?->format('Y-m-d H:i:s'),
+                    'scope' => $log->scope,
+                    'action_type' => $log->action_type,
+                    'action' => $log->action,
+                    'description' => $log->description,
+                    'method' => $log->method,
+                    'route_name' => $log->route_name,
+                    'status_code' => $log->status_code,
+                    'duration_ms' => $log->duration_ms,
+                    'ip_address' => $log->ip_address,
+                    'actor_name' => $log->user?->name,
+                    'actor_email' => $log->user?->email,
+                    'actor_role' => $log->user?->roles?->first()?->name,
+                    'warehouse' => $log->warehouse?->name,
+                    'url' => $log->url,
+                    'metadata' => json_encode($log->metadata, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        $filenameBase = 'admin_audit_logs_' . date('Y-m-d_His');
+
+        if ($format === 'csv') {
+            $headers = [
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => 'attachment; filename="' . $filenameBase . '.csv"',
+            ];
+
+            $callback = function () use ($rows): void {
+                $output = fopen('php://output', 'w');
+                if (!$output) {
+                    return;
+                }
+
+                if (!empty($rows)) {
+                    fputcsv($output, array_keys($rows[0]));
+                }
+
+                foreach ($rows as $row) {
+                    fputcsv($output, $row);
+                }
+
+                fclose($output);
+            };
+
+            return response()->stream($callback, 200, $headers);
+        }
+
+        return response()->json($rows)
+            ->header('Content-Disposition', 'attachment; filename="' . $filenameBase . '.json"');
+    }
+
+    /**
      * Send test email.
      */
     public function testEmail(Request $request): JsonResponse
@@ -741,5 +854,68 @@ class SettingsController extends Controller
             'NGN' => 'Nigerian Naira (NGN)',
             'KES' => 'Kenyan Shilling (KES)',
         ];
+    }
+
+    /**
+     * Build admin audit logs query with filters.
+     */
+    protected function buildAdminAuditLogsQuery(Request $request)
+    {
+        $query = AdminAuditLog::query()->with([
+            'user:id,name,email,warehouse_id',
+            'user.roles:id,name',
+            'warehouse:id,name',
+        ]);
+
+        if ($search = trim((string) $request->get('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('action', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhere('route_name', 'like', "%{$search}%")
+                    ->orWhere('url', 'like', "%{$search}%")
+                    ->orWhereHas('user', function ($userQuery) use ($search) {
+                        $userQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($scope = trim((string) $request->get('scope', ''))) {
+            $query->where('scope', $scope);
+        }
+
+        if ($actionType = trim((string) $request->get('action_type', ''))) {
+            $query->where('action_type', $actionType);
+        }
+
+        if ($method = trim((string) $request->get('method', ''))) {
+            $query->where('method', strtoupper($method));
+        }
+
+        if ($userId = $request->integer('user_id')) {
+            $query->where('user_id', $userId);
+        }
+
+        if ($statusCode = $request->get('status_code')) {
+            $query->where('status_code', (int) $statusCode);
+        }
+
+        if ($dateFrom = $request->get('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo = $request->get('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        $sortBy = (string) $request->get('sort_by', 'created_at');
+        $sortOrder = strtolower((string) $request->get('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $allowedSorts = ['created_at', 'action_type', 'method', 'status_code', 'duration_ms'];
+
+        if (!in_array($sortBy, $allowedSorts, true)) {
+            $sortBy = 'created_at';
+        }
+
+        return $query->orderBy($sortBy, $sortOrder);
     }
 }

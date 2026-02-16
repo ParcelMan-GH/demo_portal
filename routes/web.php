@@ -101,17 +101,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
     });
 
     // Authenticated routes
-    Route::middleware('auth:admin')->group(function () {
+    Route::middleware(['auth:admin', 'admin.audit'])->group(function () {
         Route::post('logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
         // Role Management
+        Route::get('roles/warehouse', [RoleController::class, 'warehouseIndex'])->name('roles.warehouse.index');
         Route::resource('roles', RoleController::class);
 
         // Admin Management
         Route::resource('admins', AdminController::class)->except(['destroy']);
         Route::get('admins-data', [AdminController::class, 'data'])->name('admins.data');
         Route::get('admins-export', [AdminController::class, 'export'])->name('admins.export');
+        Route::delete('admins/{admin}', [AdminController::class, 'destroy'])->name('admins.destroy');
         Route::patch('admins/{admin}/toggle-active', [AdminController::class, 'toggleActive'])
             ->name('admins.toggle-active');
         Route::post('admins/{admin}/assign-roles', [AdminController::class, 'assignRoles'])
@@ -175,6 +177,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
         Route::get('warehouses/{warehouse}', [WarehouseController::class, 'showPage'])->name('warehouses.show');
         Route::get('warehouses/{warehouse}/json', [WarehouseController::class, 'show'])->name('warehouses.show.json');
+        Route::get('warehouses/{warehouse}/users-data', [WarehouseController::class, 'usersData'])->name('warehouses.users.data');
+        Route::get('warehouses/{warehouse}/users-export', [WarehouseController::class, 'usersExport'])->name('warehouses.users.export');
         Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update'])->name('warehouses.update');
         Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->name('warehouses.destroy');
         Route::patch('warehouses/{warehouse}/toggle-active', [WarehouseController::class, 'toggleActive'])->name('warehouses.toggle-active');
@@ -191,6 +195,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('settings/email-logs-data', [SettingsController::class, 'emailLogsData'])->name('settings.email-logs.data');
         Route::get('settings/sms-logs-data', [SettingsController::class, 'smsLogsData'])->name('settings.sms-logs.data');
         Route::get('settings/otp-logs-data', [SettingsController::class, 'otpLogsData'])->name('settings.otp-logs.data');
+        Route::get('settings/admin-audit-logs-data', [SettingsController::class, 'adminAuditLogsData'])->name('settings.admin-audit-logs.data');
+        Route::get('settings/admin-audit-logs-export', [SettingsController::class, 'adminAuditLogsExport'])->name('settings.admin-audit-logs.export');
         Route::post('settings/test-email', [SettingsController::class, 'testEmail'])->name('settings.test-email');
         Route::post('settings/test-sms', [SettingsController::class, 'testSms'])->name('settings.test-sms');
         Route::post('settings/clear-cache', [SettingsController::class, 'clearCache'])->name('settings.clear-cache');

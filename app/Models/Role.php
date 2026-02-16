@@ -15,11 +15,15 @@ class Role extends Model
         'slug',
         'description',
         'is_system_role',
+        'is_warehouse_role',
+        'is_assignable_by_warehouse_manager',
         'is_active',
     ];
 
     protected $casts = [
         'is_system_role' => 'boolean',
+        'is_warehouse_role' => 'boolean',
+        'is_assignable_by_warehouse_manager' => 'boolean',
         'is_active' => 'boolean',
     ];
 
@@ -54,6 +58,14 @@ class Role extends Model
     public function scopeNotSystemRole($query)
     {
         return $query->where('is_system_role', false);
+    }
+
+    /**
+     * Scope a query to warehouse roles only.
+     */
+    public function scopeWarehouseRoles($query)
+    {
+        return $query->where('is_warehouse_role', true);
     }
 
     /**

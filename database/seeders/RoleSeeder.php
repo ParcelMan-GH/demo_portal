@@ -20,6 +20,8 @@ class RoleSeeder extends Seeder
                 'name' => 'Super Administrator',
                 'description' => 'Full system access with all permissions',
                 'is_system_role' => true,
+                'is_warehouse_role' => false,
+                'is_assignable_by_warehouse_manager' => false,
                 'is_active' => true,
             ]
         );
@@ -35,16 +37,17 @@ class RoleSeeder extends Seeder
                 'name' => 'Operations Manager',
                 'description' => 'Manage shipments, drivers, vendors, and view reports',
                 'is_system_role' => true,
+                'is_warehouse_role' => false,
+                'is_assignable_by_warehouse_manager' => false,
                 'is_active' => true,
             ]
         );
 
-        // Assign specific permissions to Operations Manager
         $operationsPermissions = Permission::whereIn('name', [
             // Dashboard
             'dashboard.view',
 
-            // Shipments (full access)
+            // Shipments
             'shipments.view',
             'shipments.create',
             'shipments.edit',
@@ -52,63 +55,157 @@ class RoleSeeder extends Seeder
             'shipments.assign_driver',
             'shipments.update_status',
 
-            // Drivers (full access)
+            // Drivers
             'drivers.view',
             'drivers.create',
             'drivers.edit',
             'drivers.delete',
             'drivers.assign',
 
-            // Vendors (full access)
+            // Vendors
             'vendors.view',
             'vendors.create',
             'vendors.edit',
             'vendors.delete',
             'vendors.activate',
 
-            // Reports (view and export)
+            // Reports
             'reports.view',
             'reports.export',
         ])->pluck('id');
         $operationsManager->permissions()->sync($operationsPermissions);
 
-        // 3. Accountant Role - Finance-focused permissions
+        // 3. Accountant Role
         $accountant = Role::updateOrCreate(
             ['slug' => 'accountant'],
             [
                 'name' => 'Accountant',
                 'description' => 'Manage invoices, view reports and settings',
                 'is_system_role' => true,
+                'is_warehouse_role' => false,
+                'is_assignable_by_warehouse_manager' => false,
                 'is_active' => true,
             ]
         );
 
-        // Assign specific permissions to Accountant
         $accountantPermissions = Permission::whereIn('name', [
-            // Dashboard
             'dashboard.view',
-
-            // Invoices (full access)
             'invoices.view',
             'invoices.create',
             'invoices.edit',
             'invoices.delete',
-
-            // Reports (view only)
             'reports.view',
             'reports.export',
-
-            // Settings (view only)
             'settings.view',
-
-            // Platform Settings (view only)
             'platform_settings.view',
         ])->pluck('id');
         $accountant->permissions()->sync($accountantPermissions);
 
-        $this->command->info('✓ Successfully seeded 3 system roles:');
+        // 4. Warehouse Manager
+        $warehouseManager = Role::updateOrCreate(
+            ['slug' => 'warehouse_manager'],
+            [
+                'name' => 'Warehouse Manager',
+                'description' => 'Manages warehouse operations and warehouse users',
+                'is_system_role' => true,
+                'is_warehouse_role' => true,
+                'is_assignable_by_warehouse_manager' => false,
+                'is_active' => true,
+            ]
+        );
+
+        $warehouseManagerPermissions = Permission::whereIn('name', [
+            'dashboard.view',
+            'warehouse.dashboard.view',
+            'warehouse.users.view',
+            'warehouse.users.create',
+            'warehouse.users.edit',
+            'warehouse.users.deactivate',
+            'warehouse.users.assign_roles',
+            'warehouse.receiving.manage',
+            'warehouse.sorting.manage',
+            'warehouse.manifest.manage',
+            'warehouse.transport.assign',
+            'warehouse.delivery.assign',
+            'warehouse.items.scan',
+            'drivers.view',
+            'drivers.assign',
+            'warehouses.view',
+        ])->pluck('id');
+        $warehouseManager->permissions()->sync($warehouseManagerPermissions);
+
+        // 5. Warehouse Receiver
+        $warehouseReceiver = Role::updateOrCreate(
+            ['slug' => 'warehouse_receiver'],
+            [
+                'name' => 'Warehouse Receiver',
+                'description' => 'Receives items into warehouse inventory',
+                'is_system_role' => true,
+                'is_warehouse_role' => true,
+                'is_assignable_by_warehouse_manager' => true,
+                'is_active' => true,
+            ]
+        );
+
+        $warehouseReceiverPermissions = Permission::whereIn('name', [
+            'warehouse.dashboard.view',
+            'warehouse.receiving.manage',
+            'warehouse.items.scan',
+        ])->pluck('id');
+        $warehouseReceiver->permissions()->sync($warehouseReceiverPermissions);
+
+        // 6. Warehouse Sorter
+        $warehouseSorter = Role::updateOrCreate(
+            ['slug' => 'warehouse_sorter'],
+            [
+                'name' => 'Warehouse Sorter',
+                'description' => 'Sorts items and prepares manifests',
+                'is_system_role' => true,
+                'is_warehouse_role' => true,
+                'is_assignable_by_warehouse_manager' => true,
+                'is_active' => true,
+            ]
+        );
+
+        $warehouseSorterPermissions = Permission::whereIn('name', [
+            'warehouse.dashboard.view',
+            'warehouse.sorting.manage',
+            'warehouse.manifest.manage',
+            'warehouse.items.scan',
+        ])->pluck('id');
+        $warehouseSorter->permissions()->sync($warehouseSorterPermissions);
+
+        // 7. Warehouse Dispatcher
+        $warehouseDispatcher = Role::updateOrCreate(
+            ['slug' => 'warehouse_dispatcher'],
+            [
+                'name' => 'Warehouse Dispatcher',
+                'description' => 'Assigns transport and delivery drivers',
+                'is_system_role' => true,
+                'is_warehouse_role' => true,
+                'is_assignable_by_warehouse_manager' => true,
+                'is_active' => true,
+            ]
+        );
+
+        $warehouseDispatcherPermissions = Permission::whereIn('name', [
+            'warehouse.dashboard.view',
+            'warehouse.manifest.manage',
+            'warehouse.transport.assign',
+            'warehouse.delivery.assign',
+            'warehouse.items.scan',
+            'drivers.view',
+            'drivers.assign',
+        ])->pluck('id');
+        $warehouseDispatcher->permissions()->sync($warehouseDispatcherPermissions);
+
+        $this->command->info('Successfully seeded 7 system roles:');
         $this->command->info('  - Super Administrator (' . $superAdmin->permissions->count() . ' permissions)');
         $this->command->info('  - Operations Manager (' . $operationsManager->permissions->count() . ' permissions)');
         $this->command->info('  - Accountant (' . $accountant->permissions->count() . ' permissions)');
+        $this->command->info('  - Warehouse Manager (' . $warehouseManager->permissions->count() . ' permissions)');
+        $this->command->info('  - Warehouse Receiver (' . $warehouseReceiver->permissions->count() . ' permissions)');
+        $this->command->info('  - Warehouse Sorter (' . $warehouseSorter->permissions->count() . ' permissions)');
+        $this->command->info('  - Warehouse Dispatcher (' . $warehouseDispatcher->permissions->count() . ' permissions)');
     }
 }

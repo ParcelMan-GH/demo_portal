@@ -5,22 +5,31 @@
 @section('breadcrumb-current', $warehouse->name)
 
 @php
-$warehouseTypeValue = $warehouse->type?->value;
-$warehouseTypeLabel = $warehouse->type?->label() ?? 'Unknown';
-
 $warehouseConfig = [
     'warehouse' => $warehouse,
     'updateEndpoint' => route('admin.warehouses.update', $warehouse),
     'toggleActiveEndpoint' => route('admin.warehouses.toggle-active', $warehouse),
     'canManage' => $canManage,
 ];
+
+$warehouseUsersTableConfig = [
+    'endpoint' => route('admin.warehouses.users.data', $warehouse),
+    'exportEndpoint' => route('admin.warehouses.users.export', $warehouse),
+    'createEndpoint' => route('admin.admins.store'),
+    'warehouseId' => $warehouse->id,
+    'csrfToken' => csrf_token(),
+    'canCreateUsers' => $canCreateUsers,
+    'roles' => $userRoles->map(fn($role) => ['id' => $role->id, 'name' => $role->name])->values(),
+];
 @endphp
 
 @section('content')
-<script>
-    window.warehouseShowConfig = {!! json_encode($warehouseConfig) !!};
-</script>
-<div x-data="warehouseShow()" class="space-y-6">
+<div
+    x-data="warehouseShow()"
+    data-warehouse-show-config="{{ e(json_encode($warehouseConfig)) }}"
+    data-warehouse-users-config="{{ e(json_encode($warehouseUsersTableConfig)) }}"
+    class="space-y-6"
+>
 
     <!-- Hero Section -->
     <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30">
@@ -38,21 +47,46 @@ $warehouseConfig = [
             </div>
 
             <div class="relative px-6 lg:px-8 py-6">
-                <!-- Top Row: Back Button -->
-                <div class="mb-6">
+                <!-- Top Row: Back (left) + Actions (right) -->
+                <div class="mb-6 flex items-center justify-between gap-3">
                     <a href="{{ route('admin.warehouses.index') }}" class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium transition-all backdrop-blur-sm hover:shadow-md">
                         <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                         </svg>
                         <span class="text-xs">Back to Warehouses</span>
                     </a>
+
+                    @if($canManage)
+                    <div class="flex flex-wrap items-center justify-end gap-2">
+                        <button
+                            @@click="openEditModal()"
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl border border-white/20 transition-all backdrop-blur-sm shadow-sm hover:shadow-md"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                            </svg>
+                            Edit Warehouse
+                        </button>
+                        <button
+                            @@click="showToggleModal = true"
+                            class="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl border transition-all backdrop-blur-sm shadow-sm hover:shadow-md"
+                            :class="warehouse.is_active
+                                ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/30'
+                                : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/30'"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                            </svg>
+                            <span x-text="warehouse.is_active ? 'Deactivate' : 'Activate'"></span>
+                        </button>
+                    </div>
+                    @endif
                 </div>
 
-                <!-- Main Row: Profile LEFT, Summary + Actions RIGHT -->
-                <div class="flex flex-col lg:flex-row lg:items-center gap-6">
-                    <!-- LEFT: Warehouse Profile Info -->
-                    <div class="flex items-start gap-5 lg:flex-shrink-0">
-                        <!-- Icon -->
+                <!-- Main Row: Details (left) + Stats (right) -->
+                <div class="flex flex-col xl:flex-row xl:items-start gap-4">
+                    <!-- Left: Warehouse profile details -->
+                    <div class="flex items-start gap-5 min-w-0 xl:flex-1">
                         <div class="relative flex-shrink-0">
                             <div class="w-20 h-20 lg:w-24 lg:h-24 rounded-2xl bg-gradient-to-br from-teal-500 via-teal-600 to-teal-700 flex items-center justify-center shadow-xl shadow-teal-500/30 ring-4 ring-white/10">
                                 <svg class="w-10 h-10 lg:w-12 lg:h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -72,23 +106,22 @@ $warehouseConfig = [
                             </div>
                         </div>
 
-                        <!-- Details -->
                         <div class="space-y-2 min-w-0">
                             <div>
-                                <h1 class="text-xl lg:text-2xl font-bold text-white truncate">{{ $warehouse->name }}</h1>
+                                <h1 class="text-xl lg:text-2xl font-bold text-white leading-tight">{{ $warehouse->name }}</h1>
                                 @if($warehouse->code)
-                                    <p class="text-slate-400 text-sm mt-0.5 truncate font-mono">{{ $warehouse->code }}</p>
+                                    <p class="text-slate-400 text-sm mt-0.5 font-mono">{{ $warehouse->code }}</p>
                                 @endif
                             </div>
 
-                            <div class="flex flex-wrap items-center gap-2 text-xs">
+                            <div class="flex flex-wrap items-start gap-x-3 gap-y-2 text-xs">
                                 @if($warehouse->address)
-                                <div class="flex items-center gap-1.5 text-slate-300">
+                                <div class="flex items-start gap-1.5 text-slate-300 basis-full min-w-0">
                                     <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                                     </svg>
-                                    <span class="truncate">{{ $warehouse->address }}</span>
+                                    <span class="whitespace-normal break-words leading-relaxed">{{ $warehouse->address }}</span>
                                 </div>
                                 @endif
                                 @if($warehouse->contact_phone)
@@ -104,7 +137,7 @@ $warehouseConfig = [
                                     <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                                     </svg>
-                                    <span class="truncate">{{ $warehouse->contact_email }}</span>
+                                    <span class="break-all">{{ $warehouse->contact_email }}</span>
                                 </div>
                                 @endif
                             </div>
@@ -114,15 +147,6 @@ $warehouseConfig = [
                                     <span class="w-1.5 h-1.5 rounded-full {{ $warehouse->is_active ? 'bg-emerald-400' : 'bg-slate-400' }}"></span>
                                     {{ $warehouse->is_active ? 'Active' : 'Inactive' }}
                                 </span>
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold
-                                    @if($warehouseTypeValue === 'origin') bg-blue-500/20 text-blue-300
-                                    @elseif($warehouseTypeValue === 'destination') bg-violet-500/20 text-violet-300
-                                    @elseif($warehouseTypeValue === 'both') bg-emerald-500/20 text-emerald-300
-                                    @else bg-slate-500/20 text-slate-300
-                                    @endif
-                                ">
-                                    {{ $warehouseTypeLabel }}
-                                </span>
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-500/20 text-slate-300">
                                     {{ $warehouse->created_at->format('M d, Y') }}
                                 </span>
@@ -130,87 +154,53 @@ $warehouseConfig = [
                         </div>
                     </div>
 
-                    <!-- RIGHT: Action Buttons (row 1) + Summary Stats (row 2) -->
-                    <div class="flex flex-col gap-3 lg:ml-auto lg:items-end">
-                        <!-- Row 1: Action Buttons -->
-                        @if($canManage)
-                        <div class="flex items-center gap-2">
-                            <button
-                                @@click="openEditModal()"
-                                class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl border border-white/20 transition-all backdrop-blur-sm shadow-sm hover:shadow-md"
-                            >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                    <!-- Right: Operational summary cards -->
+                    <div class="w-full xl:w-[420px] xl:shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div class="min-w-0 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
+                            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/30 to-blue-600/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V7a2 2 0 00-2-2H6a2 2 0 00-2 2v6m16 0l-8 5-8-5"/>
                                 </svg>
-                                Edit Warehouse
-                            </button>
-                            <button
-                                @@click="showToggleModal = true"
-                                class="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl border transition-all backdrop-blur-sm shadow-sm hover:shadow-md"
-                                :class="warehouse.is_active
-                                    ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/30'
-                                    : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/30'"
-                            >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                                </svg>
-                                <span x-text="warehouse.is_active ? 'Deactivate' : 'Activate'"></span>
-                            </button>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-lg font-bold text-white leading-none">{{ number_format($warehouseStats['total_received_items']) }}</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Total Items Received</p>
+                            </div>
                         </div>
-                        @endif
 
-                        <!-- Row 2: Summary Stats - 4 compact cards in one row -->
-                        <div class="flex items-center gap-2 flex-wrap lg:flex-nowrap">
-                            <!-- Capacity -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/30 to-blue-600/20 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-white leading-none">{{ $warehouse->capacity ? number_format($warehouse->capacity) : '--' }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Capacity</p>
-                                </div>
+                        <div class="min-w-0 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
+                            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
                             </div>
-
-                            <!-- Type -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500/30 to-violet-600/20 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-violet-400 leading-none">{{ $warehouseTypeLabel }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Type</p>
-                                </div>
+                            <div class="min-w-0">
+                                <p class="text-lg font-bold text-white leading-none">{{ number_format($warehouseStats['received_pickups']) }}</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Received Pickups</p>
                             </div>
+                        </div>
 
-                            <!-- Region -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-white leading-none truncate max-w-[80px]">{{ $warehouse->region->name ?? '--' }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Region</p>
-                                </div>
+                        <div class="min-w-0 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
+                            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500/30 to-amber-600/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3M12 3a9 9 0 100 18 9 9 0 000-18z"/>
+                                </svg>
                             </div>
+                            <div class="min-w-0">
+                                <p class="text-lg font-bold text-white leading-none">{{ number_format($warehouseStats['pending_receipts']) }}</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Pending Receipts</p>
+                            </div>
+                        </div>
 
-                            <!-- Created Date -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500/30 to-amber-600/20 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-white leading-none">{{ $warehouse->created_at->format('M d') }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Created Date</p>
-                                </div>
+                        <div class="min-w-0 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
+                            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500/30 to-violet-600/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5V9H2v11h5m10 0v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5m10 0H7"/>
+                                </svg>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-lg font-bold text-white leading-none">{{ number_format($warehouseStats['users_count']) }}</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Warehouse Users</p>
                             </div>
                         </div>
                     </div>
@@ -219,105 +209,479 @@ $warehouseConfig = [
         </div>
     </div>
 
-    <!-- Warehouse Details Card -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-200 px-6 py-4">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-500/20 to-teal-600/10 flex items-center justify-center">
-                    <svg class="w-4.5 h-4.5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h2 class="text-sm font-bold text-slate-900">Warehouse Details</h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Complete information about this warehouse</p>
-                </div>
+    <!-- Warehouse Workbench Tabs -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-visible">
+        <div class="border-b border-slate-200 px-4 sm:px-6 py-4 bg-slate-50/60">
+            <div class="flex flex-wrap gap-2">
+                <button type="button" @@click="activeTab = 'details'" :class="tabClass('details')" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all">
+                    Warehouse Details
+                </button>
+                <button type="button" @@click="activeTab = 'users'" :class="tabClass('users')" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all">
+                    Warehouse Users
+                    <span class="rounded-full px-2 py-0.5 text-[10px] bg-slate-100 text-slate-600">{{ $warehouseUsers->count() }}</span>
+                </button>
+                <button type="button" @@click="activeTab = 'received_items'" :class="tabClass('received_items')" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all">
+                    Received Items
+                    <span class="rounded-full px-2 py-0.5 text-[10px] bg-slate-100 text-slate-600">{{ $receivedItems->count() }}</span>
+                </button>
+                <button type="button" @@click="activeTab = 'received_pickups'" :class="tabClass('received_pickups')" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all">
+                    Received Pickups
+                    <span class="rounded-full px-2 py-0.5 text-[10px] bg-slate-100 text-slate-600">{{ $receivedPickups->count() }}</span>
+                </button>
+                <button type="button" @@click="activeTab = 'pending_receipts'" :class="tabClass('pending_receipts')" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all">
+                    Pending Receipts
+                    <span class="rounded-full px-2 py-0.5 text-[10px] bg-slate-100 text-slate-600">{{ $pendingReceipts->count() }}</span>
+                </button>
             </div>
         </div>
 
-        <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Name -->
-                <div class="space-y-1">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Name</p>
-                    <p class="text-sm font-medium text-slate-900">{{ $warehouse->name }}</p>
+        <div class="p-4 sm:p-6">
+            <div x-show="activeTab === 'details'" x-cloak>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="space-y-1">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Name</p>
+                        <p class="text-sm font-medium text-slate-900">{{ $warehouse->name }}</p>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Code</p>
+                        <p class="text-sm font-medium text-slate-900 font-mono">{{ $warehouse->code ?? '-' }}</p>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</p>
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $warehouse->is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600' }}">
+                            {{ $warehouse->is_active ? 'Active' : 'Inactive' }}
+                        </span>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Capacity (m&sup3;)</p>
+                        <p class="text-sm font-medium text-slate-900">{{ $warehouse->capacity ? number_format($warehouse->capacity) . " m\u{00B3}" : '-' }}</p>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Region</p>
+                        <p class="text-sm font-medium text-slate-900">{{ $warehouse->region->name ?? '-' }}</p>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">District</p>
+                        <p class="text-sm font-medium text-slate-900">{{ $warehouse->district->name ?? '-' }}</p>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Contact Phone</p>
+                        <p class="text-sm font-medium text-slate-900">{{ $warehouse->contact_phone ?? '-' }}</p>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Contact Email</p>
+                        <p class="text-sm font-medium text-slate-900">{{ $warehouse->contact_email ?? '-' }}</p>
+                    </div>
+
+                    <div class="space-y-1 md:col-span-2 lg:col-span-3">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Address</p>
+                        <p class="text-sm font-medium text-slate-900 break-words">{{ $warehouse->address ?? '-' }}</p>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Created At</p>
+                        <p class="text-sm font-medium text-slate-900">{{ $warehouse->created_at->format('M d, Y \a\t h:i A') }}</p>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Last Updated</p>
+                        <p class="text-sm font-medium text-slate-900">{{ $warehouse->updated_at->format('M d, Y \a\t h:i A') }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="activeTab === 'users'" x-cloak x-data="warehouseUsersTable()" x-init="init()" class="space-y-4 relative">
+                <div class="relative z-30 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+                        <div class="relative flex-1 max-w-xs">
+                            <input
+                                type="text"
+                                x-model="search"
+                                @@input.debounce.500ms="meta.current_page = 1; loadData()"
+                                placeholder="Search users..."
+                                class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 focus:ring-2 focus:ring-slate-400/40 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400"
+                            >
+                            <svg class="absolute right-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </div>
+
+                        <div x-data="{ open: false }" class="relative w-full sm:w-56">
+                            <button type="button" @@click="open = !open" class="w-full inline-flex items-center justify-between px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 text-sm font-medium text-slate-700 hover:bg-white/90">
+                                <span x-text="selectedRoleName()"></span>
+                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                            <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-full rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 z-[90]" style="display:none;">
+                                <button type="button" @@click="roleFilter = ''; open = false; meta.current_page = 1; loadData()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">All roles</button>
+                                <template x-for="role in roles" :key="role.id">
+                                    <button type="button" @@click="roleFilter = String(role.id); open = false; meta.current_page = 1; loadData()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50" x-text="role.name"></button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <div class="w-full sm:w-44">
+                            <select x-model="statusFilter" @@change="meta.current_page = 1; loadData()" class="w-full px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 text-sm text-slate-700">
+                                <option value="">All statuses</option>
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-end gap-3">
+                        <div x-data="{ open: false }" class="relative">
+                            <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 text-sm font-semibold text-slate-700 hover:bg-white/90">
+                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/>
+                                </svg>
+                                View
+                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                            <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 z-[90]" style="display:none;">
+                                <template x-for="col in columns" :key="col.key">
+                                    <button type="button" @@click="toggleColumn(col.key)" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">
+                                        <span x-text="col.label"></span>
+                                        <svg x-show="visibleColumns[col.key]" class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <div x-data="{ open: false }" class="relative">
+                            <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 text-sm font-semibold text-slate-700 hover:bg-white/90">
+                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                Export
+                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                            <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 z-[90]" style="display:none;">
+                                <button type="button" @@click="exportData('excel'); open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Excel</button>
+                                <button type="button" @@click="exportData('pdf'); open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">PDF</button>
+                                <button type="button" @@click="exportData('csv'); open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">CSV</button>
+                            </div>
+                        </div>
+
+                        <button x-show="canCreateUsers" type="button" @@click="openCreateModal()" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 transition-all">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Add User
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Code -->
-                <div class="space-y-1">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Code</p>
-                    <p class="text-sm font-medium text-slate-900 font-mono">{{ $warehouse->code ?? '-' }}</p>
+                <div class="overflow-hidden rounded-xl border border-slate-200/50 relative z-10">
+                    <div x-show="loading" x-transition.opacity.duration.150ms class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10" style="display:none;"></div>
+                    <table class="min-w-full divide-y divide-slate-200/50 text-xs">
+                        <thead class="bg-slate-50/50">
+                            <tr>
+                                <th x-show="visibleColumns.name" @@click="sort('name')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">NAME</th>
+                                <th x-show="visibleColumns.role" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ROLE</th>
+                                <th x-show="visibleColumns.email" @@click="sort('email')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">EMAIL</th>
+                                <th x-show="visibleColumns.status" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">STATUS</th>
+                                <th x-show="visibleColumns.created_at" @@click="sort('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">CREATED AT</th>
+                                <th x-show="visibleColumns.last_login_at" @@click="sort('last_login_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">LAST LOGIN</th>
+                                <th x-show="visibleColumns.actions" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-transparent divide-y divide-slate-100/50">
+                            <template x-if="users.length === 0 && !loading">
+                                <tr>
+                                    <td :colspan="visibleColumnCount()" class="px-4 py-8 text-center text-gray-500 text-xs">No warehouse users found</td>
+                                </tr>
+                            </template>
+                            <template x-for="user in users" :key="user.id">
+                                <tr class="hover:bg-slate-50/70">
+                                    <td x-show="visibleColumns.name" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="user.name"></td>
+                                    <td x-show="visibleColumns.role" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600">
+                                        <template x-if="user.roles && user.roles.length">
+                                            <span class="inline-flex items-center rounded-full border border-slate-200/50 px-2 py-0.5 text-[10px] font-semibold text-slate-700 bg-white/60" x-text="user.roles[0].name"></span>
+                                        </template>
+                                        <template x-if="!user.roles || !user.roles.length">
+                                            <span class="text-[10px] text-slate-400">No role</span>
+                                        </template>
+                                    </td>
+                                    <td x-show="visibleColumns.email" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-700" x-text="user.email"></td>
+                                    <td x-show="visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap">
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'" x-text="user.is_active ? 'Active' : 'Inactive'"></span>
+                                    </td>
+                                    <td x-show="visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-700" x-text="user.created_at"></td>
+                                    <td x-show="visibleColumns.last_login_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-700" x-text="user.last_login_at"></td>
+                                    <td x-show="visibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center">
+                                        <div class="inline-flex items-center gap-2">
+                                            <a :href="user.view_url" class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50">View</a>
+                                            <button x-show="user.can_manage" type="button" @@click="openEditModal(user)" class="inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 hover:bg-blue-100">Edit</button>
+                                            <button x-show="user.can_manage && !user.is_self" type="button" @@click="toggleUserStatus(user)" class="inline-flex items-center rounded-lg border px-2 py-1 text-[10px] font-semibold" :class="user.is_active ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'" x-text="user.is_active ? 'Deactivate' : 'Activate'"></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
                 </div>
 
-                <!-- Type -->
-                <div class="space-y-1">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Type</p>
-                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold
-                        @if($warehouseTypeValue === 'origin') bg-blue-100 text-blue-700
-                        @elseif($warehouseTypeValue === 'destination') bg-violet-100 text-violet-700
-                        @elseif($warehouseTypeValue === 'both') bg-emerald-100 text-emerald-700
-                        @else bg-slate-100 text-slate-700
-                        @endif
-                    ">
-                        {{ $warehouseTypeLabel }}
-                    </span>
+                <div class="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="text-xs text-slate-500" x-text="`Showing ${meta.from || 0} to ${meta.to || 0} of ${meta.total || 0} users`"></div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-500">Rows</span>
+                        <select x-model.number="perPage" @@change="meta.current_page = 1; loadData()" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </select>
+                        <button @@click="firstPage()" :disabled="meta.current_page <= 1" class="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 disabled:opacity-40">«</button>
+                        <button @@click="previousPage()" :disabled="meta.current_page <= 1" class="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 disabled:opacity-40">‹</button>
+                        <span class="px-2 text-xs text-slate-600" x-text="`Page ${meta.current_page} of ${meta.last_page || 1}`"></span>
+                        <button @@click="nextPage()" :disabled="meta.current_page >= meta.last_page" class="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 disabled:opacity-40">›</button>
+                        <button @@click="lastPage()" :disabled="meta.current_page >= meta.last_page" class="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 disabled:opacity-40">»</button>
+                    </div>
                 </div>
 
-                <!-- Status -->
-                <div class="space-y-1">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</p>
-                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $warehouse->is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600' }}">
-                        {{ $warehouse->is_active ? 'Active' : 'Inactive' }}
-                    </span>
-                </div>
+                <div
+                    x-show="showUserModal"
+                    x-cloak
+                    class="fixed inset-0 z-[120] overflow-y-auto"
+                    @@keydown.escape.window="closeUserModal()"
+                >
+                    <div
+                        x-show="showUserModal"
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0"
+                        x-transition:enter-end="opacity-100"
+                        x-transition:leave="transition ease-in duration-150"
+                        x-transition:leave-start="opacity-100"
+                        x-transition:leave-end="opacity-0"
+                        class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
+                        @@click="closeUserModal()"
+                    ></div>
 
-                <!-- Capacity -->
-                <div class="space-y-1">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Capacity</p>
-                    <p class="text-sm font-medium text-slate-900">{{ $warehouse->capacity ? number_format($warehouse->capacity) : '-' }}</p>
-                </div>
+                    <div class="flex min-h-full items-center justify-center p-4">
+                        <div
+                            x-show="showUserModal"
+                            x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0 scale-95"
+                            x-transition:enter-end="opacity-100 scale-100"
+                            x-transition:leave="transition ease-in duration-150"
+                            x-transition:leave-start="opacity-100 scale-100"
+                            x-transition:leave-end="opacity-0 scale-95"
+                            @@click.stop
+                            class="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+                        >
+                            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-lg font-bold text-slate-900" x-text="userModalMode === 'create' ? 'Add Warehouse User' : 'Edit Warehouse User'"></h3>
+                                    <p class="text-sm text-slate-500 mt-0.5">This user will remain scoped to this warehouse.</p>
+                                </div>
+                                <button type="button" @@click="closeUserModal()" class="rounded-lg p-2 text-slate-400 hover:text-slate-700 hover:bg-white">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
 
-                <!-- Region -->
-                <div class="space-y-1">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Region</p>
-                    <p class="text-sm font-medium text-slate-900">{{ $warehouse->region->name ?? '-' }}</p>
-                </div>
+                            <form @@submit.prevent="submitUserForm()">
+                                <div class="p-6 space-y-5 max-h-[calc(100vh-220px)] overflow-y-auto">
+                                    <template x-if="userFormErrors.general">
+                                        <div class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" x-text="userFormErrors.general"></div>
+                                    </template>
 
-                <!-- District -->
-                <div class="space-y-1">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">District</p>
-                    <p class="text-sm font-medium text-slate-900">{{ $warehouse->district->name ?? '-' }}</p>
-                </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Name <span class="text-rose-500">*</span></label>
+                                            <input type="text" x-model="userForm.name" required class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400">
+                                            <template x-if="userFormErrors.name"><p class="mt-1 text-xs text-rose-600" x-text="userFormErrors.name"></p></template>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Email <span class="text-rose-500">*</span></label>
+                                            <input type="email" x-model="userForm.email" required class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400">
+                                            <template x-if="userFormErrors.email"><p class="mt-1 text-xs text-rose-600" x-text="userFormErrors.email"></p></template>
+                                        </div>
+                                    </div>
 
-                <!-- Contact Phone -->
-                <div class="space-y-1">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Contact Phone</p>
-                    <p class="text-sm font-medium text-slate-900">{{ $warehouse->contact_phone ?? '-' }}</p>
-                </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Password <span x-show="userModalMode === 'create'" class="text-rose-500">*</span></label>
+                                            <input type="password" x-model="userForm.password" :required="userModalMode === 'create'" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400">
+                                            <p class="mt-1 text-xs text-slate-500" x-show="userModalMode === 'edit'">Leave blank to keep current password.</p>
+                                            <template x-if="userFormErrors.password"><p class="mt-1 text-xs text-rose-600" x-text="userFormErrors.password"></p></template>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Confirm Password <span x-show="userModalMode === 'create'" class="text-rose-500">*</span></label>
+                                            <input type="password" x-model="userForm.password_confirmation" :required="userModalMode === 'create'" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400">
+                                        </div>
+                                    </div>
 
-                <!-- Contact Email -->
-                <div class="space-y-1">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Contact Email</p>
-                    <p class="text-sm font-medium text-slate-900">{{ $warehouse->contact_email ?? '-' }}</p>
-                </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 mb-2">Assign Role</label>
+                                        <div class="max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/40 p-3 space-y-2">
+                                            <template x-for="role in roles" :key="role.id">
+                                                <label class="flex items-center gap-2 text-sm text-slate-700">
+                                                    <input type="radio" name="warehouse_user_role_id" :value="Number(role.id)" x-model.number="userForm.role_id" class="border-slate-300 text-slate-900 focus:ring-slate-400">
+                                                    <span x-text="role.name"></span>
+                                                </label>
+                                            </template>
+                                        </div>
+                                        <template x-if="userFormErrors.role_id || userFormErrors.roles"><p class="mt-1 text-xs text-rose-600" x-text="userFormErrors.role_id || userFormErrors.roles"></p></template>
+                                    </div>
 
-                <!-- Address -->
-                <div class="space-y-1 md:col-span-2 lg:col-span-3">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Address</p>
-                    <p class="text-sm font-medium text-slate-900">{{ $warehouse->address ?? '-' }}</p>
-                </div>
+                                    <div x-show="userModalMode === 'edit' && selectedUser && !selectedUser.is_self">
+                                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Status</label>
+                                        <select x-model="userForm.is_active" class="w-full md:w-56 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400">
+                                            <option value="1">Active</option>
+                                            <option value="0">Inactive</option>
+                                        </select>
+                                    </div>
+                                </div>
 
-                <!-- Created At -->
-                <div class="space-y-1">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Created At</p>
-                    <p class="text-sm font-medium text-slate-900">{{ $warehouse->created_at->format('M d, Y \a\t h:i A') }}</p>
+                                <div class="px-6 py-4 border-t border-slate-200 bg-slate-50/60 flex items-center justify-end gap-3">
+                                    <button type="button" @@click="closeUserModal()" class="px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100">Cancel</button>
+                                    <button type="submit" :disabled="submittingUser" class="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 disabled:opacity-50">
+                                        <svg x-show="submittingUser" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                        </svg>
+                                        <span x-text="submittingUser ? 'Saving...' : (userModalMode === 'create' ? 'Create User' : 'Save Changes')"></span>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
+            </div>
 
-                <!-- Updated At -->
-                <div class="space-y-1">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Last Updated</p>
-                    <p class="text-sm font-medium text-slate-900">{{ $warehouse->updated_at->format('M d, Y \a\t h:i A') }}</p>
-                </div>
+            <div x-show="activeTab === 'received_items'" x-cloak>
+                @if($receivedItems->isEmpty())
+                    <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                        No received item confirmations yet.
+                    </div>
+                @else
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Confirmed At</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Shipment</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Item</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Qty</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Driver</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                @foreach($receivedItems as $confirmation)
+                                    <tr>
+                                        <td class="px-4 py-3 text-slate-700">{{ $confirmation->confirmed_at?->format('M d, Y h:i A') ?? '-' }}</td>
+                                        <td class="px-4 py-3 font-medium text-slate-900">{{ $confirmation->shipmentItem?->shipment?->shipment_number ?? '-' }}</td>
+                                        <td class="px-4 py-3 text-slate-700">{{ $confirmation->shipmentItem?->description ?? '-' }}</td>
+                                        <td class="px-4 py-3 text-slate-700">{{ $confirmation->confirmed_quantity }} / {{ $confirmation->expected_quantity }}</td>
+                                        <td class="px-4 py-3 text-slate-700">{{ $confirmation->pickupAssignment?->driver?->name ?? '-' }}</td>
+                                        <td class="px-4 py-3 text-slate-700 max-w-xs break-words">{{ $confirmation->notes ?: '-' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+
+            <div x-show="activeTab === 'received_pickups'" x-cloak>
+                @if($receivedPickups->isEmpty())
+                    <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                        No pickups have been received at this warehouse yet.
+                    </div>
+                @else
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Shipment</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Driver</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Status</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Arrived Warehouse</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Received At</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                @foreach($receivedPickups as $pickup)
+                                    @php
+                                        $statusValue = is_object($pickup->status) ? $pickup->status->value : (string) $pickup->status;
+                                        $statusLabel = is_object($pickup->status) && method_exists($pickup->status, 'label')
+                                            ? $pickup->status->label()
+                                            : ucwords(str_replace('_', ' ', (string) $statusValue));
+                                    @endphp
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-slate-900">{{ $pickup->shipment?->shipment_number ?? '-' }}</td>
+                                        <td class="px-4 py-3 text-slate-700">{{ $pickup->driver?->name ?? '-' }}</td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{{ $statusLabel }}</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-700">{{ $pickup->arrived_warehouse_at?->format('M d, Y h:i A') ?? '-' }}</td>
+                                        <td class="px-4 py-3 text-slate-700">{{ $pickup->received_at?->format('M d, Y h:i A') ?? '-' }}</td>
+                                        <td class="px-4 py-3 text-slate-700 max-w-xs break-words">{{ $pickup->receive_notes ?: '-' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+
+            <div x-show="activeTab === 'pending_receipts'" x-cloak>
+                @if($pendingReceipts->isEmpty())
+                    <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                        No pending receipts for this warehouse.
+                    </div>
+                @else
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Shipment</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Driver</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Status</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Assigned At</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Arrived Warehouse</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                @foreach($pendingReceipts as $pickup)
+                                    @php
+                                        $statusValue = is_object($pickup->status) ? $pickup->status->value : (string) $pickup->status;
+                                        $statusLabel = is_object($pickup->status) && method_exists($pickup->status, 'label')
+                                            ? $pickup->status->label()
+                                            : ucwords(str_replace('_', ' ', (string) $statusValue));
+                                    @endphp
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-slate-900">{{ $pickup->shipment?->shipment_number ?? '-' }}</td>
+                                        <td class="px-4 py-3 text-slate-700">{{ $pickup->driver?->name ?? '-' }}</td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">{{ $statusLabel }}</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-700">{{ $pickup->assigned_at?->format('M d, Y h:i A') ?? '-' }}</td>
+                                        <td class="px-4 py-3 text-slate-700">{{ $pickup->arrived_warehouse_at?->format('M d, Y h:i A') ?? '-' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
@@ -402,8 +766,8 @@ $warehouseConfig = [
                             </template>
                         </div>
 
-                        <!-- Code & Type Grid -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <!-- Code -->
+                        <div class="grid grid-cols-1 gap-5">
                             <!-- Code -->
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-2">
@@ -424,33 +788,6 @@ $warehouseConfig = [
                                 </div>
                                 <template x-if="errors.code">
                                     <p class="mt-1.5 text-xs text-rose-600" x-text="errors.code[0]"></p>
-                                </template>
-                            </div>
-
-                            <!-- Type -->
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                    Type <span class="text-rose-500">*</span>
-                                </label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                        </svg>
-                                    </div>
-                                    <select
-                                        x-model="form.type"
-                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 transition-all appearance-none cursor-pointer"
-                                        required
-                                    >
-                                        <option value="">Select type</option>
-                                        <option value="origin">Origin</option>
-                                        <option value="destination">Destination</option>
-                                        <option value="both">Both</option>
-                                    </select>
-                                </div>
-                                <template x-if="errors.type">
-                                    <p class="mt-1.5 text-xs text-rose-600" x-text="errors.type[0]"></p>
                                 </template>
                             </div>
                         </div>
@@ -528,7 +865,7 @@ $warehouseConfig = [
                         <!-- Capacity -->
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                Capacity <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                Capacity (m&sup3;) <span class="text-slate-400 text-xs font-normal">(Optional)</span>
                             </label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -690,152 +1027,5 @@ $warehouseConfig = [
 
 @endsection
 
-@push('scripts')
-<script>
-function warehouseShow() {
-    return {
-        config: {},
-        warehouse: {},
-        canManage: false,
 
-        showToggleModal: false,
 
-        // Edit modal state
-        showEditModal: false,
-        saving: false,
-        toggling: false,
-        errors: {},
-        form: {
-            name: '',
-            code: '',
-            type: '',
-            address: '',
-            contact_phone: '',
-            contact_email: '',
-            capacity: '',
-            is_active: true
-        },
-
-        init() {
-            this.config = window.warehouseShowConfig;
-            this.warehouse = this.config.warehouse;
-            this.canManage = this.config.canManage;
-        },
-
-        openEditModal() {
-            this.form = {
-                name: this.warehouse.name,
-                code: this.warehouse.code || '',
-                type: this.warehouse.type || '',
-                address: this.warehouse.address || '',
-                contact_phone: this.warehouse.contact_phone || '',
-                contact_email: this.warehouse.contact_email || '',
-                capacity: this.warehouse.capacity || '',
-                is_active: this.warehouse.is_active
-            };
-            this.errors = {};
-            this.showEditModal = true;
-        },
-
-        async saveWarehouse() {
-            this.saving = true;
-            this.errors = {};
-
-            try {
-                const response = await fetch(this.config.updateEndpoint, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify(this.form)
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    if (response.status === 422) {
-                        this.errors = data.errors || {};
-                    } else {
-                        throw new Error(data.message || 'Failed to update warehouse');
-                    }
-                    return;
-                }
-
-                // Update local warehouse data
-                this.warehouse.name = this.form.name;
-                this.warehouse.code = this.form.code;
-                this.warehouse.type = this.form.type;
-                this.warehouse.address = this.form.address;
-                this.warehouse.contact_phone = this.form.contact_phone;
-                this.warehouse.contact_email = this.form.contact_email;
-                this.warehouse.capacity = this.form.capacity;
-                this.warehouse.is_active = this.form.is_active;
-
-                this.showEditModal = false;
-
-                // Show success notification
-                if (window.showToast) {
-                    window.showToast('Warehouse updated successfully', 'success');
-                }
-            } catch (error) {
-                console.error('Save error:', error);
-                if (window.showToast) {
-                    window.showToast(error.message || 'Failed to update warehouse', 'error');
-                }
-            } finally {
-                this.saving = false;
-            }
-        },
-
-        async toggleActive() {
-            this.toggling = true;
-
-            try {
-                const response = await fetch(this.config.toggleActiveEndpoint, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    }
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.message || 'Failed to toggle status');
-                }
-
-                this.warehouse.is_active = data.is_active;
-                this.showToggleModal = false;
-
-                if (window.showToast) {
-                    window.showToast(data.message, 'success');
-                }
-            } catch (error) {
-                console.error('Toggle error:', error);
-                if (window.showToast) {
-                    window.showToast(error.message || 'Failed to toggle status', 'error');
-                }
-            } finally {
-                this.toggling = false;
-            }
-        },
-
-        formatDateTime(dateStr) {
-            if (!dateStr) return '-';
-            const date = new Date(dateStr);
-            return date.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-    };
-}
-</script>
-@endpush

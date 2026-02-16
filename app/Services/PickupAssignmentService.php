@@ -51,6 +51,13 @@ class PickupAssignmentService
             ];
         }
 
+        if (!$driver->hasCapability(Driver::CAPABILITY_PICKUP)) {
+            return [
+                'success' => false,
+                'message' => 'Driver is not configured for pickup assignments.',
+            ];
+        }
+
         $assignment = PickupAssignment::create([
             'shipment_id' => $shipment->id,
             'driver_id' => $driver->id,
@@ -71,12 +78,26 @@ class PickupAssignmentService
         ];
     }
 
-    public function getAvailableDrivers(?string $vehicleType = null): array
+    public function getAvailableDrivers(?string $vehicleType = null, ?string $assignmentType = null): array
     {
+        $assignmentType = is_string($assignmentType) ? strtolower(trim($assignmentType)) : null;
+        if (!in_array($assignmentType, Driver::CAPABILITIES, true)) {
+            $assignmentType = Driver::CAPABILITY_PICKUP;
+        }
+
         $query = Driver::where('is_active', true)
             ->where(function ($q) {
                 $q->whereNull('status')
                     ->orWhereIn('status', ['available', 'offline']);
+            })
+            ->where(function ($q) use ($assignmentType) {
+                // Backward compatibility: null capabilities are treated as pickup-capable.
+                if ($assignmentType === Driver::CAPABILITY_PICKUP) {
+                    $q->whereNull('task_capabilities')
+                        ->orWhereJsonContains('task_capabilities', $assignmentType);
+                } else {
+                    $q->whereJsonContains('task_capabilities', $assignmentType);
+                }
             });
 
         if ($vehicleType) {

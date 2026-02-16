@@ -1,13 +1,17 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Edit Role - ' . $role->name)
+@php
+    $isWarehouseScope = ($roleScope ?? ($role->is_warehouse_role ? 'warehouse' : 'system')) === 'warehouse';
+@endphp
+
+@section('title', ($isWarehouseScope ? 'Edit Warehouse Role - ' : 'Edit Role - ') . $role->name)
 
 @section('breadcrumb-parent', 'Roles & Permissions')
-@section('breadcrumb-current', 'Edit ' . $role->name)
+@section('breadcrumb-current', ($isWarehouseScope ? 'Edit Warehouse Role - ' : 'Edit ') . $role->name)
 
 @section('content')
     <div class="mb-6">
-        <a href="{{ route('admin.roles.show', $role) }}" class="text-blue-600 hover:text-blue-800 flex items-center">
+        <a href="{{ route('admin.roles.show', ['role' => $role, 'scope' => $isWarehouseScope ? 'warehouse' : 'system']) }}" class="text-blue-600 hover:text-blue-800 flex items-center">
             <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
             </svg>
@@ -32,6 +36,7 @@
             <form action="{{ route('admin.roles.update', $role) }}" method="POST" class="p-6">
                 @csrf
                 @method('PUT')
+                <input type="hidden" name="scope" value="{{ $isWarehouseScope ? 'warehouse' : 'system' }}">
 
                 <!-- Role Name -->
                 <div class="mb-6">
@@ -169,7 +174,7 @@
 
                 <!-- Submit Buttons -->
                 <div class="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
-                    <a href="{{ route('admin.roles.show', $role) }}"
+                    <a href="{{ route('admin.roles.show', ['role' => $role, 'scope' => $isWarehouseScope ? 'warehouse' : 'system']) }}"
                        class="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
                         Cancel
                     </a>

@@ -2,14 +2,19 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\WarehouseType;
 use App\Exports\WarehousesExport;
+use App\Exports\UsersExport;
 use App\Http\Controllers\Controller;
+use App\Models\PickupAssignment;
+use App\Models\PickupItemConfirmation;
 use App\Models\Region;
+use App\Models\Role;
+use App\Models\User;
 use App\Models\Warehouse;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\GenericPdfExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -22,9 +27,7 @@ class WarehouseController extends Controller
     {
         $this->authorizePermission('warehouses.view');
 
-        return view('admin.warehouses.index', [
-            'types' => WarehouseType::toArray(),
-        ]);
+        return view('admin.warehouses.index');
     }
 
     /**
@@ -45,11 +48,6 @@ class WarehouseController extends Controller
             });
         }
 
-        // Type filter
-        if ($type = $request->get('type')) {
-            $query->where('type', $type);
-        }
-
         // Status filter
         if ($request->has('status') && $request->get('status') !== '') {
             $query->where('is_active', $request->get('status') === 'active');
@@ -66,7 +64,7 @@ class WarehouseController extends Controller
         // Sorting
         $sortBy = $request->get('sort', 'created_at');
         $sortDirection = $request->get('direction', 'desc');
-        $allowedSorts = ['name', 'code', 'type', 'created_at'];
+        $allowedSorts = ['name', 'code', 'created_at'];
 
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortDirection);
@@ -77,6 +75,7 @@ class WarehouseController extends Controller
         $warehouses = $query->paginate($perPage);
 
         $canManage = Auth::guard('admin')->user()->hasPermission('warehouses.edit');
+        $currentAdmin = Auth::guard('admin')->user();
 
         return response()->json([
             'data' => $warehouses->map(function ($warehouse) use ($canManage) {
@@ -84,8 +83,6 @@ class WarehouseController extends Controller
                     'id' => $warehouse->id,
                     'name' => $warehouse->name,
                     'code' => $warehouse->code,
-                    'type' => $warehouse->type?->value,
-                    'type_label' => $warehouse->type?->label(),
                     'address' => $warehouse->address,
                     'region' => $warehouse->region?->name,
                     'district' => $warehouse->district?->name,
@@ -116,11 +113,111 @@ class WarehouseController extends Controller
     {
         $this->authorizePermission('warehouses.view');
 
-        $canManage = Auth::guard('admin')->user()->hasPermission('warehouses.edit');
+        $currentAdmin = Auth::guard('admin')->user();
+        $canManage = $currentAdmin->hasPermission('warehouses.edit');
+
+        $warehouseUsers = $warehouse->users()
+            ->with('roles:id,name')
+            ->orderByDesc('created_at')
+            ->get(['id', 'warehouse_id', 'name', 'email', 'is_active', 'last_login_at', 'created_at']);
+
+        $userRoles = Role::active()
+            ->warehouseRoles()
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $receivedPickups = PickupAssignment::query()
+            ->with([
+                'shipment:id,shipment_number',
+                'driver:id,name,phone',
+            ])
+            ->where('received_warehouse_id', $warehouse->id)
+            ->whereNotNull('received_at')
+            ->latest('received_at')
+            ->limit(100)
+            ->get([
+                'id',
+                'shipment_id',
+                'driver_id',
+                'status',
+                'assigned_at',
+                'arrived_warehouse_at',
+                'received_at',
+                'receive_notes',
+            ]);
+
+        $pendingReceipts = PickupAssignment::query()
+            ->with([
+                'shipment:id,shipment_number',
+                'driver:id,name,phone',
+            ])
+            ->where('target_warehouse_id', $warehouse->id)
+            ->whereNull('received_at')
+            ->where('status', '!=', 'cancelled')
+            ->latest('assigned_at')
+            ->limit(100)
+            ->get([
+                'id',
+                'shipment_id',
+                'driver_id',
+                'status',
+                'assigned_at',
+                'arrived_warehouse_at',
+                'receive_notes',
+            ]);
+
+        $receivedItems = PickupItemConfirmation::query()
+            ->with([
+                'shipmentItem:id,shipment_id,description,quantity',
+                'shipmentItem.shipment:id,shipment_number',
+                'pickupAssignment:id,driver_id,received_warehouse_id,received_at',
+                'pickupAssignment.driver:id,name,phone',
+            ])
+            ->whereHas('pickupAssignment', function ($query) use ($warehouse) {
+                $query->where('received_warehouse_id', $warehouse->id)
+                    ->whereNotNull('received_at');
+            })
+            ->latest('confirmed_at')
+            ->limit(200)
+            ->get([
+                'id',
+                'pickup_assignment_id',
+                'shipment_item_id',
+                'expected_quantity',
+                'confirmed_quantity',
+                'notes',
+                'confirmed_at',
+            ]);
+
+        $warehouseStats = [
+            'total_received_items' => (int) PickupItemConfirmation::query()
+                ->whereHas('pickupAssignment', function ($query) use ($warehouse) {
+                    $query->where('received_warehouse_id', $warehouse->id)
+                        ->whereNotNull('received_at');
+                })
+                ->sum('confirmed_quantity'),
+            'received_pickups' => PickupAssignment::query()
+                ->where('received_warehouse_id', $warehouse->id)
+                ->whereNotNull('received_at')
+                ->count(),
+            'pending_receipts' => PickupAssignment::query()
+                ->where('target_warehouse_id', $warehouse->id)
+                ->whereNull('received_at')
+                ->where('status', '!=', 'cancelled')
+                ->count(),
+            'users_count' => $warehouse->users()->count(),
+        ];
 
         return view('admin.warehouses.show', [
             'warehouse' => $warehouse,
             'canManage' => $canManage,
+            'warehouseStats' => $warehouseStats,
+            'warehouseUsers' => $warehouseUsers,
+            'userRoles' => $userRoles,
+            'receivedPickups' => $receivedPickups,
+            'pendingReceipts' => $pendingReceipts,
+            'receivedItems' => $receivedItems,
+            'canCreateUsers' => $currentAdmin->hasPermission('users.create'),
         ]);
     }
 
@@ -136,7 +233,6 @@ class WarehouseController extends Controller
                 'id' => $warehouse->id,
                 'name' => $warehouse->name,
                 'code' => $warehouse->code,
-                'type' => $warehouse->type?->value,
                 'address' => $warehouse->address,
                 'region_id' => $warehouse->region_id,
                 'district_id' => $warehouse->district_id,
@@ -158,7 +254,6 @@ class WarehouseController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:255', 'unique:warehouses,code'],
-            'type' => ['nullable', 'string', Rule::in(['origin', 'destination', 'both'])],
             'address' => ['nullable', 'string', 'max:255'],
             'region_id' => ['nullable', 'integer', 'exists:regions,id'],
             'district_id' => ['nullable', 'integer', 'exists:districts,id'],
@@ -171,7 +266,6 @@ class WarehouseController extends Controller
         $warehouse = new Warehouse();
         $warehouse->name = $validated['name'];
         $warehouse->code = $validated['code'] ?? null;
-        $warehouse->type = $validated['type'] ?? null;
         $warehouse->address = $validated['address'] ?? null;
         $warehouse->region_id = $validated['region_id'] ?? null;
         $warehouse->district_id = $validated['district_id'] ?? null;
@@ -198,7 +292,6 @@ class WarehouseController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:255', Rule::unique('warehouses')->ignore($warehouse->id)],
-            'type' => ['nullable', 'string', Rule::in(['origin', 'destination', 'both'])],
             'address' => ['nullable', 'string', 'max:255'],
             'region_id' => ['nullable', 'integer', 'exists:regions,id'],
             'district_id' => ['nullable', 'integer', 'exists:districts,id'],
@@ -210,7 +303,6 @@ class WarehouseController extends Controller
 
         $warehouse->name = $validated['name'];
         $warehouse->code = $validated['code'] ?? null;
-        $warehouse->type = $validated['type'] ?? null;
         $warehouse->address = $validated['address'] ?? null;
         $warehouse->region_id = $validated['region_id'] ?? null;
         $warehouse->district_id = $validated['district_id'] ?? null;
@@ -276,11 +368,6 @@ class WarehouseController extends Controller
             });
         }
 
-        // Type filter
-        if ($type = $request->get('type')) {
-            $query->where('type', $type);
-        }
-
         if ($request->has('status') && $request->get('status') !== '') {
             $query->where('is_active', $request->get('status') === 'active');
         }
@@ -299,11 +386,10 @@ class WarehouseController extends Controller
                 'ID' => $warehouse->id,
                 'Name' => $warehouse->name,
                 'Code' => $warehouse->code,
-                'Type' => $warehouse->type?->label(),
                 'Region' => $warehouse->region?->name,
                 'District' => $warehouse->district?->name,
                 'Contact Phone' => $warehouse->contact_phone,
-                'Capacity' => $warehouse->capacity,
+                'Capacity (m³)' => $warehouse->capacity,
                 'Status' => $warehouse->is_active ? 'Active' : 'Inactive',
                 'Created At' => $warehouse->created_at->format('Y-m-d H:i:s'),
             ];
@@ -337,11 +423,7 @@ class WarehouseController extends Controller
     private function exportPDF(array $rows)
     {
         $filename = 'warehouses_' . date('Y-m-d_His') . '.pdf';
-        $pdf = Pdf::loadView('admin.warehouses.export-pdf', [
-            'rows' => $rows,
-            'generatedAt' => now()->format('F d, Y H:i:s'),
-        ]);
-        return $pdf->download($filename);
+        return GenericPdfExporter::download($rows, $filename, 'Warehouses List');
     }
 
     /**
@@ -374,6 +456,172 @@ class WarehouseController extends Controller
     }
 
     /**
+     * Get warehouse users data for DataTable.
+     */
+    public function usersData(Request $request, Warehouse $warehouse): JsonResponse
+    {
+        $this->authorizePermission('warehouses.view');
+
+        $currentUser = Auth::guard('admin')->user();
+
+        if ($currentUser->isSuperAdmin()) {
+            $query = User::query()
+                ->where('warehouse_id', $warehouse->id)
+                ->with(['creator', 'roles', 'warehouse']);
+        } else {
+            $query = User::query()
+                ->where('warehouse_id', $warehouse->id)
+                ->where('created_by_user_id', $currentUser->id)
+                ->with(['creator', 'roles', 'warehouse']);
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if ($roleId = $request->input('role')) {
+            $query->whereHas('roles', function ($q) use ($roleId) {
+                $q->where('roles.id', $roleId);
+            });
+        }
+
+        if ($request->has('status') && $request->input('status') !== '') {
+            $query->where('is_active', $request->boolean('status'));
+        }
+
+        if ($dateFrom = $request->input('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo = $request->input('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        $total = $query->count();
+
+        $sortField = $request->input('sort', 'created_at');
+        $sortDirection = $request->input('direction', 'desc');
+        $allowedSorts = ['name', 'email', 'created_at', 'last_login_at'];
+
+        if (in_array($sortField, $allowedSorts, true)) {
+            $query->orderBy($sortField, $sortDirection === 'asc' ? 'asc' : 'desc');
+        }
+
+        $perPage = min((int) $request->input('per_page', 10), 100);
+        $page = (int) $request->input('page', 1);
+        $offset = ($page - 1) * $perPage;
+
+        $users = $query->skip($offset)->take($perPage)->get();
+
+        $data = $users->map(function ($user) use ($currentUser) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'roles' => $user->roles->map(fn($role) => ['id' => $role->id, 'name' => $role->name]),
+                'is_active' => $user->is_active,
+                'creator' => $user->creator?->name ?? 'System',
+                'created_at' => $user->created_at->format('d/m/Y, H:i:s'),
+                'last_login_at' => $user->last_login_at?->diffForHumans() ?? 'Never',
+                'can_manage' => $currentUser->canManage($user),
+                'is_self' => $user->id === $currentUser->id,
+                'view_url' => route('admin.admins.show', $user),
+                'edit_url' => route('admin.admins.edit', $user),
+                'update_url' => route('admin.admins.update', $user),
+                'toggle_url' => route('admin.admins.toggle-active', $user),
+            ];
+        });
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => (int) ceil($total / $perPage),
+                'from' => $total > 0 ? $offset + 1 : 0,
+                'to' => min($offset + $perPage, $total),
+            ],
+        ]);
+    }
+
+    /**
+     * Export warehouse users data.
+     */
+    public function usersExport(Request $request, Warehouse $warehouse)
+    {
+        $this->authorizePermission('warehouses.view');
+
+        $currentUser = Auth::guard('admin')->user();
+
+        if ($currentUser->isSuperAdmin()) {
+            $query = User::query()
+                ->where('warehouse_id', $warehouse->id)
+                ->with(['creator', 'roles', 'warehouse']);
+        } else {
+            $query = User::query()
+                ->where('warehouse_id', $warehouse->id)
+                ->where('created_by_user_id', $currentUser->id)
+                ->with(['creator', 'roles', 'warehouse']);
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if ($roleId = $request->input('role')) {
+            $query->whereHas('roles', function ($q) use ($roleId) {
+                $q->where('roles.id', $roleId);
+            });
+        }
+
+        if ($request->has('status') && $request->input('status') !== '') {
+            $query->where('is_active', $request->boolean('status'));
+        }
+
+        if ($dateFrom = $request->input('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo = $request->input('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        $users = $query->latest()->get();
+
+        $rows = $users->map(function ($user) {
+            return [
+                'Name' => $user->name,
+                'Email' => $user->email,
+                'Roles' => $user->roles->pluck('name')->implode(', '),
+                'Status' => $user->is_active ? 'Active' : 'Inactive',
+                'Warehouse' => $user->warehouse?->name ?? 'Unassigned',
+                'Created By' => $user->creator?->name ?? 'System',
+                'Created At' => $user->created_at->format('Y-m-d H:i:s'),
+                'Last Login' => $user->last_login_at?->format('Y-m-d H:i:s') ?? 'Never',
+            ];
+        })->values()->toArray();
+
+        $format = $request->input('format', 'json');
+
+        if ($format === 'excel') {
+            $filename = 'warehouse_users_' . $warehouse->id . '_' . date('Y-m-d_His') . '.xlsx';
+            return Excel::download(new UsersExport($rows), $filename);
+        }
+
+        if ($format === 'pdf') {
+            $filename = 'warehouse_users_' . $warehouse->id . '_' . date('Y-m-d_His') . '.pdf';
+            return GenericPdfExporter::download($rows, $filename, 'Warehouse Users List');
+        }
+
+        return response()->json(['data' => $rows]);
+    }
+
+    /**
      * Check if current admin has permission.
      */
     protected function authorizePermission(string $permission): void
@@ -383,3 +631,4 @@ class WarehouseController extends Controller
         }
     }
 }
+

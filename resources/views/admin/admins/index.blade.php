@@ -7,7 +7,12 @@
 @section('content')
 <div class="space-y-6">
     <!-- Users Datatable -->
-    <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100" x-data="usersTable">
+    <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100"
+         x-data="usersTable"
+         data-endpoint="{{ route('admin.admins.data') }}"
+         data-export-endpoint="{{ route('admin.admins.export') }}"
+         data-store-endpoint="{{ route('admin.admins.store') }}"
+         data-csrf-token="{{ csrf_token() }}">
         <!-- Card Header -->
         <div class="px-6 py-5 border-b border-slate-200/50">
             <div class="flex items-center justify-between">
@@ -252,10 +257,14 @@
                     <template x-for="user in users" :key="user.id">
                         <tr class="hover:bg-slate-50/70">
                             <td x-show="visibleColumns.name" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="user.name"></td>
-                            <td x-show="visibleColumns.role" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600">
+                            <td x-show="visibleColumns.role" class="px-4 py-2.5 text-xs text-slate-600">
                                 <template x-if="user.roles && user.roles.length">
-                                    <span class="inline-flex items-center rounded-full border border-slate-200/50 px-2 py-0.5 text-[10px] font-semibold text-slate-700 bg-white/60 backdrop-blur-sm shadow-sm"
-                                          x-text="user.roles[0].name"></span>
+                                    <div class="flex flex-wrap gap-1">
+                                        <template x-for="role in user.roles" :key="`role-${user.id}-${role.id}`">
+                                            <span class="inline-flex items-center rounded-full border border-slate-200/50 px-2 py-0.5 text-[10px] font-semibold text-slate-700 bg-white/60 backdrop-blur-sm shadow-sm"
+                                                  x-text="role.name"></span>
+                                        </template>
+                                    </div>
                                 </template>
                                 <template x-if="!user.roles || !user.roles.length">
                                     <span>-</span>
@@ -265,53 +274,27 @@
                             <td x-show="visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="user.created_at"></td>
                             <td x-show="visibleColumns.last_login_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="user.last_login_at || '-'"></td>
                             <td x-show="visibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center text-xs font-medium">
-                                <div x-data="{ open: false }" class="relative inline-flex justify-center">
-                                    <button @@click="open = !open" @@click.away="open = false" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                            <circle cx="5" cy="12" r="2"/>
-                                            <circle cx="12" cy="12" r="2"/>
-                                            <circle cx="19" cy="12" r="2"/>
-                                        </svg>
+                                <div class="inline-flex items-center gap-2">
+                                    <a :href="user.view_url"
+                                       class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50">
+                                        View
+                                    </a>
+                                    <button x-show="user.can_manage"
+                                            @@click="openEditModal(user)"
+                                            class="inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 hover:bg-blue-100">
+                                        Edit
                                     </button>
-                                    <div x-show="open"
-                                         x-transition:enter="transition ease-out duration-100"
-                                         x-transition:enter-start="opacity-0 scale-95"
-                                         x-transition:enter-end="opacity-100 scale-100"
-                                         x-transition:leave="transition ease-in duration-75"
-                                         x-transition:leave-start="opacity-100 scale-100"
-                                         x-transition:leave-end="opacity-0 scale-95"
-                                         class="absolute right-0 mt-7 w-40 bg-white/90 backdrop-blur-xl rounded-xl shadow-2xl ring-1 ring-slate-200/50 z-[9999]"
-                                         style="display: none;">
-                                        <div class="py-1">
-                                            <a :href="user.view_url" class="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-white/70 transition-colors">
-                                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                                </svg>
-                                                View
-                                            </a>
-                                            <template x-if="user.can_manage">
-                                                <button @@click="openEditModal(user); open = false" class="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-white/70 transition-colors">
-                                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-                                                    </svg>
-                                                    Edit
-                                                </button>
-                                            </template>
-                                            <template x-if="user.can_manage && !user.is_self">
-                                                <div>
-                                                    <div class="border-t border-slate-100/50 my-1"></div>
-                                                    <button @@click="toggleUserStatus(user); open = false" class="w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors"
-                                                            :class="user.is_active ? 'text-amber-600 hover:bg-amber-50/70' : 'text-emerald-600 hover:bg-emerald-50/70'">
-                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                                                        </svg>
-                                                        <span x-text="user.is_active ? 'Deactivate' : 'Activate'"></span>
-                                                    </button>
-                                                </div>
-                                            </template>
-                                        </div>
-                                    </div>
+                                    <button x-show="user.can_manage && !user.is_self"
+                                            @@click="toggleUserStatus(user)"
+                                            class="inline-flex items-center rounded-lg border px-2 py-1 text-[10px] font-semibold"
+                                            :class="user.is_active ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'"
+                                            x-text="user.is_active ? 'Deactivate' : 'Activate'">
+                                    </button>
+                                    <button x-show="user.can_delete && !user.is_self"
+                                            @@click="openDeleteModal(user)"
+                                            class="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700 hover:bg-red-100">
+                                        Delete
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -420,6 +403,7 @@
         </div>
 
         <!-- User Modal (Create/Edit) -->
+        <template x-teleport="body">
         <div x-show="showModal"
              x-cloak
              class="fixed inset-0 z-[100] overflow-y-auto"
@@ -493,22 +477,24 @@
                             <p x-show="formErrors.email" x-text="formErrors.email" class="mt-1 text-xs text-red-500"></p>
                         </div>
 
-                        <!-- Roles -->
+                        <!-- Role -->
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-2">Assign Roles</label>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Assign Role</label>
                             <div class="space-y-2 max-h-40 overflow-y-auto border border-slate-200/70 rounded-xl p-3 bg-white/50">
                                 @foreach($roles as $role)
                                 <label class="flex items-center cursor-pointer">
-                                    <input type="checkbox"
+                                    <input type="radio"
+                                           name="modal_role_id"
                                            value="{{ $role->id }}"
-                                           :checked="formData.roles.includes({{ $role->id }})"
-                                           @@change="toggleRole({{ $role->id }})"
-                                           class="h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300 rounded">
+                                           x-model.number="formData.role_id"
+                                           class="h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300">
                                     <span class="ml-2 text-sm text-slate-700">{{ $role->name }}</span>
                                 </label>
                                 @endforeach
                             </div>
-                            <p x-show="formErrors.roles" x-text="formErrors.roles" class="mt-1 text-xs text-red-500"></p>
+                            <p x-show="formErrors.role_id || formErrors.roles"
+                               x-text="formErrors.role_id || formErrors.roles"
+                               class="mt-1 text-xs text-red-500"></p>
                         </div>
 
                         <!-- Status (Edit mode only, not for self) -->
@@ -596,626 +582,79 @@
                 </div>
             </div>
         </div>
+        </template>
+
+        <!-- Delete Confirmation Modal -->
+        <template x-teleport="body">
+        <div x-show="showDeleteModal"
+             x-cloak
+             class="fixed inset-0 z-[110] overflow-y-auto"
+             @@keydown.escape.window="closeDeleteModal()">
+            <div x-show="showDeleteModal"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
+                 @@click="closeDeleteModal()"></div>
+
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div x-show="showDeleteModal"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-150"
+                     x-transition:leave-start="opacity-100 scale-100"
+                     x-transition:leave-end="opacity-0 scale-95"
+                     @@click.stop
+                     class="relative w-full max-w-md rounded-2xl border border-slate-200/60 bg-white/95 p-6 shadow-2xl backdrop-blur-xl">
+                    <div class="flex items-start gap-4">
+                        <div class="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-700">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-1.414-1.414A2 2 0 0015.536 3H8.464a2 2 0 00-1.414.586L5.636 5M4 7h16M10 11v6m4-6v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12"/>
+                            </svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <h3 class="text-base font-semibold text-slate-900">Delete user</h3>
+                            <p class="mt-1 text-sm text-slate-600">
+                                This action will permanently remove this user account.
+                            </p>
+                            <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2">
+                                <p class="text-xs font-medium text-slate-500">User</p>
+                                <p class="mt-0.5 text-sm font-semibold text-slate-900" x-text="deletingUser?.name || '-'"></p>
+                                <p class="text-xs text-slate-600" x-text="deletingUser?.email || ''"></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex items-center justify-end gap-3">
+                        <button type="button"
+                                @@click="closeDeleteModal()"
+                                :disabled="deleting"
+                                class="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-60 disabled:cursor-not-allowed">
+                            Cancel
+                        </button>
+                        <button type="button"
+                                @@click="deleteUser()"
+                                :disabled="deleting"
+                                class="inline-flex items-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed">
+                            <span x-show="!deleting">Delete User</span>
+                            <span x-show="deleting" class="inline-flex items-center gap-2">
+                                <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                                Deleting...
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </template>
     </div>
 </div>
 
-@push('scripts')
-<script>
-window.usersTableConfig = {
-    endpoint: @json(route('admin.admins.data')),
-    exportEndpoint: @json(route('admin.admins.export')),
-    storeEndpoint: @json(route('admin.admins.store')),
-    csrfToken: @json(csrf_token())
-};
-
-document.addEventListener('alpine:init', () => {
-    Alpine.data('usersTable', () => ({
-        endpoint: window.usersTableConfig.endpoint,
-        exportEndpoint: window.usersTableConfig.exportEndpoint,
-        storeEndpoint: window.usersTableConfig.storeEndpoint,
-        csrfToken: window.usersTableConfig.csrfToken,
-        users: [],
-        meta: {
-            current_page: 1,
-            from: 0,
-            to: 0,
-            total: 0,
-            last_page: 1,
-        },
-        loading: false,
-        search: '',
-        roleFilter: '',
-        roleFilterName: 'All roles',
-        statusFilter: '',
-        createdFrom: '',
-        createdTo: '',
-        dateRangePicker: null,
-        perPage: 50,
-        sortBy: 'created_at',
-        sortDirection: 'desc',
-        columns: [
-            { key: 'name', label: 'Name' },
-            { key: 'role', label: 'Role' },
-            { key: 'email', label: 'Email' },
-            { key: 'created_at', label: 'Created At' },
-            { key: 'last_login_at', label: 'Last Login' },
-            { key: 'actions', label: 'Actions' },
-        ],
-        visibleColumns: {
-            name: true,
-            role: true,
-            email: true,
-            created_at: true,
-            last_login_at: true,
-            actions: true,
-        },
-
-        // Modal state
-        showModal: false,
-        modalMode: 'create',
-        editingUser: null,
-        submitting: false,
-        changePassword: false,
-        exporting: false,
-        formData: {
-            name: '',
-            email: '',
-            roles: [],
-            is_active: '1',
-            password: '',
-            password_confirmation: '',
-        },
-        formErrors: {},
-
-        init() {
-            this.initDateRange();
-            this.loadData();
-        },
-
-        // Modal methods
-        openCreateModal() {
-            this.modalMode = 'create';
-            this.editingUser = null;
-            this.changePassword = false;
-            this.formData = {
-                name: '',
-                email: '',
-                roles: [],
-                is_active: '1',
-                password: '',
-                password_confirmation: '',
-            };
-            this.formErrors = {};
-            this.showModal = true;
-        },
-
-        openEditModal(user) {
-            this.modalMode = 'edit';
-            this.editingUser = user;
-            this.changePassword = false;
-            this.formData = {
-                name: user.name,
-                email: user.email,
-                roles: user.roles ? user.roles.map(r => r.id) : [],
-                is_active: user.is_active ? '1' : '0',
-                password: '',
-                password_confirmation: '',
-            };
-            this.formErrors = {};
-            this.showModal = true;
-        },
-
-        closeModal() {
-            this.showModal = false;
-            this.editingUser = null;
-            this.formErrors = {};
-        },
-
-        toggleRole(roleId) {
-            const index = this.formData.roles.indexOf(roleId);
-            if (index > -1) {
-                this.formData.roles.splice(index, 1);
-            } else {
-                this.formData.roles.push(roleId);
-            }
-        },
-
-        async submitForm() {
-            this.submitting = true;
-            this.formErrors = {};
-
-            try {
-                const url = this.modalMode === 'create'
-                    ? this.storeEndpoint
-                    : this.editingUser.edit_url.replace('/edit', '');
-
-                const method = this.modalMode === 'create' ? 'POST' : 'PUT';
-
-                const body = {
-                    name: this.formData.name,
-                    email: this.formData.email,
-                    roles: this.formData.roles,
-                };
-
-                if (this.modalMode === 'edit' && !this.editingUser?.is_self) {
-                    body.is_active = this.formData.is_active;
-                }
-
-                if (this.modalMode === 'create' || this.changePassword) {
-                    body.password = this.formData.password;
-                    body.password_confirmation = this.formData.password_confirmation;
-                }
-
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': this.csrfToken,
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    body: JSON.stringify(body),
-                });
-
-                const result = await response.json();
-
-                if (!response.ok) {
-                    if (response.status === 422 && result.errors) {
-                        this.formErrors = {};
-                        for (const [key, messages] of Object.entries(result.errors)) {
-                            this.formErrors[key] = messages[0];
-                        }
-                    } else {
-                        this.formErrors.general = result.message || 'An error occurred';
-                    }
-                    return;
-                }
-
-                this.closeModal();
-                this.loadData();
-
-            } catch (error) {
-                console.error('Form submission error:', error);
-                this.formErrors.general = 'An unexpected error occurred';
-            } finally {
-                this.submitting = false;
-            }
-        },
-
-        async loadData() {
-            this.loading = true;
-            try {
-                const params = new URLSearchParams({
-                    page: this.meta.current_page,
-                    per_page: this.perPage,
-                    sort: this.sortBy,
-                    direction: this.sortDirection,
-                });
-
-                if (this.search) params.append('search', this.search);
-                if (this.roleFilter) params.append('role', this.roleFilter);
-                if (this.createdFrom) params.append('date_from', this.createdFrom);
-                if (this.createdTo) params.append('date_to', this.createdTo);
-
-                const response = await fetch(this.endpoint + '?' + params.toString(), {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-
-                if (!response.ok) throw new Error('Failed to fetch data');
-
-                const result = await response.json();
-                this.users = result.data;
-                this.meta = {
-                    current_page: result.meta.current_page,
-                    from: result.meta.from,
-                    to: result.meta.to,
-                    total: result.meta.total,
-                    last_page: result.meta.last_page,
-                };
-            } catch (error) {
-                console.error('Error loading users:', error);
-            } finally {
-                this.loading = false;
-            }
-        },
-
-        sort(column) {
-            if (this.sortBy === column) {
-                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                this.sortBy = column;
-                this.sortDirection = 'asc';
-            }
-            this.loadData();
-        },
-
-        toggleColumn(key) {
-            this.visibleColumns[key] = !this.visibleColumns[key];
-        },
-
-        visibleColumnCount() {
-            return Object.values(this.visibleColumns).filter(Boolean).length;
-        },
-
-        initDateRange() {
-            if (!this.$refs.createdRange) return;
-
-            const setupPicker = () => {
-                if (!window.$ || !window.moment || !window.$.fn.daterangepicker) return;
-
-                const $input = window.$(this.$refs.createdRange);
-
-                $input.daterangepicker({
-                    autoUpdateInput: false,
-                    alwaysShowCalendars: true,
-                    opens: 'right',
-                    locale: {
-                        format: 'YYYY-MM-DD',
-                        cancelLabel: 'Clear',
-                    },
-                    ranges: {
-                        'Today': [window.moment(), window.moment()],
-                        'Yesterday': [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
-                        'Last 7 Days': [window.moment().subtract(6, 'days'), window.moment()],
-                        'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
-                        'This Month': [window.moment().startOf('month'), window.moment().endOf('month')],
-                        'Last Month': [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
-                    },
-                });
-
-                $input.on('apply.daterangepicker', (ev, picker) => {
-                    this.createdFrom = picker.startDate.format('YYYY-MM-DD');
-                    this.createdTo = picker.endDate.format('YYYY-MM-DD');
-                    $input.val(this.createdFrom + ' - ' + this.createdTo);
-                    this.loadData();
-                });
-
-                $input.on('cancel.daterangepicker', () => {
-                    this.clearDateFilter();
-                });
-
-                this.dateRangePicker = $input.data('daterangepicker');
-            };
-
-            if (window.$ && window.moment && window.$.fn.daterangepicker) {
-                setupPicker();
-                return;
-            }
-
-            // Load from CDN
-            const cssId = 'daterangepicker-css';
-            if (!document.getElementById(cssId)) {
-                const link = document.createElement('link');
-                link.id = cssId;
-                link.rel = 'stylesheet';
-                link.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
-                document.head.appendChild(link);
-            }
-
-            const loadScript = (id, src) => new Promise((resolve) => {
-                if (document.getElementById(id)) return resolve();
-                const script = document.createElement('script');
-                script.id = id;
-                script.src = src;
-                script.onload = () => resolve();
-                document.body.appendChild(script);
-            });
-
-            loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
-                .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
-                .then(() => loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js'))
-                .then(() => {
-                    window.$ = window.jQuery = window.$ || window.jQuery;
-                    window.moment = window.moment || moment;
-                    setupPicker();
-                });
-        },
-
-        clearDateFilter() {
-            this.createdFrom = '';
-            this.createdTo = '';
-            if (this.dateRangePicker) {
-                this.dateRangePicker.setStartDate(window.moment());
-                this.dateRangePicker.setEndDate(window.moment());
-            }
-            if (this.$refs.createdRange) {
-                this.$refs.createdRange.value = '';
-            }
-            this.loadData();
-        },
-
-        nextPage() {
-            if (this.meta.current_page < this.meta.last_page) {
-                this.meta.current_page++;
-                this.loadData();
-            }
-        },
-
-        firstPage() {
-            if (this.meta.current_page !== 1) {
-                this.meta.current_page = 1;
-                this.loadData();
-            }
-        },
-
-        lastPage() {
-            if (this.meta.current_page !== this.meta.last_page) {
-                this.meta.current_page = this.meta.last_page;
-                this.loadData();
-            }
-        },
-
-        previousPage() {
-            if (this.meta.current_page > 1) {
-                this.meta.current_page--;
-                this.loadData();
-            }
-        },
-
-        async toggleUserStatus(user) {
-            if (user.is_self) return;
-
-            try {
-                const response = await fetch(user.toggle_url, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': this.csrfToken,
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-
-                if (response.ok) {
-                    this.loadData();
-                }
-            } catch (err) {
-                console.error('Failed to update user status:', err);
-            }
-        },
-
-        async exportData(format) {
-            this.exporting = true;
-
-            try {
-                const params = new URLSearchParams();
-                if (this.search) params.append('search', this.search);
-                if (this.roleFilter) params.append('role', this.roleFilter);
-                if (this.statusFilter !== '' && this.statusFilter !== null) {
-                    params.append('status', this.statusFilter);
-                }
-                params.append('format', format);
-
-                // For Excel and PDF, download directly
-                if (format === 'excel' || format === 'pdf') {
-                    var url = this.exportEndpoint + '?' + params.toString();
-                    window.location.href = url;
-                    setTimeout(() => { this.exporting = false; }, 1000);
-                    return;
-                }
-
-                // For CSV, fetch data and generate client-side
-                const response = await fetch(this.exportEndpoint + '?' + params.toString(), {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-
-                if (!response.ok) throw new Error('Export failed');
-
-                const result = await response.json();
-
-                if (format === 'csv') {
-                    this.downloadCSV(result.data);
-                }
-            } catch (err) {
-                console.error('Export failed:', err);
-                alert('Export failed. Please try again.');
-            } finally {
-                this.exporting = false;
-            }
-        },
-
-        async printData() {
-            try {
-                const params = new URLSearchParams();
-                if (this.search) params.append('search', this.search);
-                if (this.roleFilter) params.append('role', this.roleFilter);
-                if (this.statusFilter !== '' && this.statusFilter !== null) {
-                    params.append('status', this.statusFilter);
-                }
-
-                const response = await fetch(this.exportEndpoint + '?' + params.toString(), {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-
-                if (!response.ok) throw new Error('Failed to fetch data');
-
-                const result = await response.json();
-                this.openPrintWindow(result.data);
-            } catch (err) {
-                console.error('Print failed:', err);
-                alert('Print failed. Please try again.');
-            }
-        },
-
-        openPrintWindow(data) {
-            if (!data.length) {
-                alert('No data to print');
-                return;
-            }
-
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                alert('Pop-up blocked. Please allow pop-ups to print.');
-                return;
-            }
-            const doc = printWindow.document;
-            const headers = Object.keys(data[0]);
-
-            if (!doc.documentElement) {
-                doc.appendChild(doc.createElement('html'));
-            }
-            if (!doc.head) {
-                doc.documentElement.appendChild(doc.createElement('head'));
-            }
-            if (!doc.body) {
-                doc.documentElement.appendChild(doc.createElement('body'));
-            }
-            doc.title = 'Users Export';
-            doc.body.innerHTML = '';
-
-            const style = doc.createElement('style');
-            style.textContent = [
-                'body { font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 20px; }',
-                'h1 { font-size: 24px; margin-bottom: 20px; color: #1e293b; }',
-                'table { width: 100%; border-collapse: collapse; margin-top: 20px; }',
-                'th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; font-size: 12px; }',
-                'th { background-color: #f1f5f9; font-weight: 600; color: #475569; }',
-                'tr:nth-child(even) { background-color: #f8fafc; }',
-            ].join('\n');
-            doc.head.appendChild(style);
-
-            const title = doc.createElement('h1');
-            title.textContent = 'Users List';
-            doc.body.appendChild(title);
-
-            const meta = doc.createElement('p');
-            meta.style.color = '#64748b';
-            meta.style.fontSize = '14px';
-            meta.style.marginBottom = '20px';
-            meta.textContent = `Generated on ${new Date().toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-            })}`;
-            doc.body.appendChild(meta);
-
-            const table = doc.createElement('table');
-            const thead = doc.createElement('thead');
-            const headRow = doc.createElement('tr');
-            headers.forEach((header) => {
-                const th = doc.createElement('th');
-                th.textContent = header;
-                headRow.appendChild(th);
-            });
-            thead.appendChild(headRow);
-            table.appendChild(thead);
-
-            const tbody = doc.createElement('tbody');
-            data.forEach((row) => {
-                const tr = doc.createElement('tr');
-                headers.forEach((header) => {
-                    const td = doc.createElement('td');
-                    const value = row[header];
-                    td.textContent = value === null || value === undefined || value === '' ? '-' : String(value);
-                    tr.appendChild(td);
-                });
-                tbody.appendChild(tr);
-            });
-            table.appendChild(tbody);
-            doc.body.appendChild(table);
-
-            setTimeout(function() { printWindow.print(); }, 250);
-        },
-
-        downloadCSV(data) {
-            if (!data.length) return;
-
-            const headers = Object.keys(data[0]);
-            let csvContent = headers.join(',') + '\n';
-
-            data.forEach(row => {
-                const rowData = headers.map(header => {
-                    let cell = row[header] ?? '';
-                    cell = String(cell).replace(/"/g, '""');
-                    return '"' + cell + '"';
-                });
-                csvContent += rowData.join(',') + '\n';
-            });
-
-            this.downloadFile(csvContent, 'users.csv', 'text/csv');
-        },
-
-        downloadFile(content, filename, type) {
-            const blob = new Blob([content], { type: type });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        },
-    }));
-});
-</script>
-@endpush
-
-@push('styles')
-<style>
-    .daterangepicker {
-        border-radius: 20px;
-        border: 1px solid rgba(148, 163, 184, 0.45);
-        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
-        overflow: hidden;
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
-        background: rgba(255, 255, 255, 0.86);
-    }
-    .daterangepicker .drp-buttons {
-        border-top: 1px solid rgba(148, 163, 184, 0.25);
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(12px);
-    }
-    .daterangepicker .ranges li.active,
-    .daterangepicker .ranges li:hover {
-        background: rgba(59, 130, 246, 0.18);
-        color: #1f2937;
-        border-radius: 999px;
-        margin: 4px 8px;
-    }
-    .daterangepicker .ranges li {
-        border-radius: 999px;
-        padding: 8px 14px;
-        margin: 4px 8px;
-    }
-    .daterangepicker td.active,
-    .daterangepicker td.active:hover {
-        background: #3b82f6;
-        border-radius: 10px;
-    }
-    .daterangepicker td.in-range {
-        background: rgba(59, 130, 246, 0.15);
-    }
-    .daterangepicker .calendar-table {
-        background: transparent;
-    }
-    .daterangepicker .drp-selected {
-        color: #1f2937;
-        font-weight: 600;
-    }
-    .daterangepicker .applyBtn {
-        border-radius: 999px;
-        padding: 6px 18px;
-        background: #3b82f6;
-        border: 0;
-    }
-    .daterangepicker .cancelBtn {
-        border-radius: 999px;
-        padding: 6px 18px;
-        background: transparent;
-    }
-</style>
-@endpush
 @endsection
+

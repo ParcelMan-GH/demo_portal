@@ -30,6 +30,7 @@ class User extends Authenticatable
         'last_login_at',
         'last_permission_cache_at',
         'created_by_user_id',
+        'warehouse_id',
     ];
 
     /**
@@ -55,6 +56,7 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'last_login_at' => 'datetime',
             'last_permission_cache_at' => 'datetime',
+            'warehouse_id' => 'integer',
         ];
     }
 
@@ -80,11 +82,27 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the warehouse this user belongs to.
+     */
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
+    }
+
+    /**
      * Get the users created by this user.
      */
     public function createdUsers(): HasMany
     {
         return $this->hasMany(User::class, 'created_by_user_id');
+    }
+
+    /**
+     * Audit logs created by this user.
+     */
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AdminAuditLog::class);
     }
 
     // =====================
@@ -178,7 +196,8 @@ class User extends Authenticatable
             ? Role::where('slug', $role)->firstOrFail()
             : $role;
 
-        $this->roles()->syncWithoutDetaching([
+        // Enforce one-role-per-user by replacing any existing role assignment.
+        $this->roles()->sync([
             $role->id => [
                 'assigned_at' => now(),
                 'assigned_by' => auth('admin')->id()
@@ -206,15 +225,23 @@ class User extends Authenticatable
      */
     public function syncRoles(array $roleIds): void
     {
-        $syncData = [];
-        foreach ($roleIds as $roleId) {
-            $syncData[$roleId] = [
-                'assigned_at' => now(),
-                'assigned_by' => auth('admin')->id()
-            ];
+        $firstRoleId = collect($roleIds)
+            ->filter(fn($id) => !is_null($id) && $id !== '')
+            ->map(fn($id) => (int) $id)
+            ->first();
+
+        if (!$firstRoleId) {
+            $this->roles()->sync([]);
+            $this->flushPermissionCache();
+            return;
         }
 
-        $this->roles()->sync($syncData);
+        $this->roles()->sync([
+            $firstRoleId => [
+                'assigned_at' => now(),
+                'assigned_by' => auth('admin')->id()
+            ]
+        ]);
         $this->flushPermissionCache();
     }
 

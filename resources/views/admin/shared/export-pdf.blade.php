@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Vendors Export</title>
+    <title>{{ $title }}</title>
     <style>
         body {
             font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -38,16 +38,22 @@
         tr:nth-child(even) {
             background-color: #f8fafc;
         }
+        .empty {
+            margin-top: 12px;
+            color: #64748b;
+            font-size: 11px;
+        }
     </style>
 </head>
 <body>
-    <h1>Vendors List</h1>
+    <h1>{{ $title }}</h1>
     <div class="meta">Generated on {{ $generatedAt }}</div>
-    <table>
-        @if(!empty($rows))
+
+    @if(!empty($rows) && !empty($headers))
+        <table>
             <thead>
                 <tr>
-                    @foreach(array_keys($rows[0]) as $header)
+                    @foreach($headers as $header)
                         <th>{{ $header }}</th>
                     @endforeach
                 </tr>
@@ -55,13 +61,16 @@
             <tbody>
                 @foreach($rows as $row)
                     <tr>
-                        @foreach($row as $cell)
-                            <td>{{ $cell }}</td>
+                        @foreach($headers as $header)
+                            <td>{{ $row[$header] ?? '' }}</td>
                         @endforeach
                     </tr>
                 @endforeach
             </tbody>
-        @endif
-    </table>
+        </table>
+    @else
+        <p class="empty">No records found.</p>
+    @endif
 </body>
 </html>
+

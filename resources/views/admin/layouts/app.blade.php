@@ -133,27 +133,66 @@
                     </div>
                 </div>
 
-                @hasPermission('warehouses.view')
-                <a href="{{ route('admin.warehouses.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.warehouses.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
-                        </svg>
-                    </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Warehouses</span>
-                    <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Warehouses</span>
-                    </template>
-                </a>
-                @endhasPermission
-
                 @php
-                    $canSeeUsers = Auth::guard('admin')->user()->hasPermission('users.view');
+                    $canSeeWarehouses = Auth::guard('admin')->user()->hasPermission('warehouses.view');
                     $canSeeRoles = Auth::guard('admin')->user()->hasPermission('roles.view');
-                    $userMgmtActive = request()->routeIs('admin.admins.*') || request()->routeIs('admin.roles.*');
+                    $isWarehouseRoleContext = request()->routeIs('admin.roles.warehouse.*')
+                        || (request()->routeIs('admin.roles.*') && request()->query('scope') === 'warehouse');
+                    $warehouseMgmtActive = request()->routeIs('admin.warehouses.*') || $isWarehouseRoleContext;
+                    $canSeeUsers = Auth::guard('admin')->user()->hasPermission('users.view');
+                    $systemRolesActive = request()->routeIs('admin.roles.*') && !$isWarehouseRoleContext;
+                    $userMgmtActive = request()->routeIs('admin.admins.*') || $systemRolesActive;
                 @endphp
+                @if($canSeeWarehouses || $canSeeRoles)
+                <div x-data="{ expanded: {{ $warehouseMgmtActive ? 'true' : 'false' }} }" class="relative">
+                    <button @click="expanded = !expanded"
+                            class="summary-item nav-item relative w-full flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ $warehouseMgmtActive ? 'active text-white' : '' }} cursor-pointer"
+                            :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                        <div class="nav-icon-wrap">
+                            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
+                            </svg>
+                        </div>
+                        <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300"
+                              :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Warehouse Management</span>
+                        <span x-show="!sidebarCollapsed"
+                              class="ml-auto flex items-center justify-center w-5 h-5 rounded-md text-slate-400 transition-all duration-200">
+                            <svg class="w-4 h-4 transition-transform duration-200" :class="expanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </span>
+                        <template x-if="sidebarCollapsed">
+                            <span class="sidebar-tooltip">Warehouse Management</span>
+                        </template>
+                    </button>
+
+                    <div x-show="expanded && !sidebarCollapsed"
+                         x-cloak
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 -translate-y-2"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         x-transition:leave="transition ease-in duration-150"
+                         x-transition:leave-start="opacity-100 translate-y-0"
+                         x-transition:leave-end="opacity-0 -translate-y-2"
+                         class="mt-1 ml-5 pl-4 border-l border-white/10 space-y-1">
+                        @if($canSeeWarehouses)
+                        <a href="{{ route('admin.warehouses.index') }}"
+                           class="flex items-center gap-2 py-1.5 px-3 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-all {{ request()->routeIs('admin.warehouses.*') ? 'text-white bg-white/5' : '' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request()->routeIs('admin.warehouses.*') ? 'bg-primary-400' : 'bg-slate-500' }}"></span>
+                            <span class="text-[12px] font-medium">Warehouses</span>
+                        </a>
+                        @endif
+                        @if($canSeeRoles)
+                        <a href="{{ route('admin.roles.warehouse.index') }}"
+                           class="flex items-center gap-2 py-1.5 px-3 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-all {{ $isWarehouseRoleContext ? 'text-white bg-white/5' : '' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ $isWarehouseRoleContext ? 'bg-primary-400' : 'bg-slate-500' }}"></span>
+                            <span class="text-[12px] font-medium">Warehouse Roles</span>
+                        </a>
+                        @endif
+                    </div>
+                </div>
+                @endif
+
                 @if($canSeeUsers || $canSeeRoles)
                 <div x-data="{ expanded: {{ $userMgmtActive ? 'true' : 'false' }} }" class="relative">
                     <button @click="expanded = !expanded"
@@ -195,9 +234,9 @@
                         @endif
                         @if($canSeeRoles)
                         <a href="{{ route('admin.roles.index') }}"
-                           class="flex items-center gap-2 py-1.5 px-3 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-all {{ request()->routeIs('admin.roles.*') ? 'text-white bg-white/5' : '' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->routeIs('admin.roles.*') ? 'bg-primary-400' : 'bg-slate-500' }}"></span>
-                            <span class="text-[12px] font-medium">Roles</span>
+                           class="flex items-center gap-2 py-1.5 px-3 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-all {{ $systemRolesActive ? 'text-white bg-white/5' : '' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ $systemRolesActive ? 'bg-primary-400' : 'bg-slate-500' }}"></span>
+                            <span class="text-[12px] font-medium">System Roles</span>
                         </a>
                         @endif
                     </div>
@@ -454,58 +493,14 @@
 
             <!-- Page Content -->
             <main class="flex-1 p-4 lg:p-6">
-                <!-- Flash Messages -->
-                @if(session('success'))
-                    <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)"
-                         x-transition:enter="transition ease-out duration-300"
-                         x-transition:enter-start="opacity-0 transform -translate-y-2"
-                         x-transition:enter-end="opacity-100 transform translate-y-0"
-                         x-transition:leave="transition ease-in duration-200"
-                         x-transition:leave-start="opacity-100"
-                         x-transition:leave-end="opacity-0"
-                         class="mb-4 flex items-center p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl">
-                        <div class="flex-shrink-0 w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center mr-3">
-                            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                            </svg>
-                        </div>
-                        <span class="flex-1 text-sm font-medium">{{ session('success') }}</span>
-                        <button @click="show = false" class="ml-3 p-1 rounded-lg hover:bg-emerald-100 transition-colors">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                            </svg>
-                        </button>
-                    </div>
-                @endif
-
-                @if(session('error'))
-                    <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)"
-                         x-transition:enter="transition ease-out duration-300"
-                         x-transition:enter-start="opacity-0 transform -translate-y-2"
-                         x-transition:enter-end="opacity-100 transform translate-y-0"
-                         x-transition:leave="transition ease-in duration-200"
-                         x-transition:leave-start="opacity-100"
-                         x-transition:leave-end="opacity-0"
-                         class="mb-4 flex items-center p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl">
-                        <div class="flex-shrink-0 w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-3">
-                            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </div>
-                        <span class="flex-1 text-sm font-medium">{{ session('error') }}</span>
-                        <button @click="show = false" class="ml-3 p-1 rounded-lg hover:bg-red-100 transition-colors">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                            </svg>
-                        </button>
-                    </div>
-                @endif
-
                 @yield('content')
             </main>
         </div>
     </div>
+    <div id="admin-toast-container"
+         class="fixed top-5 right-5 z-[120] flex w-full max-w-sm flex-col gap-3 pointer-events-none"
+         data-flash-success="{{ session('success') }}"
+         data-flash-error="{{ session('error') }}"></div>
     @stack('scripts')
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
 </body>
 </html>

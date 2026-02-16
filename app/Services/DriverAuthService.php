@@ -112,7 +112,7 @@ class DriverAuthService
             'base_location' => $driver->base_location,
             'status' => $driver->status,
             'is_active' => $driver->is_active,
-            'task_capabilities' => $driver->task_capabilities,
+            'task_capabilities' => $driver->getCapabilities(),
         ];
     }
 }

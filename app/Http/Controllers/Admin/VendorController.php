@@ -9,7 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\OtpCode;
 use App\Models\Vendor;
 use App\Models\VendorActivityLog;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\GenericPdfExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -524,11 +524,7 @@ class VendorController extends Controller
     private function exportPDF(array $rows)
     {
         $filename = 'vendors_' . date('Y-m-d_His') . '.pdf';
-        $pdf = Pdf::loadView('admin.vendors.export-pdf', [
-            'rows' => $rows,
-            'generatedAt' => now()->format('F d, Y H:i:s'),
-        ]);
-        return $pdf->download($filename);
+        return GenericPdfExporter::download($rows, $filename, 'Vendors List');
     }
 
     /**

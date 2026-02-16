@@ -11,6 +11,16 @@ class Driver extends Authenticatable
 {
     use HasApiTokens;
 
+    public const CAPABILITY_PICKUP = 'pickup';
+    public const CAPABILITY_TRANSPORT = 'transport';
+    public const CAPABILITY_DELIVERY = 'delivery';
+
+    public const CAPABILITIES = [
+        self::CAPABILITY_PICKUP,
+        self::CAPABILITY_TRANSPORT,
+        self::CAPABILITY_DELIVERY,
+    ];
+
     protected $fillable = [
         'name',
         'email',
@@ -36,6 +46,32 @@ class Driver extends Authenticatable
         'task_capabilities' => 'array',
         'last_login_at' => 'datetime',
     ];
+
+    /**
+     * Get normalized driver capabilities.
+     *
+     * @return array<int, string>
+     */
+    public function getCapabilities(): array
+    {
+        $raw = $this->task_capabilities;
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            static fn ($value) => is_string($value) ? strtolower(trim($value)) : null,
+            $raw
+        ), static fn ($value) => in_array($value, self::CAPABILITIES, true))));
+    }
+
+    /**
+     * Check whether driver can handle a given assignment capability.
+     */
+    public function hasCapability(string $capability): bool
+    {
+        return in_array(strtolower($capability), $this->getCapabilities(), true);
+    }
 
     /**
      * Activity logs for this driver.

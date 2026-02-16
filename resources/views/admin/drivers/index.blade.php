@@ -723,6 +723,53 @@
                                 </div>
                             </div>
 
+                            <!-- Task Capabilities -->
+                            <div class="bg-slate-50/50 rounded-2xl p-5 border border-slate-200">
+                                <div class="flex items-center justify-between gap-3 mb-3">
+                                    <div>
+                                        <h4 class="text-sm font-bold text-slate-800">Driver Capabilities</h4>
+                                        <p class="text-xs text-slate-500">Select what this driver is allowed to handle.</p>
+                                    </div>
+                                    <span class="text-xs font-semibold text-slate-600" x-text="(form.task_capabilities || []).length + ' selected'"></span>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                        <input type="checkbox"
+                                               value="pickup"
+                                               x-model="form.task_capabilities"
+                                               :disabled="modalMode === 'view'"
+                                               class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500">
+                                        <span class="text-sm font-medium text-slate-700">Pickup</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                        <input type="checkbox"
+                                               value="transport"
+                                               x-model="form.task_capabilities"
+                                               :disabled="modalMode === 'view'"
+                                               class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500">
+                                        <span class="text-sm font-medium text-slate-700">Transport</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                        <input type="checkbox"
+                                               value="delivery"
+                                               x-model="form.task_capabilities"
+                                               :disabled="modalMode === 'view'"
+                                               class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500">
+                                        <span class="text-sm font-medium text-slate-700">Delivery</span>
+                                    </label>
+                                </div>
+
+                                <template x-if="errors.task_capabilities">
+                                    <p class="mt-2 text-xs text-rose-600 flex items-center gap-1">
+                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                        </svg>
+                                        <span x-text="errors.task_capabilities[0]"></span>
+                                    </p>
+                                </template>
+                            </div>
+
                             <!-- Status Toggle -->
                             <div x-show="modalMode !== 'view'" class="bg-slate-50/50 rounded-2xl p-5 border border-slate-200">
                                 <div class="flex items-center justify-between">

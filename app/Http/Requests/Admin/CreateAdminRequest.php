@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\Role;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
@@ -25,8 +26,10 @@ class CreateAdminRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'roles' => ['nullable', 'array'],
+            'role_id' => ['nullable', 'exists:roles,id'],
+            'roles' => ['nullable', 'array', 'max:1'],
             'roles.*' => ['exists:roles,id'],
+            'warehouse_id' => ['nullable', 'exists:warehouses,id'],
         ];
     }
 
@@ -35,7 +38,51 @@ class CreateAdminRequest extends FormRequest
      */
     public function withValidator($validator): void
     {
-        // No additional validation needed
+        $validator->after(function ($validator) {
+            $selectedRoleId = $this->selectedRoleId();
+
+            if (!$selectedRoleId) {
+                $validator->errors()->add('role_id', 'A role is required.');
+                return;
+            }
+
+            $hasWarehouse = $this->filled('warehouse_id');
+
+            if ($hasWarehouse) {
+                $isWarehouseRole = Role::query()
+                    ->whereKey($selectedRoleId)
+                    ->warehouseRoles()
+                    ->exists();
+
+                if (!$isWarehouseRole) {
+                    $validator->errors()->add('role_id', 'Warehouse users can only be assigned warehouse roles.');
+                }
+                return;
+            }
+
+            $isWarehouseRole = Role::query()
+                ->whereKey($selectedRoleId)
+                ->warehouseRoles()
+                ->exists();
+
+            if ($isWarehouseRole) {
+                $validator->errors()->add('role_id', 'System users cannot be assigned warehouse roles.');
+            }
+        });
+    }
+
+    private function selectedRoleId(): ?int
+    {
+        if ($this->filled('role_id')) {
+            return (int) $this->input('role_id');
+        }
+
+        $roles = array_values(array_filter((array) $this->input('roles')));
+        if (empty($roles)) {
+            return null;
+        }
+
+        return (int) $roles[0];
     }
 
     /**

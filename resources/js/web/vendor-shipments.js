@@ -492,6 +492,7 @@ function vendorShipmentFormPage() {
     return {
         loading: true,
         saving: false,
+        step: 1,
         mode: 'create',
         shipmentId: null,
         alert: null,
@@ -502,6 +503,12 @@ function vendorShipmentFormPage() {
         pickupDistricts: [],
         deliveryDistricts: [],
         form: emptyShipmentForm(),
+        pickupSearchQuery: '',
+        pickupSearchResults: [],
+        pickupSearching: false,
+        deliverySearchQuery: '',
+        deliverySearchResults: [],
+        deliverySearching: false,
 
         async init() {
             this.mode = this.$el.dataset.mode || 'create';
@@ -525,6 +532,109 @@ function vendorShipmentFormPage() {
             return this.mode === 'edit';
         },
 
+        get totalSteps() {
+            return this.form.destination_mode === 'single' ? 4 : 3;
+        },
+
+        get reviewStep() {
+            return this.form.destination_mode === 'single' ? 4 : 3;
+        },
+
+        stepLabel(s) {
+            const labels = {
+                1: 'Shipment Type',
+                2: 'Pickup Info',
+            };
+            if (this.form.destination_mode === 'single') {
+                labels[3] = 'Delivery Info';
+                labels[4] = 'Review & Submit';
+            } else {
+                labels[3] = 'Review & Submit';
+            }
+            return labels[s] || '';
+        },
+
+        goToStep(target) {
+            if (target <= this.step) {
+                this.step = target;
+                return;
+            }
+
+            if (this.step === 1) {
+                // No validation needed on step 1, just a selection
+                this.step = target;
+                return;
+            }
+
+            if (this.step === 2) {
+                const errors = this.validatePickup();
+                if (errors.length) {
+                    errors.forEach((msg) => window.vendorToast('error', msg));
+                    return;
+                }
+                this.step = target;
+                return;
+            }
+
+            if (this.step === 3 && this.form.destination_mode === 'single') {
+                const errors = this.validateDelivery();
+                if (errors.length) {
+                    errors.forEach((msg) => window.vendorToast('error', msg));
+                    return;
+                }
+                this.step = target;
+                return;
+            }
+
+            this.step = target;
+        },
+
+        validatePickup() {
+            const errors = [];
+            if (!this.form.pickup_contact_name.trim()) {
+                errors.push('Pickup contact name is required.');
+            }
+            const phone = normalizePhone(this.form.pickup_contact_phone);
+            if (!phone) {
+                errors.push('Pickup contact phone is required.');
+            } else if (phone.length < 10) {
+                errors.push('Pickup phone number is too short.');
+            }
+            const phoneConfirm = normalizePhone(this.form.pickup_contact_phone_confirm);
+            if (!phoneConfirm) {
+                errors.push('Please confirm the pickup phone number.');
+            } else if (phone !== phoneConfirm) {
+                errors.push('Pickup phone numbers do not match.');
+            }
+            return errors;
+        },
+
+        validateDelivery() {
+            const errors = [];
+            const phone = normalizePhone(this.form.delivery_recipient_phone);
+            const phoneConfirm = normalizePhone(this.form.delivery_recipient_phone_confirm);
+            if (phone && phoneConfirm && phone !== phoneConfirm) {
+                errors.push('Delivery phone numbers do not match.');
+            }
+            if (phone && phone.length < 10) {
+                errors.push('Delivery phone number is too short.');
+            }
+            return errors;
+        },
+
+        getRegionName(regionId) {
+            if (!regionId) return '-';
+            const region = this.regions.find((r) => String(r.id) === String(regionId));
+            return region ? region.name : '-';
+        },
+
+        getDistrictName(regionId, districtId) {
+            if (!regionId || !districtId) return '-';
+            const districts = getDistrictsFromRegions(this.regions, regionId);
+            const district = districts.find((d) => String(d.id) === String(districtId));
+            return district ? district.name : '-';
+        },
+
         onPickupPhoneInput(event) {
             this.form.pickup_contact_phone = normalizePhone(event.target.value);
         },
@@ -543,6 +653,9 @@ function vendorShipmentFormPage() {
 
         showAlert(type, message) {
             this.alert = { type, message };
+            if (window.vendorToast) {
+                window.vendorToast(type, message);
+            }
         },
 
         clearErrors() {
@@ -551,6 +664,9 @@ function vendorShipmentFormPage() {
 
         setValidationErrors(payload) {
             this.validationErrors = flattenErrors(payload);
+            if (window.vendorToast) {
+                this.validationErrors.forEach((msg) => window.vendorToast('error', msg));
+            }
         },
 
         async loadRegions() {
@@ -628,12 +744,22 @@ function vendorShipmentFormPage() {
             this.form.pickup_landmark = shipment.pickup?.location?.landmark || '';
             this.form.pickup_instructions = shipment.pickup?.instructions || '';
             this.form.pickup_location_method = locationMethodFromObject(shipment.pickup?.location);
-            this.form.pickup_region_id = shipment.pickup?.location?.region_id || '';
-            this.form.pickup_district_id = shipment.pickup?.location?.district_id || '';
+            this.form.pickup_region_id = shipment.pickup?.location?.region_id ? String(shipment.pickup.location.region_id) : '';
             this.form.pickup_latitude = shipment.pickup?.location?.latitude || '';
             this.form.pickup_longitude = shipment.pickup?.location?.longitude || '';
             this.form.pickup_gh_post_address = shipment.pickup?.location?.gh_post_address || '';
             this.pickupDistricts = getDistrictsFromRegions(this.regions, this.form.pickup_region_id);
+            const pickupDistrictId = shipment.pickup?.location?.district_id ? String(shipment.pickup.location.district_id) : '';
+            this.$nextTick(() => { this.form.pickup_district_id = pickupDistrictId; });
+
+            // Reverse geocode pickup coordinates to show original place name
+            if (this.form.pickup_location_method === 'coordinates' && this.form.pickup_latitude && this.form.pickup_longitude) {
+                this.form.pickup_town = '';
+                this.pickupSearchQuery = `${this.form.pickup_latitude}, ${this.form.pickup_longitude}`;
+                this.reverseGeocode(this.form.pickup_latitude, this.form.pickup_longitude).then((name) => {
+                    if (name) this.pickupSearchQuery = name;
+                });
+            }
 
             this.form.delivery_recipient_name = shipment.delivery?.recipient_name || '';
             this.form.delivery_recipient_phone = shipment.delivery?.recipient_phone || '';
@@ -642,12 +768,22 @@ function vendorShipmentFormPage() {
             this.form.delivery_landmark = shipment.delivery?.location?.landmark || '';
             this.form.delivery_instructions = shipment.delivery?.instructions || '';
             this.form.delivery_location_method = locationMethodFromObject(shipment.delivery?.location);
-            this.form.delivery_region_id = shipment.delivery?.location?.region_id || '';
-            this.form.delivery_district_id = shipment.delivery?.location?.district_id || '';
+            this.form.delivery_region_id = shipment.delivery?.location?.region_id ? String(shipment.delivery.location.region_id) : '';
             this.form.delivery_latitude = shipment.delivery?.location?.latitude || '';
             this.form.delivery_longitude = shipment.delivery?.location?.longitude || '';
             this.form.delivery_gh_post_address = shipment.delivery?.location?.gh_post_address || '';
             this.deliveryDistricts = getDistrictsFromRegions(this.regions, this.form.delivery_region_id);
+            const deliveryDistrictId = shipment.delivery?.location?.district_id ? String(shipment.delivery.location.district_id) : '';
+            this.$nextTick(() => { this.form.delivery_district_id = deliveryDistrictId; });
+
+            // Reverse geocode delivery coordinates to show original place name
+            if (this.form.delivery_location_method === 'coordinates' && this.form.delivery_latitude && this.form.delivery_longitude) {
+                this.form.delivery_town = '';
+                this.deliverySearchQuery = `${this.form.delivery_latitude}, ${this.form.delivery_longitude}`;
+                this.reverseGeocode(this.form.delivery_latitude, this.form.delivery_longitude).then((name) => {
+                    if (name) this.deliverySearchQuery = name;
+                });
+            }
         },
 
         onPickupRegionChange() {
@@ -680,6 +816,50 @@ function vendorShipmentFormPage() {
             }
         },
 
+        async reverseGeocode(lat, lon) {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&format=json`);
+                const data = await res.json();
+                return data.display_name || '';
+            } catch (e) {
+                return '';
+            }
+        },
+
+        async searchPickupLocation() {
+            if (this.pickupSearchQuery.length < 3) { this.pickupSearchResults = []; return; }
+            this.pickupSearching = true;
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(this.pickupSearchQuery)}&format=json&limit=5`);
+                this.pickupSearchResults = await res.json();
+            } catch (e) { this.pickupSearchResults = []; }
+            this.pickupSearching = false;
+        },
+
+        selectPickupResult(result) {
+            this.form.pickup_latitude = result.lat;
+            this.form.pickup_longitude = result.lon;
+            this.pickupSearchQuery = result.display_name;
+            this.pickupSearchResults = [];
+        },
+
+        async searchDeliveryLocation() {
+            if (this.deliverySearchQuery.length < 3) { this.deliverySearchResults = []; return; }
+            this.deliverySearching = true;
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(this.deliverySearchQuery)}&format=json&limit=5`);
+                this.deliverySearchResults = await res.json();
+            } catch (e) { this.deliverySearchResults = []; }
+            this.deliverySearching = false;
+        },
+
+        selectDeliveryResult(result) {
+            this.form.delivery_latitude = result.lat;
+            this.form.delivery_longitude = result.lon;
+            this.deliverySearchQuery = result.display_name;
+            this.deliverySearchResults = [];
+        },
+
         async saveShipment() {
             this.saving = true;
             this.alert = null;
@@ -705,16 +885,25 @@ function vendorShipmentFormPage() {
 
             if (!result.success) {
                 this.setValidationErrors(result.payload);
-                this.showAlert('error', result.message);
+                if (!this.validationErrors.length) {
+                    this.showAlert('error', result.message);
+                }
                 this.saving = false;
+                // Go back to relevant step so user can fix errors
+                this.step = 2;
                 return;
             }
 
             const shipment = result.payload?.data?.shipment;
-            this.showAlert('success', result.message);
 
             if (shipment?.id) {
-                window.location.href = `/vendor/shipments/${shipment.id}`;
+                if (this.isEditMode) {
+                    window.vendorToast?.('success', result.message || 'Shipment updated successfully.');
+                    window.location.href = `/vendor/shipments/${shipment.id}`;
+                } else {
+                    window.vendorToast?.('success', 'Shipment created! Now add your items.');
+                    window.location.href = `/vendor/shipments/${shipment.id}#add-items`;
+                }
                 return;
             }
 
@@ -728,11 +917,13 @@ function vendorShipmentShowPage() {
         loading: true,
         shipmentId: null,
         shipment: null,
-        alert: null,
-        itemAlert: null,
+        toast: null,
+        toastTimeout: null,
         itemErrors: [],
         editItemErrors: [],
         addingItem: false,
+        savingItem: false,
+        updatingItem: false,
         editingItemId: null,
         itemForm: emptyItemForm(),
         editItemForm: emptyItemForm(),
@@ -742,6 +933,7 @@ function vendorShipmentShowPage() {
         editItemDistricts: [],
         imageUploadFiles: {},
         imageUploadState: {},
+        confirmDialog: null,
 
         async init() {
             this.shipmentId = this.$el.dataset.shipmentId;
@@ -752,11 +944,18 @@ function vendorShipmentShowPage() {
             await this.loadRegions();
             await this.loadShipment();
             this.loading = false;
+
+            // Auto-open add item form when redirected from create page
+            if (window.location.hash === '#add-items' && this.canEditShipment) {
+                this.$nextTick(() => this.openAddItem());
+                history.replaceState(null, '', window.location.pathname);
+            }
         },
 
         statusLabel,
         modeLabel,
         formatDateTime,
+        formatMoney,
 
         get canEditShipment() {
             return Boolean(this.shipment?.can_edit);
@@ -808,12 +1007,24 @@ function vendorShipmentShowPage() {
             this.editItemForm.delivery_recipient_phone_confirm = normalizePhone(event.target.value);
         },
 
-        showAlert(type, message) {
-            this.alert = { type, message };
+        showToast(type, message) {
+            if (this.toastTimeout) clearTimeout(this.toastTimeout);
+            this.toast = { type, message };
+            this.toastTimeout = setTimeout(() => { this.toast = null; }, 4000);
         },
 
-        showItemAlert(type, message) {
-            this.itemAlert = { type, message };
+        openConfirm(message, callback) {
+            this.confirmDialog = { message, callback };
+        },
+
+        confirmYes() {
+            const cb = this.confirmDialog?.callback;
+            this.confirmDialog = null;
+            if (cb) cb();
+        },
+
+        confirmNo() {
+            this.confirmDialog = null;
         },
 
         setItemErrors(payload, target = 'item') {
@@ -852,7 +1063,7 @@ function vendorShipmentShowPage() {
             }
 
             if (!result.success) {
-                this.showAlert('error', result.message);
+                this.showToast('error', result.message);
                 return;
             }
 
@@ -878,7 +1089,12 @@ function vendorShipmentShowPage() {
         },
 
         onItemImagesSelected(event, formType = 'create') {
-            const files = Array.from(event.target.files || []);
+            let files = Array.from(event.target.files || []);
+            if (files.length > 5) {
+                this.showToast('error', 'You can upload at most 5 images at a time.');
+                files = files.slice(0, 5);
+                event.target.value = '';
+            }
             if (formType === 'edit') {
                 this.editItemForm.images = files;
             } else {
@@ -902,9 +1118,14 @@ function vendorShipmentShowPage() {
         },
 
         async addItem() {
-            this.itemAlert = null;
             this.itemErrors = [];
 
+            if (this.itemForm.quantity < 1) {
+                this.itemErrors = ['Quantity must be at least 1.'];
+                return;
+            }
+
+            this.savingItem = true;
             const formData = new FormData();
             appendIfFilled(formData, 'description', this.itemForm.description);
             appendIfFilled(formData, 'quantity', this.itemForm.quantity);
@@ -923,6 +1144,8 @@ function vendorShipmentShowPage() {
                 data: formData,
             });
 
+            this.savingItem = false;
+
             if (result.unauthorized) {
                 clearToken('vendor');
                 window.location.href = '/vendor/login';
@@ -931,11 +1154,11 @@ function vendorShipmentShowPage() {
 
             if (!result.success) {
                 this.setItemErrors(result.payload, 'item');
-                this.showItemAlert('error', result.message);
+                this.showToast('error', result.message);
                 return;
             }
 
-            this.showItemAlert('success', result.message);
+            this.showToast('success', result.message || 'Item added successfully.');
             this.cancelAddItem();
             await this.loadShipment();
         },
@@ -978,9 +1201,14 @@ function vendorShipmentShowPage() {
         },
 
         async updateItem(item) {
-            this.itemAlert = null;
             this.editItemErrors = [];
 
+            if (this.editItemForm.quantity < 1) {
+                this.editItemErrors = ['Quantity must be at least 1.'];
+                return;
+            }
+
+            this.updatingItem = true;
             const formData = new FormData();
             formData.append('_method', 'PUT');
             appendIfFilled(formData, 'description', this.editItemForm.description);
@@ -1004,6 +1232,8 @@ function vendorShipmentShowPage() {
                 data: formData,
             });
 
+            this.updatingItem = false;
+
             if (result.unauthorized) {
                 clearToken('vendor');
                 window.location.href = '/vendor/login';
@@ -1012,53 +1242,59 @@ function vendorShipmentShowPage() {
 
             if (!result.success) {
                 this.setItemErrors(result.payload, 'edit');
-                this.showItemAlert('error', result.message);
+                this.showToast('error', result.message);
                 return;
             }
 
-            this.showItemAlert('success', result.message);
+            this.showToast('success', result.message || 'Item updated successfully.');
             this.cancelEditItem();
             await this.loadShipment();
         },
 
-        async deleteItem(item) {
-            const proceed = window.confirm(`Delete item "${item.description}"?`);
-            if (!proceed) {
-                return;
-            }
+        deleteItem(item) {
+            this.openConfirm(`Delete item "${item.description}"?`, async () => {
+                const result = await apiRequest(`/api/v1/vendor/shipments/${this.shipmentId}/items/${item.id}`, {
+                    method: 'DELETE',
+                    role: 'vendor',
+                });
 
-            const result = await apiRequest(`/api/v1/vendor/shipments/${this.shipmentId}/items/${item.id}`, {
-                method: 'DELETE',
-                role: 'vendor',
+                if (result.unauthorized) {
+                    clearToken('vendor');
+                    window.location.href = '/vendor/login';
+                    return;
+                }
+
+                if (!result.success) {
+                    this.showToast('error', result.message);
+                    return;
+                }
+
+                this.showToast('success', result.message || 'Item deleted.');
+                await this.loadShipment();
             });
-
-            if (result.unauthorized) {
-                clearToken('vendor');
-                window.location.href = '/vendor/login';
-                return;
-            }
-
-            if (!result.success) {
-                this.showItemAlert('error', result.message);
-                return;
-            }
-
-            this.showItemAlert('success', result.message);
-            await this.loadShipment();
         },
 
         setInlineUploadFiles(itemId, event) {
-            this.imageUploadFiles[itemId] = Array.from(event.target.files || []);
+            let files = Array.from(event.target.files || []);
+            if (files.length > 5) {
+                this.showToast('error', 'You can upload at most 5 images at a time.');
+                files = files.slice(0, 5);
+            }
+            this.imageUploadFiles = { ...this.imageUploadFiles, [itemId]: files };
+        },
+
+        hasInlineUploadFiles(itemId) {
+            return (this.imageUploadFiles[itemId] || []).length > 0;
         },
 
         async uploadItemImages(item) {
             const files = this.imageUploadFiles[item.id] || [];
             if (!files.length) {
-                this.showItemAlert('error', 'Select one or more images first.');
+                this.showToast('error', 'Select one or more images first.');
                 return;
             }
 
-            this.imageUploadState[item.id] = true;
+            this.imageUploadState = { ...this.imageUploadState, [item.id]: true };
             const formData = new FormData();
             files.forEach((file) => formData.append('images[]', file));
 
@@ -1068,7 +1304,7 @@ function vendorShipmentShowPage() {
                 data: formData,
             });
 
-            this.imageUploadState[item.id] = false;
+            this.imageUploadState = { ...this.imageUploadState, [item.id]: false };
 
             if (result.unauthorized) {
                 clearToken('vendor');
@@ -1077,68 +1313,62 @@ function vendorShipmentShowPage() {
             }
 
             if (!result.success) {
-                this.showItemAlert('error', result.message);
+                this.showToast('error', result.message);
                 return;
             }
 
-            this.showItemAlert('success', result.message);
-            this.imageUploadFiles[item.id] = [];
+            this.showToast('success', result.message || 'Images uploaded.');
+            this.imageUploadFiles = { ...this.imageUploadFiles, [item.id]: [] };
             await this.loadShipment();
         },
 
-        async deleteItemImage(item, image) {
-            const proceed = window.confirm(`Delete image "${image.original_name}"?`);
-            if (!proceed) {
-                return;
-            }
+        deleteItemImage(item, image) {
+            this.openConfirm(`Delete image "${image.original_name}"?`, async () => {
+                const result = await apiRequest(
+                    `/api/v1/vendor/shipments/${this.shipmentId}/items/${item.id}/images/${image.id}`,
+                    {
+                        method: 'DELETE',
+                        role: 'vendor',
+                    }
+                );
 
-            const result = await apiRequest(
-                `/api/v1/vendor/shipments/${this.shipmentId}/items/${item.id}/images/${image.id}`,
-                {
-                    method: 'DELETE',
-                    role: 'vendor',
+                if (result.unauthorized) {
+                    clearToken('vendor');
+                    window.location.href = '/vendor/login';
+                    return;
                 }
-            );
 
-            if (result.unauthorized) {
-                clearToken('vendor');
-                window.location.href = '/vendor/login';
-                return;
-            }
+                if (!result.success) {
+                    this.showToast('error', result.message);
+                    return;
+                }
 
-            if (!result.success) {
-                this.showItemAlert('error', result.message);
-                return;
-            }
-
-            this.showItemAlert('success', result.message);
-            await this.loadShipment();
+                this.showToast('success', result.message || 'Image deleted.');
+                await this.loadShipment();
+            });
         },
 
-        async submitShipment() {
-            const proceed = window.confirm(`Submit shipment ${this.shipment?.shipment_number} for invoicing?`);
-            if (!proceed) {
-                return;
-            }
+        submitShipment() {
+            this.openConfirm(`Submit shipment ${this.shipment?.shipment_number} for invoicing?`, async () => {
+                const result = await apiRequest(`/api/v1/vendor/shipments/${this.shipmentId}/submit`, {
+                    method: 'POST',
+                    role: 'vendor',
+                });
 
-            const result = await apiRequest(`/api/v1/vendor/shipments/${this.shipmentId}/submit`, {
-                method: 'POST',
-                role: 'vendor',
+                if (result.unauthorized) {
+                    clearToken('vendor');
+                    window.location.href = '/vendor/login';
+                    return;
+                }
+
+                if (!result.success) {
+                    this.showToast('error', result.message);
+                    return;
+                }
+
+                this.showToast('success', result.message || 'Shipment submitted.');
+                await this.loadShipment();
             });
-
-            if (result.unauthorized) {
-                clearToken('vendor');
-                window.location.href = '/vendor/login';
-                return;
-            }
-
-            if (!result.success) {
-                this.showAlert('error', result.message);
-                return;
-            }
-
-            this.showAlert('success', result.message);
-            await this.loadShipment();
         },
 
         async acceptCurrentInvoice() {
@@ -1164,11 +1394,11 @@ function vendorShipmentShowPage() {
             }
 
             if (!result.success) {
-                this.showAlert('error', result.message);
+                this.showToast('error', result.message);
                 return;
             }
 
-            this.showAlert('success', result.message);
+            this.showToast('success', result.message || 'Invoice accepted.');
             await this.loadShipment();
         },
 
@@ -1180,7 +1410,7 @@ function vendorShipmentShowPage() {
 
             const rejectionReason = window.prompt('Rejection reason (required):', '');
             if (!rejectionReason || !rejectionReason.trim()) {
-                this.showAlert('error', 'Rejection reason is required.');
+                this.showToast('error', 'Rejection reason is required.');
                 return;
             }
 
@@ -1199,37 +1429,34 @@ function vendorShipmentShowPage() {
             }
 
             if (!result.success) {
-                this.showAlert('error', result.message);
+                this.showToast('error', result.message);
                 return;
             }
 
-            this.showAlert('success', result.message);
+            this.showToast('success', result.message || 'Invoice rejected.');
             await this.loadShipment();
         },
 
-        async deleteShipment() {
-            const proceed = window.confirm(`Delete shipment ${this.shipment?.shipment_number}?`);
-            if (!proceed) {
-                return;
-            }
+        deleteShipment() {
+            this.openConfirm(`Delete shipment ${this.shipment?.shipment_number}? This cannot be undone.`, async () => {
+                const result = await apiRequest(`/api/v1/vendor/shipments/${this.shipmentId}`, {
+                    method: 'DELETE',
+                    role: 'vendor',
+                });
 
-            const result = await apiRequest(`/api/v1/vendor/shipments/${this.shipmentId}`, {
-                method: 'DELETE',
-                role: 'vendor',
+                if (result.unauthorized) {
+                    clearToken('vendor');
+                    window.location.href = '/vendor/login';
+                    return;
+                }
+
+                if (!result.success) {
+                    this.showToast('error', result.message);
+                    return;
+                }
+
+                window.location.href = '/vendor/shipments';
             });
-
-            if (result.unauthorized) {
-                clearToken('vendor');
-                window.location.href = '/vendor/login';
-                return;
-            }
-
-            if (!result.success) {
-                this.showAlert('error', result.message);
-                return;
-            }
-
-            window.location.href = '/vendor/shipments';
         },
     };
 }

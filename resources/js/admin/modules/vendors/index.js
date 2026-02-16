@@ -1,14 +1,16 @@
+import './view.js';
+
 /**
- * Drivers page Alpine component
+ * Vendors page Alpine component
  */
 
-function buildDriversTable(config) {
+function buildVendorsTable(config) {
     return {
         endpoint: config.endpoint,
         exportEndpoint: config.exportEndpoint,
         storeEndpoint: config.storeEndpoint,
         csrfToken: config.csrfToken,
-        drivers: [],
+        vendors: [],
         meta: {
             current_page: 1,
             from: 0,
@@ -28,23 +30,21 @@ function buildDriversTable(config) {
         sortDirection: 'desc',
         columns: [
             { key: 'name', label: 'Name' },
+            { key: 'business_name', label: 'Business Name' },
             { key: 'email', label: 'Email' },
             { key: 'phone', label: 'Phone' },
-            { key: 'vehicle_type', label: 'Vehicle Type' },
             { key: 'status', label: 'Status' },
-            { key: 'is_active', label: 'Active' },
-            { key: 'assignments', label: 'Assignments' },
+            { key: 'shipments', label: 'Shipments' },
             { key: 'created_at', label: 'Created At' },
             { key: 'actions', label: 'Actions' },
         ],
         visibleColumns: {
             name: true,
+            business_name: true,
             email: true,
             phone: true,
-            vehicle_type: true,
             status: true,
-            is_active: true,
-            assignments: true,
+            shipments: true,
             created_at: true,
             actions: true,
         },
@@ -52,17 +52,14 @@ function buildDriversTable(config) {
         // Modal state
         showModal: false,
         modalMode: 'add', // 'add', 'edit', 'view'
-        editingDriverId: null,
+        editingVendorId: null,
         saving: false,
         errors: {},
         form: {
             name: '',
+            business_name: '',
             email: '',
             phone: '',
-            password: '',
-            vehicle_type: '',
-            vehicle_number: '',
-            license_number: '',
             is_active: true,
         },
 
@@ -96,7 +93,7 @@ function buildDriversTable(config) {
                 if (!response.ok) throw new Error('Failed to fetch data');
 
                 const result = await response.json();
-                this.drivers = result.data;
+                this.vendors = result.data;
                 this.meta = {
                     current_page: result.meta.current_page,
                     from: result.meta.from,
@@ -105,7 +102,7 @@ function buildDriversTable(config) {
                     last_page: result.meta.last_page,
                 };
             } catch (error) {
-                console.error('Error loading drivers:', error);
+                console.error('Error loading vendors:', error);
             } finally {
                 this.loading = false;
             }
@@ -247,51 +244,42 @@ function buildDriversTable(config) {
         // Modal methods
         openAddModal() {
             this.modalMode = 'add';
-            this.editingDriverId = null;
+            this.editingVendorId = null;
             this.errors = {};
             this.form = {
                 name: '',
+                business_name: '',
                 email: '',
                 phone: '',
-                password: '',
-                vehicle_type: '',
-                vehicle_number: '',
-                license_number: '',
                 is_active: true,
             };
             this.showModal = true;
         },
 
-        openEditModal(driver) {
+        openEditModal(vendor) {
             this.modalMode = 'edit';
-            this.editingDriverId = driver.id;
+            this.editingVendorId = vendor.id;
             this.errors = {};
             this.form = {
-                name: driver.name,
-                email: driver.email,
-                phone: driver.phone,
-                password: '',
-                vehicle_type: driver.vehicle_type || '',
-                vehicle_number: driver.vehicle_number || '',
-                license_number: driver.license_number || '',
-                is_active: driver.is_active,
+                name: vendor.name,
+                business_name: vendor.business_name || '',
+                email: vendor.email,
+                phone: vendor.phone,
+                is_active: vendor.is_active,
             };
             this.showModal = true;
         },
 
-        viewDriver(driver) {
+        viewVendor(vendor) {
             this.modalMode = 'view';
-            this.editingDriverId = driver.id;
+            this.editingVendorId = vendor.id;
             this.errors = {};
             this.form = {
-                name: driver.name,
-                email: driver.email,
-                phone: driver.phone,
-                password: '',
-                vehicle_type: driver.vehicle_type || '',
-                vehicle_number: driver.vehicle_number || '',
-                license_number: driver.license_number || '',
-                is_active: driver.is_active,
+                name: vendor.name,
+                business_name: vendor.business_name || '',
+                email: vendor.email,
+                phone: vendor.phone,
+                is_active: vendor.is_active,
             };
             this.showModal = true;
         },
@@ -301,14 +289,14 @@ function buildDriversTable(config) {
             this.errors = {};
         },
 
-        async saveDriver() {
+        async saveVendor() {
             this.saving = true;
             this.errors = {};
 
             try {
                 const url = this.modalMode === 'add'
                     ? this.storeEndpoint
-                    : `${window.location.origin}/admin/drivers/${this.editingDriverId}`;
+                    : `${window.location.origin}/admin/vendors/${this.editingVendorId}`;
 
                 const method = this.modalMode === 'add' ? 'POST' : 'PUT';
 
@@ -329,7 +317,7 @@ function buildDriversTable(config) {
                     if (response.status === 422) {
                         this.errors = result.errors || {};
                     } else {
-                        throw new Error(result.message || 'Failed to save driver');
+                        throw new Error(result.message || 'Failed to save vendor');
                     }
                     return;
                 }
@@ -337,15 +325,15 @@ function buildDriversTable(config) {
                 this.closeModal();
                 this.loadData();
             } catch (error) {
-                console.error('Error saving driver:', error);
+                console.error('Error saving vendor:', error);
             } finally {
                 this.saving = false;
             }
         },
 
-        async toggleDriverStatus(driver) {
+        async toggleVendorStatus(vendor) {
             try {
-                const response = await fetch(`${window.location.origin}/admin/drivers/${driver.id}/toggle-active`, {
+                const response = await fetch(`${window.location.origin}/admin/vendors/${vendor.id}/toggle-active`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -359,26 +347,26 @@ function buildDriversTable(config) {
                     this.loadData();
                 }
             } catch (err) {
-                console.error('Failed to update driver status:', err);
+                console.error('Failed to update vendor status:', err);
             }
         },
 
-        openDeleteModal(driver) {
-            if (this.$store?.driversDelete) {
-                this.$store.driversDelete.driver = driver;
-                this.$store.driversDelete.onConfirm = () => this.confirmDelete();
-                this.$store.driversDelete.show = true;
+        openDeleteModal(vendor) {
+            if (this.$store?.vendorsDelete) {
+                this.$store.vendorsDelete.vendor = vendor;
+                this.$store.vendorsDelete.onConfirm = () => this.confirmDelete();
+                this.$store.vendorsDelete.show = true;
             }
         },
 
         async confirmDelete() {
-            const store = this.$store?.driversDelete;
-            if (!store?.driver) return;
+            const store = this.$store?.vendorsDelete;
+            if (!store?.vendor) return;
 
             store.deleting = true;
 
             try {
-                const response = await fetch(`${window.location.origin}/admin/drivers/${store.driver.id}`, {
+                const response = await fetch(`${window.location.origin}/admin/vendors/${store.vendor.id}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
@@ -389,15 +377,15 @@ function buildDriversTable(config) {
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to delete driver');
+                    throw new Error('Failed to delete vendor');
                 }
 
                 store.show = false;
-                store.driver = null;
+                store.vendor = null;
                 this.loadData();
             } catch (error) {
-                console.error('Error deleting driver:', error);
-                alert('Failed to delete driver. Please try again.');
+                console.error('Error deleting vendor:', error);
+                alert('Failed to delete vendor. Please try again.');
             } finally {
                 store.deleting = false;
             }
@@ -476,12 +464,12 @@ function buildDriversTable(config) {
             const doc = printWindow.document;
             const headers = Object.keys(data[0]);
 
-            doc.title = 'Drivers Export';
+            doc.title = 'Vendors Export';
             doc.body.innerHTML = '';
 
             const style = doc.createElement('style');
             style.textContent = [
-                'body { font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 20px; }',
+                'body { font-family: \"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; padding: 20px; }',
                 'h1 { font-size: 24px; margin-bottom: 20px; color: #1e293b; }',
                 'table { width: 100%; border-collapse: collapse; margin-top: 20px; }',
                 'th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; font-size: 12px; }',
@@ -491,7 +479,7 @@ function buildDriversTable(config) {
             doc.head.appendChild(style);
 
             const title = doc.createElement('h1');
-            title.textContent = 'Drivers List';
+            title.textContent = 'Vendors List';
             doc.body.appendChild(title);
 
             const meta = doc.createElement('p');
@@ -550,7 +538,7 @@ function buildDriversTable(config) {
                 )
             ].join('\n');
 
-            this.downloadFile(csvContent, 'drivers.csv', 'text/csv');
+            this.downloadFile(csvContent, 'vendors.csv', 'text/csv');
         },
 
         downloadFile(content, filename, type) {
@@ -580,15 +568,15 @@ function buildDriversTable(config) {
     };
 }
 
-function getDriversConfig() {
-    const container = document.querySelector('[data-drivers-config]');
-    let config = window.driversTableConfig || null;
+function getVendorsConfig() {
+    const container = document.querySelector('[data-vendors-config]');
+    let config = window.vendorsTableConfig || null;
 
     if (container) {
         try {
-            config = JSON.parse(container.getAttribute('data-drivers-config'));
+            config = JSON.parse(container.getAttribute('data-vendors-config'));
         } catch (error) {
-            console.error('Invalid drivers config JSON:', error);
+            console.error('Invalid vendors config JSON:', error);
         }
     }
 
@@ -604,32 +592,33 @@ function getDriversConfig() {
     return config;
 }
 
-function registerDriversTable() {
+function registerVendorsTable() {
     if (!window.Alpine) {
         return;
     }
 
-    const config = getDriversConfig();
+    const config = getVendorsConfig();
     if (!config) {
         return;
     }
 
-    if (!window.driversTable) {
-        window.driversTable = () => buildDriversTable(config);
+    if (!window.vendorsTable) {
+        window.vendorsTable = () => buildVendorsTable(config);
     }
 
-    Alpine.store('driversDelete', {
+    Alpine.store('vendorsDelete', {
         show: false,
-        driver: null,
+        vendor: null,
         deleting: false,
         onConfirm: null,
     });
 
-    Alpine.data('driversTable', window.driversTable);
+    Alpine.data('vendorsTable', window.vendorsTable);
 }
 
 if (window.Alpine) {
-    registerDriversTable();
+    registerVendorsTable();
 } else {
-    document.addEventListener('alpine:init', registerDriversTable);
+    document.addEventListener('alpine:init', registerVendorsTable);
 }
+

@@ -20,7 +20,6 @@ class WarehouseSeeder extends Seeder
             [
                 'name' => 'Accra Main Hub',
                 'code' => 'WH-001',
-                'type' => 'both',
                 'address' => 'Industrial Area, Tema Motorway Extension, Accra',
                 'region_id' => $greaterAccra?->id,
                 'contact_phone' => '+233241000001',
@@ -31,7 +30,6 @@ class WarehouseSeeder extends Seeder
             [
                 'name' => 'Kumasi Distribution Center',
                 'code' => 'WH-002',
-                'type' => 'destination',
                 'address' => 'Asokwa Industrial Area, Kumasi',
                 'region_id' => $ashanti?->id,
                 'contact_phone' => '+233241000002',
@@ -42,7 +40,6 @@ class WarehouseSeeder extends Seeder
             [
                 'name' => 'Tema Port Warehouse',
                 'code' => 'WH-003',
-                'type' => 'origin',
                 'address' => 'Tema Community 1, Near Tema Port',
                 'region_id' => $greaterAccra?->id,
                 'contact_phone' => '+233241000003',

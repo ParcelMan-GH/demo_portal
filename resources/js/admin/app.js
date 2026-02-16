@@ -3,57 +3,20 @@
  * This file is bundled by Vite and includes all admin-specific functionality
  */
 
-// Page-level components
-import './users-datatable.js';
-import './vendors.js';
-import './shipments.js';
-import './drivers.js';
-import './warehouses.js';
+import Alpine from 'alpinejs';
+import { initAdminUtils } from './core/admin-utils.js';
+import { initAdminLayout } from './modules/layout/index.js';
 
-// Global admin utilities
-window.AdminUtils = {
-    // Format date
-    formatDate(date, format = 'short') {
-        if (!date) return '-';
-        const d = new Date(date);
-        if (format === 'short') {
-            return d.toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-            });
-        }
-        return d.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    },
+// Page-level modules
+import './modules/users/index.js';
+import './modules/vendors/index.js';
+import './modules/shipments/index.js';
+import './modules/drivers/index.js';
+import './modules/warehouses/index.js';
 
-    // Debounce function
-    debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    },
-
-    // Copy to clipboard
-    async copyToClipboard(text) {
-        try {
-            await navigator.clipboard.writeText(text);
-            return true;
-        } catch {
-            return false;
-        }
-    },
-};
+window.Alpine = Alpine;
+initAdminUtils();
+initAdminLayout();
+Alpine.start();
 
 console.log('Admin JS loaded');
