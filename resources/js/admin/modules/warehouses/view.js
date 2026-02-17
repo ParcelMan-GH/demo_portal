@@ -17,6 +17,7 @@ function warehouseUsersTable(config) {
         userModalMode: 'create',
         submittingUser: false,
         selectedUser: null,
+        changePassword: false,
         userFormErrors: {},
         userForm: {
             name: '',
@@ -32,6 +33,7 @@ function warehouseUsersTable(config) {
         search: '',
         roleFilter: '',
         statusFilter: '',
+        statusFilterName: 'All statuses',
         sortBy: 'created_at',
         sortDirection: 'desc',
         perPage: 10,
@@ -71,10 +73,26 @@ function warehouseUsersTable(config) {
             return selected ? selected.name : 'All roles';
         },
 
+        setStatusFilter(value, label) {
+            this.statusFilter = value;
+            this.statusFilterName = label;
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        setPerPage(value) {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed <= 0) return;
+            this.perPage = parsed;
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
         openCreateModal() {
             this.userModalMode = 'create';
             this.selectedUser = null;
             this.userFormErrors = {};
+            this.changePassword = false;
             this.userForm = {
                 name: '',
                 email: '',
@@ -92,6 +110,7 @@ function warehouseUsersTable(config) {
             this.userModalMode = 'edit';
             this.selectedUser = user;
             this.userFormErrors = {};
+            this.changePassword = false;
             this.userForm = {
                 name: user.name || '',
                 email: user.email || '',
@@ -107,6 +126,7 @@ function warehouseUsersTable(config) {
             this.showUserModal = false;
             this.submittingUser = false;
             this.selectedUser = null;
+            this.changePassword = false;
             this.userFormErrors = {};
         },
 
@@ -136,7 +156,7 @@ function warehouseUsersTable(config) {
                 payload.is_active = this.userForm.is_active;
             }
 
-            if (this.userForm.password) {
+            if (this.userForm.password && (isCreate || this.changePassword)) {
                 payload.password = this.userForm.password;
                 payload.password_confirmation = this.userForm.password_confirmation;
             } else if (isCreate) {
@@ -320,13 +340,103 @@ function warehouseUsersTable(config) {
                 }
 
                 const result = await response.json();
-                this.downloadCSV(Array.isArray(result.data) ? result.data : []);
+                const data = Array.isArray(result.data) ? result.data : [];
+                if (format === 'print') {
+                    this.openPrintWindow(data);
+                    return;
+                }
+                this.downloadCSV(data);
             } catch (error) {
                 console.error('Warehouse users export failed:', error);
                 if (window.showToast) {
                     window.showToast(error.message || 'Export failed', 'error');
                 }
             }
+        },
+
+        printData() {
+            return this.exportData('print');
+        },
+
+        openPrintWindow(data) {
+            if (!data.length) {
+                if (window.showToast) {
+                    window.showToast('No data to print.', 'warning');
+                }
+                return;
+            }
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                if (window.showToast) {
+                    window.showToast('Pop-up blocked. Please allow pop-ups to print.', 'warning');
+                }
+                return;
+            }
+
+            const doc = printWindow.document;
+            const headers = ['Name', 'Role', 'Email', 'Status', 'Created At', 'Last Login'];
+
+            if (!doc.documentElement) doc.appendChild(doc.createElement('html'));
+            if (!doc.head) doc.documentElement.appendChild(doc.createElement('head'));
+            if (!doc.body) doc.documentElement.appendChild(doc.createElement('body'));
+
+            doc.title = 'Warehouse Users Export';
+            doc.body.innerHTML = '';
+
+            const style = doc.createElement('style');
+            style.textContent = [
+                'body { font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 20px; }',
+                'h1 { font-size: 24px; margin-bottom: 20px; color: #1e293b; }',
+                'table { width: 100%; border-collapse: collapse; margin-top: 20px; }',
+                'th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; font-size: 12px; }',
+                'th { background-color: #f1f5f9; font-weight: 600; color: #475569; }',
+                'tr:nth-child(even) { background-color: #f8fafc; }',
+            ].join('\n');
+            doc.head.appendChild(style);
+
+            const title = doc.createElement('h1');
+            title.textContent = 'Warehouse Users';
+            doc.body.appendChild(title);
+
+            const table = doc.createElement('table');
+            const thead = doc.createElement('thead');
+            const headRow = doc.createElement('tr');
+            headers.forEach((header) => {
+                const th = doc.createElement('th');
+                th.textContent = header;
+                headRow.appendChild(th);
+            });
+            thead.appendChild(headRow);
+            table.appendChild(thead);
+
+            const tbody = doc.createElement('tbody');
+            data.forEach((row) => {
+                const tr = doc.createElement('tr');
+                const roleName = row.roles && row.roles.length ? row.roles[0].name : 'No role';
+                const values = [
+                    row.name ?? '-',
+                    roleName,
+                    row.email ?? '-',
+                    row.is_active ? 'Active' : 'Inactive',
+                    row.created_at ?? '-',
+                    row.last_login_at ?? '-',
+                ];
+
+                values.forEach((value) => {
+                    const td = doc.createElement('td');
+                    td.textContent = value;
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            doc.body.appendChild(table);
+
+            setTimeout(() => {
+                printWindow.print();
+            }, 250);
         },
 
         downloadCSV(data) {

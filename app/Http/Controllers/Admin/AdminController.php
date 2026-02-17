@@ -294,15 +294,98 @@ class AdminController extends Controller
                 ->with('error', 'You do not have permission to view this user.');
         }
 
-        $admin->load(['roles.permissions', 'creator', 'warehouse', 'createdUsers.roles']);
-        $auditLogs = AdminAuditLog::query()
-            ->with(['warehouse:id,name'])
-            ->where('user_id', $admin->id)
-            ->orderByDesc('created_at')
-            ->paginate(15, ['*'], 'logs_page')
-            ->withQueryString();
+        $admin->load(['roles.permissions', 'creator', 'warehouse']);
 
-        return view('admin.admins.show', compact('admin', 'auditLogs'));
+        return view('admin.admins.show', compact('admin'));
+    }
+
+    /**
+     * Get audit logs data for a specific user (AJAX datatable).
+     */
+    public function auditLogsData(Request $request, User $admin): JsonResponse
+    {
+        $currentUser = Auth::guard('admin')->user();
+
+        if (!$currentUser->isSuperAdmin() && $admin->created_by_user_id !== $currentUser->id && $admin->id !== $currentUser->id) {
+            return response()->json(['data' => [], 'meta' => ['total' => 0, 'per_page' => 15, 'current_page' => 1, 'last_page' => 1, 'from' => 0, 'to' => 0]]);
+        }
+
+        $query = AdminAuditLog::query()
+            ->with(['warehouse:id,name'])
+            ->where('user_id', $admin->id);
+
+        // Search
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('action', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('action_type', 'like', "%{$search}%")
+                  ->orWhere('route_name', 'like', "%{$search}%")
+                  ->orWhere('ip_address', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by scope
+        if ($scope = $request->input('scope')) {
+            $query->where('scope', $scope);
+        }
+
+        // Filter by action type
+        if ($actionType = $request->input('action_type')) {
+            $query->where('action_type', $actionType);
+        }
+
+        // Filter by date range
+        if ($dateFrom = $request->input('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo = $request->input('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        $total = $query->count();
+
+        // Sorting
+        $sortField = $request->input('sort', 'created_at');
+        $sortDirection = $request->input('direction', 'desc');
+        $allowedSorts = ['created_at', 'action', 'action_type', 'scope', 'status_code', 'duration_ms'];
+
+        if (in_array($sortField, $allowedSorts)) {
+            $query->orderBy($sortField, $sortDirection === 'asc' ? 'asc' : 'desc');
+        }
+
+        // Pagination
+        $perPage = min((int) $request->input('per_page', 15), 100);
+        $page = (int) $request->input('page', 1);
+        $offset = ($page - 1) * $perPage;
+
+        $logs = $query->skip($offset)->take($perPage)->get();
+
+        $data = $logs->map(fn($log) => [
+            'id' => $log->id,
+            'created_at' => $log->created_at?->format('Y-m-d H:i:s') ?? '-',
+            'scope' => $log->scope ?? 'system',
+            'action_type' => $log->action_type ? \Str::of($log->action_type)->replace('_', ' ')->title()->toString() : '-',
+            'action' => $this->humanizeAction($log->action, $log->action_type),
+            'description' => $this->humanizeDescription($log),
+            'method' => $log->method ?: '-',
+            'url' => $log->url ? parse_url($log->url, PHP_URL_PATH) : '-',
+            'ip_address' => $log->ip_address ?: '-',
+            'status_code' => $log->status_code ?: '-',
+            'duration_ms' => $log->duration_ms ?? '-',
+        ]);
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => (int) ceil($total / $perPage) ?: 1,
+                'from' => $total > 0 ? $offset + 1 : 0,
+                'to' => min($offset + $perPage, $total),
+            ],
+        ]);
     }
 
     /**
@@ -479,6 +562,139 @@ class AdminController extends Controller
         $admin->syncRoles([(int) $roleId]);
 
         return back()->with('success', 'Role assigned successfully.');
+    }
+
+    /**
+     * Convert a route name like "admin.admins.show" into a human-readable label like "Viewed User".
+     */
+    private function humanizeAction(?string $routeName, ?string $actionType): string
+    {
+        if (!$routeName) {
+            return $actionType ? \Str::of($actionType)->replace('_', ' ')->title()->toString() : '-';
+        }
+
+        // Special-case auth actions
+        $specialActions = [
+            'admin.login' => 'Logged In',
+            'admin.logout' => 'Logged Out',
+            'admin.dashboard' => 'Viewed Dashboard',
+        ];
+
+        if (isset($specialActions[$routeName])) {
+            return $specialActions[$routeName];
+        }
+
+        // Strip the "admin." prefix
+        $stripped = preg_replace('/^admin\./', '', $routeName);
+        $segments = explode('.', $stripped);
+
+        // Resource label map
+        $resourceLabels = [
+            'admins' => 'User',
+            'roles' => 'Role',
+            'vendors' => 'Vendor',
+            'shipments' => 'Shipment',
+            'invoices' => 'Invoice',
+            'drivers' => 'Driver',
+            'warehouses' => 'Warehouse',
+            'assignments' => 'Pickup Assignment',
+            'settings' => 'Settings',
+        ];
+
+        // Action verb map
+        $actionVerbs = [
+            'index' => 'Listed',
+            'show' => 'Viewed',
+            'show.json' => 'Loaded',
+            'create' => 'Opened Create Form',
+            'store' => 'Created',
+            'edit' => 'Opened Edit Form',
+            'update' => 'Updated',
+            'destroy' => 'Deleted',
+            'data' => 'Loaded',
+            'export' => 'Exported',
+            'toggle-active' => 'Toggled Status of',
+            'assign-roles' => 'Assigned Role to',
+            'audit-logs-data' => 'Loaded Audit Logs for',
+            'shipments' => 'Viewed Shipments of',
+            'activity-logs' => 'Viewed Activity Logs of',
+            'otp-logs' => 'Viewed OTP Logs of',
+            'assignments' => 'Viewed Assignments of',
+            'items' => 'Viewed Items of',
+            'tracking' => 'Viewed Tracking of',
+            'send' => 'Sent',
+            'cancel' => 'Cancelled',
+            'assign' => 'Assigned Driver to',
+            'receive' => 'Received',
+            'regions' => 'Loaded Regions',
+            'districts' => 'Loaded Districts',
+            'users.data' => 'Loaded Users of',
+            'users.export' => 'Exported Users of',
+            'save' => 'Saved',
+            'upload' => 'Uploaded File to',
+            'logs.data' => 'Loaded Logs',
+            'logs.detail' => 'Viewed Log Detail',
+            'logs.clear' => 'Cleared Logs',
+            'logs.export' => 'Exported Logs',
+            'email-logs.data' => 'Loaded Email Logs',
+            'sms-logs.data' => 'Loaded SMS Logs',
+            'otp-logs.data' => 'Loaded OTP Logs',
+            'admin-audit-logs.data' => 'Loaded Admin Audit Logs',
+            'admin-audit-logs.export' => 'Exported Admin Audit Logs',
+            'test-email' => 'Sent Test Email',
+            'test-sms' => 'Sent Test SMS',
+            'clear-cache' => 'Cleared Cache',
+        ];
+
+        $resource = $segments[0] ?? '';
+        $action = implode('.', array_slice($segments, 1));
+        $resourceLabel = $resourceLabels[$resource] ?? \Str::of($resource)->replace('-', ' ')->title()->singular()->toString();
+
+        // Settings sub-actions don't need a resource suffix
+        if ($resource === 'settings' && isset($actionVerbs[$action])) {
+            return $actionVerbs[$action];
+        }
+
+        if (isset($actionVerbs[$action])) {
+            $verb = $actionVerbs[$action];
+            // Verbs ending with "of" or "to" or "for" need the resource after
+            if (preg_match('/(of|to|for)$/', $verb)) {
+                return "{$verb} {$resourceLabel}";
+            }
+            return "{$verb} {$resourceLabel}";
+        }
+
+        // Fallback: make the action readable
+        return \Str::of($action ?: $resource)->replace(['.', '-', '_'], ' ')->title()->toString();
+    }
+
+    /**
+     * Build a human-readable description from an audit log entry.
+     */
+    private function humanizeDescription(AdminAuditLog $log): string
+    {
+        $parts = [];
+
+        if ($log->method) {
+            $parts[] = $log->method;
+        }
+
+        if ($log->url) {
+            $path = parse_url($log->url, PHP_URL_PATH);
+            if ($path) {
+                $parts[] = $path;
+            }
+        }
+
+        if ($log->status_code) {
+            $parts[] = "→ HTTP {$log->status_code}";
+        }
+
+        if ($log->duration_ms !== null) {
+            $parts[] = "({$log->duration_ms}ms)";
+        }
+
+        return implode(' ', $parts) ?: '-';
     }
 
     private function resolveRequestedRoleId(Request $request): ?int

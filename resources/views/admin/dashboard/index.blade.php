@@ -90,8 +90,8 @@
                 <div class="ml-3">
                     <h3 class="text-sm font-medium text-yellow-800">Limited Access</h3>
                     <p class="mt-1 text-sm text-yellow-700">
-                        You are logged in as a <strong>{{ Auth::guard('admin')->user()->role->label() }}</strong>.
-                        You can only see and manage admins that you have created.
+                        You are logged in as <strong>{{ Auth::guard('admin')->user()->roles->first()?->name ?? 'User' }}</strong>.
+                        You can only see and manage users that you have created.
                     </p>
                 </div>
             </div>

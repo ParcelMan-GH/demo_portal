@@ -9,9 +9,14 @@ import { initAdminLayout } from './modules/layout/index.js';
 
 // Page-level modules
 import './modules/users/index.js';
+import './modules/users/audit-logs-table.js';
 import './modules/vendors/index.js';
 import './modules/shipments/index.js';
 import './modules/drivers/index.js';
+import './modules/roles/index.js';
+import './modules/roles/create.js';
+import './modules/roles/edit.js';
+import './modules/roles/show.js';
 import './modules/warehouses/index.js';
 
 window.Alpine = Alpine;

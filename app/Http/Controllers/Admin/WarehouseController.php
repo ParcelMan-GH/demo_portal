@@ -37,7 +37,8 @@ class WarehouseController extends Controller
     {
         $this->authorizePermission('warehouses.view');
 
-        $query = Warehouse::with(['region', 'district']);
+        $query = Warehouse::with(['region', 'district'])
+            ->withCount('users');
 
         // Search
         if ($search = $request->get('search')) {
@@ -64,7 +65,7 @@ class WarehouseController extends Controller
         // Sorting
         $sortBy = $request->get('sort', 'created_at');
         $sortDirection = $request->get('direction', 'desc');
-        $allowedSorts = ['name', 'code', 'created_at'];
+        $allowedSorts = ['name', 'code', 'users_count', 'created_at'];
 
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortDirection);
@@ -91,6 +92,7 @@ class WarehouseController extends Controller
                     'contact_phone' => $warehouse->contact_phone,
                     'contact_email' => $warehouse->contact_email,
                     'capacity' => $warehouse->capacity,
+                    'users_count' => (int) $warehouse->users_count,
                     'is_active' => $warehouse->is_active,
                     'created_at' => $warehouse->created_at->format('Y-m-d H:i:s'),
                     'can_manage' => $canManage,
@@ -358,7 +360,8 @@ class WarehouseController extends Controller
     {
         $this->authorizePermission('warehouses.view');
 
-        $query = Warehouse::with(['region', 'district']);
+        $query = Warehouse::with(['region', 'district'])
+            ->withCount('users');
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
@@ -389,6 +392,7 @@ class WarehouseController extends Controller
                 'Region' => $warehouse->region?->name,
                 'District' => $warehouse->district?->name,
                 'Contact Phone' => $warehouse->contact_phone,
+                'Total Users' => (int) $warehouse->users_count,
                 'Capacity (m³)' => $warehouse->capacity,
                 'Status' => $warehouse->is_active ? 'Active' : 'Inactive',
                 'Created At' => $warehouse->created_at->format('Y-m-d H:i:s'),

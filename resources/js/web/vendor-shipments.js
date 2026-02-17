@@ -300,21 +300,24 @@ function applyPerItemDeliveryToForm(formData, form) {
 }
 
 function vendorShipmentsListPage() {
+    const TAB_STATUSES = {
+        all: [],
+        draft: ['draft'],
+        submitted: ['submitted'],
+        in_progress: ['invoice_sent', 'invoice_accepted', 'pickup_assigned', 'picked_up', 'at_warehouse', 'sorted', 'in_transit', 'at_destination', 'out_for_delivery'],
+        delivered: ['delivered'],
+        cancelled: ['cancelled'],
+    };
+
     return {
         loading: true,
         shipments: [],
         alert: null,
-        statuses: SHIPMENT_STATUS_OPTIONS,
-        sortFields: SORT_FIELD_OPTIONS,
+        activeTab: 'all',
+        tabCounts: { all: 0, draft: 0, submitted: 0, in_progress: 0, delivered: 0, cancelled: 0 },
         filters: {
-            search: '',
-            statuses: [],
-            from_date: '',
-            to_date: '',
             limit: 15,
             offset: 0,
-            sort_by: 'created_at',
-            sort_order: 'desc',
         },
         pagination: {
             offset: 0,
@@ -324,14 +327,13 @@ function vendorShipmentsListPage() {
             next_offset: null,
             current_page: 1,
             last_page: 1,
-            per_page: 15,
         },
 
         async init() {
             if (!(await ensureVendorSessionOrRedirect())) {
                 return;
             }
-            await this.loadShipments();
+            await Promise.all([this.loadShipments(), this.loadTabCounts()]);
         },
 
         statusLabel,
@@ -339,30 +341,44 @@ function vendorShipmentsListPage() {
         formatDateTime,
         formatMoney,
 
+        formatDate(value) {
+            if (!value) return '-';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return '-';
+            return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        },
+
+        statusColor(status) {
+            const map = {
+                draft: 'gray',
+                submitted: 'blue',
+                invoice_sent: 'orange',
+                invoice_accepted: 'orange',
+                pickup_assigned: 'cyan',
+                picked_up: 'cyan',
+                at_warehouse: 'cyan',
+                sorted: 'cyan',
+                in_transit: 'cyan',
+                at_destination: 'cyan',
+                out_for_delivery: 'cyan',
+                delivered: 'green',
+                cancelled: 'red',
+            };
+            return map[status] || 'gray';
+        },
+
         showAlert(type, message) {
             this.alert = { type, message };
         },
 
         buildQueryString() {
             const params = new URLSearchParams();
-            if (this.filters.search.trim()) {
-                params.append('search', this.filters.search.trim());
-            }
-            if (this.filters.from_date) {
-                params.append('from_date', this.filters.from_date);
-            }
-            if (this.filters.to_date) {
-                params.append('to_date', this.filters.to_date);
-            }
-            this.filters.statuses.forEach((value) => {
-                if (value) {
-                    params.append('status[]', value);
-                }
-            });
+            const statuses = TAB_STATUSES[this.activeTab] || [];
+            statuses.forEach((s) => params.append('status[]', s));
             params.append('limit', String(this.filters.limit));
             params.append('offset', String(this.filters.offset));
-            params.append('sort_by', this.filters.sort_by);
-            params.append('sort_order', this.filters.sort_order);
+            params.append('sort_by', 'created_at');
+            params.append('sort_order', 'desc');
             return params.toString();
         },
 
@@ -395,20 +411,31 @@ function vendorShipmentsListPage() {
             this.loading = false;
         },
 
-        async applyFilters() {
-            this.filters.offset = 0;
-            await this.loadShipments();
+        async loadTabCounts() {
+            const tabs = Object.entries(TAB_STATUSES).map(([key, statuses]) => ({
+                key,
+                params: statuses.map((s) => `status[]=${s}`).join('&'),
+            }));
+
+            const results = await Promise.all(
+                tabs.map((tab) =>
+                    apiRequest(`/api/v1/vendor/shipments?limit=1&offset=0${tab.params ? '&' + tab.params : ''}`, {
+                        role: 'vendor',
+                    })
+                )
+            );
+
+            results.forEach((result, i) => {
+                if (result.success) {
+                    this.tabCounts[tabs[i].key] = result.payload?.data?.pagination?.total || 0;
+                }
+            });
         },
 
-        async resetFilters() {
-            this.filters.search = '';
-            this.filters.statuses = [];
-            this.filters.from_date = '';
-            this.filters.to_date = '';
-            this.filters.limit = 15;
+        async switchTab(tab) {
+            if (this.activeTab === tab) return;
+            this.activeTab = tab;
             this.filters.offset = 0;
-            this.filters.sort_by = 'created_at';
-            this.filters.sort_order = 'desc';
             await this.loadShipments();
         },
 
@@ -454,7 +481,7 @@ function vendorShipmentsListPage() {
             }
 
             this.showAlert('success', result.message);
-            await this.loadShipments();
+            await Promise.all([this.loadShipments(), this.loadTabCounts()]);
         },
 
         async deleteShipment(shipment) {
@@ -483,7 +510,7 @@ function vendorShipmentsListPage() {
             }
 
             this.showAlert('success', result.message);
-            await this.loadShipments();
+            await Promise.all([this.loadShipments(), this.loadTabCounts()]);
         },
     };
 }
@@ -989,6 +1016,78 @@ function vendorShipmentShowPage() {
 
         get pickupAssignment() {
             return this.shipment?.pickup_assignment || null;
+        },
+
+        get heroClass() {
+            const status = this.shipment?.status || 'draft';
+            const map = {
+                draft: 'hero-draft',
+                submitted: 'hero-submitted',
+                invoice_sent: 'hero-invoiced',
+                invoice_accepted: 'hero-invoiced',
+                pickup_assigned: 'hero-pickup',
+                picked_up: 'hero-pickup',
+                at_warehouse: 'hero-warehouse',
+                sorted: 'hero-warehouse',
+                in_transit: 'hero-transit',
+                at_destination: 'hero-transit',
+                out_for_delivery: 'hero-transit',
+                delivered: 'hero-delivered',
+                cancelled: 'hero-cancelled',
+            };
+            return map[status] || 'hero-draft';
+        },
+
+        get heroMessage() {
+            const status = this.shipment?.status || 'draft';
+            const messages = {
+                draft: { title: 'Shipment is a draft', text: 'Add items and submit when ready.' },
+                submitted: { title: 'Shipment submitted', text: 'Awaiting admin review and invoice.' },
+                invoice_sent: { title: 'Invoice ready - Review required', text: 'An invoice has been sent. Accept or reject to proceed.' },
+                invoice_accepted: { title: 'Invoice accepted', text: 'Your shipment is being prepared for pickup.' },
+                pickup_assigned: { title: 'Pickup driver assigned', text: 'A driver has been assigned to collect your shipment.' },
+                picked_up: { title: 'Shipment picked up', text: 'Your items are on the way to the warehouse.' },
+                at_warehouse: { title: 'At warehouse', text: 'Your shipment has arrived at the sorting facility.' },
+                sorted: { title: 'Shipment sorted', text: 'Items have been processed and ready for dispatch.' },
+                in_transit: { title: 'In transit', text: 'Your shipment is on its way to the destination.' },
+                at_destination: { title: 'Arrived at destination', text: 'Your shipment has reached the destination hub.' },
+                out_for_delivery: { title: 'Out for delivery', text: 'A driver is delivering your shipment now.' },
+                delivered: { title: 'Delivered!', text: 'Your shipment has been delivered successfully.' },
+                cancelled: { title: 'Shipment cancelled', text: 'This shipment has been cancelled and cannot be processed further.' },
+            };
+            return messages[status] || messages.draft;
+        },
+
+        get progressSteps() {
+            const steps = [
+                { key: 'draft', label: 'Draft', icon: 'pencil', statuses: ['draft'] },
+                { key: 'submitted', label: 'Submitted', icon: 'send', statuses: ['submitted'] },
+                { key: 'invoiced', label: 'Invoiced', icon: 'receipt', statuses: ['invoice_sent', 'invoice_accepted'] },
+                { key: 'picked_up', label: 'Picked Up', icon: 'truck-pickup', statuses: ['pickup_assigned', 'picked_up'] },
+                { key: 'warehouse', label: 'Warehouse', icon: 'warehouse', statuses: ['at_warehouse', 'sorted'] },
+                { key: 'transit', label: 'In Transit', icon: 'truck', statuses: ['in_transit', 'at_destination', 'out_for_delivery'] },
+                { key: 'delivered', label: 'Delivered', icon: 'check-circle', statuses: ['delivered'] },
+            ];
+
+            const status = this.shipment?.status || 'draft';
+            let currentIdx = 0;
+            for (let i = 0; i < steps.length; i++) {
+                if (steps[i].statuses.includes(status)) {
+                    currentIdx = i;
+                    break;
+                }
+            }
+
+            return {
+                steps: steps.map((s, i) => ({
+                    ...s,
+                    state: status === 'cancelled' ? 'cancelled' : i < currentIdx ? 'done' : i === currentIdx ? 'active' : 'pending',
+                })),
+                currentIdx,
+                total: steps.length,
+                isCancelled: status === 'cancelled',
+                statusDetail: statusLabel(status),
+            };
         },
 
         onItemPhoneInput(event) {

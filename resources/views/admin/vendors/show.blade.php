@@ -18,7 +18,7 @@ $vendorConfig = [
 @endphp
 
 @section('content')
-<div x-data="vendorShow()" data-vendor-show-config="{{ e(json_encode($vendorConfig)) }}" class="space-y-6">
+<div x-data="vendorShow()" data-vendor-show-config="{{ json_encode($vendorConfig) }}" class="space-y-6">
 
     <!-- Hero Section -->
     <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30">

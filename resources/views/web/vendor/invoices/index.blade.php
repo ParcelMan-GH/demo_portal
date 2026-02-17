@@ -5,166 +5,150 @@
 
 @section('content')
 <div x-data="vendorInvoicesListPage()">
-    {{-- Header --}}
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <p class="text-sm text-slate-500">View and manage your invoices</p>
-    </div>
 
-    {{-- Filters --}}
-    <div class="vendor-card mb-6 p-4">
-        <form class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" @submit.prevent="applyFilters()">
-            <div>
-                <label class="mb-1 block text-xs font-medium text-slate-500">Shipment</label>
-                <select x-model="filters.shipment_id" @change="onShipmentChange()" class="vendor-input">
-                    <option value="">All shipments</option>
-                    <template x-for="shipment in shipments" :key="shipment.id">
-                        <option :value="shipment.id" x-text="shipment.shipment_number"></option>
-                    </template>
-                </select>
-            </div>
-            <div>
-                <label class="mb-1 block text-xs font-medium text-slate-500">Invoice Number</label>
-                <select x-model="filters.invoice_number" class="vendor-input">
-                    <option value="">All invoices</option>
-                    <template x-for="invoice in invoiceOptions" :key="invoice.id">
-                        <option :value="invoice.invoice_number" x-text="`${invoice.invoice_number} (${invoice.shipment_number})`"></option>
-                    </template>
-                </select>
-            </div>
-            <div class="sm:col-span-2">
-                <label class="mb-1 block text-xs font-medium text-slate-500">Search</label>
-                <input x-model="filters.search" type="text" placeholder="Invoice #, shipment #, status, notes..." class="vendor-input">
-            </div>
-            <div>
-                <label class="mb-1 block text-xs font-medium text-slate-500">From Date</label>
-                <input x-model="filters.from_date" type="date" class="vendor-input">
-            </div>
-            <div>
-                <label class="mb-1 block text-xs font-medium text-slate-500">To Date</label>
-                <input x-model="filters.to_date" type="date" class="vendor-input">
-            </div>
-            <div>
-                <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>
-                <select x-model="filters.status" multiple class="vendor-input h-[100px]">
-                    <template x-for="status in statuses" :key="status.value">
-                        <option :value="status.value" x-text="status.label"></option>
-                    </template>
-                </select>
-            </div>
-            <div>
-                <label class="mb-1 block text-xs font-medium text-slate-500">Sort By</label>
-                <select x-model="filters.sort_by" class="vendor-input">
-                    <template x-for="field in sortFields" :key="field.value">
-                        <option :value="field.value" x-text="field.label"></option>
-                    </template>
-                </select>
-            </div>
-            <div>
-                <label class="mb-1 block text-xs font-medium text-slate-500">Order</label>
-                <select x-model="filters.sort_order" class="vendor-input">
-                    <option value="desc">Newest First</option>
-                    <option value="asc">Oldest First</option>
-                </select>
-            </div>
-            <div>
-                <label class="mb-1 block text-xs font-medium text-slate-500">Per Page</label>
-                <select x-model.number="filters.limit" class="vendor-input">
-                    <option value="10">10</option>
-                    <option value="15">15</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                </select>
-            </div>
-            <div class="flex items-end gap-2">
-                <button type="submit" class="flex-1 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Apply</button>
-                <button type="button" @click="resetFilters()" class="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-gray-50">Reset</button>
-            </div>
-        </form>
-    </div>
-
-    {{-- Alert --}}
-    <div class="mb-4" x-show="alert" x-cloak>
-        <div class="rounded-lg border px-4 py-3 text-sm"
-             :class="{ 'border-green-200 bg-green-50 text-green-700': alert?.type === 'success', 'border-red-200 bg-red-50 text-red-700': alert?.type === 'error' }">
-            <span x-text="alert?.message"></span>
-        </div>
-    </div>
-
-    {{-- Validation Errors --}}
-    <div class="mb-4" x-show="validationErrors.length" x-cloak>
-        <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <ul class="list-disc pl-5">
-                <template x-for="err in validationErrors" :key="err">
-                    <li x-text="err"></li>
-                </template>
-            </ul>
-        </div>
-    </div>
-
-    {{-- Table --}}
-    <div class="vendor-card overflow-hidden">
-        <div x-show="loading" class="flex items-center justify-center py-16">
-            <svg class="h-6 w-6 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-        </div>
-
-        <div x-show="!loading" x-cloak>
-            <div class="overflow-x-auto">
-                <table class="vendor-table">
-                    <thead>
-                        <tr>
-                            <th>Invoice #</th>
-                            <th>Shipment #</th>
-                            <th>Status</th>
-                            <th>Total</th>
-                            <th>Created</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template x-for="invoice in invoices" :key="invoice.id">
-                            <tr>
-                                <td class="font-semibold text-slate-900" x-text="invoice.invoice_number"></td>
-                                <td x-text="invoice.shipment_number || '-'"></td>
-                                <td>
-                                    <span class="vendor-badge" :class="'vendor-badge-' + invoice.status" x-text="statusLabel(invoice.status)"></span>
-                                </td>
-                                <td x-text="formatMoney(invoice.total_amount, invoice.currency)"></td>
-                                <td class="text-xs" x-text="formatDateTime(invoice.created_at)"></td>
-                                <td>
-                                    <div class="flex flex-wrap gap-1.5">
-                                        <a :href="`/vendor/invoices/${invoice.id}`" class="rounded border border-gray-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-gray-50">View</a>
-                                        <button x-show="invoice.status === 'sent'" type="button" @click="acceptInvoice(invoice)"
-                                                class="rounded border border-green-200 px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-50">
-                                            Accept
-                                        </button>
-                                        <button x-show="invoice.status === 'sent'" type="button" @click="rejectInvoice(invoice)"
-                                                class="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
-                                            Reject
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-            </div>
-
-            {{-- Empty state --}}
-            <div x-show="invoices.length === 0" class="px-6 py-12 text-center">
-                <svg class="mx-auto h-10 w-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                <p class="mt-2 text-sm text-slate-500">No invoices found for the selected filters.</p>
-            </div>
-
-            {{-- Pagination --}}
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-4 py-3 text-sm text-slate-500">
-                <span>Page <span x-text="pagination.current_page"></span> of <span x-text="pagination.last_page"></span> (<span x-text="pagination.total"></span> total)</span>
-                <div class="flex gap-2">
-                    <button type="button" @click="previousPage()" :disabled="filters.offset <= 0"
-                            class="rounded border border-gray-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-gray-50 disabled:opacity-40">Previous</button>
-                    <button type="button" @click="nextPage()" :disabled="!pagination.has_more"
-                            class="rounded border border-gray-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-gray-50 disabled:opacity-40">Next</button>
+    {{-- Page Hero --}}
+    <div class="inv-hero">
+        <div class="inv-hero-content">
+            <div class="inv-hero-text">
+                <span class="inv-hero-title-icon">
+                    <svg width="26" height="26" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                </span>
+                <div class="inv-hero-text-group">
+                    <h1>Invoices</h1>
+                    <p>View and manage all your invoices</p>
                 </div>
             </div>
+            <div class="inv-hero-stats">
+                <div class="inv-hero-stat">
+                    <span class="inv-hero-stat-value" x-text="tabCounts.all"></span>
+                    <span class="inv-hero-stat-label">Total</span>
+                </div>
+                <div class="inv-hero-stat">
+                    <span class="inv-hero-stat-value" x-text="tabCounts.pending"></span>
+                    <span class="inv-hero-stat-label">Pending</span>
+                </div>
+                <div class="inv-hero-stat">
+                    <span class="inv-hero-stat-value" x-text="tabCounts.accepted"></span>
+                    <span class="inv-hero-stat-label">Accepted</span>
+                </div>
+                <div class="inv-hero-stat">
+                    <span class="inv-hero-stat-value" x-text="tabCounts.rejected"></span>
+                    <span class="inv-hero-stat-label">Rejected</span>
+                </div>
+            </div>
+        </div>
+
+        {{-- Filter Tabs (fused into hero) --}}
+        <div class="inv-filter-tabs">
+            <template x-for="tab in [
+                { key: 'all', label: 'All' },
+                { key: 'pending', label: 'Pending' },
+                { key: 'accepted', label: 'Accepted' },
+                { key: 'rejected', label: 'Rejected' },
+                { key: 'cancelled', label: 'Cancelled' },
+            ]" :key="tab.key">
+                <button type="button"
+                    class="inv-filter-tab"
+                    :class="{ 'active': activeTab === tab.key }"
+                    @click="switchTab(tab.key)">
+                    <span x-text="tab.label"></span>
+                    <span class="inv-filter-count" x-text="tabCounts[tab.key]"></span>
+                </button>
+            </template>
+        </div>
+    </div>
+
+    {{-- Loading --}}
+    <div x-show="loading" class="inv-loading">
+        <svg class="animate-spin" width="24" height="24" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+    </div>
+
+    {{-- Invoice Cards --}}
+    <div x-show="!loading" x-cloak>
+        <div class="inv-grid">
+            <template x-for="invoice in invoices" :key="invoice.id">
+                <div class="inv-card" :class="'inv-card-' + statusColor(invoice.status)">
+                    <div class="inv-card-inner">
+
+                        {{-- Status icon --}}
+                        <div class="inv-icon-wrap" :class="statusColor(invoice.status)">
+                            <template x-if="invoice.status === 'accepted'">
+                                <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </template>
+                            <template x-if="invoice.status === 'pending' || invoice.status === 'sent'">
+                                <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </template>
+                            <template x-if="invoice.status === 'rejected'">
+                                <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </template>
+                            <template x-if="invoice.status === 'cancelled'">
+                                <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                            </template>
+                        </div>
+
+                        {{-- Main content - inline row --}}
+                        <div class="inv-main">
+                            <a :href="`/vendor/invoices/${invoice.id}`" class="inv-number" x-text="invoice.invoice_number"></a>
+                            <span class="inv-meta-item amount">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                <span x-text="formatMoney(invoice.total_amount, invoice.currency)"></span>
+                            </span>
+                            <span class="inv-meta-item">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M4 11h16M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                <span x-text="formatDate(invoice.created_at)"></span>
+                            </span>
+                            <a x-show="invoice.shipment_number" :href="`/vendor/shipments/${invoice.shipment_id}`" class="inv-meta-item inv-shipment-link">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                <span x-text="invoice.shipment_number"></span>
+                            </a>
+                        </div>
+
+                        {{-- Actions (status + buttons pushed right) --}}
+                        <div class="inv-actions">
+                            <button x-show="invoice.status === 'sent'" type="button" @click="acceptInvoice(invoice)" class="inv-btn-accept">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Accept
+                            </button>
+                            <button x-show="invoice.status === 'sent'" type="button" @click="rejectInvoice(invoice)" class="inv-btn-reject">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                Reject
+                            </button>
+                            <span class="inv-status-badge" :class="statusColor(invoice.status)">
+                                <span x-text="vendorStatusLabel(invoice.status)"></span>
+                            </span>
+                            <a :href="`/vendor/invoices/${invoice.id}`" class="inv-btn-view">
+                                View Details
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        {{-- Empty state --}}
+        <div x-show="invoices.length === 0" class="inv-empty">
+            <div class="inv-empty-icon">
+                <svg width="56" height="56" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+            </div>
+            <h3>No invoices found</h3>
+            <p>There are no invoices matching your current filter.</p>
+        </div>
+
+        {{-- Pagination --}}
+        <div class="inv-pagination" x-show="invoices.length > 0 && pagination.last_page > 1">
+            <button type="button" @click="previousPage()" :disabled="filters.offset <= 0" class="inv-page-btn">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                Previous
+            </button>
+            <span class="inv-page-info">Page <span x-text="pagination.current_page"></span> of <span x-text="pagination.last_page"></span></span>
+            <button type="button" @click="nextPage()" :disabled="!pagination.has_more" class="inv-page-btn">
+                Next
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </button>
         </div>
     </div>
 </div>

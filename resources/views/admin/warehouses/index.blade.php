@@ -257,6 +257,15 @@
                         <th x-show="visibleColumns.capacity" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             CAPACITY (M&sup3;)
                         </th>
+                        <th x-show="visibleColumns.users_count" @@click="sort('users_count')" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                            <div class="flex items-center justify-center">
+                                USERS
+                                <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'users_count' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                </svg>
+                            </div>
+                        </th>
                         <th x-show="visibleColumns.status" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             STATUS
                         </th>
@@ -291,6 +300,7 @@
                             <td x-show="visibleColumns.district" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="warehouse.district || '-'"></td>
                             <td x-show="visibleColumns.contact_phone" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="warehouse.contact_phone || '-'"></td>
                             <td x-show="visibleColumns.capacity" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 text-center" x-text="warehouse.capacity ? warehouse.capacity + ' m\u00B3' : '-'"></td>
+                            <td x-show="visibleColumns.users_count" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-700 text-center font-semibold" x-text="warehouse.users_count ?? 0"></td>
                             <td x-show="visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap text-xs">
                                 <span
                                     class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"

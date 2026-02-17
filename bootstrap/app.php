@@ -16,7 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Configure redirect for admin guard
         $middleware->redirectGuestsTo(function (Request $request) {
-            if ($request->is('admin/*') || $request->is('admin')) {
+            if ($request->is('admin/*') || $request->is('admin') || $request->is('warehouse/*') || $request->is('warehouse')) {
                 return route('admin.login');
             }
             return route('login');
@@ -26,6 +26,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'permission' => \App\Http\Middleware\CheckPermission::class,
             'admin.audit' => \App\Http\Middleware\LogAdminAuditActivity::class,
+            'warehouse.user' => \App\Http\Middleware\EnsureWarehouseUser::class,
+            'system.user' => \App\Http\Middleware\EnsureSystemUser::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

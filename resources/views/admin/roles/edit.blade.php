@@ -2,46 +2,61 @@
 
 @php
     $isWarehouseScope = ($roleScope ?? ($role->is_warehouse_role ? 'warehouse' : 'system')) === 'warehouse';
+    $backUrl = route('admin.roles.show', ['role' => $role, 'scope' => $isWarehouseScope ? 'warehouse' : 'system']);
+    $selectedPermissions = is_array(old('permissions'))
+        ? array_map(static fn ($permissionId) => (int) $permissionId, old('permissions'))
+        : $rolePermissions;
 @endphp
 
-@section('title', ($isWarehouseScope ? 'Edit Warehouse Role - ' : 'Edit Role - ') . $role->name)
+@section('title', ($isWarehouseScope ? 'Edit Warehouse Role - ' : 'Edit System Role - ') . $role->name)
 
 @section('breadcrumb-parent', 'Roles & Permissions')
-@section('breadcrumb-current', ($isWarehouseScope ? 'Edit Warehouse Role - ' : 'Edit ') . $role->name)
+@section('breadcrumb-current', ($isWarehouseScope ? 'Edit Warehouse Role' : 'Edit System Role'))
 
 @section('content')
-    <div class="mb-6">
-        <a href="{{ route('admin.roles.show', ['role' => $role, 'scope' => $isWarehouseScope ? 'warehouse' : 'system']) }}" class="text-blue-600 hover:text-blue-800 flex items-center">
-            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-            Back to Role Details
-        </a>
-    </div>
+<div class="mx-auto max-w-5xl space-y-5">
+    <a href="{{ $backUrl }}"
+       class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        <span>Back to Role Details</span>
+    </a>
 
-    <div class="max-w-3xl">
-        <div class="bg-white rounded-lg shadow">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h1 class="text-xl font-semibold text-gray-900">Edit Role</h1>
-                <p class="text-sm text-gray-600">Update role information and permissions for {{ $role->name }}</p>
-                @if($role->is_system_role)
-                    <div class="mt-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-md">
-                        <p class="text-sm text-purple-700">
-                            <strong>Note:</strong> This is a system role. Some restrictions may apply.
-                        </p>
-                    </div>
-                @endif
+    <div class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-xl shadow-slate-300/40 ring-1 ring-slate-100 backdrop-blur-xl">
+        <div class="border-b border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-5 text-white lg:px-8">
+            <div class="flex items-start gap-4">
+                <div class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 12h6m-6 4h6m-6-8h6m4 11H5a2 2 0 01-2-2V7a2 2 0 012-2h9l5 5v7a2 2 0 01-2 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-semibold tracking-tight">
+                        {{ $isWarehouseScope ? 'Edit Warehouse Role' : 'Edit System Role' }}
+                    </h1>
+                    <p class="mt-1 text-sm text-slate-200">
+                        Update role details and permission access for {{ $role->name }}.
+                    </p>
+                </div>
             </div>
+        </div>
 
-            <form action="{{ route('admin.roles.update', $role) }}" method="POST" class="p-6">
-                @csrf
-                @method('PUT')
-                <input type="hidden" name="scope" value="{{ $isWarehouseScope ? 'warehouse' : 'system' }}">
+        <form
+            action="{{ route('admin.roles.update', $role) }}"
+            method="POST"
+            class="space-y-6 p-6 lg:p-8"
+            data-role-edit-form
+        >
+            @csrf
+            @method('PUT')
+            <input type="hidden" name="scope" value="{{ $isWarehouseScope ? 'warehouse' : 'system' }}">
+            <p data-role-edit-error="general" class="hidden rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"></p>
 
-                <!-- Role Name -->
-                <div class="mb-6">
-                    <label for="name" class="block text-sm font-medium text-gray-700 mb-1">
-                        Role Name <span class="text-red-500">*</span>
+            <div class="grid gap-6 lg:grid-cols-3">
+                <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 lg:col-span-2">
+                    <label for="name" class="mb-1.5 block text-sm font-semibold text-slate-800">
+                        Role Name <span class="text-rose-500">*</span>
                     </label>
                     <input
                         type="text"
@@ -49,82 +64,142 @@
                         name="name"
                         value="{{ old('name', $role->name) }}"
                         required
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('name') border-red-500 @enderror"
-                        placeholder="e.g., Sales Manager"
+                        placeholder="e.g., Operations Supervisor"
+                        class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-300/70 @error('name') border-rose-400 focus:border-rose-400 focus:ring-rose-200 @enderror"
                     >
                     @error('name')
-                        <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
+                        <p class="mt-1.5 text-sm text-rose-600">{{ $message }}</p>
                     @enderror
-                </div>
+                    <p data-role-edit-error="name" class="mt-1.5 hidden text-sm text-rose-600"></p>
 
-                <!-- Description -->
-                <div class="mb-6">
-                    <label for="description" class="block text-sm font-medium text-gray-700 mb-1">
+                    <label for="description" class="mt-5 mb-1.5 block text-sm font-semibold text-slate-800">
                         Description
                     </label>
                     <textarea
                         id="description"
                         name="description"
-                        rows="3"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('description') border-red-500 @enderror"
-                        placeholder="Brief description of this role's responsibilities"
+                        rows="4"
+                        placeholder="Short description of responsibilities and intended access."
+                        class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-300/70 @error('description') border-rose-400 focus:border-rose-400 focus:ring-rose-200 @enderror"
                     >{{ old('description', $role->description) }}</textarea>
                     @error('description')
-                        <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
+                        <p class="mt-1.5 text-sm text-rose-600">{{ $message }}</p>
                     @enderror
+                    <p data-role-edit-error="description" class="mt-1.5 hidden text-sm text-rose-600"></p>
                 </div>
 
-                <!-- Status -->
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                    <div class="flex items-center space-x-4">
-                        <label class="flex items-center">
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p class="text-sm font-semibold text-slate-800">Role Status</p>
+                    <p class="mt-1 text-xs text-slate-500">Choose whether this role is currently assignable.</p>
+
+                    <div class="mt-4 space-y-2">
+                        <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50">
                             <input
                                 type="radio"
                                 name="is_active"
                                 value="1"
-                                {{ old('is_active', $role->is_active) ? 'checked' : '' }}
-                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                {{ old('is_active', (string) (int) $role->is_active) === '1' ? 'checked' : '' }}
+                                class="h-4 w-4 border-slate-300 text-slate-700 focus:ring-slate-500"
                             >
-                            <span class="ml-2 text-sm text-gray-700">Active</span>
+                            <span>Active</span>
                         </label>
-                        <label class="flex items-center">
+                        <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50">
                             <input
                                 type="radio"
                                 name="is_active"
                                 value="0"
-                                {{ !old('is_active', $role->is_active) ? 'checked' : '' }}
-                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                {{ old('is_active', (string) (int) $role->is_active) === '0' ? 'checked' : '' }}
+                                class="h-4 w-4 border-slate-300 text-slate-700 focus:ring-slate-500"
                             >
-                            <span class="ml-2 text-sm text-gray-700">Inactive</span>
+                            <span>Inactive</span>
                         </label>
                     </div>
                 </div>
+            </div>
 
-                <!-- Permissions -->
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-3">
-                        Permissions <span class="text-red-500">*</span>
-                    </label>
+            @php
+                $permissionModules = $permissions->keys()->values();
+            @endphp
 
-                    @if($permissions->isEmpty())
-                        <p class="text-sm text-gray-500 italic">No permissions available. Please seed permissions first.</p>
-                    @else
-                        <div class="space-y-4" x-data="{ openModules: [] }">
-                            @foreach($permissions as $module => $modulePermissions)
-                                <div class="border border-gray-200 rounded-md">
-                                    <!-- Module Header -->
+            <div
+                class="rounded-2xl border border-slate-200 bg-slate-50/60 p-5"
+                x-data="{
+                    openModules: @js($permissionModules),
+                    allModules: @js($permissionModules),
+                    toggleModules() {
+                        this.openModules = this.openModules.length ? [] : [...this.allModules];
+                    },
+                    setAllPermissions(checked) {
+                        this.$refs.permissionsRoot.querySelectorAll('.permission-checkbox').forEach((checkbox) => {
+                            checkbox.checked = checked;
+                        });
+                    },
+                    setModulePermissions(module, checked) {
+                        this.$refs.permissionsRoot.querySelectorAll('.permission-checkbox').forEach((checkbox) => {
+                            if (checkbox.dataset.module !== module) {
+                                return;
+                            }
+                            checkbox.checked = checked;
+                        });
+                    }
+                }"
+            >
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-800">
+                            Permissions <span class="text-rose-500">*</span>
+                        </label>
+                        <p class="mt-1 text-xs text-slate-500">Select modules and actions this role can perform.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            @click="setAllPermissions(true)"
+                        >
+                            Select All
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            @click="setAllPermissions(false)"
+                        >
+                            Deselect All
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            @click="toggleModules()"
+                        >
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                            <span x-text="openModules.length ? 'Collapse All' : 'Expand All'"></span>
+                        </button>
+                    </div>
+                </div>
+
+                @if($permissions->isEmpty())
+                    <p class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                        No permissions available. Please run permission seeders first.
+                    </p>
+                @else
+                    <div class="space-y-3" x-ref="permissionsRoot">
+                        @foreach($permissions as $module => $modulePermissions)
+                            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                                <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-50/80 px-4 py-3">
                                     <button
                                         type="button"
                                         @click="openModules.includes('{{ $module }}') ? openModules = openModules.filter(m => m !== '{{ $module }}') : openModules.push('{{ $module }}')"
-                                        class="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left"
+                                        class="flex flex-1 items-center justify-between gap-2 text-left hover:text-slate-950"
                                     >
-                                        <span class="text-sm font-medium text-gray-900 capitalize">
-                                            {{ str_replace('_', ' ', $module) }} ({{ $modulePermissions->count() }})
+                                        <span class="text-sm font-semibold capitalize text-slate-800">
+                                            {{ str_replace('_', ' ', $module) }}
+                                            <span class="ml-1 text-xs font-medium text-slate-500">({{ $modulePermissions->count() }})</span>
                                         </span>
                                         <svg
-                                            class="w-5 h-5 text-gray-500 transition-transform"
-                                            :class="openModules.includes('{{ $module }}') ? 'transform rotate-180' : ''"
+                                            class="h-4 w-4 text-slate-500 transition-transform"
+                                            :class="openModules.includes('{{ $module }}') ? 'rotate-180' : ''"
                                             fill="none"
                                             stroke="currentColor"
                                             viewBox="0 0 24 24"
@@ -132,60 +207,71 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                         </svg>
                                     </button>
+                                    <div class="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            class="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                            @click.stop="setModulePermissions('{{ $module }}', true)"
+                                        >
+                                            Select All
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                            @click.stop="setModulePermissions('{{ $module }}', false)"
+                                        >
+                                            Deselect All
+                                        </button>
+                                    </div>
+                                </div>
 
-                                    <!-- Module Permissions -->
-                                    <div
-                                        x-show="openModules.includes('{{ $module }}')"
-                                        x-cloak
-                                        class="px-4 py-3 space-y-2 bg-white"
-                                    >
+                                <div x-show="openModules.includes('{{ $module }}')" x-cloak class="border-t border-slate-100 px-4 py-3">
+                                    <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                                         @foreach($modulePermissions as $permission)
-                                            <label class="flex items-center">
+                                            <label class="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
                                                 <input
                                                     type="checkbox"
                                                     name="permissions[]"
                                                     value="{{ $permission->id }}"
-                                                    {{
-                                                        (is_array(old('permissions')) && in_array($permission->id, old('permissions')))
-                                                        || (empty(old('permissions')) && in_array($permission->id, $rolePermissions))
-                                                        ? 'checked'
-                                                        : ''
-                                                    }}
-                                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                                    data-module="{{ $module }}"
+                                                    {{ in_array($permission->id, $selectedPermissions, true) ? 'checked' : '' }}
+                                                    class="permission-checkbox mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
                                                 >
-                                                <span class="ml-2 text-sm text-gray-700">
+                                                <span class="leading-snug">
                                                     {{ $permission->label() }}
                                                     @if($permission->description)
-                                                        <span class="text-gray-500">({{ $permission->description }})</span>
+                                                        <span class="block text-xs text-slate-500">{{ $permission->description }}</span>
                                                     @endif
                                                 </span>
                                             </label>
                                         @endforeach
                                     </div>
                                 </div>
-                            @endforeach
-                        </div>
-                    @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
 
-                    @error('permissions')
-                        <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
-                    @enderror
-                </div>
+                @error('permissions')
+                    <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                @enderror
+                <p data-role-edit-error="permissions" class="mt-2 hidden text-sm text-rose-600"></p>
+            </div>
 
-                <!-- Submit Buttons -->
-                <div class="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
-                    <a href="{{ route('admin.roles.show', ['role' => $role, 'scope' => $isWarehouseScope ? 'warehouse' : 'system']) }}"
-                       class="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
-                        Cancel
-                    </a>
-                    <button
-                        type="submit"
-                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                    >
-                        Update Role
-                    </button>
-                </div>
-            </form>
-        </div>
+            <div class="flex items-center justify-end gap-3 border-t border-slate-200 pt-5">
+                <a href="{{ $backUrl }}"
+                   class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+                    Cancel
+                </a>
+                <button
+                    type="submit"
+                    data-role-edit-submit
+                    class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                >
+                    Update Role
+                </button>
+            </div>
+        </form>
     </div>
+</div>
 @endsection

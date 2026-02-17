@@ -26,8 +26,8 @@ $warehouseUsersTableConfig = [
 @section('content')
 <div
     x-data="warehouseShow()"
-    data-warehouse-show-config="{{ e(json_encode($warehouseConfig)) }}"
-    data-warehouse-users-config="{{ e(json_encode($warehouseUsersTableConfig)) }}"
+    data-warehouse-show-config="{{ json_encode($warehouseConfig) }}"
+    data-warehouse-users-config="{{ json_encode($warehouseUsersTableConfig) }}"
     class="space-y-6"
 >
 
@@ -320,20 +320,70 @@ $warehouseUsersTableConfig = [
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                 </svg>
                             </button>
-                            <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-full rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 z-[90]" style="display:none;">
-                                <button type="button" @@click="roleFilter = ''; open = false; meta.current_page = 1; loadData()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">All roles</button>
+                            <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/85 shadow-2xl p-2 z-50 backdrop-blur-xl" style="display:none;">
+                                <button type="button" @@click="roleFilter = ''; open = false; meta.current_page = 1; loadData()" class="w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70" :class="roleFilter === '' ? 'bg-white/70 shadow-sm' : ''">
+                                    <svg x-show="roleFilter === ''" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    <span>All roles</span>
+                                </button>
                                 <template x-for="role in roles" :key="role.id">
-                                    <button type="button" @@click="roleFilter = String(role.id); open = false; meta.current_page = 1; loadData()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50" x-text="role.name"></button>
+                                    <button type="button" @@click="roleFilter = String(role.id); open = false; meta.current_page = 1; loadData()" class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70" :class="roleFilter === String(role.id) ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''">
+                                        <svg x-show="roleFilter === String(role.id)" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                        <span x-text="role.name"></span>
+                                    </button>
                                 </template>
                             </div>
                         </div>
 
-                        <div class="w-full sm:w-44">
-                            <select x-model="statusFilter" @@change="meta.current_page = 1; loadData()" class="w-full px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 text-sm text-slate-700">
-                                <option value="">All statuses</option>
-                                <option value="1">Active</option>
-                                <option value="0">Inactive</option>
-                            </select>
+                        <div x-data="{ open: false }" class="relative w-full sm:w-56">
+                            <button
+                                type="button"
+                                @@click="open = !open"
+                                class="w-full inline-flex items-center justify-between px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors"
+                            >
+                                <span x-text="statusFilterName"></span>
+                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                            <div
+                                x-show="open"
+                                @@click.away="open = false"
+                                x-transition
+                                class="absolute right-0 mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/85 shadow-2xl p-2 z-50 backdrop-blur-xl"
+                                style="display: none;"
+                            >
+                                <button type="button"
+                                        @@click="setStatusFilter('', 'All statuses'); open = false"
+                                        class="w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
+                                        :class="statusFilter === '' ? 'bg-white/70 shadow-sm' : ''">
+                                    <svg x-show="statusFilter === ''" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    <span>All statuses</span>
+                                </button>
+                                <button type="button"
+                                        @@click="setStatusFilter('1', 'Active'); open = false"
+                                        class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
+                                        :class="statusFilter === '1' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''">
+                                    <svg x-show="statusFilter === '1'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    <span>Active</span>
+                                </button>
+                                <button type="button"
+                                        @@click="setStatusFilter('0', 'Inactive'); open = false"
+                                        class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
+                                        :class="statusFilter === '0' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''">
+                                    <svg x-show="statusFilter === '0'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    <span>Inactive</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -348,7 +398,7 @@ $warehouseUsersTableConfig = [
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                 </svg>
                             </button>
-                            <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 z-[90]" style="display:none;">
+                            <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50" style="display:none;">
                                 <template x-for="col in columns" :key="col.key">
                                     <button type="button" @@click="toggleColumn(col.key)" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">
                                         <span x-text="col.label"></span>
@@ -370,10 +420,32 @@ $warehouseUsersTableConfig = [
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                 </svg>
                             </button>
-                            <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 z-[90]" style="display:none;">
-                                <button type="button" @@click="exportData('excel'); open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Excel</button>
-                                <button type="button" @@click="exportData('pdf'); open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">PDF</button>
-                                <button type="button" @@click="exportData('csv'); open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">CSV</button>
+                            <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50" style="display:none;">
+                                <button type="button" @@click="exportData('excel'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                    <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    Excel
+                                </button>
+                                <button type="button" @@click="exportData('pdf'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                    <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                    </svg>
+                                    PDF
+                                </button>
+                                <button type="button" @@click="exportData('csv'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    CSV
+                                </button>
+                                <div class="border-t border-slate-200/50 my-1"></div>
+                                <button type="button" @@click="printData(); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                    <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                    </svg>
+                                    Print
+                                </button>
                             </div>
                         </div>
 
@@ -391,12 +463,44 @@ $warehouseUsersTableConfig = [
                     <table class="min-w-full divide-y divide-slate-200/50 text-xs">
                         <thead class="bg-slate-50/50">
                             <tr>
-                                <th x-show="visibleColumns.name" @@click="sort('name')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">NAME</th>
+                                <th x-show="visibleColumns.name" @@click="sort('name')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <div class="flex items-center">
+                                        NAME
+                                        <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'name' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                        </svg>
+                                    </div>
+                                </th>
                                 <th x-show="visibleColumns.role" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ROLE</th>
-                                <th x-show="visibleColumns.email" @@click="sort('email')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">EMAIL</th>
+                                <th x-show="visibleColumns.email" @@click="sort('email')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <div class="flex items-center">
+                                        EMAIL
+                                        <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'email' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                        </svg>
+                                    </div>
+                                </th>
                                 <th x-show="visibleColumns.status" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">STATUS</th>
-                                <th x-show="visibleColumns.created_at" @@click="sort('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">CREATED AT</th>
-                                <th x-show="visibleColumns.last_login_at" @@click="sort('last_login_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">LAST LOGIN</th>
+                                <th x-show="visibleColumns.created_at" @@click="sort('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <div class="flex items-center">
+                                        CREATED AT
+                                        <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'created_at' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                        </svg>
+                                    </div>
+                                </th>
+                                <th x-show="visibleColumns.last_login_at" @@click="sort('last_login_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <div class="flex items-center">
+                                        LAST LOGIN
+                                        <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'last_login_at' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                        </svg>
+                                    </div>
+                                </th>
                                 <th x-show="visibleColumns.actions" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ACTIONS</th>
                             </tr>
                         </thead>
@@ -434,25 +538,74 @@ $warehouseUsersTableConfig = [
                             </template>
                         </tbody>
                     </table>
-                </div>
 
-                <div class="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="text-xs text-slate-500" x-text="`Showing ${meta.from || 0} to ${meta.to || 0} of ${meta.total || 0} users`"></div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs text-slate-500">Rows</span>
-                        <select x-model.number="perPage" @@change="meta.current_page = 1; loadData()" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700">
-                            <option value="10">10</option>
-                            <option value="25">25</option>
-                            <option value="50">50</option>
-                        </select>
-                        <button @@click="firstPage()" :disabled="meta.current_page <= 1" class="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 disabled:opacity-40">«</button>
-                        <button @@click="previousPage()" :disabled="meta.current_page <= 1" class="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 disabled:opacity-40">‹</button>
-                        <span class="px-2 text-xs text-slate-600" x-text="`Page ${meta.current_page} of ${meta.last_page || 1}`"></span>
-                        <button @@click="nextPage()" :disabled="meta.current_page >= meta.last_page" class="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 disabled:opacity-40">›</button>
-                        <button @@click="lastPage()" :disabled="meta.current_page >= meta.last_page" class="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 disabled:opacity-40">»</button>
+                <div class="px-4 py-2.5 border-t border-slate-200/50 bg-slate-50/30">
+                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div class="text-xs text-slate-600">
+                            Showing
+                            <span x-text="meta.from"></span>
+                            to
+                            <span x-text="meta.to"></span>
+                            of
+                            <span x-text="meta.total"></span>
+                            users
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-medium text-slate-600">Rows</span>
+                                <div x-data="{ open: false }" class="relative">
+                                    <button type="button" @@click="open = !open" class="inline-flex items-center justify-between gap-1.5 px-2.5 py-1 min-w-[60px] border border-slate-200/70 rounded-lg bg-white/70 backdrop-blur-sm text-xs font-medium text-slate-700 hover:bg-white/90 transition-colors">
+                                        <span x-text="perPage"></span>
+                                        <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                    </button>
+                                    <div x-show="open" @@click.away="open = false" x-transition class="absolute bottom-full mb-1 right-0 w-16 rounded-lg border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-lg p-1 z-[9999]" style="display: none;">
+                                        <button type="button" @@click="setPerPage(10); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 10 ? 'bg-slate-100/70' : ''">10</button>
+                                        <button type="button" @@click="setPerPage(25); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 25 ? 'bg-slate-100/70' : ''">25</button>
+                                        <button type="button" @@click="setPerPage(50); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 50 ? 'bg-slate-100/70' : ''">50</button>
+                                        <button type="button" @@click="setPerPage(100); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 100 ? 'bg-slate-100/70' : ''">100</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-xs font-medium text-slate-600">
+                                Page
+                                <span x-text="meta.current_page"></span>
+                                of
+                                <span x-text="meta.last_page"></span>
+                            </div>
+
+                            <div class="flex space-x-1">
+                                <button @@click="firstPage()" :disabled="meta.current_page === 1" :class="meta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/>
+                                    </svg>
+                                </button>
+
+                                <button @@click="previousPage()" :disabled="meta.current_page === 1" :class="meta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                    </svg>
+                                </button>
+
+                                <button @@click="nextPage()" :disabled="meta.current_page === meta.last_page" :class="meta.current_page === meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
+
+                                <button @@click="lastPage()" :disabled="meta.current_page === meta.last_page" :class="meta.current_page === meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
+                </div>
                 <div
                     x-show="showUserModal"
                     x-cloak
@@ -481,82 +634,144 @@ $warehouseUsersTableConfig = [
                             x-transition:leave-start="opacity-100 scale-100"
                             x-transition:leave-end="opacity-0 scale-95"
                             @@click.stop
-                            class="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+                            class="relative w-full max-w-lg bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50"
                         >
-                            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
+                            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200/50">
                                 <div>
-                                    <h3 class="text-lg font-bold text-slate-900" x-text="userModalMode === 'create' ? 'Add Warehouse User' : 'Edit Warehouse User'"></h3>
-                                    <p class="text-sm text-slate-500 mt-0.5">This user will remain scoped to this warehouse.</p>
+                                    <h3 class="text-lg font-semibold text-slate-900" x-text="userModalMode === 'create' ? 'Add New User' : 'Edit User'"></h3>
+                                    <p class="text-sm text-slate-500" x-text="userModalMode === 'create' ? 'Create a new warehouse user' : 'Update warehouse user information'"></p>
                                 </div>
-                                <button type="button" @@click="closeUserModal()" class="rounded-lg p-2 text-slate-400 hover:text-slate-700 hover:bg-white">
+                                <button @@click="closeUserModal()" class="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                     </svg>
                                 </button>
                             </div>
 
-                            <form @@submit.prevent="submitUserForm()">
-                                <div class="p-6 space-y-5 max-h-[calc(100vh-220px)] overflow-y-auto">
-                                    <template x-if="userFormErrors.general">
-                                        <div class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" x-text="userFormErrors.general"></div>
-                                    </template>
+                            <form @@submit.prevent="submitUserForm()" class="p-6 space-y-4">
+                                <div x-show="userFormErrors.general" x-cloak class="p-3 rounded-xl bg-red-50 border border-red-200">
+                                    <p class="text-sm text-red-600" x-text="userFormErrors.general"></p>
+                                </div>
 
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Name <span class="text-rose-500">*</span></label>
-                                            <input type="text" x-model="userForm.name" required class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400">
-                                            <template x-if="userFormErrors.name"><p class="mt-1 text-xs text-rose-600" x-text="userFormErrors.name"></p></template>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Email <span class="text-rose-500">*</span></label>
-                                            <input type="email" x-model="userForm.email" required class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400">
-                                            <template x-if="userFormErrors.email"><p class="mt-1 text-xs text-rose-600" x-text="userFormErrors.email"></p></template>
-                                        </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                                        Full Name <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text"
+                                           x-model="userForm.name"
+                                           class="w-full px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                                           :class="userFormErrors.name ? 'border-red-300 focus:ring-red-400/50' : ''"
+                                           placeholder="John Doe">
+                                    <p x-show="userFormErrors.name" x-text="userFormErrors.name" class="mt-1 text-xs text-red-500"></p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                                        Email Address <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="email"
+                                           x-model="userForm.email"
+                                           class="w-full px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                                           :class="userFormErrors.email ? 'border-red-300 focus:ring-red-400/50' : ''"
+                                           placeholder="warehouse.user@example.com">
+                                    <p x-show="userFormErrors.email" x-text="userFormErrors.email" class="mt-1 text-xs text-red-500"></p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Assign Role</label>
+                                    <div class="space-y-2 max-h-40 overflow-y-auto border border-slate-200/70 rounded-xl p-3 bg-white/50">
+                                        <template x-for="role in roles" :key="role.id">
+                                            <label class="flex items-center cursor-pointer">
+                                                <input type="radio"
+                                                       name="warehouse_user_role_id"
+                                                       :value="Number(role.id)"
+                                                       x-model.number="userForm.role_id"
+                                                       class="h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300">
+                                                <span class="ml-2 text-sm text-slate-700" x-text="role.name"></span>
+                                            </label>
+                                        </template>
                                     </div>
+                                    <p x-show="userFormErrors.role_id || userFormErrors.roles"
+                                       x-text="userFormErrors.role_id || userFormErrors.roles"
+                                       class="mt-1 text-xs text-red-500"></p>
+                                </div>
 
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Password <span x-show="userModalMode === 'create'" class="text-rose-500">*</span></label>
-                                            <input type="password" x-model="userForm.password" :required="userModalMode === 'create'" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400">
-                                            <p class="mt-1 text-xs text-slate-500" x-show="userModalMode === 'edit'">Leave blank to keep current password.</p>
-                                            <template x-if="userFormErrors.password"><p class="mt-1 text-xs text-rose-600" x-text="userFormErrors.password"></p></template>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Confirm Password <span x-show="userModalMode === 'create'" class="text-rose-500">*</span></label>
-                                            <input type="password" x-model="userForm.password_confirmation" :required="userModalMode === 'create'" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400">
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-sm font-semibold text-slate-700 mb-2">Assign Role</label>
-                                        <div class="max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/40 p-3 space-y-2">
-                                            <template x-for="role in roles" :key="role.id">
-                                                <label class="flex items-center gap-2 text-sm text-slate-700">
-                                                    <input type="radio" name="warehouse_user_role_id" :value="Number(role.id)" x-model.number="userForm.role_id" class="border-slate-300 text-slate-900 focus:ring-slate-400">
-                                                    <span x-text="role.name"></span>
-                                                </label>
-                                            </template>
-                                        </div>
-                                        <template x-if="userFormErrors.role_id || userFormErrors.roles"><p class="mt-1 text-xs text-rose-600" x-text="userFormErrors.role_id || userFormErrors.roles"></p></template>
-                                    </div>
-
-                                    <div x-show="userModalMode === 'edit' && selectedUser && !selectedUser.is_self">
-                                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Status</label>
-                                        <select x-model="userForm.is_active" class="w-full md:w-56 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400">
-                                            <option value="1">Active</option>
-                                            <option value="0">Inactive</option>
-                                        </select>
+                                <div x-show="userModalMode === 'edit' && selectedUser && !selectedUser.is_self" x-cloak>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Status</label>
+                                    <div class="flex items-center gap-4">
+                                        <label class="flex items-center cursor-pointer">
+                                            <input type="radio" x-model="userForm.is_active" value="1" class="h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300">
+                                            <span class="ml-2 text-sm text-slate-700">Active</span>
+                                        </label>
+                                        <label class="flex items-center cursor-pointer">
+                                            <input type="radio" x-model="userForm.is_active" value="0" class="h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300">
+                                            <span class="ml-2 text-sm text-slate-700">Inactive</span>
+                                        </label>
                                     </div>
                                 </div>
 
-                                <div class="px-6 py-4 border-t border-slate-200 bg-slate-50/60 flex items-center justify-end gap-3">
-                                    <button type="button" @@click="closeUserModal()" class="px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100">Cancel</button>
-                                    <button type="submit" :disabled="submittingUser" class="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 disabled:opacity-50">
-                                        <svg x-show="submittingUser" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                        </svg>
-                                        <span x-text="submittingUser ? 'Saving...' : (userModalMode === 'create' ? 'Create User' : 'Save Changes')"></span>
+                                <div x-data="{ showPassword: false }">
+                                    <div x-show="userModalMode === 'edit'" x-cloak class="mb-3">
+                                        <label class="flex items-center cursor-pointer">
+                                            <input type="checkbox" x-model="changePassword" class="h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300 rounded">
+                                            <span class="ml-2 text-sm text-slate-700">Change Password</span>
+                                        </label>
+                                    </div>
+
+                                    <div x-show="userModalMode === 'create' || changePassword" x-cloak class="space-y-3">
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-700 mb-1">
+                                                <span x-text="userModalMode === 'create' ? 'Password' : 'New Password'"></span>
+                                                <span x-show="userModalMode === 'create'" class="text-red-500">*</span>
+                                            </label>
+                                            <div class="relative">
+                                                <input :type="showPassword ? 'text' : 'password'"
+                                                       x-model="userForm.password"
+                                                       :required="userModalMode === 'create'"
+                                                       class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                                                       :class="userFormErrors.password ? 'border-red-300 focus:ring-red-400/50' : ''"
+                                                       placeholder="Minimum 8 characters">
+                                                <button type="button" @@click="showPassword = !showPassword" class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-slate-600">
+                                                    <svg x-show="!showPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                                    </svg>
+                                                    <svg x-show="showPassword" x-cloak class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <p x-show="userFormErrors.password" x-text="userFormErrors.password" class="mt-1 text-xs text-red-500"></p>
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-700 mb-1">
+                                                Confirm Password <span x-show="userModalMode === 'create'" class="text-red-500">*</span>
+                                            </label>
+                                            <input :type="showPassword ? 'text' : 'password'"
+                                                   x-model="userForm.password_confirmation"
+                                                   :required="userModalMode === 'create'"
+                                                   class="w-full px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                                                   placeholder="Re-enter password">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200/50">
+                                    <button type="button" @@click="closeUserModal()" class="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
+                                        Cancel
+                                    </button>
+                                    <button type="submit"
+                                            :disabled="submittingUser"
+                                            class="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <span x-show="!submittingUser" x-text="userModalMode === 'create' ? 'Create User' : 'Update User'"></span>
+                                        <span x-show="submittingUser" class="flex items-center gap-2">
+                                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Saving...
+                                        </span>
                                     </button>
                                 </div>
                             </form>

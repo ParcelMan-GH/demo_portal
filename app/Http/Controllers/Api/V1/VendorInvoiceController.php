@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Shipment;
 use App\Services\InvoiceService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -321,6 +322,42 @@ class VendorInvoiceController extends Controller
                 'invoice' => $this->transformInvoiceForDetail($rejectedInvoice),
             ],
         ]);
+    }
+
+    /**
+     * Download invoice as PDF.
+     */
+    public function downloadPdf(Request $request, Invoice $invoice)
+    {
+        if ($invoice->shipment->vendor_id !== $request->user()->id || $invoice->status === InvoiceStatus::PENDING) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found.',
+            ], 404);
+        }
+
+        $invoice->load('shipment.vendor');
+
+        $logoPath = public_path('logo.png');
+        $logoBase64 = '';
+        if (file_exists($logoPath)) {
+            $logoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+        }
+
+        $data = [
+            'invoice' => $invoice,
+            'shipment' => $invoice->shipment,
+            'vendor' => $invoice->shipment->vendor,
+            'logoBase64' => $logoBase64,
+        ];
+
+        $pdf = Pdf::loadView('pdf.vendor-invoice', $data);
+        $pdf->setPaper('A4', 'portrait');
+        $pdf->setOption('isRemoteEnabled', true);
+
+        $filename = ($invoice->invoice_number ?: 'invoice') . '.pdf';
+
+        return $pdf->download($filename);
     }
 
     private function transformInvoiceForList(Invoice $invoice): array

@@ -64,6 +64,7 @@ Route::prefix('v1/vendor')->middleware('auth:sanctum')->group(function () {
     Route::get('invoices/{invoice}', [VendorInvoiceController::class, 'show']);
     Route::post('invoices/{invoice}/accept', [VendorInvoiceController::class, 'accept']);
     Route::post('invoices/{invoice}/reject', [VendorInvoiceController::class, 'reject']);
+    Route::get('invoices/{invoice}/pdf', [VendorInvoiceController::class, 'downloadPdf']);
 });
 
 // API v1 - Driver Authentication

@@ -26,7 +26,7 @@ $shipmentConfig = [
 @endphp
 
 @section('content')
-<div x-data="shipmentShow()" data-shipment-show-config="{{ e(json_encode($shipmentConfig)) }}" class="space-y-6">
+<div x-data="shipmentShow()" data-shipment-show-config="{{ json_encode($shipmentConfig) }}" class="space-y-6">
 
     <!-- Hero Section -->
     <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30">

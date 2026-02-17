@@ -89,6 +89,10 @@ class AuthController extends Controller
             statusCode: 200
         );
 
+        if (!empty($admin->warehouse_id)) {
+            return redirect()->route('warehouse.dashboard');
+        }
+
         return redirect()->route('admin.dashboard');
     }
 

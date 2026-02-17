@@ -11,6 +11,9 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\ShipmentController;
 use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\WarehouseController;
+use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
+use App\Http\Controllers\Warehouse\ReceiptController as WarehouseReceiptController;
+use App\Http\Controllers\Warehouse\UserController as WarehouseUserController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -100,13 +103,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('login', [AuthController::class, 'login']);
     });
 
-    // Authenticated routes
+    // Shared authenticated route(s)
     Route::middleware(['auth:admin', 'admin.audit'])->group(function () {
         Route::post('logout', [AuthController::class, 'logout'])->name('logout');
+    });
+
+    // Authenticated system-admin routes
+    Route::middleware(['auth:admin', 'admin.audit', 'system.user'])->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
         // Role Management
         Route::get('roles/warehouse', [RoleController::class, 'warehouseIndex'])->name('roles.warehouse.index');
+        Route::get('roles-data', [RoleController::class, 'data'])->name('roles.data');
+        Route::get('roles-export', [RoleController::class, 'export'])->name('roles.export');
         Route::resource('roles', RoleController::class);
 
         // Admin Management
@@ -118,6 +127,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->name('admins.toggle-active');
         Route::post('admins/{admin}/assign-roles', [AdminController::class, 'assignRoles'])
             ->name('admins.assign-roles');
+        Route::get('admins/{admin}/audit-logs-data', [AdminController::class, 'auditLogsData'])
+            ->name('admins.audit-logs-data');
 
         // Vendor Management
         Route::get('vendors', [VendorController::class, 'index'])->name('vendors.index');
@@ -202,3 +213,31 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('settings/clear-cache', [SettingsController::class, 'clearCache'])->name('settings.clear-cache');
     });
 });
+
+/*
+|--------------------------------------------------------------------------
+| Warehouse Web Portal Routes
+|--------------------------------------------------------------------------
+*/
+Route::prefix('warehouse')
+    ->name('warehouse.')
+    ->middleware(['auth:admin', 'admin.audit', 'warehouse.user'])
+    ->group(function () {
+        Route::get('/', [WarehouseDashboardController::class, 'index'])->name('dashboard');
+
+        // Warehouse Users
+        Route::get('users', [WarehouseUserController::class, 'index'])->name('users.index');
+        Route::get('users-data', [WarehouseUserController::class, 'data'])->name('users.data');
+        Route::get('users-export', [WarehouseUserController::class, 'export'])->name('users.export');
+        Route::post('users', [WarehouseUserController::class, 'store'])->name('users.store');
+        Route::put('users/{user}', [WarehouseUserController::class, 'update'])->name('users.update');
+        Route::patch('users/{user}/toggle-active', [WarehouseUserController::class, 'toggleActive'])->name('users.toggle-active');
+
+        // Receipts / Pickups / Items
+        Route::get('receipts/pending', [WarehouseReceiptController::class, 'pendingIndex'])->name('receipts.pending.index');
+        Route::get('receipts/pending-data', [WarehouseReceiptController::class, 'pendingData'])->name('receipts.pending.data');
+        Route::get('pickups/received', [WarehouseReceiptController::class, 'receivedPickupsIndex'])->name('pickups.received.index');
+        Route::get('pickups/received-data', [WarehouseReceiptController::class, 'receivedPickupsData'])->name('pickups.received.data');
+        Route::get('items/received', [WarehouseReceiptController::class, 'receivedItemsIndex'])->name('items.received.index');
+        Route::get('items/received-data', [WarehouseReceiptController::class, 'receivedItemsData'])->name('items.received.data');
+    });
