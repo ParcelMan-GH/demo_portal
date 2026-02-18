@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceiptItem;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -35,6 +36,7 @@ class WarehouseSortingService
                 $query->where('warehouse_id', $warehouse->id)
                     ->where('status', 'finalized');
             })
+            ->where('received_quantity', '>', 0)
             ->whereDoesntHave('sortBatchItems', function (Builder $query) {
                 $query->whereNull('removed_at');
             });
@@ -53,27 +55,79 @@ class WarehouseSortingService
 
     public function createBatch(
         Warehouse $originWarehouse,
-        Warehouse $destinationWarehouse,
+        ?Warehouse $destinationWarehouse,
         User $user,
+        string $dispatchMode = SortBatch::DISPATCH_TRANSFER,
         ?string $notes = null
     ): array {
-        if (!$destinationWarehouse->is_active) {
+        if (!in_array($dispatchMode, [SortBatch::DISPATCH_TRANSFER, SortBatch::DISPATCH_LOCAL_DELIVERY], true)) {
             return [
                 'success' => false,
-                'message' => 'Destination warehouse is inactive.',
+                'message' => 'Invalid dispatch mode.',
             ];
         }
 
-        $batchNumber = $this->generateBatchNumber($originWarehouse, $destinationWarehouse);
+        if ($dispatchMode === SortBatch::DISPATCH_TRANSFER) {
+            if (!$destinationWarehouse) {
+                return [
+                    'success' => false,
+                    'message' => 'Destination warehouse is required for transfer batches.',
+                ];
+            }
 
-        $batch = SortBatch::query()->create([
-            'batch_number' => $batchNumber,
-            'origin_warehouse_id' => $originWarehouse->id,
-            'destination_warehouse_id' => $destinationWarehouse->id,
-            'status' => SortBatch::STATUS_OPEN,
-            'created_by_user_id' => $user->id,
-            'notes' => $notes,
-        ]);
+            if ((int) $destinationWarehouse->id === (int) $originWarehouse->id) {
+                return [
+                    'success' => false,
+                    'message' => 'Use local delivery mode when destination is the same warehouse.',
+                ];
+            }
+
+            if (!$destinationWarehouse->is_active) {
+                return [
+                    'success' => false,
+                    'message' => 'Destination warehouse is inactive.',
+                ];
+            }
+        }
+
+        if ($dispatchMode === SortBatch::DISPATCH_LOCAL_DELIVERY) {
+            $destinationWarehouse = null;
+        }
+
+        $batch = null;
+        $maxAttempts = 5;
+        $attempt = 0;
+
+        while ($attempt < $maxAttempts && !$batch) {
+            $attempt++;
+            $batchNumber = $this->generateBatchNumber($originWarehouse, $dispatchMode, $destinationWarehouse);
+
+            try {
+                $batch = SortBatch::query()->create([
+                    'batch_number' => $batchNumber,
+                    'origin_warehouse_id' => $originWarehouse->id,
+                    'destination_warehouse_id' => $destinationWarehouse?->id,
+                    'dispatch_mode' => $dispatchMode,
+                    'status' => SortBatch::STATUS_OPEN,
+                    'created_by_user_id' => $user->id,
+                    'notes' => $notes,
+                ]);
+            } catch (QueryException $exception) {
+                if (!$this->isDuplicateBatchNumberError($exception) || $attempt >= $maxAttempts) {
+                    return [
+                        'success' => false,
+                        'message' => 'Unable to create sort batch right now. Please try again.',
+                    ];
+                }
+            }
+        }
+
+        if (!$batch) {
+            return [
+                'success' => false,
+                'message' => 'Unable to create sort batch right now. Please try again.',
+            ];
+        }
 
         return [
             'success' => true,
@@ -129,27 +183,47 @@ class WarehouseSortingService
                     ];
                 }
 
+                if ((int) $receiptItem->received_quantity <= 0) {
+                    return [
+                        'success' => false,
+                        'message' => "Item #{$receiptItem->shipment_item_id} has no receivable quantity for sorting.",
+                    ];
+                }
+
+                $shipmentItem = ShipmentItem::query()
+                    ->with('shipment')
+                    ->whereKey($receiptItem->shipment_item_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$shipmentItem) {
+                    return [
+                        'success' => false,
+                        'message' => 'One or more selected shipment items could not be found.',
+                    ];
+                }
+
                 $alreadyInActiveBatch = SortBatchItem::query()
-                    ->where('shipment_item_id', $receiptItem->shipment_item_id)
+                    ->where('shipment_item_id', $shipmentItem->id)
                     ->whereNull('removed_at')
                     ->exists();
 
                 if ($alreadyInActiveBatch) {
                     return [
                         'success' => false,
-                        'message' => "Item #{$receiptItem->shipment_item_id} is already in an active sort batch.",
+                        'message' => "Item #{$shipmentItem->id} is already in an active sort batch.",
                     ];
                 }
 
                 $sortBatchItem = SortBatchItem::query()
                     ->where('sort_batch_id', $batch->id)
-                    ->where('shipment_item_id', $receiptItem->shipment_item_id)
+                    ->where('shipment_item_id', $shipmentItem->id)
                     ->first();
 
                 if ($sortBatchItem) {
                     $sortBatchItem->update([
                         'warehouse_receipt_item_id' => $receiptItem->id,
-                        'quantity_allocated' => max(0, (int) $receiptItem->received_quantity),
+                        'quantity_allocated' => (int) $receiptItem->received_quantity,
                         'added_by_user_id' => $user->id,
                         'added_at' => now(),
                         'removed_at' => null,
@@ -157,33 +231,35 @@ class WarehouseSortingService
                 } else {
                     $sortBatchItem = SortBatchItem::query()->create([
                         'sort_batch_id' => $batch->id,
-                        'shipment_item_id' => $receiptItem->shipment_item_id,
+                        'shipment_item_id' => $shipmentItem->id,
                         'warehouse_receipt_item_id' => $receiptItem->id,
-                        'quantity_allocated' => max(0, (int) $receiptItem->received_quantity),
+                        'quantity_allocated' => (int) $receiptItem->received_quantity,
                         'added_by_user_id' => $user->id,
                         'added_at' => now(),
                     ]);
                 }
 
-                $shipmentItem = $receiptItem->shipmentItem;
-                if ($shipmentItem) {
-                    $shipmentItem->update(['status' => ItemStatus::SORTED]);
-                    ShipmentItemTracking::create([
-                        'shipment_item_id' => $shipmentItem->id,
-                        'status' => ItemStatus::SORTED->value,
-                        'location' => $warehouse->name,
-                        'notes' => 'Item added to sort batch ' . $batch->batch_number . '.',
-                        'meta' => [
-                            'sort_batch_id' => $batch->id,
-                            'sort_batch_number' => $batch->batch_number,
-                            'destination_warehouse_id' => $batch->destination_warehouse_id,
-                        ],
-                        'created_by' => "user:{$user->id}",
-                        'created_at' => now(),
-                    ]);
+                $shipmentItem->update(['status' => ItemStatus::SORTED]);
+                $itemTrackingNote = $batch->isLocalDeliveryMode()
+                    ? 'Item added to local delivery batch ' . $batch->batch_number . '.'
+                    : 'Item added to transfer batch ' . $batch->batch_number . '.';
 
-                    $this->syncShipmentSortedStatus($shipmentItem->shipment);
-                }
+                ShipmentItemTracking::create([
+                    'shipment_item_id' => $shipmentItem->id,
+                    'status' => ItemStatus::SORTED->value,
+                    'location' => $warehouse->name,
+                    'notes' => $itemTrackingNote,
+                    'meta' => [
+                        'sort_batch_id' => $batch->id,
+                        'sort_batch_number' => $batch->batch_number,
+                        'dispatch_mode' => $batch->dispatch_mode,
+                        'destination_warehouse_id' => $batch->destination_warehouse_id,
+                    ],
+                    'created_by' => "user:{$user->id}",
+                    'created_at' => now(),
+                ]);
+
+                $this->syncShipmentSortedStatus($shipmentItem->shipment);
 
                 unset($sortBatchItem);
             }
@@ -300,12 +376,50 @@ class WarehouseSortingService
         ];
     }
 
-    private function generateBatchNumber(Warehouse $originWarehouse, Warehouse $destinationWarehouse): string
+    public function reopenBatch(SortBatch $batch, Warehouse $warehouse, User $user): array
+    {
+        if ((int) $batch->origin_warehouse_id !== (int) $warehouse->id) {
+            return [
+                'success' => false,
+                'message' => 'Cannot reopen a batch from another warehouse.',
+            ];
+        }
+
+        if ($batch->isOpen()) {
+            return [
+                'success' => false,
+                'message' => 'Batch is already open.',
+            ];
+        }
+
+        $batch->update([
+            'status' => SortBatch::STATUS_OPEN,
+            'sealed_by_user_id' => null,
+            'sealed_at' => null,
+        ]);
+
+        return [
+            'success' => true,
+            'message' => 'Sort batch reopened successfully.',
+            'data' => ['batch' => $batch->fresh('activeItems')],
+        ];
+    }
+
+    private function generateBatchNumber(
+        Warehouse $originWarehouse,
+        string $dispatchMode,
+        ?Warehouse $destinationWarehouse
+    ): string
     {
         $year = now()->format('Y');
         $originCode = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($originWarehouse->code ?: $originWarehouse->id)));
-        $destinationCode = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($destinationWarehouse->code ?: $destinationWarehouse->id)));
-        $prefix = "SB-{$year}-{$originCode}-{$destinationCode}-";
+
+        if ($dispatchMode === SortBatch::DISPATCH_LOCAL_DELIVERY) {
+            $prefix = "LB-{$year}-{$originCode}-LOCAL-";
+        } else {
+            $destinationCode = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($destinationWarehouse?->code ?: $destinationWarehouse?->id)));
+            $prefix = "SB-{$year}-{$originCode}-{$destinationCode}-";
+        }
 
         $lastBatch = SortBatch::query()
             ->where('batch_number', 'like', $prefix . '%')
@@ -402,5 +516,13 @@ class WarehouseSortingService
                 ],
             ];
         })->values();
+    }
+
+    private function isDuplicateBatchNumberError(QueryException $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, 'duplicate')
+            && str_contains($message, 'batch_number');
     }
 }

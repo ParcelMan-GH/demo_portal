@@ -3,7 +3,6 @@
 namespace App\Services\Warehouse;
 
 use App\Models\PickupAssignment;
-use App\Models\PickupItemConfirmation;
 use App\Models\Role;
 use App\Models\SortBatch;
 use App\Models\User;
@@ -28,7 +27,7 @@ class WarehousePortalService
         return [
             'pending_receipts' => $this->pendingReceiptsQuery($warehouse)->count(),
             'received_pickups' => $this->receivedPickupsQuery($warehouse)->count(),
-            'received_items' => (int) $this->receivedItemsQuery($warehouse)->sum('confirmed_quantity'),
+            'received_items' => (int) $this->receivedItemsQuery($warehouse)->sum('received_quantity'),
             'warehouse_users' => $this->warehouseUsersQuery($warehouse)->count(),
         ];
     }
@@ -58,6 +57,7 @@ class WarehousePortalService
                 'targetWarehouse:id,name,code',
             ])
             ->where('target_warehouse_id', $warehouse->id)
+            ->whereNotNull('picked_up_at')
             ->whereNull('received_at')
             ->where('status', '!=', 'cancelled');
     }
@@ -76,16 +76,17 @@ class WarehousePortalService
 
     public function receivedItemsQuery(Warehouse $warehouse): Builder
     {
-        return PickupItemConfirmation::query()
+        return WarehouseReceiptItem::query()
             ->with([
+                'receipt:id,pickup_assignment_id,warehouse_id,status,finalized_at',
+                'receipt.pickupAssignment:id,driver_id,received_warehouse_id,received_at',
+                'receipt.pickupAssignment.driver:id,name,phone',
                 'shipmentItem:id,shipment_id,description,quantity',
                 'shipmentItem.shipment:id,shipment_number',
-                'pickupAssignment:id,driver_id,received_warehouse_id,received_at',
-                'pickupAssignment.driver:id,name,phone',
             ])
-            ->whereHas('pickupAssignment', function (Builder $query) use ($warehouse) {
-                $query->where('received_warehouse_id', $warehouse->id)
-                    ->whereNotNull('received_at');
+            ->whereHas('receipt', function (Builder $query) use ($warehouse) {
+                $query->where('warehouse_id', $warehouse->id)
+                    ->where('status', WarehouseReceipt::STATUS_FINALIZED);
             });
     }
 

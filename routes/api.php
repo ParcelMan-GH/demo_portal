@@ -3,7 +3,9 @@
 use App\Http\Controllers\Api\V1\Auth\DriverAuthController;
 use App\Http\Controllers\Api\V1\Auth\VendorAuthController;
 use App\Http\Controllers\Api\V1\DriverAssignmentController;
+use App\Http\Controllers\Api\V1\DriverDeliveryController;
 use App\Http\Controllers\Api\V1\DriverProfileController;
+use App\Http\Controllers\Api\V1\DriverTransportController;
 use App\Http\Controllers\Api\V1\VendorInvoiceController;
 use App\Http\Controllers\Api\V1\VendorLocationController;
 use App\Http\Controllers\Api\V1\VendorProfileController;
@@ -85,5 +87,20 @@ Route::prefix('v1/driver')->group(function () {
         Route::post('pickups/{assignment}/arrive', [DriverAssignmentController::class, 'arrive']);
         Route::post('pickups/{assignment}/items/{item}/confirm', [DriverAssignmentController::class, 'confirmPickupItem']);
         Route::post('pickups/{assignment}/confirm-pickup', [DriverAssignmentController::class, 'confirmPickup']);
+
+        // Transport endpoints
+        Route::get('transports', [DriverTransportController::class, 'index']);
+        Route::get('transports/{manifest}', [DriverTransportController::class, 'show']);
+        Route::post('transports/{manifest}/start-loading', [DriverTransportController::class, 'startLoading']);
+        Route::post('transports/{manifest}/scan-load', [DriverTransportController::class, 'scanLoad']);
+        Route::post('transports/{manifest}/depart', [DriverTransportController::class, 'depart']);
+        Route::post('transports/{manifest}/arrive', [DriverTransportController::class, 'arrive']);
+
+        // Delivery endpoints
+        Route::get('deliveries', [DriverDeliveryController::class, 'index']);
+        Route::get('deliveries/{run}', [DriverDeliveryController::class, 'show']);
+        Route::post('deliveries/{run}/stops/{stop}/arrive', [DriverDeliveryController::class, 'arriveStop']);
+        Route::post('deliveries/{run}/stops/{stop}/confirm', [DriverDeliveryController::class, 'confirmStop']);
+        Route::post('deliveries/{run}/stops/{stop}/fail', [DriverDeliveryController::class, 'failStop']);
     });
 });

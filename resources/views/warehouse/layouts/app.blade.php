@@ -22,6 +22,9 @@
         $canReceiving = $authUser?->hasPermission('warehouse.receiving.manage');
         $canItems = $authUser?->hasPermission('warehouse.items.scan');
         $canSorting = $authUser?->hasPermission('warehouse.sorting.manage');
+        $canManifest = $authUser?->hasPermission('warehouse.manifest.manage');
+        $canTransportAssign = $authUser?->hasPermission('warehouse.transport.assign');
+        $canDeliveryAssign = $authUser?->hasPermission('warehouse.delivery.assign');
     @endphp
 
     <div class="min-h-screen flex">
@@ -68,7 +71,7 @@
                     </a>
                 @endif
 
-                @if($canReceiving || $canItems || $canSorting)
+                @if($canReceiving || $canItems || $canSorting || $canManifest || $canTransportAssign || $canDeliveryAssign)
                     <div class="pt-4 mt-3">
                         <div class="flex items-center gap-2 px-3 mb-2">
                             <span class="text-[10px] uppercase tracking-[0.14em] text-slate-500 font-semibold">Shipments</span>
@@ -118,6 +121,40 @@
                                     </svg>
                                 </div>
                                 <span class="text-[13px] font-medium">Sorting</span>
+                            </a>
+                        @endif
+
+                        @if($canManifest || $canTransportAssign)
+                            <a href="{{ route('warehouse.manifests.transport.index') }}"
+                               class="warehouse-nav-link {{ request()->routeIs('warehouse.manifests.transport.*') ? 'active' : '' }} flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-300">
+                                <div class="wh-nav-icon">
+                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 17H7a2 2 0 01-2-2V9a2 2 0 012-2h2m0 10h6m-6 0V7m6 10h2a2 2 0 002-2V9a2 2 0 00-2-2h-2m0 10V7m-6 3h6"/>
+                                    </svg>
+                                </div>
+                                <span class="text-[13px] font-medium">Transport Manifests</span>
+                            </a>
+
+                            <a href="{{ route('warehouse.manifests.incoming.index') }}"
+                               class="warehouse-nav-link {{ request()->routeIs('warehouse.manifests.incoming.*') ? 'active' : '' }} flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-300">
+                                <div class="wh-nav-icon">
+                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 7h16M4 12h16M4 17h16"/>
+                                    </svg>
+                                </div>
+                                <span class="text-[13px] font-medium">Incoming Manifests</span>
+                            </a>
+                        @endif
+
+                        @if($canDeliveryAssign)
+                            <a href="{{ route('warehouse.deliveries.runs.index') }}"
+                               class="warehouse-nav-link {{ request()->routeIs('warehouse.deliveries.runs.*') ? 'active' : '' }} flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-300">
+                                <div class="wh-nav-icon">
+                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 19V6l12-2v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-2c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-2"/>
+                                    </svg>
+                                </div>
+                                <span class="text-[13px] font-medium">Delivery Runs</span>
                             </a>
                         @endif
                     </div>

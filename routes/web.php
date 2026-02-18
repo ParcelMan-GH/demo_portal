@@ -12,8 +12,10 @@ use App\Http\Controllers\Admin\ShipmentController;
 use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
+use App\Http\Controllers\Warehouse\DeliveryRunController as WarehouseDeliveryRunController;
 use App\Http\Controllers\Warehouse\ReceiptController as WarehouseReceiptController;
 use App\Http\Controllers\Warehouse\SortingController as WarehouseSortingController;
+use App\Http\Controllers\Warehouse\TransportManifestController as WarehouseTransportManifestController;
 use App\Http\Controllers\Warehouse\UserController as WarehouseUserController;
 use Illuminate\Support\Facades\Route;
 
@@ -256,4 +258,26 @@ Route::prefix('warehouse')
         Route::post('sorting/batches/{sortBatch}/items', [WarehouseSortingController::class, 'addItems'])->name('sorting.batches.items.store');
         Route::delete('sorting/batches/{sortBatch}/items/{shipmentItem}', [WarehouseSortingController::class, 'removeItem'])->name('sorting.batches.items.destroy');
         Route::post('sorting/batches/{sortBatch}/seal', [WarehouseSortingController::class, 'seal'])->name('sorting.batches.seal');
+        Route::post('sorting/batches/{sortBatch}/reopen', [WarehouseSortingController::class, 'reopen'])->name('sorting.batches.reopen');
+
+        // Transport Manifests (Outbound + Incoming)
+        Route::get('manifests/transport', [WarehouseTransportManifestController::class, 'outboundIndex'])->name('manifests.transport.index');
+        Route::get('manifests/transport-data', [WarehouseTransportManifestController::class, 'outboundData'])->name('manifests.transport.data');
+        Route::post('manifests/transport', [WarehouseTransportManifestController::class, 'create'])->name('manifests.transport.store');
+        Route::post('manifests/transport/{manifest}/assign-driver', [WarehouseTransportManifestController::class, 'assignDriver'])->name('manifests.transport.assign-driver');
+        Route::post('manifests/transport/{manifest}/dispatch', [WarehouseTransportManifestController::class, 'dispatch'])->name('manifests.transport.dispatch');
+
+        Route::get('manifests/incoming', [WarehouseTransportManifestController::class, 'incomingIndex'])->name('manifests.incoming.index');
+        Route::get('manifests/incoming-data', [WarehouseTransportManifestController::class, 'incomingData'])->name('manifests.incoming.data');
+        Route::get('manifests/incoming/{manifest}', [WarehouseTransportManifestController::class, 'incomingShow'])->name('manifests.incoming.show');
+        Route::post('manifests/incoming/{manifest}/items/{shipmentItem}/scan-receive', [WarehouseTransportManifestController::class, 'scanIncomingItem'])->name('manifests.incoming.items.scan');
+        Route::post('manifests/incoming/{manifest}/finalize-receipt', [WarehouseTransportManifestController::class, 'finalizeIncoming'])->name('manifests.incoming.finalize');
+
+        // Delivery Runs
+        Route::get('deliveries/runs', [WarehouseDeliveryRunController::class, 'index'])->name('deliveries.runs.index');
+        Route::get('deliveries/runs-data', [WarehouseDeliveryRunController::class, 'data'])->name('deliveries.runs.data');
+        Route::post('deliveries/runs', [WarehouseDeliveryRunController::class, 'store'])->name('deliveries.runs.store');
+        Route::post('deliveries/runs/{run}/assign-driver', [WarehouseDeliveryRunController::class, 'assignDriver'])->name('deliveries.runs.assign-driver');
+        Route::post('deliveries/runs/{run}/dispatch', [WarehouseDeliveryRunController::class, 'dispatch'])->name('deliveries.runs.dispatch');
+        Route::post('deliveries/runs/{run}/stops/{stop}/resend-code', [WarehouseDeliveryRunController::class, 'resendCode'])->name('deliveries.runs.stops.resend-code');
     });

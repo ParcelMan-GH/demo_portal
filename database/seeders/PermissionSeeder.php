@@ -74,9 +74,11 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouse', 'action' => 'receiving_manage', 'name' => 'warehouse.receiving.manage', 'description' => 'Manage warehouse receiving', 'sort_order' => 126],
             ['module' => 'warehouse', 'action' => 'receiving_approve_discrepancy', 'name' => 'warehouse.receiving.approve_discrepancy', 'description' => 'Approve warehouse receiving discrepancies', 'sort_order' => 1261],
             ['module' => 'warehouse', 'action' => 'sorting_manage', 'name' => 'warehouse.sorting.manage', 'description' => 'Manage warehouse sorting', 'sort_order' => 127],
+            ['module' => 'warehouse', 'action' => 'sorting_reopen', 'name' => 'warehouse.sorting.reopen', 'description' => 'Reopen sealed sort batches', 'sort_order' => 1271],
             ['module' => 'warehouse', 'action' => 'manifest_manage', 'name' => 'warehouse.manifest.manage', 'description' => 'Manage transport manifests', 'sort_order' => 128],
             ['module' => 'warehouse', 'action' => 'transport_assign', 'name' => 'warehouse.transport.assign', 'description' => 'Assign transport drivers', 'sort_order' => 129],
             ['module' => 'warehouse', 'action' => 'delivery_assign', 'name' => 'warehouse.delivery.assign', 'description' => 'Assign delivery drivers', 'sort_order' => 130],
+            ['module' => 'warehouse', 'action' => 'delivery_code_reset', 'name' => 'warehouse.delivery.code.reset', 'description' => 'Regenerate delivery verification codes', 'sort_order' => 1301],
             ['module' => 'warehouse', 'action' => 'items_scan', 'name' => 'warehouse.items.scan', 'description' => 'Scan warehouse items in/out', 'sort_order' => 131],
 
             // Reports (2)

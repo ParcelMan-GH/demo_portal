@@ -21,16 +21,18 @@ function registerReceivedItemsPage() {
 
     const pageConfig = {
         endpoint: config.endpoint,
-        defaultSort: 'confirmed_at',
+        defaultSort: 'received_at',
         exportFileName: 'warehouse-received-items',
         printTitle: 'Warehouse Received Items',
         columns: [
             { key: 'shipment_number', label: 'Shipment #', exportLabel: 'Shipment Number' },
             { key: 'item_description', label: 'Item' },
             { key: 'expected_quantity', label: 'Expected Qty' },
-            { key: 'confirmed_quantity', label: 'Confirmed Qty' },
+            { key: 'received_quantity', label: 'Received Qty' },
+            { key: 'damaged_quantity', label: 'Damaged Qty' },
             { key: 'driver_name', label: 'Driver' },
-            { key: 'confirmed_at', label: 'Confirmed At' },
+            { key: 'received_at', label: 'Received At' },
+            { key: 'discrepancy_type', label: 'Discrepancy' },
             { key: 'notes', label: 'Notes', sortable: false },
         ],
     };

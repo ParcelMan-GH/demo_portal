@@ -476,6 +476,8 @@
                         <thead class="bg-slate-50/50">
                             <tr>
                                 <th class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Item</th>
+                                <th class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Vendor (Declared)</th>
+                                <th class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Driver (Confirmed)</th>
                                 <th class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Expected</th>
                                 <th class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Received</th>
                                 <th class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Damaged</th>
@@ -495,7 +497,42 @@
                                             <span class="mt-1 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700" x-text="item.discrepancy_type"></span>
                                         </template>
                                     </td>
-                                    <td class="px-4 py-2.5 text-center text-xs font-semibold text-slate-800" x-text="item.expected_quantity"></td>
+                                    <td class="px-4 py-2.5 text-xs text-slate-700 min-w-[200px]">
+                                        <p class="font-semibold text-slate-900">Qty: <span x-text="item.vendor_quantity"></span></p>
+                                        <p class="text-[11px] text-slate-500 mt-1">Photos: <span x-text="(item.vendor_photos || []).length"></span></p>
+                                        <div class="mt-2 flex flex-wrap gap-1">
+                                            <template x-for="photo in (item.vendor_photos || []).slice(0, 3)" :key="`vendor-${photo.id}`">
+                                                <a :href="photo.url" target="_blank" rel="noopener" class="block">
+                                                    <img :src="photo.url" alt="Vendor item photo" class="h-8 w-8 rounded border border-slate-200 object-cover">
+                                                </a>
+                                            </template>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-2.5 text-xs text-slate-700 min-w-[210px]">
+                                        <p class="font-semibold text-slate-900">
+                                            Qty:
+                                            <span x-text="item.driver_confirmed_quantity === null ? '-' : item.driver_confirmed_quantity"></span>
+                                        </p>
+                                        <p class="text-[11px] text-slate-500 mt-1">Photos: <span x-text="(item.driver_photos || []).length"></span></p>
+                                        <template x-if="item.driver_qty_matches_vendor !== null">
+                                            <span
+                                                class="mt-1 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                                                :class="item.driver_qty_matches_vendor ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'"
+                                                x-text="item.driver_qty_matches_vendor ? 'Matches vendor qty' : 'Mismatch vs vendor qty'"
+                                            ></span>
+                                        </template>
+                                        <div class="mt-2 flex flex-wrap gap-1">
+                                            <template x-for="photo in (item.driver_photos || []).slice(0, 3)" :key="`driver-${photo.id}`">
+                                                <a :href="photo.url" target="_blank" rel="noopener" class="block">
+                                                    <img :src="photo.url" alt="Driver item photo" class="h-8 w-8 rounded border border-slate-200 object-cover">
+                                                </a>
+                                            </template>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-2.5 text-center text-xs font-semibold text-slate-800">
+                                        <span x-text="item.expected_quantity"></span>
+                                        <p class="text-[10px] text-slate-500 mt-0.5" x-text="item.expected_source === 'driver' ? 'Driver confirmed qty' : 'Vendor qty fallback'"></p>
+                                    </td>
                                     <td class="px-4 py-2.5 text-center">
                                         <input type="number" min="0" class="w-20 rounded-lg border border-slate-200 px-2 py-1 text-xs text-center"
                                                x-model.number="item.received_quantity" :disabled="isFinalized()">
@@ -548,7 +585,7 @@
                                 </tr>
                             </template>
                             <tr x-show="items.length === 0">
-                                <td colspan="8" class="px-4 py-8 text-center text-xs text-slate-500">No shipment items found.</td>
+                                <td colspan="10" class="px-4 py-8 text-center text-xs text-slate-500">No shipment items found.</td>
                             </tr>
                         </tbody>
                     </table>

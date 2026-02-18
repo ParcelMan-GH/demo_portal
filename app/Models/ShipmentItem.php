@@ -138,6 +138,16 @@ class ShipmentItem extends Model
         return $this->hasMany(SortBatchItem::class);
     }
 
+    public function transportManifestItems(): HasMany
+    {
+        return $this->hasMany(TransportManifestItem::class);
+    }
+
+    public function deliveryRunItems(): HasMany
+    {
+        return $this->hasMany(DeliveryRunItem::class);
+    }
+
     public function getDeliveryLocationTypeAttribute(): string
     {
         if ($this->delivery_region_id && $this->delivery_district_id) {

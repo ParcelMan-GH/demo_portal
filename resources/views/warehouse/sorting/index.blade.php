@@ -11,6 +11,12 @@
         'add_items_endpoint' => route('warehouse.sorting.batches.items.store', ['sortBatch' => '__BATCH__']),
         'remove_item_endpoint' => route('warehouse.sorting.batches.items.destroy', ['sortBatch' => '__BATCH__', 'shipmentItem' => '__ITEM__']),
         'seal_batch_endpoint' => route('warehouse.sorting.batches.seal', ['sortBatch' => '__BATCH__']),
+        'reopen_batch_endpoint' => route('warehouse.sorting.batches.reopen', ['sortBatch' => '__BATCH__']),
+        'can_reopen_batches' => (bool) ($canReopenBatches ?? false),
+        'dispatch_modes' => [
+            ['value' => 'transfer', 'label' => 'Transfer to Warehouse'],
+            ['value' => 'local_delivery', 'label' => 'Local Delivery'],
+        ],
         'destinations' => $destinationWarehouses->values(),
     ];
 @endphp
@@ -23,8 +29,17 @@
                 <h2 class="text-lg font-semibold text-slate-900">Destination Sorting Batches</h2>
                 <p class="text-sm text-slate-500 mt-1">Group received items by destination warehouse before manifest creation.</p>
             </div>
-            <div class="flex items-center gap-2">
-                <select x-model="newBatchDestinationId" class="rounded-xl border border-slate-200 px-3 py-2 text-sm min-w-[220px]">
+            <div class="flex items-center gap-2 flex-wrap">
+                <select x-model="newBatchDispatchMode" class="rounded-xl border border-slate-200 px-3 py-2 text-sm min-w-[210px]">
+                    <template x-for="mode in dispatchModes" :key="mode.value">
+                        <option :value="mode.value" x-text="mode.label"></option>
+                    </template>
+                </select>
+                <select
+                    x-show="newBatchDispatchMode === 'transfer'"
+                    x-model="newBatchDestinationId"
+                    class="rounded-xl border border-slate-200 px-3 py-2 text-sm min-w-[240px]"
+                >
                     <option value="">Select destination warehouse</option>
                     <template x-for="destination in destinations" :key="destination.id">
                         <option :value="destination.id" x-text="`${destination.name}${destination.code ? ' (' + destination.code + ')' : ''}`"></option>
@@ -98,7 +113,8 @@
                         <div class="flex items-start justify-between gap-2">
                             <div>
                                 <p class="text-xs font-semibold text-slate-900" x-text="batch.batch_number"></p>
-                                <p class="text-[11px] text-slate-500" x-text="batch.destination_warehouse?.name || '-'"></p>
+                                <p class="text-[11px] text-slate-500" x-text="batch.dispatch_mode_label || 'Transfer'"></p>
+                                <p class="text-[11px] text-slate-500" x-text="batch.dispatch_mode === 'transfer' ? (batch.destination_warehouse?.name || '-') : 'Deliver from this warehouse'"></p>
                             </div>
                             <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold"
                                   :class="batch.status === 'sealed' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-indigo-200 bg-indigo-50 text-indigo-700'"
@@ -132,6 +148,10 @@
                             <button type="button" class="rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
                                     @@click="sealBatch(batch.id)" :disabled="batch.status !== 'open'">
                                 Seal
+                            </button>
+                            <button type="button" class="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                                    @@click="reopenBatch(batch.id)" x-show="canReopenBatches && batch.status === 'sealed'" :disabled="loading">
+                                Reopen
                             </button>
                         </div>
                     </div>

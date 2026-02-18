@@ -132,6 +132,26 @@
                             <div id="group-driver-assignments">
                                 <!-- Endpoints will be populated by JS -->
                             </div>
+
+                            <!-- Driver Transports Group -->
+                            <div class="group-header nested" onclick="toggleGroup('driver-transports')">
+                                <span class="folder-chevron open" id="chevron-driver-transports">â–¶</span>
+                                <span>Transports</span>
+                            </div>
+
+                            <div id="group-driver-transports">
+                                <!-- Endpoints will be populated by JS -->
+                            </div>
+
+                            <!-- Driver Deliveries Group -->
+                            <div class="group-header nested" onclick="toggleGroup('driver-deliveries')">
+                                <span class="folder-chevron open" id="chevron-driver-deliveries">â–¶</span>
+                                <span>Deliveries</span>
+                            </div>
+
+                            <div id="group-driver-deliveries">
+                                <!-- Endpoints will be populated by JS -->
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2786,6 +2806,347 @@
                         message: 'The longitude field is required when latitude is present.'
                     }
                 }
+            },
+            // ============ DRIVER TRANSPORT ENDPOINTS ============
+            {
+                method: 'GET',
+                url: '/api/v1/driver/transports',
+                name: 'List Transports',
+                description: 'Get transport assignments for the authenticated driver with filters and offset pagination.',
+                auth: true,
+                group: 'driver-transports',
+                userType: 'driver',
+                fields: [
+                    { name: 'status', queryName: 'status[]', type: 'multiselect', required: false, description: 'Transport statuses (array). Allowed: draft, assigned, loading, in_transit, arrived, received, cancelled', options: ['draft', 'assigned', 'loading', 'in_transit', 'arrived', 'received', 'cancelled'] },
+                    { name: 'search', type: 'string', required: false, description: 'Search by manifest number, shipment number, status', example: 'TM-2026' },
+                    { name: 'limit', type: 'number', required: false, description: 'Number of rows to return (max 100)', example: '15' },
+                    { name: 'offset', type: 'number', required: false, description: 'Rows to skip', example: '0' },
+                    { name: 'sort_by', type: 'enum', required: false, description: 'Sort field', options: ['created_at', 'updated_at', 'id', 'manifest_number', 'status', 'assigned_at', 'dispatched_at', 'arrived_at'] },
+                    { name: 'sort_order', type: 'enum', required: false, description: 'Sort direction', options: ['asc', 'desc'] }
+                ],
+                sampleBody: null,
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Transports retrieved successfully.',
+                        data: {
+                            transports: [
+                                {
+                                    id: 4,
+                                    manifest_number: 'TM-2026-AC01-KM01-0001',
+                                    status: 'loading',
+                                    origin_warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01' },
+                                    destination_warehouse: { id: 2, name: 'Kumasi Hub', code: 'KM01' },
+                                    timeline: {
+                                        assigned: { at: '2026-02-18T09:00:00Z' },
+                                        dispatched: { at: '2026-02-18T09:10:00Z' },
+                                        arrived: { at: null },
+                                        received: { at: null }
+                                    },
+                                    items: [
+                                        {
+                                            shipment_item_id: 14,
+                                            shipment_number: 'PCM-2026-00014',
+                                            description: 'LED TV 50-inch',
+                                            tracking_code: 'TRK5PNQ13E',
+                                            expected_quantity: 1,
+                                            loaded_quantity: 1,
+                                            received_quantity: 0,
+                                            line_status: 'loaded'
+                                        }
+                                    ]
+                                }
+                            ],
+                            pagination: {
+                                offset: 0,
+                                limit: 15,
+                                total: 1,
+                                has_more: false,
+                                next_offset: null,
+                                current_page: 1,
+                                last_page: 1,
+                                per_page: 15
+                            }
+                        }
+                    },
+                    '401': { success: false, message: 'Unauthenticated.' }
+                }
+            },
+            {
+                method: 'GET',
+                url: '/api/v1/driver/transports/{manifest}',
+                name: 'View Transport',
+                description: 'Get a single transport manifest assigned to the authenticated driver.',
+                auth: true,
+                group: 'driver-transports',
+                userType: 'driver',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'manifest', type: 'dropdown', required: true, description: 'Select a transport manifest', source: 'transports?limit=100', labelField: 'manifest_number', valueField: 'id' }
+                ],
+                fields: [],
+                sampleBody: {},
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Transport retrieved successfully.',
+                        data: {
+                            transport: {
+                                id: 4,
+                                manifest_number: 'TM-2026-AC01-KM01-0001',
+                                status: 'loading'
+                            }
+                        }
+                    },
+                    '404': { success: false, message: 'Transport not found.' }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/transports/{manifest}/start-loading',
+                name: 'Start Loading',
+                description: 'Move assigned manifest into loading state.',
+                auth: true,
+                group: 'driver-transports',
+                userType: 'driver',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'manifest', type: 'dropdown', required: true, description: 'Select an assigned/loading manifest', source: 'transports?status[]=assigned&status[]=loading&limit=100', labelField: 'manifest_number', valueField: 'id' }
+                ],
+                fields: [],
+                sampleBody: {},
+                exampleResponses: {
+                    '200': { success: true, message: 'Loading started.' },
+                    '400': { success: false, message: 'Manifest is not ready for loading.' }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/transports/{manifest}/scan-load',
+                name: 'Scan Load',
+                description: 'Scan a shipment item tracking code while loading transport manifest.',
+                auth: true,
+                group: 'driver-transports',
+                userType: 'driver',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'manifest', type: 'dropdown', required: true, description: 'Select an assigned/loading manifest', source: 'transports?status[]=assigned&status[]=loading&limit=100', labelField: 'manifest_number', valueField: 'id' }
+                ],
+                fields: [
+                    { name: 'tracking_code', type: 'string', required: true, description: 'Shipment item tracking code from manifest line', example: 'TRK5PNQ13E' }
+                ],
+                sampleBody: {
+                    tracking_code: 'TRK5PNQ13E'
+                },
+                exampleResponses: {
+                    '200': { success: true, message: 'Item loaded successfully.' },
+                    '400': { success: false, message: 'Tracking code not found in this manifest.' }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/transports/{manifest}/depart',
+                name: 'Depart',
+                description: 'Mark transport manifest as departed/in transit after loading scans.',
+                auth: true,
+                group: 'driver-transports',
+                userType: 'driver',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'manifest', type: 'dropdown', required: true, description: 'Select a loading manifest', source: 'transports?status[]=loading&limit=100', labelField: 'manifest_number', valueField: 'id' }
+                ],
+                fields: [],
+                sampleBody: {},
+                exampleResponses: {
+                    '200': { success: true, message: 'Manifest departed successfully.' },
+                    '400': { success: false, message: 'All manifest items must be scanned before departure.' }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/transports/{manifest}/arrive',
+                name: 'Arrive',
+                description: 'Mark transport manifest as arrived at destination warehouse.',
+                auth: true,
+                group: 'driver-transports',
+                userType: 'driver',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'manifest', type: 'dropdown', required: true, description: 'Select an in-transit manifest', source: 'transports?status[]=in_transit&limit=100', labelField: 'manifest_number', valueField: 'id' }
+                ],
+                fields: [],
+                sampleBody: {},
+                exampleResponses: {
+                    '200': { success: true, message: 'Arrival recorded successfully.' },
+                    '400': { success: false, message: 'Manifest is not in transit.' }
+                }
+            },
+            // ============ DRIVER DELIVERY ENDPOINTS ============
+            {
+                method: 'GET',
+                url: '/api/v1/driver/deliveries',
+                name: 'List Deliveries',
+                description: 'Get delivery runs assigned to driver with stop-level summaries and pagination.',
+                auth: true,
+                group: 'driver-deliveries',
+                userType: 'driver',
+                fields: [
+                    { name: 'status', queryName: 'status[]', type: 'multiselect', required: false, description: 'Run statuses (array). Allowed: draft, assigned, out_for_delivery, partially_delivered, completed, cancelled', options: ['draft', 'assigned', 'out_for_delivery', 'partially_delivered', 'completed', 'cancelled'] },
+                    { name: 'search', type: 'string', required: false, description: 'Search by run number, recipient name/phone, status', example: 'DR-2026' },
+                    { name: 'limit', type: 'number', required: false, description: 'Number of rows to return (max 100)', example: '15' },
+                    { name: 'offset', type: 'number', required: false, description: 'Rows to skip', example: '0' },
+                    { name: 'sort_by', type: 'enum', required: false, description: 'Sort field', options: ['created_at', 'updated_at', 'id', 'run_number', 'status', 'assigned_at', 'dispatched_at', 'completed_at'] },
+                    { name: 'sort_order', type: 'enum', required: false, description: 'Sort direction', options: ['asc', 'desc'] }
+                ],
+                sampleBody: null,
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Deliveries retrieved successfully.',
+                        data: {
+                            deliveries: [
+                                {
+                                    id: 3,
+                                    run_number: 'DR-2026-AC01-0001',
+                                    status: 'out_for_delivery',
+                                    timeline: {
+                                        assigned: { at: '2026-02-18T10:00:00Z' },
+                                        out_for_delivery: { at: '2026-02-18T10:30:00Z' },
+                                        completed: { at: null }
+                                    },
+                                    stops: [
+                                        {
+                                            id: 9,
+                                            recipient_name: 'Ama Mensah',
+                                            recipient_phone: '+233241234567',
+                                            status: 'pending',
+                                            verification: {
+                                                code_sent_at: '2026-02-18T10:30:00Z',
+                                                code_expires_at: '2026-02-19T10:30:00Z',
+                                                attempts: 0,
+                                                max_attempts: 5
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            pagination: {
+                                offset: 0,
+                                limit: 15,
+                                total: 1,
+                                has_more: false,
+                                next_offset: null,
+                                current_page: 1,
+                                last_page: 1,
+                                per_page: 15
+                            }
+                        }
+                    },
+                    '401': { success: false, message: 'Unauthenticated.' }
+                }
+            },
+            {
+                method: 'GET',
+                url: '/api/v1/driver/deliveries/{run}',
+                name: 'View Delivery Run',
+                description: 'Get full delivery run details with grouped stops and line items.',
+                auth: true,
+                group: 'driver-deliveries',
+                userType: 'driver',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'run', type: 'dropdown', required: true, description: 'Select a delivery run', source: 'deliveries?limit=100', labelField: 'run_number', valueField: 'id', onSelect: 'handleDeliveryRunSelection' }
+                ],
+                fields: [],
+                sampleBody: {},
+                exampleResponses: {
+                    '200': { success: true, message: 'Delivery run retrieved successfully.' },
+                    '404': { success: false, message: 'Delivery run not found.' }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/deliveries/{run}/stops/{stop}/arrive',
+                name: 'Arrive Stop',
+                description: 'Mark arrival at a recipient stop for an active delivery run.',
+                auth: true,
+                group: 'driver-deliveries',
+                userType: 'driver',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'run', type: 'dropdown', required: true, description: 'Select active delivery run', source: 'deliveries?status[]=out_for_delivery&status[]=partially_delivered&limit=100', labelField: 'run_number', valueField: 'id', onSelect: 'handleDeliveryRunSelection' },
+                    { name: 'stop', type: 'dropdown', required: true, description: 'Select stop under chosen run', dependsOn: 'run' }
+                ],
+                fields: [],
+                sampleBody: {},
+                exampleResponses: {
+                    '200': { success: true, message: 'Arrival at recipient stop recorded.' },
+                    '400': { success: false, message: 'Delivery run is not active.' }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/deliveries/{run}/stops/{stop}/confirm',
+                name: 'Confirm Stop Delivery',
+                description: 'Confirm recipient delivery with verification code, GPS, proof photo, and per-item delivered quantities.',
+                auth: true,
+                group: 'driver-deliveries',
+                userType: 'driver',
+                useFormInputs: true,
+                bodyType: 'formdata',
+                urlParams: [
+                    { name: 'run', type: 'dropdown', required: true, description: 'Select active delivery run', source: 'deliveries?status[]=out_for_delivery&status[]=partially_delivered&limit=100', labelField: 'run_number', valueField: 'id', onSelect: 'handleDeliveryRunSelection' },
+                    { name: 'stop', type: 'dropdown', required: true, description: 'Select stop under chosen run', dependsOn: 'run', onSelect: 'handleDeliveryStopSelection' }
+                ],
+                fields: [
+                    { name: 'verification_code', type: 'string', required: true, description: '6-digit code from recipient', example: '483219' },
+                    { name: 'latitude', type: 'string', required: true, description: 'Delivery GPS latitude', example: '5.6037' },
+                    { name: 'longitude', type: 'string', required: true, description: 'Delivery GPS longitude', example: '-0.1870' },
+                    { name: 'proof_photo', type: 'file', required: true, description: 'Delivery proof image', accept: 'image/jpeg,image/png,image/webp' },
+                    { name: 'items[0][shipment_item_id]', type: 'string', required: true, description: 'Shipment item ID at this stop', example: '14' },
+                    { name: 'items[0][delivered_quantity]', type: 'string', required: true, description: 'Delivered quantity for this line', example: '1' },
+                    { name: 'items[0][notes]', type: 'string', required: false, description: 'Optional line notes', example: 'Handed over to recipient' }
+                ],
+                sampleBody: {
+                    verification_code: '483219',
+                    latitude: '5.6037',
+                    longitude: '-0.1870',
+                    'items[0][shipment_item_id]': '14',
+                    'items[0][delivered_quantity]': '1',
+                    'items[0][notes]': 'Delivered successfully'
+                },
+                exampleResponses: {
+                    '200': { success: true, message: 'Delivery stop confirmed successfully.' },
+                    '400_invalid_code': { success: false, message: 'Invalid verification code. 4 attempt(s) remaining.' },
+                    '400_locked': { success: false, message: 'Verification code attempts exceeded. Ask warehouse manager to regenerate.', locked: true },
+                    '422': { success: false, message: 'The proof photo field is required.' }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/deliveries/{run}/stops/{stop}/fail',
+                name: 'Fail Stop Delivery',
+                description: 'Mark stop as failed with reason/notes so items return to destination warehouse queue.',
+                auth: true,
+                group: 'driver-deliveries',
+                userType: 'driver',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'run', type: 'dropdown', required: true, description: 'Select active delivery run', source: 'deliveries?status[]=out_for_delivery&status[]=partially_delivered&limit=100', labelField: 'run_number', valueField: 'id', onSelect: 'handleDeliveryRunSelection' },
+                    { name: 'stop', type: 'dropdown', required: true, description: 'Select stop under chosen run', dependsOn: 'run' }
+                ],
+                fields: [
+                    { name: 'reason', type: 'string', required: true, description: 'Failure reason', example: 'recipient_unreachable' },
+                    { name: 'notes', type: 'string', required: false, description: 'Additional failure notes', example: 'Phone switched off after 3 attempts' }
+                ],
+                sampleBody: {
+                    reason: 'recipient_unreachable',
+                    notes: 'Phone switched off after 3 attempts'
+                },
+                exampleResponses: {
+                    '200': { success: true, message: 'Delivery stop marked as failed.' },
+                    '400': { success: false, message: 'Delivery run is not active.' }
+                }
             }
         ];
 
@@ -2813,6 +3174,8 @@
             const driverProfileContainer = document.getElementById('group-driver-profile');
             const invoicesContainer = document.getElementById('group-invoices');
             const driverAssignmentsContainer = document.getElementById('group-driver-assignments');
+            const driverTransportsContainer = document.getElementById('group-driver-transports');
+            const driverDeliveriesContainer = document.getElementById('group-driver-deliveries');
             authContainer.innerHTML = '';
             profileContainer.innerHTML = '';
             locationContainer.innerHTML = '';
@@ -2822,6 +3185,8 @@
             driverProfileContainer.innerHTML = '';
             invoicesContainer.innerHTML = '';
             driverAssignmentsContainer.innerHTML = '';
+            driverTransportsContainer.innerHTML = '';
+            driverDeliveriesContainer.innerHTML = '';
 
             endpoints.forEach((ep, index) => {
                 const div = document.createElement('div');
@@ -2852,6 +3217,10 @@
                     invoicesContainer.appendChild(div);
                 } else if (ep.group === 'driver-assignments') {
                     driverAssignmentsContainer.appendChild(div);
+                } else if (ep.group === 'driver-transports') {
+                    driverTransportsContainer.appendChild(div);
+                } else if (ep.group === 'driver-deliveries') {
+                    driverDeliveriesContainer.appendChild(div);
                 } else {
                     authContainer.appendChild(div);
                 }
@@ -2942,6 +3311,12 @@
                 folderName = 'Driver';
             } else if (selectedEndpoint.group === 'driver-assignments') {
                 groupName = 'Pickups';
+                folderName = 'Driver';
+            } else if (selectedEndpoint.group === 'driver-transports') {
+                groupName = 'Transports';
+                folderName = 'Driver';
+            } else if (selectedEndpoint.group === 'driver-deliveries') {
+                groupName = 'Deliveries';
                 folderName = 'Driver';
             }
             document.getElementById('breadcrumbGroup').textContent = folderName + ' / ' + groupName;
@@ -3405,6 +3780,8 @@
             if (baseSource.startsWith('shipments')) return 'shipments';
             if (baseSource.startsWith('invoices')) return 'invoices';
             if (baseSource.startsWith('pickups')) return 'pickups';
+            if (baseSource.startsWith('transports')) return 'transports';
+            if (baseSource.startsWith('deliveries')) return 'deliveries';
             return baseSource;
         }
 
@@ -3414,6 +3791,9 @@
                 return '{{ url('') }}/api/v1/vendor/regions';
             }
             if (String(source).startsWith('assignments') || String(source).startsWith('pickups')) {
+                return '{{ url('') }}/api/v1/driver/' + source;
+            }
+            if (String(source).startsWith('transports') || String(source).startsWith('deliveries')) {
                 return '{{ url('') }}/api/v1/driver/' + source;
             }
             return '{{ url('') }}/api/v1/vendor/' + source;
@@ -3853,6 +4233,18 @@
 
             const select = document.getElementById('url-param-' + paramName);
             const selectedValue = select ? select.value : null;
+
+            if (changedParam.onSelect && select && selectedValue) {
+                const selectedOption = select.options[select.selectedIndex];
+                const itemData = selectedOption ? selectedOption.getAttribute('data-item') : null;
+                if (itemData && typeof window[changedParam.onSelect] === 'function') {
+                    try {
+                        window[changedParam.onSelect](JSON.parse(itemData), changedParam);
+                    } catch (error) {
+                        console.error('Error in url param onSelect handler:', error);
+                    }
+                }
+            }
 
             if (
                 selectedEndpoint.group === 'driver-assignments' &&
@@ -4687,6 +5079,44 @@
                 }
             } catch (error) {
                 console.error('Error loading shipment mode:', error);
+            }
+        }
+
+        function handleDeliveryRunSelection(run) {
+            if (!run || !run.id) return;
+
+            const stopSelect = document.getElementById('url-param-stop');
+            if (!stopSelect) return;
+
+            const stops = Array.isArray(run.stops) ? run.stops : [];
+            let optionsHtml = '<option value="">-- Select stop --</option>';
+
+            stops.forEach((stop) => {
+                const label = `${stop.recipient_name || 'Recipient'} (${stop.recipient_phone || 'n/a'})`;
+                optionsHtml += `<option value="${stop.id}" data-item='${JSON.stringify(stop).replace(/'/g, "&apos;")}'>${label}</option>`;
+            });
+
+            stopSelect.innerHTML = optionsHtml;
+            stopSelect.disabled = stops.length === 0;
+            stopSelect.value = '';
+            updateUrlWithParams();
+        }
+
+        function handleDeliveryStopSelection(stop) {
+            if (!stop || !stop.id) return;
+
+            const itemIdInput = document.getElementById('form-field-items[0][shipment_item_id]');
+            const itemQtyInput = document.getElementById('form-field-items[0][delivered_quantity]');
+            if (!itemIdInput) return;
+
+            const items = Array.isArray(stop.items) ? stop.items : [];
+            const firstItem = items.length > 0 ? items[0] : null;
+
+            if (firstItem && firstItem.shipment_item_id) {
+                itemIdInput.value = String(firstItem.shipment_item_id);
+                if (itemQtyInput && firstItem.expected_quantity) {
+                    itemQtyInput.value = String(firstItem.expected_quantity);
+                }
             }
         }
 

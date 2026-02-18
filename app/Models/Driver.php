@@ -98,4 +98,14 @@ class Driver extends Authenticatable
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->latestOfMany();
     }
+
+    public function transportManifests(): HasMany
+    {
+        return $this->hasMany(TransportManifest::class, 'assigned_driver_id');
+    }
+
+    public function deliveryRuns(): HasMany
+    {
+        return $this->hasMany(DeliveryRun::class, 'assigned_driver_id');
+    }
 }

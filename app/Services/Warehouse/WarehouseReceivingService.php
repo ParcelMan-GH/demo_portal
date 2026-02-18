@@ -97,7 +97,12 @@ class WarehouseReceivingService
             $photos,
             $removePhotoIds
         ) {
-            $receipt = $this->getOrCreateReceipt($assignment, $warehouse, $user);
+            $lockedAssignment = PickupAssignment::query()->lockForUpdate()->findOrFail($assignment->id);
+            if ($error = $this->validateReceivingPreconditions($lockedAssignment, $warehouse)) {
+                return $error;
+            }
+
+            $receipt = $this->getOrCreateReceipt($lockedAssignment, $warehouse, $user);
             $receipt = WarehouseReceipt::query()->lockForUpdate()->findOrFail($receipt->id);
 
             if ($receipt->isFinalized()) {
@@ -107,7 +112,7 @@ class WarehouseReceivingService
                 ];
             }
 
-            $expectedQuantity = $this->resolveExpectedQuantity($assignment, $shipmentItem);
+            $expectedQuantity = $this->resolveExpectedQuantity($lockedAssignment, $shipmentItem);
             $effectiveConditionStatus = $conditionStatus ?: $this->deriveConditionStatus(
                 $expectedQuantity,
                 $receivedQuantity,
@@ -205,7 +210,12 @@ class WarehouseReceivingService
         }
 
         return DB::transaction(function () use ($assignment, $shipmentItem, $warehouse, $user) {
-            $receipt = $this->getOrCreateReceipt($assignment, $warehouse, $user);
+            $lockedAssignment = PickupAssignment::query()->lockForUpdate()->findOrFail($assignment->id);
+            if ($error = $this->validateReceivingPreconditions($lockedAssignment, $warehouse)) {
+                return $error;
+            }
+
+            $receipt = $this->getOrCreateReceipt($lockedAssignment, $warehouse, $user);
 
             $receiptItem = WarehouseReceiptItem::query()
                 ->where('warehouse_receipt_id', $receipt->id)
@@ -237,14 +247,14 @@ class WarehouseReceivingService
                 'barcode_print_count' => (int) $receiptItem->barcode_print_count + 1,
             ]);
 
-            $shipment = $assignment->shipment()->with([
+            $shipment = $lockedAssignment->shipment()->with([
                 'vendor:id,name,business_name',
                 'deliveryRegion:id,name',
                 'deliveryDistrict:id,name',
             ])->first();
 
             $labelHtml = View::make('warehouse.receipts.partials.item-label', [
-                'assignment' => $assignment,
+                'assignment' => $lockedAssignment,
                 'shipment' => $shipment,
                 'shipmentItem' => $shipmentItem,
                 'receiptItem' => $receiptItem->fresh(),
@@ -272,7 +282,12 @@ class WarehouseReceivingService
         ?string $approvalReason = null
     ): array {
         return DB::transaction(function () use ($assignment, $warehouse, $user, $notes, $approvalReason) {
-            $receipt = $this->getOrCreateReceipt($assignment, $warehouse, $user);
+            $lockedAssignment = PickupAssignment::query()->lockForUpdate()->findOrFail($assignment->id);
+            if ($error = $this->validateReceivingPreconditions($lockedAssignment, $warehouse)) {
+                return $error;
+            }
+
+            $receipt = $this->getOrCreateReceipt($lockedAssignment, $warehouse, $user);
             $receipt = WarehouseReceipt::query()->with(['items'])->lockForUpdate()->findOrFail($receipt->id);
 
             if ($receipt->isFinalized()) {
@@ -282,7 +297,7 @@ class WarehouseReceivingService
                 ];
             }
 
-            $shipmentItemIds = $assignment->shipment()->firstOrFail()
+            $shipmentItemIds = $lockedAssignment->shipment()->firstOrFail()
                 ->items()
                 ->pluck('id');
 
@@ -329,7 +344,7 @@ class WarehouseReceivingService
             })->all();
 
             $receiveResult = $this->pickupAssignmentService->receiveAtWarehouse(
-                assignment: $assignment,
+                assignment: $lockedAssignment,
                 receivedByUserId: $user->id,
                 receivedWarehouseId: $warehouse->id,
                 receiveNotes: $notes,
@@ -394,10 +409,12 @@ class WarehouseReceivingService
 
     private function resolveExpectedQuantity(PickupAssignment $assignment, ShipmentItem $shipmentItem): int
     {
-        $confirmation = PickupItemConfirmation::query()
-            ->where('pickup_assignment_id', $assignment->id)
-            ->where('shipment_item_id', $shipmentItem->id)
-            ->first();
+        $confirmation = $assignment->relationLoaded('itemConfirmations')
+            ? $assignment->itemConfirmations->firstWhere('shipment_item_id', $shipmentItem->id)
+            : PickupItemConfirmation::query()
+                ->where('pickup_assignment_id', $assignment->id)
+                ->where('shipment_item_id', $shipmentItem->id)
+                ->first();
 
         if ($confirmation) {
             return (int) $confirmation->confirmed_quantity;
@@ -474,5 +491,39 @@ class WarehouseReceivingService
     {
         return $items->map(fn (WarehouseReceiptItem $item) => $this->serializeReceiptItem($item));
     }
-}
 
+    private function validateReceivingPreconditions(PickupAssignment $assignment, Warehouse $warehouse): ?array
+    {
+        $status = $assignment->status?->value ?? $assignment->getRawOriginal('status');
+
+        if ($status === 'cancelled') {
+            return [
+                'success' => false,
+                'message' => 'Cancelled pickup assignments cannot be received.',
+            ];
+        }
+
+        if (is_null($assignment->picked_up_at)) {
+            return [
+                'success' => false,
+                'message' => 'Pickup must be finalized before warehouse receiving.',
+            ];
+        }
+
+        if (!is_null($assignment->received_at)) {
+            return [
+                'success' => false,
+                'message' => 'This pickup has already been received at warehouse.',
+            ];
+        }
+
+        if (!is_null($assignment->target_warehouse_id) && (int) $assignment->target_warehouse_id !== (int) $warehouse->id) {
+            return [
+                'success' => false,
+                'message' => 'This pickup is assigned to a different warehouse.',
+            ];
+        }
+
+        return null;
+    }
+}

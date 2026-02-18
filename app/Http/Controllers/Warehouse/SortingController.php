@@ -33,6 +33,7 @@ class SortingController extends Controller
             'destinationWarehouses' => $this->portalService->destinationWarehouses()
                 ->where('id', '!=', $warehouse->id)
                 ->values(),
+            'canReopenBatches' => (bool) Auth::guard('admin')->user()?->hasPermission('warehouse.sorting.reopen'),
         ]);
     }
 
@@ -95,6 +96,10 @@ class SortingController extends Controller
                 return [
                     'id' => $batch->id,
                     'batch_number' => $batch->batch_number,
+                    'dispatch_mode' => $batch->dispatch_mode,
+                    'dispatch_mode_label' => $batch->dispatch_mode === SortBatch::DISPATCH_LOCAL_DELIVERY
+                        ? 'Local Delivery'
+                        : 'Transfer',
                     'status' => $batch->status,
                     'destination_warehouse' => [
                         'id' => $batch->destinationWarehouse?->id,
@@ -127,16 +132,20 @@ class SortingController extends Controller
         $user = Auth::guard('admin')->user();
 
         $validated = $request->validate([
-            'destination_warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+            'dispatch_mode' => ['required', 'in:transfer,local_delivery'],
+            'destination_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $destinationWarehouse = Warehouse::query()->findOrFail((int) $validated['destination_warehouse_id']);
+        $destinationWarehouse = !empty($validated['destination_warehouse_id'])
+            ? Warehouse::query()->findOrFail((int) $validated['destination_warehouse_id'])
+            : null;
 
         $result = $this->sortingService->createBatch(
             originWarehouse: $warehouse,
             destinationWarehouse: $destinationWarehouse,
             user: $user,
+            dispatchMode: (string) $validated['dispatch_mode'],
             notes: $validated['notes'] ?? null
         );
 
@@ -198,6 +207,22 @@ class SortingController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
+    public function reopen(SortBatch $sortBatch): JsonResponse
+    {
+        $this->authorizePermission('warehouse.sorting.reopen');
+
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        $user = Auth::guard('admin')->user();
+
+        $result = $this->sortingService->reopenBatch(
+            batch: $sortBatch,
+            warehouse: $warehouse,
+            user: $user
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
     private function paginate(Builder $query, Request $request, callable $mapper): JsonResponse
     {
         $total = $query->count();
@@ -227,4 +252,3 @@ class SortingController extends Controller
         }
     }
 }
-

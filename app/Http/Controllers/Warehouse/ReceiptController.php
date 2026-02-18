@@ -6,10 +6,11 @@ use App\Enums\PickupAssignmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\PickupAssignment;
-use App\Models\PickupItemConfirmation;
 use App\Models\ShipmentItem;
 use App\Models\Shipment;
+use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceipt;
+use App\Services\StorageService;
 use App\Services\Warehouse\WarehousePortalService;
 use App\Services\Warehouse\WarehouseReceivingService;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,7 +23,8 @@ class ReceiptController extends Controller
 {
     public function __construct(
         private WarehousePortalService $portalService,
-        private WarehouseReceivingService $warehouseReceivingService
+        private WarehouseReceivingService $warehouseReceivingService,
+        private StorageService $storageService
     )
     {
     }
@@ -46,6 +48,10 @@ class ReceiptController extends Controller
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
 
         if ((int) $pickupAssignment->target_warehouse_id !== (int) $warehouse->id) {
+            abort(404);
+        }
+
+        if (is_null($pickupAssignment->picked_up_at) || (string) ($pickupAssignment->status?->value ?? $pickupAssignment->status) === 'cancelled') {
             abort(404);
         }
 
@@ -81,11 +87,38 @@ class ReceiptController extends Controller
             'items' => $pickupAssignment->shipment?->items?->map(function (ShipmentItem $item) use ($pickupAssignment, $receipt) {
                 $receiptItem = $receipt?->items?->firstWhere('shipment_item_id', $item->id);
                 $driverConfirmation = $pickupAssignment->itemConfirmations->firstWhere('shipment_item_id', $item->id);
+                $driverPhotos = $pickupAssignment->photos
+                    ->where('shipment_item_id', $item->id)
+                    ->values()
+                    ->map(fn ($photo) => [
+                        'id' => $photo->id,
+                        'type' => $photo->type,
+                        'url' => $this->storageService->getUrl($photo->path),
+                        'created_at' => optional($photo->created_at)?->toIso8601String(),
+                    ])->values();
+
+                $vendorPhotos = $item->images
+                    ->map(fn ($image) => $image->getSignedUrl())
+                    ->values();
+
+                $vendorQuantity = (int) $item->quantity;
+                $driverQuantity = $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : null;
+                $expectedQuantity = $driverQuantity ?? $vendorQuantity;
+                $expectedSource = $driverQuantity !== null ? 'driver' : 'vendor_fallback';
+
                 return [
                     'shipment_item_id' => $item->id,
                     'description' => $item->description,
                     'tracking_code' => $item->tracking_code,
-                    'expected_quantity' => (int) ($driverConfirmation?->confirmed_quantity ?? $item->quantity),
+                    'vendor_quantity' => $vendorQuantity,
+                    'driver_confirmed_quantity' => $driverQuantity,
+                    'driver_qty_matches_vendor' => $driverQuantity !== null
+                        ? $driverQuantity === $vendorQuantity
+                        : null,
+                    'vendor_photos' => $vendorPhotos,
+                    'driver_photos' => $driverPhotos,
+                    'expected_quantity' => $expectedQuantity,
+                    'expected_source' => $expectedSource,
                     'received_quantity' => (int) ($receiptItem?->received_quantity ?? 0),
                     'damaged_quantity' => (int) ($receiptItem?->damaged_quantity ?? 0),
                     'discrepancy_type' => $receiptItem?->discrepancy_type ?? 'none',
@@ -327,29 +360,32 @@ class ReceiptController extends Controller
             $query->where(function (Builder $q) use ($search) {
                 $q->whereHas('shipmentItem.shipment', fn (Builder $sq) => $sq->where('shipment_number', 'like', "%{$search}%"))
                     ->orWhereHas('shipmentItem', fn (Builder $iq) => $iq->where('description', 'like', "%{$search}%"))
-                    ->orWhereHas('pickupAssignment.driver', fn (Builder $dq) => $dq->where('name', 'like', "%{$search}%"));
+                    ->orWhereHas('receipt.pickupAssignment.driver', fn (Builder $dq) => $dq->where('name', 'like', "%{$search}%"));
             });
         }
 
-        $sortBy = $request->input('sort', 'confirmed_at');
+        $sortBy = $request->input('sort', 'received_at');
         $sortDirection = $request->input('direction', 'desc') === 'asc' ? 'asc' : 'desc';
-        $allowedSorts = ['confirmed_at', 'confirmed_quantity', 'expected_quantity', 'created_at'];
+        $allowedSorts = ['received_at', 'received_quantity', 'expected_quantity', 'damaged_quantity', 'discrepancy_type', 'created_at'];
         if (in_array($sortBy, $allowedSorts, true)) {
             $query->orderBy($sortBy, $sortDirection);
         } else {
-            $query->latest('confirmed_at');
+            $query->latest('received_at');
         }
 
-        return $this->paginatedResponse($query, $request, function (PickupItemConfirmation $item) {
+        return $this->paginatedResponse($query, $request, function (WarehouseReceiptItem $item) {
             return [
                 'id' => $item->id,
-                'pickup_assignment_id' => $item->pickup_assignment_id,
+                'warehouse_receipt_id' => $item->warehouse_receipt_id,
+                'pickup_assignment_id' => $item->receipt?->pickup_assignment_id,
                 'shipment_number' => $item->shipmentItem?->shipment?->shipment_number,
                 'item_description' => $item->shipmentItem?->description,
                 'expected_quantity' => (int) $item->expected_quantity,
-                'confirmed_quantity' => (int) $item->confirmed_quantity,
-                'driver_name' => $item->pickupAssignment?->driver?->name,
-                'confirmed_at' => optional($item->confirmed_at)?->format('Y-m-d H:i:s'),
+                'received_quantity' => (int) $item->received_quantity,
+                'damaged_quantity' => (int) $item->damaged_quantity,
+                'discrepancy_type' => $item->discrepancy_type,
+                'driver_name' => $item->receipt?->pickupAssignment?->driver?->name,
+                'received_at' => optional($item->received_at)?->format('Y-m-d H:i:s'),
                 'notes' => $item->notes,
             ];
         });

@@ -15,7 +15,7 @@
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h2 class="text-lg font-semibold text-slate-900">Received Items</h2>
-                <p class="text-sm text-slate-500">Item-level confirmations received into this warehouse.</p>
+                <p class="text-sm text-slate-500">Item-level warehouse receipt records finalized in this warehouse.</p>
             </div>
             <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700" x-text="meta.total + ' Records'"></span>
         </div>
@@ -64,9 +64,11 @@
                         <th x-show="visibleColumns.shipment_number" @@click="sort('shipment_number')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Shipment #</th>
                         <th x-show="visibleColumns.item_description" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Item</th>
                         <th x-show="visibleColumns.expected_quantity" @@click="sort('expected_quantity')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Expected Qty</th>
-                        <th x-show="visibleColumns.confirmed_quantity" @@click="sort('confirmed_quantity')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Confirmed Qty</th>
+                        <th x-show="visibleColumns.received_quantity" @@click="sort('received_quantity')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Received Qty</th>
+                        <th x-show="visibleColumns.damaged_quantity" @@click="sort('damaged_quantity')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Damaged Qty</th>
                         <th x-show="visibleColumns.driver_name" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Driver</th>
-                        <th x-show="visibleColumns.confirmed_at" @@click="sort('confirmed_at')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Confirmed At</th>
+                        <th x-show="visibleColumns.received_at" @@click="sort('received_at')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Received At</th>
+                        <th x-show="visibleColumns.discrepancy_type" @@click="sort('discrepancy_type')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Discrepancy</th>
                         <th x-show="visibleColumns.notes" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Notes</th>
                     </tr>
                 </thead>
@@ -79,9 +81,11 @@
                             <td x-show="visibleColumns.shipment_number" class="px-4 py-3 font-semibold text-slate-900" x-text="row.shipment_number || '-' "></td>
                             <td x-show="visibleColumns.item_description" class="px-4 py-3 text-slate-700" x-text="row.item_description || '-' "></td>
                             <td x-show="visibleColumns.expected_quantity" class="px-4 py-3 text-slate-700" x-text="row.expected_quantity ?? 0"></td>
-                            <td x-show="visibleColumns.confirmed_quantity" class="px-4 py-3 text-slate-700" x-text="row.confirmed_quantity ?? 0"></td>
+                            <td x-show="visibleColumns.received_quantity" class="px-4 py-3 text-slate-700" x-text="row.received_quantity ?? 0"></td>
+                            <td x-show="visibleColumns.damaged_quantity" class="px-4 py-3 text-slate-700" x-text="row.damaged_quantity ?? 0"></td>
                             <td x-show="visibleColumns.driver_name" class="px-4 py-3 text-slate-700" x-text="row.driver_name || '-' "></td>
-                            <td x-show="visibleColumns.confirmed_at" class="px-4 py-3 text-slate-600" x-text="row.confirmed_at || '-' "></td>
+                            <td x-show="visibleColumns.received_at" class="px-4 py-3 text-slate-600" x-text="row.received_at || '-' "></td>
+                            <td x-show="visibleColumns.discrepancy_type" class="px-4 py-3 text-slate-600" x-text="row.discrepancy_type || 'none'"></td>
                             <td x-show="visibleColumns.notes" class="px-4 py-3 text-slate-600" x-text="row.notes || '-' "></td>
                         </tr>
                     </template>

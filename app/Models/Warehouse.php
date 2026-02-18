@@ -95,4 +95,19 @@ class Warehouse extends Model
     {
         return $this->hasMany(SortBatch::class, 'destination_warehouse_id');
     }
+
+    public function originTransportManifests(): HasMany
+    {
+        return $this->hasMany(TransportManifest::class, 'origin_warehouse_id');
+    }
+
+    public function destinationTransportManifests(): HasMany
+    {
+        return $this->hasMany(TransportManifest::class, 'destination_warehouse_id');
+    }
+
+    public function deliveryRuns(): HasMany
+    {
+        return $this->hasMany(DeliveryRun::class);
+    }
 }
