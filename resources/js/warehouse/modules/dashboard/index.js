@@ -1,13 +1,15 @@
+import { parseJsonAttribute } from '../../core/config.js';
+
 function getDashboardConfig() {
     const el = document.querySelector('[data-warehouse-dashboard-config]');
     if (!el) return null;
 
-    try {
-        return JSON.parse(el.getAttribute('data-warehouse-dashboard-config'));
-    } catch (error) {
-        console.error('Invalid warehouse dashboard config JSON:', error);
-        return null;
+    const config = parseJsonAttribute(el, 'data-warehouse-dashboard-config', null);
+    if (!config) {
+        console.error('Invalid warehouse dashboard config JSON');
     }
+
+    return config;
 }
 
 function buildWarehouseDashboard(config) {
@@ -31,4 +33,3 @@ if (window.Alpine) {
 } else {
     document.addEventListener('alpine:init', registerWarehouseDashboard);
 }
-

@@ -78,16 +78,6 @@
                         <span class="sh-title-text">Shipment</span>
                     </div>
                     <span class="sh-status-badge">
-                        <svg class="h-[15px] w-[15px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <template x-if="shipment?.status === 'draft'"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></template>
-                            <template x-if="shipment?.status === 'submitted'"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></template>
-                            <template x-if="['invoice_sent','invoice_accepted'].includes(shipment?.status)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></template>
-                            <template x-if="['pickup_assigned','picked_up'].includes(shipment?.status)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0m-8 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></template>
-                            <template x-if="['at_warehouse','sorted'].includes(shipment?.status)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></template>
-                            <template x-if="['in_transit','at_destination','out_for_delivery'].includes(shipment?.status)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0m-8 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></template>
-                            <template x-if="shipment?.status === 'delivered'"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></template>
-                            <template x-if="shipment?.status === 'cancelled'"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></template>
-                        </svg>
                         <span x-text="statusLabel(shipment?.status)"></span>
                     </span>
                 </div>
@@ -109,21 +99,39 @@
                         <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z"/></svg>
                         <span x-text="modeLabel(shipment?.destination_mode)"></span>
                     </span>
+                    <span class="sh-meta-item" x-show="shipment?.submitted_at">
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                        Submitted: <span x-text="formatDateTime(shipment?.submitted_at)"></span>
+                    </span>
                 </div>
 
                 {{-- Status message + action buttons --}}
                 <div class="sh-status-section">
                     <div class="sh-status-icon">
-                        <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <template x-if="['draft'].includes(shipment?.status)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></template>
-                            <template x-if="['submitted'].includes(shipment?.status)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></template>
-                            <template x-if="['invoice_sent','invoice_accepted'].includes(shipment?.status)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></template>
-                            <template x-if="['pickup_assigned','picked_up'].includes(shipment?.status)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0"/></template>
-                            <template x-if="['at_warehouse','sorted'].includes(shipment?.status)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></template>
-                            <template x-if="['in_transit','at_destination','out_for_delivery'].includes(shipment?.status)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0"/></template>
-                            <template x-if="shipment?.status === 'delivered'"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></template>
-                            <template x-if="shipment?.status === 'cancelled'"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></template>
-                        </svg>
+                        <template x-if="['draft'].includes(shipment?.status)">
+                            <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        </template>
+                        <template x-if="['submitted'].includes(shipment?.status)">
+                            <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </template>
+                        <template x-if="['invoice_sent','invoice_accepted'].includes(shipment?.status)">
+                            <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                        </template>
+                        <template x-if="['pickup_assigned','picked_up'].includes(shipment?.status)">
+                            <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                        </template>
+                        <template x-if="['at_warehouse','sorted'].includes(shipment?.status)">
+                            <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
+                        </template>
+                        <template x-if="['in_transit','at_destination','out_for_delivery'].includes(shipment?.status)">
+                            <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                        </template>
+                        <template x-if="shipment?.status === 'delivered'">
+                            <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </template>
+                        <template x-if="shipment?.status === 'cancelled'">
+                            <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                        </template>
                     </div>
                     <div class="sh-status-content">
                         <h4 class="sh-status-title" x-text="heroMessage.title"></h4>
@@ -158,7 +166,7 @@
             </div>
 
             {{-- Desktop: horizontal --}}
-            <div class="sh-steps hidden sm:flex" :data-progress="progressSteps.currentIdx">
+            <div class="sh-steps" :data-progress="progressSteps.currentIdx">
                 <template x-for="(step, i) in progressSteps.steps" :key="step.key">
                     <div class="sh-step" :class="'sh-step-' + step.state">
                         <div class="sh-step-dot">
@@ -178,7 +186,7 @@
             </div>
 
             {{-- Mobile: vertical --}}
-            <div class="sh-steps-mobile flex sm:hidden" :data-progress="progressSteps.currentIdx">
+            <div class="sh-steps-mobile" :data-progress="progressSteps.currentIdx">
                 <template x-for="(step, i) in progressSteps.steps" :key="'m-' + step.key">
                     <div class="sh-step-m" :class="'sh-step-' + step.state">
                         <div class="sh-step-dot-m">
@@ -200,24 +208,26 @@
 
         {{-- ========== MAIN GRID ========== --}}
         <div class="sh-grid">
-            {{-- ===== LEFT: MAIN CONTENT ===== --}}
-            <div class="sh-main-col">
-
                 {{-- ===== ITEMS CARD ===== --}}
-                <div class="sh-card">
+                <div class="sh-card sh-items-card">
                     <div class="sh-card-head">
                         <div class="sh-card-icon slate">
                             <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                         </div>
                         <div class="flex-1 min-w-0">
                             <h3>Items</h3>
-                            <p class="text-xs text-slate-400 mt-0.5"><span x-text="shipment?.items?.length || 0"></span> item(s) in this shipment</p>
                         </div>
-                        <button x-show="canEditShipment && !addingItem" x-cloak type="button" @click="openAddItem()"
-                                class="sh-card-action-btn">
-                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            Add Item
-                        </button>
+                        <div class="sh-items-header-right">
+                            <div class="sh-items-total-qty">
+                                <span class="sh-items-total-qty-num" x-text="(shipment?.items || []).reduce((s, i) => s + (i.quantity || 0), 0)"></span>
+                                <span class="sh-items-total-qty-label">Total Qty</span>
+                            </div>
+<button x-show="canEditShipment && !addingItem" x-cloak type="button" @click="openAddItem()"
+                                    class="sh-card-action-btn">
+                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Add Item
+                            </button>
+                        </div>
                     </div>
 
                     <div class="sh-card-body">
@@ -355,55 +365,109 @@
                                         </div>
                                         <div class="sh-item-main">
                                             <div class="sh-item-header">
-                                                <div class="sh-item-name" x-text="item.description"></div>
-                                                <span class="sh-item-qty">
-                                                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
-                                                    Qty: <span x-text="item.quantity"></span>
-                                                </span>
+                                                <div class="sh-item-title-group">
+                                                    <div class="sh-item-name" x-text="item.description"></div>
+                                                    <div class="sh-item-tracking" x-show="item.tracking_code" x-cloak>
+                                                        <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                                        <span x-text="item.tracking_code"></span>
+                                                    </div>
+                                                </div>
+                                                <div class="sh-item-qty-group">
+                                                    <span class="sh-item-qty">
+                                                        <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                                                        Qty: <span x-text="item.quantity"></span>
+                                                    </span>
+                                                    <span class="sh-item-confirmed" x-show="item.pickup_confirmation" x-cloak>
+                                                        <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                        <span x-text="item.pickup_confirmation?.confirmed_quantity ?? 0"></span> confirmed
+                                                    </span>
+                                                </div>
                                             </div>
                                             <div class="sh-item-meta">
-                                                <span class="vendor-badge" :class="'vendor-badge-' + item.status" x-text="statusLabel(item.status)"></span>
+                                                <span x-show="item.status !== 'picked_up'" class="vendor-badge" :class="'vendor-badge-' + item.status" x-text="statusLabel(item.status)"></span>
                                             </div>
 
                                             {{-- Per-item delivery info --}}
                                             <div class="sh-item-delivery" x-show="item.delivery">
-                                                <div class="flex items-center gap-1.5 mb-2">
-                                                    <svg class="h-3.5 w-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                                    <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Delivery</span>
-                                                </div>
-                                                <div class="grid gap-1.5 sm:grid-cols-2 text-xs text-emerald-900">
-                                                    <div><span class="text-emerald-600">To:</span> <span class="font-semibold" x-text="item.delivery?.recipient_name || '-'"></span></div>
-                                                    <div><span class="text-emerald-600">Phone:</span> <span class="font-semibold" x-text="item.delivery?.recipient_phone || '-'"></span></div>
-                                                    <div><span class="text-emerald-600">Town:</span> <span class="font-semibold" x-text="item.delivery?.location?.town || '-'"></span></div>
-                                                    <div><span class="text-emerald-600">Landmark:</span> <span class="font-semibold" x-text="item.delivery?.location?.landmark || '-'"></span></div>
-                                                </div>
-                                            </div>
-
-                                            {{-- Pickup confirmation --}}
-                                            <div class="rounded-lg border border-blue-100 bg-blue-50/40 px-3.5 py-3 text-xs mt-3" x-show="item.pickup_confirmation">
-                                                <div class="flex items-center gap-1.5 mb-2">
-                                                    <svg class="h-3.5 w-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                    <span class="font-bold uppercase tracking-wider text-blue-700">Pickup Confirmation</span>
-                                                </div>
-                                                <div class="grid grid-cols-2 gap-1.5 sm:grid-cols-4 text-blue-900">
-                                                    <div><span class="text-blue-500">Expected:</span> <span class="font-bold" x-text="item.pickup_confirmation?.expected_quantity ?? '-'"></span></div>
-                                                    <div><span class="text-blue-500">Confirmed:</span> <span class="font-bold" x-text="item.pickup_confirmation?.confirmed_quantity ?? '-'"></span></div>
-                                                    <div><span class="text-blue-500">Missing:</span> <span class="font-bold" x-text="item.pickup_confirmation?.missing_quantity ?? '-'"></span></div>
-                                                    <div><span class="text-blue-500">Extra:</span> <span class="font-bold" x-text="item.pickup_confirmation?.extra_quantity ?? '-'"></span></div>
-                                                </div>
-                                            </div>
-
-                                            {{-- Images --}}
-                                            <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 mt-3" x-show="(item.images || []).length > 0">
-                                                <template x-for="image in (item.images || [])" :key="image.id">
-                                                    <div class="group relative rounded-lg border border-gray-200 overflow-hidden bg-gray-50">
-                                                        <img :src="image.url" :alt="image.original_name" class="h-20 w-full object-cover sm:h-24">
-                                                        <button x-show="canEditShipment" type="button" @click="deleteItemImage(item, image)"
-                                                                class="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs font-semibold opacity-0 group-hover:opacity-100 transition">
-                                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                                        </button>
+                                                <div class="sh-item-delivery-header">
+                                                    <div class="sh-item-delivery-avatar">
+                                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                                     </div>
-                                                </template>
+                                                    <div class="sh-item-delivery-recipient">
+                                                        <span class="sh-item-delivery-name" x-text="item.delivery?.recipient_name || '-'"></span>
+                                                        <span class="sh-item-delivery-label">Recipient</span>
+                                                    </div>
+                                                    <div class="sh-item-delivery-phone-pill" x-show="item.delivery?.recipient_phone">
+                                                        <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                                                        <span x-text="item.delivery?.recipient_phone"></span>
+                                                    </div>
+                                                </div>
+                                                <div class="sh-item-delivery-address" x-show="item.delivery?.location?.town || item.delivery?.location?.landmark">
+                                                    <div class="sh-item-delivery-pin">
+                                                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>
+                                                    </div>
+                                                    <div class="sh-item-delivery-address-text">
+                                                        <span x-show="item.delivery?.location?.town" x-text="item.delivery?.location?.town"></span>
+                                                        <span class="sh-item-delivery-dot" x-show="item.delivery?.location?.town && item.delivery?.location?.landmark">&middot;</span>
+                                                        <span x-show="item.delivery?.location?.landmark" x-text="item.delivery?.location?.landmark"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {{-- Vendor Images --}}
+                                            <div x-show="(item.images || []).length > 0" class="sh-item-photo-section">
+                                                <div class="sh-item-photo-label">
+                                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                                    Vendor Photos
+                                                    <span class="sh-item-photo-count" x-text="(item.images || []).length"></span>
+                                                </div>
+                                                <div class="sh-item-images">
+                                                    <template x-for="image in (item.images || [])" :key="image.id">
+                                                        <div class="sh-item-image group" x-data="{ broken: false, loaded: false }">
+                                                            <img x-show="loaded && !broken" :src="image.url" :alt="image.original_name"
+                                                                 x-on:load="loaded = true"
+                                                                 x-on:error="broken = true"
+                                                                 class="sh-item-image-img">
+                                                            <div x-show="!loaded && !broken" class="sh-item-image-loader">
+                                                                <svg class="animate-spin" width="16" height="16" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                                            </div>
+                                                            <div x-show="broken" class="sh-item-image-fallback">
+                                                                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                                                <span class="sh-item-image-fallback-text">Failed</span>
+                                                            </div>
+                                                            <button x-show="canEditShipment" type="button" @click="deleteItemImage(item, image)"
+                                                                    class="sh-item-image-delete">
+                                                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                            </button>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+
+                                            {{-- Driver Pickup Photos --}}
+                                            <div x-show="(item.pickup_confirmation?.photos || []).length > 0" x-cloak class="sh-item-photo-section driver">
+                                                <div class="sh-item-photo-label driver">
+                                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                                    Pickup Photos
+                                                    <span class="sh-item-photo-count driver" x-text="(item.pickup_confirmation?.photos || []).length"></span>
+                                                </div>
+                                                <div class="sh-item-images">
+                                                    <template x-for="photo in (item.pickup_confirmation?.photos || [])" :key="photo.id">
+                                                        <div class="sh-item-image group" x-data="{ broken: false, loaded: false }">
+                                                            <img x-show="loaded && !broken" :src="photo.url" :alt="photo.original_name"
+                                                                 x-on:load="loaded = true"
+                                                                 x-on:error="broken = true"
+                                                                 class="sh-item-image-img">
+                                                            <div x-show="!loaded && !broken" class="sh-item-image-loader">
+                                                                <svg class="animate-spin" width="16" height="16" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                                            </div>
+                                                            <div x-show="broken" class="sh-item-image-fallback">
+                                                                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                                                <span class="sh-item-image-fallback-text">Failed</span>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                </div>
                                             </div>
 
                                             {{-- Inline image upload --}}
@@ -597,18 +661,20 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            {{-- ===== RIGHT: SIDEBAR ===== --}}
-            <div class="sh-sidebar-col">
 
                 {{-- ---- Invoice Card (priority) ---- --}}
-                <div class="sh-sidebar-card sh-invoice-card">
+                <div class="sh-sidebar-card sh-invoice-card" x-show="currentInvoice" x-cloak>
                     <div class="sh-sidebar-head">
                         <div class="head-icon">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                         </div>
                         <h4>Invoice</h4>
+                        <button x-show="invoiceHistory.length > 1" x-cloak type="button"
+                                @click="document.getElementById('invoice-history').scrollIntoView({ behavior: 'smooth' })"
+                                class="ml-auto text-xs font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1">
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            View History
+                        </button>
                     </div>
                     <div class="sh-sidebar-body">
                         <template x-if="currentInvoice">
@@ -662,50 +728,8 @@
                     </div>
                 </div>
 
-                {{-- ---- Details Card (2x2 grid) ---- --}}
-                <div class="sh-sidebar-card sh-details-card">
-                    <div class="sh-sidebar-head">
-                        <div class="head-icon">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        </div>
-                        <h4>Details</h4>
-                    </div>
-                    <div class="sh-details-grid">
-                        <div class="sh-detail-item">
-                            <div class="sh-detail-label">
-                                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                Status
-                            </div>
-                            <div class="sh-detail-value">
-                                <span class="vendor-badge text-[10px]" :class="'vendor-badge-' + shipment?.status" x-text="statusLabel(shipment?.status)"></span>
-                            </div>
-                        </div>
-                        <div class="sh-detail-item">
-                            <div class="sh-detail-label">
-                                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/></svg>
-                                Mode
-                            </div>
-                            <div class="sh-detail-value" x-text="modeLabel(shipment?.destination_mode)"></div>
-                        </div>
-                        <div class="sh-detail-item">
-                            <div class="sh-detail-label">
-                                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                Created
-                            </div>
-                            <div class="sh-detail-value" x-text="formatDateTime(shipment?.created_at)"></div>
-                        </div>
-                        <div class="sh-detail-item">
-                            <div class="sh-detail-label">
-                                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                                Submitted
-                            </div>
-                            <div class="sh-detail-value" x-text="shipment?.submitted_at ? formatDateTime(shipment?.submitted_at) : 'Not yet'"></div>
-                        </div>
-                    </div>
-                </div>
-
                 {{-- ---- Pickup Location ---- --}}
-                <div class="sh-sidebar-card">
+                <div class="sh-sidebar-card sh-pickup-card">
                     <div class="sh-sidebar-head">
                         <div class="head-icon blue">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -747,7 +771,7 @@
                 </div>
 
                 {{-- ---- Delivery Destination ---- --}}
-                <div class="sh-sidebar-card">
+                <div class="sh-sidebar-card sh-delivery-card" x-show="shipment?.destination_mode !== 'per_item'" x-cloak>
                     <div class="sh-sidebar-head">
                         <div class="head-icon green">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
@@ -802,7 +826,7 @@
                 </div>
 
                 {{-- ---- Pickup Assignment ---- --}}
-                <div class="sh-sidebar-card">
+                <div class="sh-sidebar-card sh-assignment-card">
                     <div class="sh-sidebar-head">
                         <div class="head-icon indigo">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0m-8 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
@@ -843,7 +867,7 @@
                 </div>
 
                 {{-- ---- Invoice History ---- --}}
-                <div class="sh-sidebar-card" x-show="invoiceHistory.length > 0" x-cloak>
+                <div class="sh-sidebar-card sh-history-card" id="invoice-history" x-show="invoiceHistory.length > 1" x-cloak>
                     <div class="sh-sidebar-head">
                         <div class="head-icon purple">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -854,7 +878,7 @@
                     <div class="sh-sidebar-body">
                         <div class="space-y-2.5">
                             <template x-for="(inv, i) in invoiceHistory" :key="inv.id || i">
-                                <div class="rounded-lg border border-gray-100 bg-gray-50/50 p-3 hover:border-slate-200 transition">
+                                <a :href="`/vendor/invoices/${inv.id}`" class="block rounded-lg border border-gray-100 bg-gray-50/50 p-3 hover:border-slate-300 hover:bg-white hover:shadow-sm transition no-underline">
                                     <div class="flex items-center justify-between gap-2 mb-1.5">
                                         <div class="flex items-center gap-2">
                                             <div class="h-2 w-2 rounded-full flex-shrink-0"
@@ -879,13 +903,12 @@
                                     <div x-show="inv.vendor_notes" class="mt-2 ml-4 rounded-md bg-slate-50 border border-slate-100 px-2.5 py-2 text-[11px] text-slate-500">
                                         <span x-text="inv.vendor_notes"></span>
                                     </div>
-                                </div>
+                                </a>
                             </template>
                         </div>
                     </div>
                 </div>
 
-            </div>
         </div>
 
     </div>

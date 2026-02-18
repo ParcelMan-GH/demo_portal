@@ -368,26 +368,67 @@ function registerVendorHomePage() {
         loading: true,
         error: null,
         profile: null,
-        profileForm: {
-            name: '',
-            business_name: '',
-            email: '',
+        stats: {
+            shipments: { total: 0, draft: 0, in_progress: 0, delivered: 0, cancelled: 0 },
+            invoices: { total: 0, pending: 0, accepted: 0, rejected: 0 },
         },
-        profileSaving: false,
-        profileAlert: null,
+        recentShipments: [],
+        recentInvoices: [],
 
         init() {
             this.bootstrap();
         },
 
-        showProfileAlert(type, message) {
-            this.profileAlert = { type, message };
+        get todayFormatted() {
+            return new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+            });
         },
 
-        syncProfileForm() {
-            this.profileForm.name = this.profile?.name || '';
-            this.profileForm.business_name = this.profile?.business_name || '';
-            this.profileForm.email = this.profile?.email || '';
+        statusColor(status) {
+            const map = {
+                draft: 'gray', submitted: 'blue',
+                invoice_sent: 'orange', invoice_accepted: 'orange',
+                pickup_assigned: 'cyan', picked_up: 'cyan',
+                at_warehouse: 'cyan', sorted: 'cyan',
+                in_transit: 'cyan', at_destination: 'cyan',
+                out_for_delivery: 'cyan',
+                delivered: 'green', cancelled: 'red',
+            };
+            return map[status] || 'gray';
+        },
+
+        invoiceStatusColor(status) {
+            const map = {
+                pending: 'amber', sent: 'amber',
+                accepted: 'green', rejected: 'red', cancelled: 'gray',
+            };
+            return map[status] || 'gray';
+        },
+
+        statusLabel(status) {
+            if (!status) return '-';
+            return String(status).split('_').map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' ');
+        },
+
+        formatDate(value) {
+            if (!value) return '-';
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return '-';
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        },
+
+        formatMoney(value, currency = 'GHS') {
+            const amount = Number(value);
+            if (Number.isNaN(amount)) return '-';
+            try {
+                return new Intl.NumberFormat('en-GH', { style: 'currency', currency, minimumFractionDigits: 2 }).format(amount);
+            } catch {
+                return `${amount.toFixed(2)} ${currency}`;
+            }
         },
 
         async bootstrap() {
@@ -397,59 +438,59 @@ function registerVendorHomePage() {
                 return;
             }
 
-            const result = await apiRequest('/api/v1/vendor/profile', { role: 'vendor' });
-            if (result.success) {
-                this.profile = result.payload?.data?.user || null;
-                this.syncProfileForm();
+            const inProgressStatuses = 'status[]=submitted&status[]=invoice_sent&status[]=invoice_accepted&status[]=pickup_assigned&status[]=picked_up&status[]=at_warehouse&status[]=sorted&status[]=in_transit&status[]=at_destination&status[]=out_for_delivery';
+
+            const [profileResult, ...rest] = await Promise.all([
+                apiRequest('/api/v1/vendor/profile', { role: 'vendor' }),
+                // Shipment counts: total, draft, in_progress, delivered, cancelled
+                apiRequest('/api/v1/vendor/shipments?limit=1&offset=0', { role: 'vendor' }),
+                apiRequest('/api/v1/vendor/shipments?limit=1&offset=0&status[]=draft', { role: 'vendor' }),
+                apiRequest(`/api/v1/vendor/shipments?limit=1&offset=0&${inProgressStatuses}`, { role: 'vendor' }),
+                apiRequest('/api/v1/vendor/shipments?limit=1&offset=0&status[]=delivered', { role: 'vendor' }),
+                apiRequest('/api/v1/vendor/shipments?limit=1&offset=0&status[]=cancelled', { role: 'vendor' }),
+                // Invoice counts: total, pending, accepted, rejected
+                apiRequest('/api/v1/vendor/invoices?limit=1&offset=0', { role: 'vendor' }),
+                apiRequest('/api/v1/vendor/invoices?limit=1&offset=0&status[]=pending&status[]=sent', { role: 'vendor' }),
+                apiRequest('/api/v1/vendor/invoices?limit=1&offset=0&status[]=accepted', { role: 'vendor' }),
+                apiRequest('/api/v1/vendor/invoices?limit=1&offset=0&status[]=rejected', { role: 'vendor' }),
+                // Recent lists
+                apiRequest('/api/v1/vendor/shipments?limit=5&offset=0&sort_by=created_at&sort_dir=desc', { role: 'vendor' }),
+                apiRequest('/api/v1/vendor/invoices?limit=5&offset=0&sort_by=created_at&sort_dir=desc', { role: 'vendor' }),
+            ]);
+
+            if (profileResult.unauthorized || rest.some(r => r.unauthorized)) {
+                clearToken('vendor');
+                redirectTo('/vendor/login');
+                return;
+            }
+
+            if (!profileResult.success) {
+                this.error = profileResult.message;
                 this.loading = false;
                 return;
             }
 
-            if (result.unauthorized) {
-                clearToken('vendor');
-                redirectTo('/vendor/login');
-                return;
+            this.profile = profileResult.payload?.data?.user || null;
+
+            const ct = (r) => r.success ? (r.payload?.data?.pagination?.total || 0) : 0;
+            this.stats.shipments.total = ct(rest[0]);
+            this.stats.shipments.draft = ct(rest[1]);
+            this.stats.shipments.in_progress = ct(rest[2]);
+            this.stats.shipments.delivered = ct(rest[3]);
+            this.stats.shipments.cancelled = ct(rest[4]);
+            this.stats.invoices.total = ct(rest[5]);
+            this.stats.invoices.pending = ct(rest[6]);
+            this.stats.invoices.accepted = ct(rest[7]);
+            this.stats.invoices.rejected = ct(rest[8]);
+
+            if (rest[9].success) {
+                this.recentShipments = rest[9].payload?.data?.shipments || [];
+            }
+            if (rest[10].success) {
+                this.recentInvoices = rest[10].payload?.data?.invoices || [];
             }
 
-            this.error = result.message;
             this.loading = false;
-        },
-
-        async updateProfile() {
-            if (!this.profileForm.name.trim()) {
-                this.showProfileAlert('error', 'Name is required.');
-                return;
-            }
-
-            this.profileSaving = true;
-            this.profileAlert = null;
-
-            const result = await apiRequest('/api/v1/vendor/profile', {
-                method: 'PUT',
-                role: 'vendor',
-                data: {
-                    name: this.profileForm.name.trim(),
-                    business_name: this.profileForm.business_name.trim() || null,
-                    email: this.profileForm.email.trim() || null,
-                },
-            });
-
-            if (result.unauthorized) {
-                clearToken('vendor');
-                redirectTo('/vendor/login');
-                return;
-            }
-
-            if (!result.success) {
-                this.showProfileAlert('error', result.message);
-                this.profileSaving = false;
-                return;
-            }
-
-            this.profile = result.payload?.data?.user || this.profile;
-            this.syncProfileForm();
-            this.showProfileAlert('success', result.message);
-            this.profileSaving = false;
         },
 
         async logout() {
@@ -458,6 +499,121 @@ function registerVendorHomePage() {
                 role: 'vendor',
             });
 
+            clearToken('vendor');
+            redirectTo('/vendor/login');
+        },
+    };
+}
+
+function registerVendorProfilePage() {
+    return {
+        loading: true,
+        error: null,
+        profile: null,
+        editing: false,
+        saving: false,
+        alert: null,
+        form: { name: '', business_name: '', email: '' },
+
+        init() {
+            this.loadProfile();
+        },
+
+        get memberSince() {
+            if (!this.profile?.created_at) return '-';
+            const d = new Date(this.profile.created_at);
+            if (Number.isNaN(d.getTime())) return '-';
+            return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        },
+
+        get initial() {
+            return (this.profile?.name || 'V').charAt(0).toUpperCase();
+        },
+
+        showAlert(type, message) {
+            this.alert = { type, message };
+            if (type === 'success') {
+                setTimeout(() => { this.alert = null; }, 4000);
+            }
+        },
+
+        startEditing() {
+            this.form.name = this.profile?.name || '';
+            this.form.business_name = this.profile?.business_name || '';
+            this.form.email = this.profile?.email || '';
+            this.editing = true;
+            this.alert = null;
+        },
+
+        cancelEditing() {
+            this.editing = false;
+            this.alert = null;
+        },
+
+        async loadProfile() {
+            const token = getToken('vendor');
+            if (!token) {
+                redirectTo('/vendor/login');
+                return;
+            }
+
+            const result = await apiRequest('/api/v1/vendor/profile', { role: 'vendor' });
+
+            if (result.unauthorized) {
+                clearToken('vendor');
+                redirectTo('/vendor/login');
+                return;
+            }
+
+            if (!result.success) {
+                this.error = result.message;
+                this.loading = false;
+                return;
+            }
+
+            this.profile = result.payload?.data?.user || null;
+            this.loading = false;
+        },
+
+        async saveProfile() {
+            if (!this.form.name.trim()) {
+                this.showAlert('error', 'Name is required.');
+                return;
+            }
+
+            this.saving = true;
+            this.alert = null;
+
+            try {
+                const result = await apiRequest('/api/v1/vendor/profile', {
+                    method: 'PUT',
+                    role: 'vendor',
+                    data: {
+                        name: this.form.name.trim(),
+                        business_name: this.form.business_name.trim() || null,
+                        email: this.form.email.trim() || null,
+                    },
+                });
+
+                if (result.success) {
+                    this.profile = result.payload?.data?.user || this.profile;
+                    this.editing = false;
+                    this.showAlert('success', 'Profile updated successfully.');
+                } else {
+                    this.showAlert('error', result.message || 'Failed to update profile.');
+                }
+            } catch {
+                this.showAlert('error', 'Something went wrong. Please try again.');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async logout() {
+            await apiRequest('/api/v1/auth/vendor/logout', {
+                method: 'POST',
+                role: 'vendor',
+            });
             clearToken('vendor');
             redirectTo('/vendor/login');
         },
@@ -664,6 +820,7 @@ function registerPortalComponents() {
     window.Alpine.data('vendorAuthPage', registerVendorAuthPage);
     window.Alpine.data('driverAuthPage', registerDriverAuthPage);
     window.Alpine.data('vendorHomePage', registerVendorHomePage);
+    window.Alpine.data('vendorProfilePage', registerVendorProfilePage);
     window.Alpine.data('driverHomePage', registerDriverHomePage);
 }
 

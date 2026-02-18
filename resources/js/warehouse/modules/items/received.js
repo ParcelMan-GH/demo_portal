@@ -1,15 +1,16 @@
 import { createRemoteTablePage } from '../shared/table-page.js';
+import { parseJsonAttribute } from '../../core/config.js';
 
 function getConfig() {
     const container = document.querySelector('[data-warehouse-received-items-config]');
     if (!container) return null;
 
-    try {
-        return JSON.parse(container.getAttribute('data-warehouse-received-items-config') || '{}');
-    } catch (error) {
-        console.error('Invalid received items config JSON:', error);
-        return null;
+    const config = parseJsonAttribute(container, 'data-warehouse-received-items-config', null);
+    if (!config) {
+        console.error('Invalid received items config JSON');
     }
+
+    return config;
 }
 
 function registerReceivedItemsPage() {

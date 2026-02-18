@@ -393,7 +393,8 @@ class PickupAssignmentService
         PickupAssignment $assignment,
         int|string|null $receivedByUserId = null,
         ?int $receivedWarehouseId = null,
-        ?string $receiveNotes = null
+        ?string $receiveNotes = null,
+        array $trackingMetaByItem = []
     ): array
     {
         if (in_array($assignment->status, [PickupAssignmentStatus::CANCELLED], true)) {
@@ -425,7 +426,7 @@ class PickupAssignmentService
             ];
         }
 
-        return DB::transaction(function () use ($assignment, $receivedByUserId, $warehouseId, $receiveNotes) {
+        return DB::transaction(function () use ($assignment, $receivedByUserId, $warehouseId, $receiveNotes, $trackingMetaByItem) {
             $lockedAssignment = PickupAssignment::query()
                 ->with(['shipment.items', 'driver'])
                 ->lockForUpdate()
@@ -460,7 +461,7 @@ class PickupAssignmentService
             $locationLabel = optional($lockedAssignment->receivedWarehouse)->name
                 ?? optional($lockedAssignment->targetWarehouse)->name;
 
-            $lockedAssignment->shipment->items->each(function ($item) use ($now, $locationLabel, $receivedByUserId) {
+            $lockedAssignment->shipment->items->each(function ($item) use ($now, $locationLabel, $receivedByUserId, $trackingMetaByItem) {
                 $item->update(['status' => ItemStatus::AT_WAREHOUSE]);
 
                 ShipmentItemTracking::create([
@@ -468,6 +469,7 @@ class PickupAssignmentService
                     'status' => ItemStatus::AT_WAREHOUSE->value,
                     'location' => $locationLabel,
                     'notes' => 'Item received at warehouse.',
+                    'meta' => $trackingMetaByItem[$item->id] ?? null,
                     'created_by' => $receivedByUserId ? "user:{$receivedByUserId}" : null,
                     'created_at' => $now,
                 ]);

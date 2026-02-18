@@ -27,6 +27,7 @@ class ShipmentItemTracking extends Model
         'status',
         'location',
         'notes',
+        'meta',
         'created_by',
         'created_at',
     ];
@@ -38,6 +39,7 @@ class ShipmentItemTracking extends Model
      */
     protected $casts = [
         'created_at' => 'datetime',
+        'meta' => 'array',
     ];
 
     /**

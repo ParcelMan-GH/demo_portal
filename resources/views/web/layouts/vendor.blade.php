@@ -61,10 +61,58 @@
                         <span class="hidden sm:inline">Install App</span>
                     </button>
 
-                    {{-- User avatar --}}
-                    <div class="flex items-center gap-2 rounded-full border border-gray-200 py-1 pl-1 pr-3 hover:bg-gray-50 transition cursor-default">
-                        <div class="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700" x-text="vendorInitial"></div>
-                        <span class="hidden text-sm font-medium text-slate-700 sm:inline" x-text="vendorName"></span>
+                    {{-- User avatar dropdown --}}
+                    <div class="relative" x-data="{ profileOpen: false }">
+                        <button @click="profileOpen = !profileOpen" class="flex items-center gap-2 rounded-full border border-gray-200 py-1 pl-1 pr-3 hover:bg-gray-50 transition cursor-pointer">
+                            <div class="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-xs font-bold text-white" x-text="vendorInitial"></div>
+                            <span class="hidden text-sm font-medium text-slate-700 sm:inline" x-text="vendorName"></span>
+                            <svg class="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+
+                        <div x-show="profileOpen" x-cloak
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 translate-y-1"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             x-transition:leave="transition ease-in duration-100"
+                             x-transition:leave-start="opacity-100 translate-y-0"
+                             x-transition:leave-end="opacity-0 translate-y-1"
+                             @click.away="profileOpen = false"
+                             class="vendor-profile-dropdown">
+                            {{-- User info --}}
+                            <div class="vendor-profile-dropdown-header">
+                                <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-slate-700 to-slate-900 text-white text-sm font-bold shadow-sm" x-text="vendorInitial"></div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="vendor-profile-dropdown-name" x-text="vendorName"></p>
+                                    <p class="vendor-profile-dropdown-role">Vendor</p>
+                                </div>
+                            </div>
+                            {{-- Links --}}
+                            <div class="vendor-profile-dropdown-links">
+                                <a href="{{ route('web.vendor.home') }}" class="vendor-profile-dropdown-link">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                                    Dashboard
+                                </a>
+                                <a href="{{ route('web.vendor.profile') }}" class="vendor-profile-dropdown-link">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                    My Profile
+                                </a>
+                                <a href="{{ route('web.vendor.shipments.index') }}" class="vendor-profile-dropdown-link">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                    My Shipments
+                                </a>
+                                <a href="{{ route('web.vendor.invoices.index') }}" class="vendor-profile-dropdown-link">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                                    My Invoices
+                                </a>
+                            </div>
+                            {{-- Logout --}}
+                            <div class="vendor-profile-dropdown-footer">
+                                <button type="button" @click="vendorLogout()" class="vendor-profile-dropdown-logout">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                                    Logout
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     {{-- Mobile menu button --}}
@@ -339,6 +387,23 @@
                         const btn = document.getElementById('pwa-install-btn');
                         if (btn) btn.classList.add('hidden');
                     });
+                },
+
+                async vendorLogout() {
+                    try {
+                        const token = localStorage.getItem('parcelman_vendor_token');
+                        if (token) {
+                            await fetch('/api/v1/auth/vendor/logout', {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'Authorization': `Bearer ${token}`,
+                                },
+                            });
+                        }
+                    } catch {}
+                    localStorage.removeItem('parcelman_vendor_token');
+                    window.location.href = '/vendor/login';
                 },
             };
         }

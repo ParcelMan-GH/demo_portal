@@ -119,12 +119,18 @@ class User extends Authenticatable
             return true;
         }
 
-        // Check cached permissions
-        return Cache::remember(
-            "user.{$this->id}.permissions",
+        $permissionNames = Cache::remember(
+            "user.{$this->id}.permission_names",
             now()->addHours(24),
-            fn() => $this->getAllPermissions()->contains('name', $permission)
+            fn() => $this->getAllPermissions()
+                ->pluck('name')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all()
         );
+
+        return in_array($permission, $permissionNames, true);
     }
 
     /**
@@ -172,6 +178,7 @@ class User extends Authenticatable
     public function flushPermissionCache(): void
     {
         Cache::forget("user.{$this->id}.permissions");
+        Cache::forget("user.{$this->id}.permission_names");
         $this->update(['last_permission_cache_at' => now()]);
     }
 

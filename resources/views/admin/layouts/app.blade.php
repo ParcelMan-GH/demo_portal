@@ -23,18 +23,19 @@
             ]"
         >
             <!-- Logo -->
-            <div class="flex items-center h-16 border-b border-white/[0.06] transition-all duration-300" :class="sidebarCollapsed ? 'px-4 justify-center' : 'px-5'">
-                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-500/20">
+            <div class="flex items-center h-[60px] transition-all duration-300" :class="sidebarCollapsed ? 'px-4 justify-center' : 'px-5'">
+                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/25 ring-1 ring-white/10">
                     <img src="{{ asset('logo.png') }}" alt="Parcelman" class="h-6 w-6 object-contain">
                 </div>
                 <div class="ml-3 overflow-hidden transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'">
-                    <span class="text-white text-[16px] font-bold tracking-tight whitespace-nowrap">Parcelman</span>
-                    <span class="block text-primary-400/80 text-[10px] font-semibold uppercase tracking-[0.15em] whitespace-nowrap">Admin Portal</span>
+                    <span class="text-white text-[15px] font-bold tracking-tight whitespace-nowrap">Parcelman</span>
+                    <span class="block text-primary-400/70 text-[10px] font-semibold uppercase tracking-[0.15em] whitespace-nowrap">Admin Portal</span>
                 </div>
             </div>
+            <div class="mx-4 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent"></div>
 
             <!-- Navigation -->
-            <nav class="flex-1 overflow-y-auto sidebar-nav py-3 px-3">
+            <nav class="flex-1 overflow-y-auto sidebar-nav py-4 px-3">
                 <!-- Dashboard -->
                 @hasPermission('dashboard.view')
                 <a href="{{ route('admin.dashboard') }}"
@@ -262,14 +263,15 @@
             </nav>
 
             <!-- User Profile Section at Bottom -->
-            <div class="border-t border-white/[0.06] p-3">
-                <div class="flex items-center rounded-xl p-2 hover:bg-white/5 transition-all cursor-pointer"
-                     :class="sidebarCollapsed ? 'justify-center' : ''">
+            <div class="p-3">
+                <div class="mx-0 mb-2 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent"></div>
+                <div class="sidebar-user-card flex items-center cursor-pointer"
+                     :class="sidebarCollapsed ? 'justify-center !p-2' : ''">
                     <div class="relative flex-shrink-0">
-                        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-sm font-semibold shadow-lg shadow-primary-500/20">
+                        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-sm font-semibold shadow-lg shadow-primary-500/20 ring-1 ring-white/10">
                             {{ substr(Auth::guard('admin')->user()->name, 0, 1) }}
                         </div>
-                        <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
+                        <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 border-2 border-[#1e293b] rounded-full"></span>
                     </div>
                     <div class="ml-3 overflow-hidden transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'">
                         <p class="text-[13px] font-semibold text-white truncate">{{ Auth::guard('admin')->user()->name }}</p>
@@ -296,12 +298,12 @@
         <!-- Main Content -->
         <div class="flex-1 flex flex-col min-w-0 transition-all duration-300" :class="sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[260px]'" x-data="{ darkMode: false, createOpen: false }">
             <!-- Top Header -->
-            <header class="bg-white border-b border-slate-200/60 h-[52px] flex items-center px-4 sticky top-0 z-30">
+            <header class="admin-header h-[56px] flex items-center px-5 sticky top-0 z-30">
                 <!-- Left Section: Toggle + Breadcrumb -->
                 <div class="flex items-center">
                     <!-- Sidebar Toggle Button -->
                     <button @click="sidebarCollapsed = !sidebarCollapsed; sidebarMobileOpen = !sidebarMobileOpen"
-                            class="flex items-center justify-center w-9 h-9 rounded-lg bg-primary-50/80 hover:bg-primary-100 text-primary-500 transition-all duration-200"
+                            class="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100/80 hover:bg-slate-200/80 text-slate-500 hover:text-slate-700 transition-all duration-200"
                             title="Toggle Sidebar">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"/>
@@ -312,20 +314,17 @@
                     <nav class="hidden sm:flex items-center text-[13px] ml-5">
                         <span class="text-slate-400 font-medium">@yield('breadcrumb-parent', 'Dashboard')</span>
                         @hasSection('breadcrumb-current')
-                        <svg class="w-4 h-4 mx-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-3.5 h-3.5 mx-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                         </svg>
-                        <span class="text-slate-700 font-semibold">@yield('breadcrumb-current')</span>
+                        <span class="text-slate-800 font-semibold">@yield('breadcrumb-current')</span>
                         @endif
                     </nav>
-
-                    <!-- Divider -->
-                    <div class="hidden md:block w-px h-6 bg-slate-200/80 ml-5"></div>
                 </div>
 
                 <!-- Search (Center) -->
-                <div class="hidden md:flex flex-1 justify-center px-6">
-                    <div class="relative w-full max-w-lg">
+                <div class="hidden md:flex flex-1 justify-center px-8">
+                    <div class="relative w-full max-w-md">
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                             <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -333,17 +332,17 @@
                         </div>
                         <input type="text"
                                placeholder="Search anything..."
-                               class="w-full h-9 pl-10 pr-16 text-[13px] bg-slate-50 border border-slate-200/80 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-300 focus:bg-white transition-all placeholder-slate-400">
+                               class="w-full h-9 pl-10 pr-16 text-[13px] bg-slate-50/80 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-300 focus:bg-white transition-all placeholder-slate-400">
                         <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
-                            <span class="text-[11px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200/80 font-medium">⌘K</span>
+                            <span class="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded-md border border-slate-200/60 font-medium tracking-wide">⌘K</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Right Section -->
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1.5">
                     <!-- Date & Time -->
-                    <div class="hidden lg:flex items-center text-[12px] text-slate-500 px-3 py-1.5 rounded-lg bg-slate-50/80">
+                    <div class="hidden lg:flex items-center text-[12px] text-slate-500 px-3 py-1.5 rounded-xl bg-slate-50/80 border border-slate-100/80">
                         <svg class="w-3.5 h-3.5 mr-1.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>
@@ -354,7 +353,7 @@
 
                     <!-- Dark Mode Toggle -->
                     <button @click="darkMode = !darkMode"
-                            class="flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+                            class="flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100/80 transition-all"
                             title="Toggle Dark Mode">
                         <svg x-show="!darkMode" class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
@@ -365,14 +364,14 @@
                     </button>
 
                     <!-- Create Button with Dropdown -->
-                    <div class="relative ml-1">
+                    <div class="relative">
                         <button @click="createOpen = !createOpen"
-                                class="flex items-center h-9 px-3.5 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white text-[12px] font-semibold rounded-lg transition-all shadow-sm shadow-teal-500/25">
+                                class="flex items-center h-9 px-4 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white text-[12px] font-semibold rounded-xl transition-all shadow-sm shadow-slate-900/20 hover:shadow-md hover:shadow-slate-900/25">
                             <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
                             </svg>
                             Create
-                            <svg class="w-3 h-3 ml-1.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-3 h-3 ml-1.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                             </svg>
                         </button>
@@ -387,10 +386,10 @@
                             x-transition:leave-start="opacity-100 translate-y-0"
                             x-transition:leave-end="opacity-0 translate-y-1"
                             @click.away="createOpen = false"
-                            class="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg shadow-slate-200/50 border border-slate-100 py-1.5 z-50"
+                            class="absolute right-0 mt-2 w-48 bg-white/95 backdrop-blur-xl rounded-xl shadow-lg shadow-slate-200/60 border border-slate-100/80 py-1.5 z-50"
                         >
                             @hasPermission('vendors.create')
-                            <a href="{{ route('admin.vendors.index') }}" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                            <a href="{{ route('admin.vendors.index') }}" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
                                 <svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                                 </svg>
@@ -398,7 +397,7 @@
                             </a>
                             @endhasPermission
                             @hasPermission('shipments.create')
-                            <a href="#" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                            <a href="#" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
                                 <svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                 </svg>
@@ -406,7 +405,7 @@
                             </a>
                             @endhasPermission
                             @hasPermission('drivers.create')
-                            <a href="#" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                            <a href="#" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
                                 <svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -415,7 +414,7 @@
                             </a>
                             @endhasPermission
                             @hasPermission('users.create')
-                            <a href="{{ route('admin.admins.create') }}" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                            <a href="{{ route('admin.admins.create') }}" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
                                 <svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
                                 </svg>
@@ -426,18 +425,25 @@
                     </div>
 
                     <!-- Notifications -->
-                    <button class="relative flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all">
+                    <button class="relative flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100/80 transition-all">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                         </svg>
-                        <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"></span>
+                        <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white/80"></span>
                     </button>
 
+                    <!-- Separator -->
+                    <div class="w-px h-6 bg-slate-200/60 mx-1"></div>
+
                     <!-- User Avatar Dropdown -->
-                    <div x-data="{ open: false }" class="relative ml-1">
-                        <button @click="open = !open" class="flex items-center gap-1 p-1 rounded-lg hover:bg-slate-50 transition-all">
-                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-[12px] font-bold shadow-sm">
+                    <div x-data="{ open: false }" class="relative">
+                        <button @click="open = !open" class="flex items-center gap-2 py-1 px-1.5 rounded-xl hover:bg-slate-50/80 transition-all">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-white text-[12px] font-bold shadow-sm ring-1 ring-slate-200/50">
                                 {{ substr(Auth::guard('admin')->user()->name, 0, 1) }}
+                            </div>
+                            <div class="hidden xl:block text-left mr-1">
+                                <p class="text-[12px] font-semibold text-slate-700 leading-tight">{{ Auth::guard('admin')->user()->name }}</p>
+                                <p class="text-[10px] text-slate-400 leading-tight">{{ Auth::guard('admin')->user()->roles->first()?->name ?? 'Admin' }}</p>
                             </div>
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -454,20 +460,20 @@
                             x-transition:leave-start="opacity-100 translate-y-0"
                             x-transition:leave-end="opacity-0 translate-y-1"
                             @click.away="open = false"
-                            class="absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-lg shadow-slate-200/50 border border-slate-100 py-1.5 z-50"
+                            class="absolute right-0 mt-2 w-52 bg-white/95 backdrop-blur-xl rounded-xl shadow-lg shadow-slate-200/60 border border-slate-100/80 py-1.5 z-50"
                         >
-                            <div class="px-3.5 py-2.5 border-b border-slate-100">
+                            <div class="px-3.5 py-2.5 border-b border-slate-100/80">
                                 <p class="text-[13px] font-semibold text-slate-800">{{ Auth::guard('admin')->user()->name }}</p>
                                 <p class="text-[11px] text-slate-400 mt-0.5">{{ Auth::guard('admin')->user()->email }}</p>
                             </div>
                             <div class="py-1">
-                                <a href="{{ route('admin.admins.show', Auth::guard('admin')->user()) }}" class="flex items-center px-3.5 py-2 text-[12px] text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                                <a href="{{ route('admin.admins.show', Auth::guard('admin')->user()) }}" class="flex items-center px-3.5 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
                                     <svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                     </svg>
                                     My Profile
                                 </a>
-                                <a href="#" class="flex items-center px-3.5 py-2 text-[12px] text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                                <a href="#" class="flex items-center px-3.5 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
                                     <svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -475,10 +481,10 @@
                                     Settings
                                 </a>
                             </div>
-                            <div class="border-t border-slate-100 pt-1">
+                            <div class="border-t border-slate-100/80 pt-1 mt-0.5">
                                 <form action="{{ route('admin.logout') }}" method="POST">
                                     @csrf
-                                    <button type="submit" class="flex items-center w-full px-3.5 py-2 text-[12px] text-rose-600 hover:bg-rose-50 transition-colors">
+                                    <button type="submit" class="flex items-center w-[calc(100%-0.5rem)] mx-1 px-3.5 py-2 text-[12px] text-rose-600 hover:bg-rose-50/80 transition-colors rounded-lg">
                                         <svg class="w-4 h-4 mr-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                                         </svg>

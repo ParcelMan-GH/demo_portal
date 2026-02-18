@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PickupAssignment extends Model
 {
@@ -82,5 +83,10 @@ class PickupAssignment extends Model
     public function itemConfirmations(): HasMany
     {
         return $this->hasMany(PickupItemConfirmation::class);
+    }
+
+    public function warehouseReceipt(): HasOne
+    {
+        return $this->hasOne(WarehouseReceipt::class);
     }
 }

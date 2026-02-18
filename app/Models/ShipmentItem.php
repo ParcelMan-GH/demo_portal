@@ -128,6 +128,16 @@ class ShipmentItem extends Model
         return $this->hasMany(PickupItemConfirmation::class);
     }
 
+    public function warehouseReceiptItems(): HasMany
+    {
+        return $this->hasMany(WarehouseReceiptItem::class);
+    }
+
+    public function sortBatchItems(): HasMany
+    {
+        return $this->hasMany(SortBatchItem::class);
+    }
+
     public function getDeliveryLocationTypeAttribute(): string
     {
         if ($this->delivery_region_id && $this->delivery_district_id) {

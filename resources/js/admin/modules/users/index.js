@@ -86,7 +86,7 @@ document.addEventListener('alpine:init', () => {
         formData: {
             name: '',
             email: '',
-            role_id: null,
+            role_id: '',
             is_active: '1',
             password: '',
             password_confirmation: '',
@@ -120,7 +120,7 @@ document.addEventListener('alpine:init', () => {
             this.formData = {
                 name: '',
                 email: '',
-                role_id: null,
+                role_id: '',
                 is_active: '1',
                 password: '',
                 password_confirmation: '',
@@ -136,7 +136,7 @@ document.addEventListener('alpine:init', () => {
             this.formData = {
                 name: user.name,
                 email: user.email,
-                role_id: (user.roles && user.roles.length) ? Number(user.roles[0].id) : null,
+                role_id: (user.roles && user.roles.length) ? String(user.roles[0].id) : '',
                 is_active: user.is_active ? '1' : '0',
                 password: '',
                 password_confirmation: '',
@@ -211,7 +211,7 @@ document.addEventListener('alpine:init', () => {
                 const body = {
                     name: this.formData.name,
                     email: this.formData.email,
-                    role_id: this.formData.role_id,
+                    role_id: this.formData.role_id || null,
                 };
 
                 if (this.modalMode === 'edit' && !this.editingUser?.is_self) {

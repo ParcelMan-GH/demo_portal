@@ -7,6 +7,7 @@ enum ItemStatus: string
     case PENDING = 'pending';
     case PICKED_UP = 'picked_up';
     case AT_WAREHOUSE = 'at_warehouse';
+    case SORTED = 'sorted';
     case IN_TRANSIT = 'in_transit';
     case AT_DESTINATION = 'at_destination';
     case OUT_FOR_DELIVERY = 'out_for_delivery';
@@ -22,6 +23,7 @@ enum ItemStatus: string
             self::PENDING => 'Pending',
             self::PICKED_UP => 'Picked Up',
             self::AT_WAREHOUSE => 'At Warehouse',
+            self::SORTED => 'Sorted',
             self::IN_TRANSIT => 'In Transit',
             self::AT_DESTINATION => 'At Destination',
             self::OUT_FOR_DELIVERY => 'Out for Delivery',

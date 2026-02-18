@@ -4,14 +4,17 @@ namespace App\Http\Controllers\Warehouse;
 
 use App\Exports\UsersExport;
 use App\Http\Controllers\Controller;
+use App\Models\AdminAuditLog;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Warehouse\WarehousePortalService;
 use App\Support\GenericPdfExporter;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
@@ -40,6 +43,25 @@ class UserController extends Controller
         ]);
     }
 
+    public function show(User $user): View
+    {
+        $this->authorizePermission('warehouse.users.view');
+
+        $actor = Auth::guard('admin')->user();
+        $warehouse = $this->portalService->resolveWarehouse($actor);
+        $this->assertWarehouseScopedUser($user, $warehouse);
+
+        $user->load(['roles.permissions', 'creator', 'warehouse']);
+        $roles = $this->portalService->getAssignableWarehouseRoles();
+
+        // Reuse the existing rich admin profile UI with warehouse routes.
+        return view('warehouse.users.show', [
+            'admin' => $user,
+            'canManage' => $this->canManageWarehouseUser($actor, $user),
+            'roles' => $roles,
+        ]);
+    }
+
     public function data(Request $request): JsonResponse
     {
         $this->authorizePermission('warehouse.users.view');
@@ -51,7 +73,10 @@ class UserController extends Controller
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhereHas('roles', function ($roleQuery) use ($search) {
+                        $roleQuery->where('roles.name', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -61,6 +86,14 @@ class UserController extends Controller
 
         if ($request->has('status') && $request->input('status') !== '') {
             $query->where('is_active', $request->boolean('status'));
+        }
+
+        if ($dateFrom = $request->input('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo = $request->input('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
         }
 
         $sortBy = $request->input('sort', 'created_at');
@@ -82,14 +115,19 @@ class UserController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'avatar' => strtoupper(substr($user->name, 0, 1)),
                 'roles' => $user->roles->map(fn ($role) => ['id' => $role->id, 'name' => $role->name])->values(),
                 'is_active' => $user->is_active,
+                'creator' => $user->creator?->name ?? 'System',
                 'created_at' => $user->created_at?->format('d/m/Y, H:i:s'),
                 'last_login_at' => $user->last_login_at?->diffForHumans() ?? 'Never',
                 'can_manage' => $this->canManageWarehouseUser($actor, $user),
+                'can_delete' => false,
                 'is_self' => $actor->id === $user->id,
-                'update_url' => route('warehouse.users.update', $user),
+                'view_url' => route('warehouse.users.show', $user),
+                'edit_url' => route('warehouse.users.update', $user) . '/edit',
                 'toggle_url' => route('warehouse.users.toggle-active', $user),
+                'delete_url' => null,
             ];
         })->values();
 
@@ -178,8 +216,13 @@ class UserController extends Controller
         $user->update($payload);
 
         if (!empty($validated['role_id']) && $actor->hasPermission('warehouse.users.assign_roles')) {
-            $role = $this->resolveAssignableWarehouseRole((int) $validated['role_id']);
-            $user->syncRoles([$role->id]);
+            $requestedRoleId = (int) $validated['role_id'];
+            $currentRoleId = (int) ($user->roles()->value('roles.id') ?? 0);
+
+            if ($requestedRoleId !== $currentRoleId) {
+                $role = $this->resolveAssignableWarehouseRole($requestedRoleId);
+                $user->syncRoles([$role->id]);
+            }
         }
 
         return response()->json([
@@ -188,7 +231,7 @@ class UserController extends Controller
         ]);
     }
 
-    public function toggleActive(User $user): JsonResponse
+    public function toggleActive(Request $request, User $user): JsonResponse|RedirectResponse
     {
         $this->authorizePermission('warehouse.users.deactivate');
 
@@ -197,18 +240,27 @@ class UserController extends Controller
         $this->assertWarehouseScopedUser($user, $warehouse);
 
         if ($actor->id === $user->id) {
-            return response()->json([
-                'message' => 'You cannot change your own status.',
-            ], 422);
+            $message = 'You cannot change your own status.';
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            return back()->with('error', $message);
         }
 
         $user->update(['is_active' => !$user->is_active]);
+        $message = $user->is_active ? 'User activated successfully.' : 'User deactivated successfully.';
 
-        return response()->json([
-            'success' => true,
-            'message' => $user->is_active ? 'User activated successfully.' : 'User deactivated successfully.',
-            'data' => ['id' => $user->id, 'is_active' => $user->is_active],
-        ]);
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => ['id' => $user->id, 'is_active' => $user->is_active],
+            ]);
+        }
+
+        return back()->with('success', $message);
     }
 
     public function export(Request $request)
@@ -222,7 +274,10 @@ class UserController extends Controller
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhereHas('roles', function ($roleQuery) use ($search) {
+                        $roleQuery->where('roles.name', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -232,6 +287,14 @@ class UserController extends Controller
 
         if ($request->has('status') && $request->input('status') !== '') {
             $query->where('is_active', $request->boolean('status'));
+        }
+
+        if ($dateFrom = $request->input('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo = $request->input('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
         }
 
         $rows = $query->latest()->get()->map(function (User $user) {
@@ -258,6 +321,110 @@ class UserController extends Controller
         }
 
         return response()->json(['data' => $rows]);
+    }
+
+    public function auditLogsData(Request $request, User $user)
+    {
+        $this->authorizePermission('warehouse.users.view');
+
+        $actor = Auth::guard('admin')->user();
+        $warehouse = $this->portalService->resolveWarehouse($actor);
+        $this->assertWarehouseScopedUser($user, $warehouse);
+
+        $query = AdminAuditLog::query()
+            ->with(['warehouse:id,name'])
+            ->where('user_id', $user->id)
+            ->where('scope', 'warehouse');
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('action', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhere('action_type', 'like', "%{$search}%")
+                    ->orWhere('route_name', 'like', "%{$search}%")
+                    ->orWhere('ip_address', 'like', "%{$search}%");
+            });
+        }
+
+        if ($dateFrom = $request->input('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo = $request->input('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        $sortField = $request->input('sort', 'created_at');
+        $sortDirection = $request->input('direction', 'desc');
+        $allowedSorts = ['created_at', 'action', 'action_type', 'scope', 'status_code', 'duration_ms'];
+
+        if (in_array($sortField, $allowedSorts, true)) {
+            $query->orderBy($sortField, $sortDirection === 'asc' ? 'asc' : 'desc');
+        }
+
+        $format = $request->input('format');
+        if ($format) {
+            $rows = $query->get()->map(function ($log) {
+                return [
+                    'Date' => $log->created_at?->format('Y-m-d H:i:s') ?? '-',
+                    'Scope' => $log->scope ?? 'warehouse',
+                    'Type' => $log->action_type ? Str::of($log->action_type)->replace('_', ' ')->title()->toString() : '-',
+                    'Action' => $this->humanizeAction($log->action, $log->action_type),
+                    'Description' => $this->humanizeDescription($log),
+                    'Method' => $log->method ?: '-',
+                    'URL' => $log->url ? (parse_url($log->url, PHP_URL_PATH) ?: $log->url) : '-',
+                    'IP Address' => $log->ip_address ?: '-',
+                    'HTTP Status' => $log->status_code ?: '-',
+                    'Duration (ms)' => $log->duration_ms ?? '-',
+                ];
+            })->values()->toArray();
+
+            if ($format === 'excel') {
+                $filename = 'warehouse_user_activity_logs_' . date('Y-m-d_His') . '.xlsx';
+                return Excel::download(new UsersExport($rows), $filename);
+            }
+
+            if ($format === 'pdf') {
+                $filename = 'warehouse_user_activity_logs_' . date('Y-m-d_His') . '.pdf';
+                return GenericPdfExporter::download($rows, $filename, 'Warehouse User Activity Logs');
+            }
+
+            return response()->json(['data' => $rows]);
+        }
+
+        $total = $query->count();
+        $perPage = min((int) $request->input('per_page', 15), 100);
+        $page = (int) $request->input('page', 1);
+        $offset = ($page - 1) * $perPage;
+        $logs = $query->skip($offset)->take($perPage)->get();
+
+        $data = $logs->map(function ($log) {
+            return [
+                'id' => $log->id,
+                'created_at' => $log->created_at?->format('Y-m-d H:i:s') ?? '-',
+                'scope' => $log->scope ?? 'warehouse',
+                'action_type' => $log->action_type ? Str::of($log->action_type)->replace('_', ' ')->title()->toString() : '-',
+                'action' => $this->humanizeAction($log->action, $log->action_type),
+                'description' => $this->humanizeDescription($log),
+                'method' => $log->method ?: '-',
+                'url' => $log->url ? (parse_url($log->url, PHP_URL_PATH) ?: $log->url) : '-',
+                'ip_address' => $log->ip_address ?: '-',
+                'status_code' => $log->status_code ?: '-',
+                'duration_ms' => $log->duration_ms ?? '-',
+            ];
+        })->values();
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => (int) ceil($total / $perPage) ?: 1,
+                'from' => $total > 0 ? $offset + 1 : 0,
+                'to' => min($offset + $perPage, $total),
+            ],
+        ]);
     }
 
     private function resolveAssignableWarehouseRole(int $roleId): Role
@@ -306,5 +473,35 @@ class UserController extends Controller
         }
 
         return true;
+    }
+
+    private function humanizeAction(?string $routeName, ?string $actionType): string
+    {
+        if (!$routeName) {
+            return $actionType ? Str::of($actionType)->replace('_', ' ')->title()->toString() : '-';
+        }
+
+        $segments = explode('.', preg_replace('/^warehouse\./', '', $routeName));
+        $resource = isset($segments[0]) ? Str::of($segments[0])->replace('_', ' ')->title()->toString() : 'Warehouse';
+        $action = isset($segments[1]) ? Str::of($segments[1])->replace('-', ' ')->replace('_', ' ')->title()->toString() : null;
+
+        if ($action) {
+            return "{$action} {$resource}";
+        }
+
+        return Str::of($routeName)->replace('.', ' ')->replace('_', ' ')->title()->toString();
+    }
+
+    private function humanizeDescription($log): string
+    {
+        if ($log->description) {
+            return $log->description;
+        }
+
+        if ($log->route_name) {
+            return 'Route: ' . $log->route_name;
+        }
+
+        return '-';
     }
 }

@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
 use App\Http\Controllers\Warehouse\ReceiptController as WarehouseReceiptController;
+use App\Http\Controllers\Warehouse\SortingController as WarehouseSortingController;
 use App\Http\Controllers\Warehouse\UserController as WarehouseUserController;
 use Illuminate\Support\Facades\Route;
 
@@ -229,6 +230,8 @@ Route::prefix('warehouse')
         Route::get('users', [WarehouseUserController::class, 'index'])->name('users.index');
         Route::get('users-data', [WarehouseUserController::class, 'data'])->name('users.data');
         Route::get('users-export', [WarehouseUserController::class, 'export'])->name('users.export');
+        Route::get('users/{user}', [WarehouseUserController::class, 'show'])->name('users.show');
+        Route::get('users/{user}/audit-logs-data', [WarehouseUserController::class, 'auditLogsData'])->name('users.audit-logs-data');
         Route::post('users', [WarehouseUserController::class, 'store'])->name('users.store');
         Route::put('users/{user}', [WarehouseUserController::class, 'update'])->name('users.update');
         Route::patch('users/{user}/toggle-active', [WarehouseUserController::class, 'toggleActive'])->name('users.toggle-active');
@@ -236,8 +239,21 @@ Route::prefix('warehouse')
         // Receipts / Pickups / Items
         Route::get('receipts/pending', [WarehouseReceiptController::class, 'pendingIndex'])->name('receipts.pending.index');
         Route::get('receipts/pending-data', [WarehouseReceiptController::class, 'pendingData'])->name('receipts.pending.data');
+        Route::get('receipts/pending/{pickupAssignment}', [WarehouseReceiptController::class, 'pendingShow'])->name('receipts.pending.show');
+        Route::post('receipts/pending/{pickupAssignment}/items/{shipmentItem}', [WarehouseReceiptController::class, 'savePendingItem'])->name('receipts.pending.items.save');
+        Route::post('receipts/pending/{pickupAssignment}/items/{shipmentItem}/print-label', [WarehouseReceiptController::class, 'printPendingItemLabel'])->name('receipts.pending.items.print-label');
+        Route::post('receipts/pending/{pickupAssignment}/finalize', [WarehouseReceiptController::class, 'finalizePendingReceipt'])->name('receipts.pending.finalize');
         Route::get('pickups/received', [WarehouseReceiptController::class, 'receivedPickupsIndex'])->name('pickups.received.index');
         Route::get('pickups/received-data', [WarehouseReceiptController::class, 'receivedPickupsData'])->name('pickups.received.data');
         Route::get('items/received', [WarehouseReceiptController::class, 'receivedItemsIndex'])->name('items.received.index');
         Route::get('items/received-data', [WarehouseReceiptController::class, 'receivedItemsData'])->name('items.received.data');
+
+        // Sorting
+        Route::get('sorting', [WarehouseSortingController::class, 'index'])->name('sorting.index');
+        Route::get('sorting/items-data', [WarehouseSortingController::class, 'itemsData'])->name('sorting.items.data');
+        Route::get('sorting/batches-data', [WarehouseSortingController::class, 'batchesData'])->name('sorting.batches.data');
+        Route::post('sorting/batches', [WarehouseSortingController::class, 'storeBatch'])->name('sorting.batches.store');
+        Route::post('sorting/batches/{sortBatch}/items', [WarehouseSortingController::class, 'addItems'])->name('sorting.batches.items.store');
+        Route::delete('sorting/batches/{sortBatch}/items/{shipmentItem}', [WarehouseSortingController::class, 'removeItem'])->name('sorting.batches.items.destroy');
+        Route::post('sorting/batches/{sortBatch}/seal', [WarehouseSortingController::class, 'seal'])->name('sorting.batches.seal');
     });

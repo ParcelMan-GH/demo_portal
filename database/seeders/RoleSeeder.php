@@ -123,6 +123,7 @@ class RoleSeeder extends Seeder
             'warehouse.users.deactivate',
             'warehouse.users.assign_roles',
             'warehouse.receiving.manage',
+            'warehouse.receiving.approve_discrepancy',
             'warehouse.sorting.manage',
             'warehouse.manifest.manage',
             'warehouse.transport.assign',

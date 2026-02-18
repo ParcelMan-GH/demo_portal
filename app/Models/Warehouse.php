@@ -80,4 +80,19 @@ class Warehouse extends Model
     {
         return $this->hasMany(AdminAuditLog::class);
     }
+
+    public function receipts(): HasMany
+    {
+        return $this->hasMany(WarehouseReceipt::class);
+    }
+
+    public function originSortBatches(): HasMany
+    {
+        return $this->hasMany(SortBatch::class, 'origin_warehouse_id');
+    }
+
+    public function destinationSortBatches(): HasMany
+    {
+        return $this->hasMany(SortBatch::class, 'destination_warehouse_id');
+    }
 }

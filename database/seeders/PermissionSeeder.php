@@ -64,7 +64,7 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouses', 'action' => 'edit', 'name' => 'warehouses.edit', 'description' => 'Edit warehouses', 'sort_order' => 112],
             ['module' => 'warehouses', 'action' => 'delete', 'name' => 'warehouses.delete', 'description' => 'Delete warehouses', 'sort_order' => 113],
 
-            // Warehouse Operations (12)
+            // Warehouse Operations (13)
             ['module' => 'warehouse', 'action' => 'dashboard_view', 'name' => 'warehouse.dashboard.view', 'description' => 'View warehouse dashboard', 'sort_order' => 120],
             ['module' => 'warehouse', 'action' => 'users_view', 'name' => 'warehouse.users.view', 'description' => 'View warehouse users', 'sort_order' => 121],
             ['module' => 'warehouse', 'action' => 'users_create', 'name' => 'warehouse.users.create', 'description' => 'Create warehouse users', 'sort_order' => 122],
@@ -72,6 +72,7 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouse', 'action' => 'users_deactivate', 'name' => 'warehouse.users.deactivate', 'description' => 'Deactivate warehouse users', 'sort_order' => 124],
             ['module' => 'warehouse', 'action' => 'users_assign_roles', 'name' => 'warehouse.users.assign_roles', 'description' => 'Assign roles to warehouse users', 'sort_order' => 125],
             ['module' => 'warehouse', 'action' => 'receiving_manage', 'name' => 'warehouse.receiving.manage', 'description' => 'Manage warehouse receiving', 'sort_order' => 126],
+            ['module' => 'warehouse', 'action' => 'receiving_approve_discrepancy', 'name' => 'warehouse.receiving.approve_discrepancy', 'description' => 'Approve warehouse receiving discrepancies', 'sort_order' => 1261],
             ['module' => 'warehouse', 'action' => 'sorting_manage', 'name' => 'warehouse.sorting.manage', 'description' => 'Manage warehouse sorting', 'sort_order' => 127],
             ['module' => 'warehouse', 'action' => 'manifest_manage', 'name' => 'warehouse.manifest.manage', 'description' => 'Manage transport manifests', 'sort_order' => 128],
             ['module' => 'warehouse', 'action' => 'transport_assign', 'name' => 'warehouse.transport.assign', 'description' => 'Assign transport drivers', 'sort_order' => 129],

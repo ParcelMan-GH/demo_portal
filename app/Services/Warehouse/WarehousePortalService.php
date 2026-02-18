@@ -5,8 +5,11 @@ namespace App\Services\Warehouse;
 use App\Models\PickupAssignment;
 use App\Models\PickupItemConfirmation;
 use App\Models\Role;
+use App\Models\SortBatch;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Models\WarehouseReceipt;
+use App\Models\WarehouseReceiptItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -35,9 +38,8 @@ class WarehousePortalService
         return Role::query()
             ->active()
             ->warehouseRoles()
-            ->where('is_assignable_by_warehouse_manager', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'slug']);
+            ->get(['id', 'name', 'slug', 'is_assignable_by_warehouse_manager']);
     }
 
     public function warehouseUsersQuery(Warehouse $warehouse): Builder
@@ -86,5 +88,54 @@ class WarehousePortalService
                     ->whereNotNull('received_at');
             });
     }
-}
 
+    public function receiptForAssignment(PickupAssignment $assignment, Warehouse $warehouse): ?WarehouseReceipt
+    {
+        return WarehouseReceipt::query()
+            ->with([
+                'items.shipmentItem.images',
+                'items.photos',
+            ])
+            ->where('pickup_assignment_id', $assignment->id)
+            ->where('warehouse_id', $warehouse->id)
+            ->first();
+    }
+
+    public function destinationWarehouses(): Collection
+    {
+        return Warehouse::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code']);
+    }
+
+    public function sortingBatchesQuery(Warehouse $warehouse): Builder
+    {
+        return SortBatch::query()
+            ->with([
+                'destinationWarehouse:id,name,code',
+                'activeItems:id,sort_batch_id,shipment_item_id,warehouse_receipt_item_id,quantity_allocated,added_at',
+                'activeItems.shipmentItem:id,description,tracking_code',
+            ])
+            ->where('origin_warehouse_id', $warehouse->id);
+    }
+
+    public function warehouseReceiptItemsQuery(Warehouse $warehouse): Builder
+    {
+        return WarehouseReceiptItem::query()
+            ->with([
+                'receipt:id,warehouse_id,status,pickup_assignment_id',
+                'shipmentItem:id,shipment_id,description,quantity,tracking_code,status,delivery_recipient_name,delivery_recipient_phone,delivery_region_id,delivery_district_id,delivery_town,delivery_landmark',
+                'shipmentItem.shipment:id,shipment_number,destination_mode,delivery_recipient_name,delivery_recipient_phone,delivery_region_id,delivery_district_id,delivery_town,delivery_landmark',
+                'shipmentItem.shipment.deliveryRegion:id,name',
+                'shipmentItem.shipment.deliveryDistrict:id,name',
+                'shipmentItem.deliveryRegion:id,name',
+                'shipmentItem.deliveryDistrict:id,name',
+                'sortBatchItems.sortBatch:id,status',
+            ])
+            ->whereHas('receipt', function (Builder $query) use ($warehouse) {
+                $query->where('warehouse_id', $warehouse->id)
+                    ->where('status', WarehouseReceipt::STATUS_FINALIZED);
+            });
+    }
+}

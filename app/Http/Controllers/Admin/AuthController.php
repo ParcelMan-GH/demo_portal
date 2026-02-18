@@ -73,6 +73,7 @@ class AuthController extends Controller
 
         // Update last login timestamp
         $admin->update(['last_login_at' => now()]);
+        $admin->flushPermissionCache();
 
         // Regenerate session to prevent fixation
         $request->session()->regenerate();
