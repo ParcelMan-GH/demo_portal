@@ -347,7 +347,7 @@
             </div>
 
             <div x-show="activeTab === 'items'" x-cloak>
-                <div class="overflow-hidden rounded-xl border border-slate-200/50">
+                <div class="overflow-x-auto rounded-xl border border-slate-200/50">
                     <table class="min-w-full divide-y divide-slate-200/50 text-xs">
                         <thead class="bg-slate-50/50">
                             <tr>
@@ -471,7 +471,7 @@
                     </div>
                 </div>
 
-                <div class="overflow-hidden rounded-xl border border-slate-200/50">
+                <div class="overflow-x-auto rounded-xl border border-slate-200/50">
                     <table class="min-w-full divide-y divide-slate-200/50 text-xs">
                         <thead class="bg-slate-50/50">
                             <tr>

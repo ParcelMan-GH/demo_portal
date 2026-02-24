@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class TransportManifest extends Model
 {
@@ -76,6 +77,11 @@ class TransportManifest extends Model
     public function items(): HasMany
     {
         return $this->hasMany(TransportManifestItem::class);
+    }
+
+    public function warehouseReceipt(): HasOne
+    {
+        return $this->hasOne(WarehouseReceipt::class);
     }
 }
 

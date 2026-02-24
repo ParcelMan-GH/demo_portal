@@ -284,3 +284,109 @@ Artisan::command('warehouse:dispatch-backfill {--dry-run : Preview only} {--batc
         ['Failed batches', $stats['failed']],
     ]);
 })->purpose('Backfill transport manifests and delivery runs for sealed sort batches');
+
+Artisan::command('warehouse:manifest-receipts-backfill {--dry-run : Preview only}', function () {
+    $dryRun = (bool) $this->option('dry-run');
+
+    $manifests = \App\Models\TransportManifest::query()
+        ->where('status', \App\Models\TransportManifest::STATUS_RECEIVED)
+        ->whereDoesntHave('warehouseReceipt')
+        ->with(['items.shipmentItem', 'destinationWarehouse'])
+        ->get();
+
+    if ($manifests->isEmpty()) {
+        $this->info('No finalized manifests without warehouse receipts found.');
+        return;
+    }
+
+    $this->info(($dryRun ? '[DRY RUN] ' : '') . "Found {$manifests->count()} manifest(s) to backfill.");
+
+    $created = 0;
+    $failed = 0;
+
+    foreach ($manifests as $manifest) {
+        $warehouse = $manifest->destinationWarehouse;
+        if (!$warehouse) {
+            $this->warn("  Manifest #{$manifest->id} ({$manifest->manifest_number}): no destination warehouse, skipping.");
+            $failed++;
+            continue;
+        }
+
+        $receivedLines = $manifest->items->filter(fn ($line) => $line->shipmentItem !== null);
+        if ($receivedLines->isEmpty()) {
+            $this->warn("  Manifest #{$manifest->id} ({$manifest->manifest_number}): no valid items, skipping.");
+            $failed++;
+            continue;
+        }
+
+        if ($dryRun) {
+            $this->line("  Would create receipt for manifest #{$manifest->id} ({$manifest->manifest_number}) with {$receivedLines->count()} items at {$warehouse->name}.");
+            $created++;
+            continue;
+        }
+
+        try {
+            DB::transaction(function () use ($manifest, $warehouse) {
+                $receivedAt = $manifest->received_at ?? $manifest->updated_at ?? now();
+                $userId = $manifest->received_by_user_id;
+
+                $receipt = WarehouseReceipt::query()->create([
+                    'transport_manifest_id' => $manifest->id,
+                    'warehouse_id' => $warehouse->id,
+                    'status' => WarehouseReceipt::STATUS_FINALIZED,
+                    'started_by_user_id' => $userId,
+                    'finalized_by_user_id' => $userId,
+                    'notes' => 'Backfilled from transport manifest ' . $manifest->manifest_number . '.',
+                    'started_at' => $receivedAt,
+                    'finalized_at' => $receivedAt,
+                ]);
+
+                foreach ($manifest->items as $line) {
+                    if (!$line->shipmentItem) {
+                        continue;
+                    }
+
+                    $received = (int) $line->received_quantity;
+                    $expected = (int) $line->expected_quantity;
+                    $discrepancy = 'none';
+
+                    if ($received < $expected) {
+                        $discrepancy = 'missing';
+                    } elseif ($received > $expected) {
+                        $discrepancy = 'excess';
+                    }
+
+                    if ($line->line_status === \App\Models\TransportManifestItem::LINE_DAMAGED) {
+                        $discrepancy = $discrepancy === 'none' ? 'damaged' : 'mixed';
+                    }
+
+                    WarehouseReceiptItem::query()->create([
+                        'warehouse_receipt_id' => $receipt->id,
+                        'shipment_item_id' => $line->shipment_item_id,
+                        'expected_quantity' => $expected,
+                        'received_quantity' => $received,
+                        'damaged_quantity' => $line->line_status === \App\Models\TransportManifestItem::LINE_DAMAGED ? $received : 0,
+                        'discrepancy_type' => $discrepancy,
+                        'condition_status' => $line->line_status === \App\Models\TransportManifestItem::LINE_DAMAGED ? 'damaged' : 'ok',
+                        'notes' => $line->notes,
+                        'received_by_user_id' => $userId,
+                        'received_at' => $line->received_at ?? $receivedAt,
+                    ]);
+                }
+            });
+
+            $this->info("  Created receipt for manifest #{$manifest->id} ({$manifest->manifest_number}).");
+            $created++;
+        } catch (\Throwable $e) {
+            $this->error("  Failed manifest #{$manifest->id}: {$e->getMessage()}");
+            $failed++;
+        }
+    }
+
+    $this->newLine();
+    $this->table(['Metric', 'Count'], [
+        ['Total manifests scanned', $manifests->count()],
+        [$dryRun ? 'Would create receipts' : 'Receipts created', $created],
+        ['Failed / skipped', $failed],
+    ]);
+})->purpose('Backfill warehouse receipts for already-finalized transport manifests');

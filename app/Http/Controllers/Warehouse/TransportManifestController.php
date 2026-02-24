@@ -51,6 +51,29 @@ class TransportManifestController extends Controller
         ]);
     }
 
+    public function outboundShow(TransportManifest $manifest): View
+    {
+        $this->authorizePermission('warehouse.manifest.manage');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            abort(404);
+        }
+
+        $manifest->load([
+            'originWarehouse',
+            'destinationWarehouse',
+            'assignedDriver',
+            'sortBatch',
+            'createdBy',
+            'items.shipmentItem.shipment',
+        ]);
+
+        return view('warehouse.manifests.transport.show', [
+            'warehouse' => $warehouse,
+            'manifest' => $manifest,
+        ]);
+    }
+
     public function outboundData(Request $request): JsonResponse
     {
         $this->authorizePermission('warehouse.manifest.manage');
@@ -92,6 +115,7 @@ class TransportManifestController extends Controller
                 'dispatched_at' => optional($manifest->dispatched_at)?->format('Y-m-d H:i:s'),
                 'arrived_at' => optional($manifest->arrived_at)?->format('Y-m-d H:i:s'),
                 'received_at' => optional($manifest->received_at)?->format('Y-m-d H:i:s'),
+                'view_url' => route('warehouse.manifests.transport.show', $manifest),
             ];
         });
     }

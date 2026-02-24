@@ -17,6 +17,7 @@ class WarehouseReceipt extends Model
 
     protected $fillable = [
         'pickup_assignment_id',
+        'transport_manifest_id',
         'warehouse_id',
         'status',
         'started_by_user_id',
@@ -36,6 +37,11 @@ class WarehouseReceipt extends Model
     public function pickupAssignment(): BelongsTo
     {
         return $this->belongsTo(PickupAssignment::class);
+    }
+
+    public function transportManifest(): BelongsTo
+    {
+        return $this->belongsTo(TransportManifest::class);
     }
 
     public function warehouse(): BelongsTo

@@ -206,6 +206,7 @@ class WarehouseSortingService
                 $alreadyInActiveBatch = SortBatchItem::query()
                     ->where('shipment_item_id', $shipmentItem->id)
                     ->whereNull('removed_at')
+                    ->whereHas('sortBatch', fn (Builder $q) => $q->where('origin_warehouse_id', $warehouse->id))
                     ->exists();
 
                 if ($alreadyInActiveBatch) {

@@ -48,6 +48,11 @@ function registerWarehouseDeliveryRunsPage() {
         selectedDriverByRun: {},
         newRunBatchId: '',
         canResetCodes: Boolean(config.can_reset_codes),
+        showItemSelector: false,
+        eligibleItems: [],
+        eligibleSearch: '',
+        eligibleLoading: false,
+        selectedReceiptItemIds: [],
 
         async init() {
             await this.loadData();
@@ -158,6 +163,89 @@ function registerWarehouseDeliveryRunsPage() {
 
                 window.showToast?.(result.message || 'Delivery run created successfully.', 'success');
                 this.newRunBatchId = '';
+                await this.loadData();
+            } catch (error) {
+                console.error(error);
+                window.showToast?.(error.message || 'Unable to create delivery run.', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async loadEligibleItems() {
+            this.eligibleLoading = true;
+            try {
+                const params = new URLSearchParams();
+                params.set('per_page', '200');
+                if (this.eligibleSearch) params.set('search', this.eligibleSearch);
+
+                const response = await fetch(`${config.eligible_items_endpoint}?${params.toString()}`, {
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || 'Failed to load eligible items.');
+
+                this.eligibleItems = Array.isArray(result.data) ? result.data : [];
+            } catch (error) {
+                console.error(error);
+                window.showToast?.(error.message || 'Unable to load eligible items.', 'error');
+            } finally {
+                this.eligibleLoading = false;
+            }
+        },
+
+        toggleAllEligible(event) {
+            if (event.target.checked) {
+                this.selectedReceiptItemIds = this.eligibleItems.map(item => item.warehouse_receipt_item_id);
+            } else {
+                this.selectedReceiptItemIds = [];
+            }
+        },
+
+        toggleItem(id) {
+            const index = this.selectedReceiptItemIds.indexOf(id);
+            if (index === -1) {
+                this.selectedReceiptItemIds.push(id);
+            } else {
+                this.selectedReceiptItemIds.splice(index, 1);
+            }
+        },
+
+        async createRunFromItems() {
+            if (this.selectedReceiptItemIds.length === 0) {
+                window.showToast?.('Select at least one item.', 'warning');
+                return;
+            }
+
+            this.loading = true;
+            try {
+                const response = await fetch(config.create_from_items_endpoint, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrfToken(),
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        warehouse_receipt_item_ids: this.selectedReceiptItemIds.map(id => Number(id)),
+                    }),
+                });
+
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || 'Failed to create delivery run.');
+                }
+
+                window.showToast?.(result.message || 'Delivery run created successfully.', 'success');
+                this.selectedReceiptItemIds = [];
+                this.showItemSelector = false;
+                this.eligibleItems = [];
+                this.eligibleSearch = '';
                 await this.loadData();
             } catch (error) {
                 console.error(error);

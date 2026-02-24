@@ -7,6 +7,8 @@
     $config = [
         'data_endpoint' => route('warehouse.deliveries.runs.data'),
         'create_endpoint' => route('warehouse.deliveries.runs.store'),
+        'eligible_items_endpoint' => route('warehouse.deliveries.runs.eligible-items'),
+        'create_from_items_endpoint' => route('warehouse.deliveries.runs.store-from-items'),
         'assign_endpoint' => route('warehouse.deliveries.runs.assign-driver', ['run' => '__RUN__']),
         'dispatch_endpoint' => route('warehouse.deliveries.runs.dispatch', ['run' => '__RUN__']),
         'resend_code_endpoint' => route('warehouse.deliveries.runs.stops.resend-code', ['run' => '__RUN__', 'stop' => '__STOP__']),
@@ -33,6 +35,10 @@
                 </select>
                 <button type="button" @@click="createRun()" class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50" :disabled="loading || !newRunBatchId">
                     Create Run
+                </button>
+                <span class="text-xs text-slate-400">or</span>
+                <button type="button" @@click="showItemSelector = true; loadEligibleItems()" class="inline-flex items-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50" :disabled="loading">
+                    Create from Items
                 </button>
             </div>
         </div>
@@ -180,6 +186,80 @@
             </div>
         </div>
     </div>
+
+    {{-- Direct Run from Items Modal --}}
+    <template x-if="showItemSelector">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @@click.self="showItemSelector = false" @@keydown.escape.window="showItemSelector = false">
+            <div class="w-full max-w-4xl max-h-[85vh] bg-white rounded-3xl shadow-2xl border border-slate-200/80 flex flex-col" @@click.stop>
+                <div class="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-900">Select Items for Delivery Run</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Choose eligible items to include in a new delivery run.</p>
+                    </div>
+                    <button type="button" @@click="showItemSelector = false" class="text-slate-400 hover:text-slate-600">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                <div class="px-6 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
+                    <input type="text" x-model.debounce.350ms="eligibleSearch" @@input="loadEligibleItems()" placeholder="Search by shipment, item, tracking, recipient..." class="w-72 rounded-lg border border-slate-200 px-3 py-1.5 text-xs">
+                    <div class="text-xs text-slate-600">
+                        <span x-text="selectedReceiptItemIds.length"></span> item(s) selected
+                    </div>
+                </div>
+
+                <div class="flex-1 overflow-auto">
+                    <table class="min-w-full divide-y divide-slate-200/60 text-xs">
+                        <thead class="bg-slate-50/70 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-2 text-left">
+                                    <input type="checkbox" @@change="toggleAllEligible($event)" :checked="selectedReceiptItemIds.length > 0 && selectedReceiptItemIds.length === eligibleItems.length" class="rounded border-slate-300">
+                                </th>
+                                <th class="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-semibold text-slate-500">Shipment / Item</th>
+                                <th class="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-semibold text-slate-500">Destination</th>
+                                <th class="px-4 py-2 text-center text-[10px] uppercase tracking-wider font-semibold text-slate-500">Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template x-for="row in eligibleItems" :key="row.warehouse_receipt_item_id">
+                                <tr class="hover:bg-slate-50/70 cursor-pointer" @@click="toggleItem(row.warehouse_receipt_item_id)">
+                                    <td class="px-4 py-2.5">
+                                        <input type="checkbox" :value="row.warehouse_receipt_item_id" x-model.number="selectedReceiptItemIds" @@click.stop class="rounded border-slate-300">
+                                    </td>
+                                    <td class="px-4 py-2.5">
+                                        <p class="font-semibold text-slate-900" x-text="row.shipment_number"></p>
+                                        <p class="text-slate-600" x-text="row.item_description"></p>
+                                        <p class="text-[11px] text-slate-500" x-text="row.tracking_code || '-'"></p>
+                                    </td>
+                                    <td class="px-4 py-2.5 text-slate-700">
+                                        <p class="font-medium" x-text="row.destination?.recipient_name || '-'"></p>
+                                        <p class="text-[11px] text-slate-500" x-text="(row.destination?.region || '-') + ' / ' + (row.destination?.district || '-')"></p>
+                                        <p class="text-[11px] text-slate-500" x-text="row.destination?.town || '-'"></p>
+                                    </td>
+                                    <td class="px-4 py-2.5 text-center font-semibold text-slate-800" x-text="row.received_quantity"></td>
+                                </tr>
+                            </template>
+                            <tr x-show="!eligibleLoading && eligibleItems.length === 0">
+                                <td colspan="4" class="px-4 py-8 text-center text-slate-500">No eligible items found.</td>
+                            </tr>
+                            <tr x-show="eligibleLoading">
+                                <td colspan="4" class="px-4 py-8 text-center text-slate-500">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="px-6 py-4 border-t border-slate-200/60 flex items-center justify-end gap-3">
+                    <button type="button" @@click="showItemSelector = false" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        Cancel
+                    </button>
+                    <button type="button" @@click="createRunFromItems()" class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50" :disabled="loading || selectedReceiptItemIds.length === 0">
+                        Create Delivery Run (<span x-text="selectedReceiptItemIds.length"></span> items)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
 </div>
 @endsection
 

@@ -69,7 +69,7 @@
                     <template x-for="row in rows" :key="row.id">
                         <tr class="hover:bg-slate-50/70 align-top">
                             <td class="px-4 py-2.5">
-                                <p class="font-semibold text-slate-900" x-text="row.manifest_number"></p>
+                                <a :href="row.view_url" class="font-semibold text-slate-900 hover:text-blue-600 hover:underline" x-text="row.manifest_number"></a>
                                 <p class="text-[11px] text-slate-500" x-text="row.dispatched_at ? 'Dispatched: ' + row.dispatched_at : 'Not dispatched'"></p>
                             </td>
                             <td class="px-4 py-2.5 text-slate-700" x-text="row.destination_warehouse || '-'"></td>
@@ -103,12 +103,18 @@
                             </td>
                             <td class="px-4 py-2.5 text-center font-semibold text-slate-800" x-text="row.items_count"></td>
                             <td class="px-4 py-2.5">
-                                <button type="button"
-                                        class="rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-                                        @@click="dispatchManifest(row.id)"
-                                        :disabled="!canDispatch(row)">
-                                    Dispatch
-                                </button>
+                                <div class="flex items-center gap-1.5">
+                                    <a :href="row.view_url"
+                                       class="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">
+                                        View
+                                    </a>
+                                    <button type="button"
+                                            class="rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                                            @@click="dispatchManifest(row.id)"
+                                            :disabled="!canDispatch(row)">
+                                        Dispatch
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     </template>

@@ -847,7 +847,7 @@
         .json-bracket { color: #ffd700; }
         .json-colon { color: #d4d4d4; }
         .json-comma { color: #d4d4d4; }
-        .json-indent { display: inline-block; }
+        .json-indent { display: inline-block; width: 14px; margin-right: 4px; }
 
         .json-children {
             padding-left: 20px;

@@ -41,6 +41,62 @@ class WarehouseDeliveryService
             ->where('warehouse_id', $warehouse->id);
     }
 
+    /**
+     * Create a delivery run directly from eligible receipt items.
+     * Auto-creates a sealed local-delivery sort batch behind the scenes.
+     *
+     * @param array<int, int|string> $warehouseReceiptItemIds
+     */
+    public function createRunFromItems(
+        Warehouse $warehouse,
+        User $user,
+        array $warehouseReceiptItemIds,
+        WarehouseSortingService $sortingService
+    ): array {
+        if (empty($warehouseReceiptItemIds)) {
+            return ['success' => false, 'message' => 'Select at least one item.'];
+        }
+
+        return DB::transaction(function () use ($warehouse, $user, $warehouseReceiptItemIds, $sortingService) {
+            $batchResult = $sortingService->createBatch(
+                originWarehouse: $warehouse,
+                destinationWarehouse: null,
+                user: $user,
+                dispatchMode: SortBatch::DISPATCH_LOCAL_DELIVERY,
+                notes: 'Auto-created for direct delivery run.',
+            );
+
+            if (!$batchResult['success']) {
+                return $batchResult;
+            }
+
+            $batch = $batchResult['data']['batch'];
+
+            $addResult = $sortingService->addItems(
+                batch: $batch,
+                warehouse: $warehouse,
+                user: $user,
+                warehouseReceiptItemIds: $warehouseReceiptItemIds,
+            );
+
+            if (!$addResult['success']) {
+                return $addResult;
+            }
+
+            $sealResult = $sortingService->sealBatch(
+                batch: $batch->fresh(),
+                warehouse: $warehouse,
+                user: $user,
+            );
+
+            if (!$sealResult['success']) {
+                return $sealResult;
+            }
+
+            return $this->createRun($batch->fresh(), $warehouse, $user);
+        });
+    }
+
     public function createRun(SortBatch $batch, Warehouse $warehouse, User $user): array
     {
         if ((int) $batch->origin_warehouse_id !== (int) $warehouse->id) {
@@ -633,7 +689,7 @@ class WarehouseDeliveryService
 
     private function refreshRunStatus(DeliveryRun $run): void
     {
-        $run->loadMissing('stops');
+        $run->load('stops');
 
         $totalStops = $run->stops->count();
         $deliveredStops = $run->stops->where('status', DeliveryRunStop::STATUS_DELIVERED)->count();

@@ -266,6 +266,7 @@ Route::prefix('warehouse')
         Route::post('manifests/transport', [WarehouseTransportManifestController::class, 'create'])->name('manifests.transport.store');
         Route::post('manifests/transport/{manifest}/assign-driver', [WarehouseTransportManifestController::class, 'assignDriver'])->name('manifests.transport.assign-driver');
         Route::post('manifests/transport/{manifest}/dispatch', [WarehouseTransportManifestController::class, 'dispatch'])->name('manifests.transport.dispatch');
+        Route::get('manifests/transport/{manifest}', [WarehouseTransportManifestController::class, 'outboundShow'])->name('manifests.transport.show');
 
         Route::get('manifests/incoming', [WarehouseTransportManifestController::class, 'incomingIndex'])->name('manifests.incoming.index');
         Route::get('manifests/incoming-data', [WarehouseTransportManifestController::class, 'incomingData'])->name('manifests.incoming.data');
@@ -276,7 +277,9 @@ Route::prefix('warehouse')
         // Delivery Runs
         Route::get('deliveries/runs', [WarehouseDeliveryRunController::class, 'index'])->name('deliveries.runs.index');
         Route::get('deliveries/runs-data', [WarehouseDeliveryRunController::class, 'data'])->name('deliveries.runs.data');
+        Route::get('deliveries/runs/eligible-items', [WarehouseDeliveryRunController::class, 'eligibleItems'])->name('deliveries.runs.eligible-items');
         Route::post('deliveries/runs', [WarehouseDeliveryRunController::class, 'store'])->name('deliveries.runs.store');
+        Route::post('deliveries/runs/from-items', [WarehouseDeliveryRunController::class, 'storeFromItems'])->name('deliveries.runs.store-from-items');
         Route::post('deliveries/runs/{run}/assign-driver', [WarehouseDeliveryRunController::class, 'assignDriver'])->name('deliveries.runs.assign-driver');
         Route::post('deliveries/runs/{run}/dispatch', [WarehouseDeliveryRunController::class, 'dispatch'])->name('deliveries.runs.dispatch');
         Route::post('deliveries/runs/{run}/stops/{stop}/resend-code', [WarehouseDeliveryRunController::class, 'resendCode'])->name('deliveries.runs.stops.resend-code');

@@ -11,6 +11,8 @@ use App\Models\TransportManifest;
 use App\Models\TransportManifestItem;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Models\WarehouseReceipt;
+use App\Models\WarehouseReceiptItem;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -141,6 +143,9 @@ class WarehouseTransportReceivingService
                 $this->syncShipmentAtDestinationStatus($shipment);
             });
 
+            // Auto-create WarehouseReceipt + items so they appear in the sorting system
+            $this->createWarehouseReceiptFromManifest($manifest, $warehouse, $user);
+
             if ($manifest->assignedDriver) {
                 $manifest->assignedDriver->update(['status' => 'available']);
             }
@@ -158,6 +163,55 @@ class WarehouseTransportReceivingService
                 ],
             ];
         });
+    }
+
+    private function createWarehouseReceiptFromManifest(TransportManifest $manifest, Warehouse $warehouse, User $user): void
+    {
+        $now = now();
+
+        $receipt = WarehouseReceipt::query()->create([
+            'transport_manifest_id' => $manifest->id,
+            'warehouse_id' => $warehouse->id,
+            'status' => WarehouseReceipt::STATUS_FINALIZED,
+            'started_by_user_id' => $user->id,
+            'finalized_by_user_id' => $user->id,
+            'notes' => 'Auto-created from transport manifest ' . $manifest->manifest_number . '.',
+            'started_at' => $now,
+            'finalized_at' => $now,
+        ]);
+
+        foreach ($manifest->items as $line) {
+            if (!$line->shipmentItem) {
+                continue;
+            }
+
+            $received = (int) $line->received_quantity;
+            $expected = (int) $line->expected_quantity;
+            $discrepancy = 'none';
+
+            if ($received < $expected) {
+                $discrepancy = 'missing';
+            } elseif ($received > $expected) {
+                $discrepancy = 'excess';
+            }
+
+            if ($line->line_status === TransportManifestItem::LINE_DAMAGED) {
+                $discrepancy = $discrepancy === 'none' ? 'damaged' : 'mixed';
+            }
+
+            WarehouseReceiptItem::query()->create([
+                'warehouse_receipt_id' => $receipt->id,
+                'shipment_item_id' => $line->shipment_item_id,
+                'expected_quantity' => $expected,
+                'received_quantity' => $received,
+                'damaged_quantity' => $line->line_status === TransportManifestItem::LINE_DAMAGED ? $received : 0,
+                'discrepancy_type' => $discrepancy,
+                'condition_status' => $line->line_status === TransportManifestItem::LINE_DAMAGED ? 'damaged' : 'ok',
+                'notes' => $line->notes,
+                'received_by_user_id' => $user->id,
+                'received_at' => $line->received_at ?? $now,
+            ]);
+        }
     }
 
     private function resolveLineStatus(int $expected, int $received): string

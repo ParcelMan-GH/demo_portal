@@ -9,6 +9,7 @@ use App\Models\Driver;
 use App\Models\SortBatch;
 use App\Services\Warehouse\WarehouseDeliveryService;
 use App\Services\Warehouse\WarehousePortalService;
+use App\Services\Warehouse\WarehouseSortingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,8 @@ class DeliveryRunController extends Controller
 {
     public function __construct(
         private WarehousePortalService $portalService,
-        private WarehouseDeliveryService $deliveryService
+        private WarehouseDeliveryService $deliveryService,
+        private WarehouseSortingService $sortingService
     ) {
     }
 
@@ -119,6 +121,67 @@ class DeliveryRunController extends Controller
 
         $batch = SortBatch::query()->findOrFail((int) $validated['sort_batch_id']);
         $result = $this->deliveryService->createRun($batch, $warehouse, Auth::guard('admin')->user());
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function eligibleItems(Request $request): JsonResponse
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+
+        $query = $this->sortingService->eligibleItemsQuery($warehouse);
+
+        if ($search = trim((string) $request->input('search'))) {
+            $query->where(function (Builder $builder) use ($search) {
+                $builder->whereHas('shipmentItem.shipment', fn (Builder $q) => $q->where('shipment_number', 'like', "%{$search}%"))
+                    ->orWhereHas('shipmentItem', fn (Builder $q) => $q
+                        ->where('description', 'like', "%{$search}%")
+                        ->orWhere('tracking_code', 'like', "%{$search}%")
+                        ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                        ->orWhere('delivery_town', 'like', "%{$search}%")
+                    );
+            });
+        }
+
+        $query->latest('id');
+
+        $total = $query->count();
+        $perPage = min(max((int) $request->input('per_page', 10), 1), 200);
+        $page = max((int) $request->input('page', 1), 1);
+        $offset = ($page - 1) * $perPage;
+        $rows = $query->skip($offset)->take($perPage)->get();
+
+        return response()->json([
+            'data' => $this->sortingService->mapEligibleItems($rows),
+            'meta' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => (int) ceil($total / $perPage) ?: 1,
+                'from' => $total > 0 ? $offset + 1 : 0,
+                'to' => min($offset + $perPage, $total),
+            ],
+        ]);
+    }
+
+    public function storeFromItems(Request $request): JsonResponse
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        $user = Auth::guard('admin')->user();
+
+        $validated = $request->validate([
+            'warehouse_receipt_item_ids' => ['required', 'array', 'min:1'],
+            'warehouse_receipt_item_ids.*' => ['integer', 'exists:warehouse_receipt_items,id'],
+        ]);
+
+        $result = $this->deliveryService->createRunFromItems(
+            warehouse: $warehouse,
+            user: $user,
+            warehouseReceiptItemIds: $validated['warehouse_receipt_item_ids'],
+            sortingService: $this->sortingService,
+        );
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }
