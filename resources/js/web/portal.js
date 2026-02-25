@@ -7,6 +7,8 @@ import {
 import './vendor-shipments';
 import './vendor-invoices';
 import './driver-pickups';
+import './driver-transports';
+import './driver-deliveries';
 
 function redirectTo(url) {
     window.location.href = url;
@@ -625,6 +627,175 @@ function registerDriverHomePage() {
         loading: true,
         error: null,
         profile: null,
+        stats: {
+            pickups: { total: 0, active: 0, en_route: 0, completed: 0, cancelled: 0 },
+            transports: { active: 0, in_transit: 0, arrived: 0 },
+            deliveries: { active: 0, out_for_delivery: 0, partially_delivered: 0, completed: 0 },
+        },
+        recentPickups: [],
+        recentDeliveries: [],
+
+        init() {
+            this.bootstrap();
+        },
+
+        get todayFormatted() {
+            return new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+            });
+        },
+
+        get totalActiveTasks() {
+            return this.stats.pickups.active + this.stats.transports.active + this.stats.deliveries.active;
+        },
+
+        get vehicleSubtitle() {
+            const parts = [];
+            if (this.profile?.vehicle_type) {
+                parts.push(this.profile.vehicle_type.charAt(0).toUpperCase() + this.profile.vehicle_type.slice(1));
+            }
+            if (this.profile?.vehicle_number) {
+                parts.push(this.profile.vehicle_number);
+            }
+            if (this.profile?.base_location) {
+                parts.push('Based at ' + this.profile.base_location);
+            }
+            return parts.join(' · ');
+        },
+
+        pickupStatusColor(status) {
+            const map = {
+                assigned: 'blue',
+                en_route: 'orange',
+                arrived: 'amber',
+                picking_up: 'emerald',
+                completed: 'green',
+                cancelled: 'red',
+            };
+            return map[status] || 'gray';
+        },
+
+        deliveryStatusColor(status) {
+            const map = {
+                draft: 'gray',
+                assigned: 'blue',
+                out_for_delivery: 'orange',
+                partially_delivered: 'amber',
+                completed: 'green',
+                cancelled: 'red',
+            };
+            return map[status] || 'gray';
+        },
+
+        statusLabel(status) {
+            if (!status) return '-';
+            return String(status).split('_').map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' ');
+        },
+
+        formatDate(value) {
+            if (!value) return '-';
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return '-';
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        },
+
+        async bootstrap() {
+            const token = getToken('driver');
+            if (!token) {
+                redirectTo('/driver/login');
+                return;
+            }
+
+            const activePickupStatuses = 'status[]=assigned&status[]=en_route&status[]=arrived&status[]=picking_up';
+            const activeTransportStatuses = 'status[]=assigned&status[]=loading&status[]=in_transit';
+            const activeDeliveryStatuses = 'status[]=assigned&status[]=out_for_delivery';
+
+            const [profileResult, ...rest] = await Promise.all([
+                apiRequest('/api/v1/driver/profile', { role: 'driver' }),
+                // Pickup counts
+                apiRequest('/api/v1/driver/pickups?limit=1&offset=0', { role: 'driver' }),
+                apiRequest(`/api/v1/driver/pickups?limit=1&offset=0&${activePickupStatuses}`, { role: 'driver' }),
+                apiRequest('/api/v1/driver/pickups?limit=1&offset=0&status[]=en_route', { role: 'driver' }),
+                apiRequest('/api/v1/driver/pickups?limit=1&offset=0&status[]=completed', { role: 'driver' }),
+                apiRequest('/api/v1/driver/pickups?limit=1&offset=0&status[]=cancelled', { role: 'driver' }),
+                // Transport counts
+                apiRequest(`/api/v1/driver/transports?limit=1&offset=0&${activeTransportStatuses}`, { role: 'driver' }),
+                apiRequest('/api/v1/driver/transports?limit=1&offset=0&status[]=in_transit', { role: 'driver' }),
+                apiRequest('/api/v1/driver/transports?limit=1&offset=0&status[]=arrived', { role: 'driver' }),
+                // Delivery counts
+                apiRequest(`/api/v1/driver/deliveries?limit=1&offset=0&${activeDeliveryStatuses}`, { role: 'driver' }),
+                apiRequest('/api/v1/driver/deliveries?limit=1&offset=0&status[]=out_for_delivery', { role: 'driver' }),
+                apiRequest('/api/v1/driver/deliveries?limit=1&offset=0&status[]=partially_delivered', { role: 'driver' }),
+                apiRequest('/api/v1/driver/deliveries?limit=1&offset=0&status[]=completed', { role: 'driver' }),
+                // Recent lists
+                apiRequest('/api/v1/driver/pickups?limit=5&offset=0&sort_by=created_at&sort_dir=desc', { role: 'driver' }),
+                apiRequest('/api/v1/driver/deliveries?limit=5&offset=0&sort_by=created_at&sort_dir=desc', { role: 'driver' }),
+            ]);
+
+            if (profileResult.unauthorized || rest.some(r => r.unauthorized)) {
+                clearToken('driver');
+                redirectTo('/driver/login');
+                return;
+            }
+
+            if (!profileResult.success) {
+                this.error = profileResult.message || 'Failed to load profile.';
+                this.loading = false;
+                return;
+            }
+
+            this.profile = profileResult.payload?.data?.user || null;
+
+            const ct = (r) => r.success ? (r.payload?.data?.pagination?.total ?? 0) : 0;
+            this.stats.pickups.total       = ct(rest[0]);
+            this.stats.pickups.active      = ct(rest[1]);
+            this.stats.pickups.en_route    = ct(rest[2]);
+            this.stats.pickups.completed   = ct(rest[3]);
+            this.stats.pickups.cancelled   = ct(rest[4]);
+            this.stats.transports.active   = ct(rest[5]);
+            this.stats.transports.in_transit = ct(rest[6]);
+            this.stats.transports.arrived  = ct(rest[7]);
+            this.stats.deliveries.active             = ct(rest[8]);
+            this.stats.deliveries.out_for_delivery   = ct(rest[9]);
+            this.stats.deliveries.partially_delivered = ct(rest[10]);
+            this.stats.deliveries.completed          = ct(rest[11]);
+
+            if (rest[12].success) {
+                this.recentPickups = rest[12].payload?.data?.pickups || [];
+            }
+            if (rest[13].success) {
+                this.recentDeliveries = rest[13].payload?.data?.deliveries
+                    || rest[13].payload?.data?.runs
+                    || [];
+            }
+
+            this.loading = false;
+        },
+
+        async logout() {
+            await apiRequest('/api/v1/driver/logout', {
+                method: 'POST',
+                role: 'driver',
+            });
+            clearToken('driver');
+            redirectTo('/driver/login');
+        },
+    };
+}
+
+function registerDriverProfilePage() {
+    return {
+        loading: true,
+        profile: null,
+        error: null,
+        alert: null,
+        editMode: false,
+        profileSaving: false,
+        passwordSaving: false,
+        passwordAlert: null,
         profileForm: {
             name: '',
             phone: '',
@@ -638,176 +809,101 @@ function registerDriverHomePage() {
             new_password: '',
             confirm_password: '',
         },
-        vehicleTypeOptions: ['motorcycle', 'car', 'van', 'truck'],
-        profileSaving: false,
-        passwordSaving: false,
-        profileAlert: null,
-        passwordAlert: null,
-        showCurrentPassword: false,
-        showNewPassword: false,
-        showConfirmPassword: false,
+        vehicleTypeOptions: ['Motorcycle', 'Bicycle', 'Car', 'Van', 'Truck', 'Mini Truck'],
 
-        init() {
-            this.bootstrap();
-        },
-
-        showProfileAlert(type, message) {
-            this.profileAlert = { type, message };
-        },
-
-        showPasswordAlert(type, message) {
-            this.passwordAlert = { type, message };
-        },
-
-        syncProfileForm() {
-            this.profileForm.name = this.profile?.name || '';
-            this.profileForm.phone = this.profile?.phone || '';
-            this.profileForm.vehicle_type = this.profile?.vehicle_type || '';
-            this.profileForm.vehicle_number = this.profile?.vehicle_number || '';
-            this.profileForm.license_number = this.profile?.license_number || '';
-            this.profileForm.base_location = this.profile?.base_location || '';
-        },
-
-        async bootstrap() {
+        async init() {
             const token = getToken('driver');
-            if (!token) {
-                redirectTo('/driver/login');
-                return;
-            }
-
-            const result = await apiRequest('/api/v1/driver/profile', { role: 'driver' });
-            if (result.success) {
-                this.profile = result.payload?.data?.user || null;
-                this.syncProfileForm();
-                this.loading = false;
-                return;
-            }
-
-            if (result.unauthorized) {
-                clearToken('driver');
-                redirectTo('/driver/login');
-                return;
-            }
-
-            this.error = result.message;
-            this.loading = false;
+            if (!token) { redirectTo('/driver/login'); return; }
+            await this.loadProfile();
         },
 
-        async updateProfile() {
-            if (!this.profileForm.name.trim()) {
-                this.showProfileAlert('error', 'Name is required.');
-                return;
+        async loadProfile() {
+            this.loading = true;
+            try {
+                const res = await apiRequest('/api/v1/driver/profile', { role: 'driver' });
+                if (res.unauthorized) { clearToken('driver'); redirectTo('/driver/login'); return; }
+                if (res.success) {
+                    this.profile = res.payload?.data?.driver || res.payload?.data?.user || res.payload?.data || null;
+                } else {
+                    this.error = res.message || 'Could not load profile.';
+                }
+            } catch {
+                this.error = 'Network error loading profile.';
+            } finally {
+                this.loading = false;
             }
-            if (!this.profileForm.phone.trim()) {
-                this.showProfileAlert('error', 'Phone is required.');
-                return;
-            }
-            if (!this.profileForm.vehicle_type) {
-                this.showProfileAlert('error', 'Vehicle type is required.');
-                return;
-            }
+        },
 
+        startEdit() {
+            this.profileForm = {
+                name: this.profile?.name || '',
+                phone: this.profile?.phone || '',
+                vehicle_type: this.profile?.vehicle_type || '',
+                vehicle_number: this.profile?.vehicle_number || '',
+                license_number: this.profile?.license_number || '',
+                base_location: this.profile?.base_location || '',
+            };
+            this.editMode = true;
+        },
+
+        cancelEdit() {
+            this.editMode = false;
+            this.alert = null;
+        },
+
+        async saveProfile() {
             this.profileSaving = true;
-            this.profileAlert = null;
-
-            const result = await apiRequest('/api/v1/driver/profile', {
-                method: 'PUT',
-                role: 'driver',
-                data: {
-                    name: this.profileForm.name.trim(),
-                    phone: this.profileForm.phone.trim(),
-                    vehicle_type: this.profileForm.vehicle_type,
-                    vehicle_number: this.profileForm.vehicle_number.trim() || null,
-                    license_number: this.profileForm.license_number.trim() || null,
-                    base_location: this.profileForm.base_location.trim() || null,
-                },
-            });
-
-            if (result.unauthorized) {
-                clearToken('driver');
-                redirectTo('/driver/login');
-                return;
-            }
-
-            if (!result.success) {
-                this.showProfileAlert('error', result.message);
+            this.alert = null;
+            try {
+                const res = await apiRequest('/api/v1/driver/profile', {
+                    method: 'PUT',
+                    role: 'driver',
+                    data: this.profileForm,
+                });
+                if (res.unauthorized) { clearToken('driver'); redirectTo('/driver/login'); return; }
+                if (res.success) {
+                    this.profile = res.payload?.data?.driver || res.payload?.data?.user || res.payload?.data || this.profile;
+                    this.alert = { type: 'success', message: 'Profile updated successfully.' };
+                    this.editMode = false;
+                } else {
+                    this.alert = { type: 'error', message: res.message || 'Failed to update profile.' };
+                }
+            } catch {
+                this.alert = { type: 'error', message: 'Network error. Please try again.' };
+            } finally {
                 this.profileSaving = false;
-                return;
             }
-
-            this.profile = result.payload?.data?.user || this.profile;
-            this.syncProfileForm();
-            this.showProfileAlert('success', result.message);
-            this.profileSaving = false;
         },
 
         async changePassword() {
-            if (!this.passwordForm.current_password) {
-                this.showPasswordAlert('error', 'Current password is required.');
-                return;
-            }
-            if (!this.passwordForm.new_password) {
-                this.showPasswordAlert('error', 'New password is required.');
-                return;
-            }
-            if (this.passwordForm.new_password.length < 6) {
-                this.showPasswordAlert('error', 'New password must be at least 6 characters.');
-                return;
-            }
-            if (!this.passwordForm.confirm_password) {
-                this.showPasswordAlert('error', 'Confirm password is required.');
-                return;
-            }
             if (this.passwordForm.new_password !== this.passwordForm.confirm_password) {
-                this.showPasswordAlert('error', 'Password confirmation does not match.');
+                this.passwordAlert = { type: 'error', message: 'New passwords do not match.' };
                 return;
             }
-
             this.passwordSaving = true;
             this.passwordAlert = null;
-
-            const result = await apiRequest('/api/v1/driver/change-password', {
-                method: 'PUT',
-                role: 'driver',
-                data: {
-                    current_password: this.passwordForm.current_password,
-                    new_password: this.passwordForm.new_password,
-                    confirm_password: this.passwordForm.confirm_password,
-                },
-            });
-
-            if (result.unauthorized) {
-                clearToken('driver');
-                redirectTo('/driver/login');
-                return;
-            }
-
-            if (!result.success) {
-                this.showPasswordAlert('error', result.message);
+            try {
+                const res = await apiRequest('/api/v1/driver/change-password', {
+                    method: 'POST',
+                    role: 'driver',
+                    data: {
+                        current_password: this.passwordForm.current_password,
+                        new_password: this.passwordForm.new_password,
+                        new_password_confirmation: this.passwordForm.confirm_password,
+                    },
+                });
+                if (res.unauthorized) { clearToken('driver'); redirectTo('/driver/login'); return; }
+                if (res.success) {
+                    this.passwordAlert = { type: 'success', message: 'Password changed successfully.' };
+                    this.passwordForm = { current_password: '', new_password: '', confirm_password: '' };
+                } else {
+                    this.passwordAlert = { type: 'error', message: res.message || 'Failed to change password.' };
+                }
+            } catch {
+                this.passwordAlert = { type: 'error', message: 'Network error. Please try again.' };
+            } finally {
                 this.passwordSaving = false;
-                return;
             }
-
-            const newToken = result.payload?.data?.token || null;
-            if (newToken) {
-                setToken('driver', newToken);
-            }
-
-            this.passwordForm.current_password = '';
-            this.passwordForm.new_password = '';
-            this.passwordForm.confirm_password = '';
-            this.showPasswordAlert('success', result.message);
-            this.passwordSaving = false;
-        },
-
-        async logout() {
-            await apiRequest('/api/v1/driver/logout', {
-                method: 'POST',
-                role: 'driver',
-            });
-
-            clearToken('driver');
-            redirectTo('/driver/login');
         },
     };
 }
@@ -822,6 +918,8 @@ function registerPortalComponents() {
     window.Alpine.data('vendorHomePage', registerVendorHomePage);
     window.Alpine.data('vendorProfilePage', registerVendorProfilePage);
     window.Alpine.data('driverHomePage', registerDriverHomePage);
+    window.Alpine.data('driverProfilePage', registerDriverProfilePage);
+    window.Alpine.data('driverLayoutPage', () => ({ mobileMenuOpen: false, driverName: '...', driverInitial: 'D' }));
 }
 
 if (window.Alpine) {

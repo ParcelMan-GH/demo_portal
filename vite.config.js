@@ -9,6 +9,7 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/css/pages/api-tester.css',
                 'resources/css/pages/vendor-portal.css',
+                'resources/css/pages/driver-portal.css',
                 'resources/css/pages/warehouse-portal.css',
                 'resources/js/app.js',
                 'resources/js/admin/app.js',

@@ -110,14 +110,15 @@ function driverPickupsListPage() {
             last_page: 1,
             per_page: 15,
         },
+        activeTab: "all",
+        tabCounts: { all: 0, assigned: 0, en_route: 0, arrived: 0, picking_up: 0, completed: 0, cancelled: 0 },
 
         async init() {
             if (!(await ensureDriverSessionOrRedirect())) {
                 return;
             }
 
-            await this.loadShipmentOptions();
-            await this.loadPickups();
+            await Promise.all([this.loadShipmentOptions(), this.loadPickups(), this.loadTabCounts()]);
         },
 
         statusLabel,
@@ -290,6 +291,48 @@ function driverPickupsListPage() {
             this.showAlert('success', result.message);
             await this.loadPickups();
         },
+
+        async loadTabCounts() {
+            const statuses = ['assigned', 'en_route', 'arrived', 'picking_up', 'completed', 'cancelled'];
+            const calls = statuses.map((s) =>
+                apiRequest(`/api/v1/driver/pickups?limit=1&offset=0&status[]=${s}`, { role: 'driver' })
+            );
+            const allResult = apiRequest('/api/v1/driver/pickups?limit=1&offset=0', { role: 'driver' });
+            const [all, ...perStatus] = await Promise.all([allResult, ...calls]);
+            if (all.success) this.tabCounts.all = all.payload?.data?.pagination?.total || 0;
+            statuses.forEach((s, i) => {
+                if (perStatus[i]?.success) this.tabCounts[s] = perStatus[i].payload?.data?.pagination?.total || 0;
+            });
+        },
+
+        async switchTab(key) {
+            const statusMap = {
+                all: [],
+                assigned: ['assigned'],
+                en_route: ['en_route'],
+                arrived: ['arrived'],
+                picking_up: ['picking_up'],
+                completed: ['completed'],
+                cancelled: ['cancelled'],
+            };
+            if (!(key in statusMap)) return;
+            this.activeTab = key;
+            this.filters.status = [...statusMap[key]];
+            this.filters.offset = 0;
+            await this.loadPickups();
+        },
+
+        statusColor(status) {
+            const map = {
+                assigned: 'blue',
+                en_route: 'orange',
+                arrived: 'amber',
+                picking_up: 'purple',
+                completed: 'green',
+                cancelled: 'red',
+            };
+            return map[status] || 'gray';
+        },
     };
 }
 
@@ -342,6 +385,56 @@ function driverPickupShowPage() {
 
         get canFinalize() {
             return ['arrived', 'picking_up'].includes(this.pickup?.status || '');
+        },
+
+        statusColor(status) {
+            const map = {
+                assigned: 'blue',
+                en_route: 'orange',
+                arrived: 'amber',
+                picking_up: 'purple',
+                completed: 'green',
+                cancelled: 'red',
+            };
+            return map[status] || 'gray';
+        },
+
+        get heroClass() {
+            const s = this.pickup?.status || '';
+            if (s === 'cancelled') return 'no-progress';
+            if (s === 'completed') return 'sh-hero-arrived';
+            if (['arrived', 'picking_up'].includes(s)) return 'sh-hero-loading';
+            if (s === 'en_route') return 'sh-hero-in_transit';
+            return '';
+        },
+
+        get heroMessage() {
+            const s = this.pickup?.status || '';
+            const msgs = {
+                assigned:    { title: "Ready for Pickup", text: "Tap \"Start En Route\" to begin heading to the pickup location." },
+                en_route:    { title: "En Route to Pickup", text: "You are on your way. Tap \"Mark Arrived\" when you reach the location." },
+                arrived:     { title: "Arrived at Location", text: "Confirm each item's quantity below, then finalize the pickup when ready." },
+                picking_up:  { title: "Picking Up Items", text: "Confirm each item and finalize the pickup when all items are checked." },
+                completed:   { title: "Pickup Complete", text: "This pickup has been completed and items are on their way to the warehouse." },
+                cancelled:   { title: "Pickup Cancelled", text: "This pickup assignment has been cancelled." },
+            };
+            return msgs[s] || { title: 'Pickup Assignment', text: 'View pickup details and take action.' };
+        },
+
+        get progressSteps() {
+            const statuses = ['assigned', 'en_route', 'arrived', 'picking_up', 'completed'];
+            const current = this.pickup?.status || '';
+            const isCancelled = current === 'cancelled';
+            const currentIdx = statuses.indexOf(current);
+            return {
+                isCancelled,
+                currentIdx: Math.max(0, currentIdx),
+                total: statuses.length,
+                steps: statuses.map((s, i) => ({
+                    label: s === 'en_route' ? 'En Route' : (s === 'picking_up' ? 'Picking Up' : s.charAt(0).toUpperCase() + s.slice(1)),
+                    state: isCancelled ? 'pending' : (i < currentIdx ? 'done' : (i === currentIdx ? 'active' : 'pending')),
+                })),
+            };
         },
 
         showAlert(type, message) {

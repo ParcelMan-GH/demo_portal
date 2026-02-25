@@ -87,6 +87,26 @@ Route::prefix('driver')->name('web.driver.')->group(function () {
             return view('web.driver.pickups.show', ['pickupId' => $pickup]);
         })->name('show');
     });
+
+    Route::prefix('transports')->name('transports.')->group(function () {
+        Route::get('/', function () {
+            return view('web.driver.transports.index');
+        })->name('index');
+
+        Route::get('{manifest}', function ($manifest) {
+            return view('web.driver.transports.show', ['manifestId' => $manifest]);
+        })->name('show');
+    });
+
+    Route::prefix('deliveries')->name('deliveries.')->group(function () {
+        Route::get('/', function () {
+            return view('web.driver.deliveries.index');
+        })->name('index');
+
+        Route::get('{run}', function ($run) {
+            return view('web.driver.deliveries.show', ['runId' => $run]);
+        })->name('show');
+    });
 });
 
 // API Tester (no auth required)

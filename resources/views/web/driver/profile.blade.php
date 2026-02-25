@@ -1,188 +1,241 @@
-@extends('web.layouts.portal')
+@extends('web.layouts.driver')
 
-@section('title', 'Driver Profile')
+@section('title', 'My Profile')
 
 @section('content')
-<main class="mx-auto min-h-screen w-full max-w-6xl px-6 py-10" x-data="driverHomePage()">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-sky-200">Driver Portal</p>
-            <h1 class="mt-1 text-3xl font-extrabold text-white">Profile & Security</h1>
+<div class="profile-page" x-data="driverProfilePage()">
+
+    {{-- Alert --}}
+    <div x-show="alert" x-cloak class="profile-alert" :class="alert?.type" x-text="alert?.message"></div>
+
+    {{-- Hero --}}
+    <div class="profile-hero">
+        <div class="profile-hero-inner">
+            <div class="profile-hero-top">
+                <div class="profile-avatar" x-text="profile ? (profile.name || 'D').charAt(0).toUpperCase() : 'D'"></div>
+                <div class="profile-hero-info">
+                    <div class="profile-hero-name" x-text="profile?.name || 'Driver'"></div>
+                    <div class="profile-hero-meta">
+                        <div class="profile-hero-meta-item" x-show="profile?.email">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                            <span x-text="profile?.email"></span>
+                        </div>
+                        <div class="profile-hero-meta-item" x-show="profile?.phone">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                            <span x-text="profile?.phone"></span>
+                        </div>
+                        <div class="profile-hero-meta-item" x-show="profile?.vehicle_type">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                            <span x-text="profile?.vehicle_type"></span>
+                        </div>
+                        <div class="profile-hero-meta-item" x-show="profile?.vehicle_number">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                            <span x-text="profile?.vehicle_number"></span>
+                        </div>
+                    </div>
+                    <div class="profile-hero-status" :class="profile?.status === 'active' ? 'active' : 'inactive'">
+                        <span class="profile-hero-status-dot"></span>
+                        <span x-text="profile?.status || 'Unknown'"></span>
+                    </div>
+                </div>
+            </div>
+            {{-- Quick links --}}
+            <div class="profile-hero-links">
+                <a href="{{ route('web.driver.home') }}" class="profile-hero-link">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    Dashboard
+                </a>
+                <a href="{{ route('web.driver.pickups.index') }}" class="profile-hero-link">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    My Pickups
+                </a>
+                <a href="{{ route('web.driver.transports.index') }}" class="profile-hero-link">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1"/></svg>
+                    My Transports
+                </a>
+                <a href="{{ route('web.driver.deliveries.index') }}" class="profile-hero-link">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                    My Deliveries
+                </a>
+            </div>
         </div>
-        <div class="flex gap-3">
-            <a href="{{ route('web.driver.pickups.index') }}" class="rounded-xl border border-emerald-300/30 bg-emerald-500/15 px-4 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-500/25">
-                My Pickups
-            </a>
-            <a href="{{ route('web.driver.home') }}" class="rounded-xl border border-sky-300/30 bg-sky-500/15 px-4 py-2 text-sm font-semibold text-sky-100 hover:bg-sky-500/25">
-                Back to Home
-            </a>
-            <button type="button" @click="logout()" class="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-400">
-                Logout
+    </div>
+
+    {{-- Profile Details Section --}}
+    <div class="profile-section">
+        <div class="profile-section-head">
+            <div class="profile-section-icon emerald">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            </div>
+            <div>
+                <h2 class="profile-section-title">Profile Details</h2>
+            </div>
+            <button type="button" x-show="!editMode" @click="startEdit()"
+                    style="margin-left:auto;padding:0.4rem 0.9rem;border-radius:10px;font-size:0.78rem;font-weight:600;color:#059669;background:#d1fae5;border:1px solid #a7f3d0;cursor:pointer;">
+                Edit
             </button>
         </div>
-    </div>
+        <div class="profile-section-body">
 
-    <div class="mt-6 grid gap-6 lg:grid-cols-3">
-        <section class="rounded-3xl border border-slate-200/15 bg-slate-900/75 p-6 backdrop-blur-xl lg:col-span-2">
-            <h2 class="text-lg font-bold text-white">Current Profile</h2>
-
-            <div x-show="loading" class="mt-4 text-sm text-slate-300">Loading profile...</div>
-            <div x-show="!loading && error" x-cloak class="mt-4 rounded-xl border border-rose-300/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100" x-text="error"></div>
-
-            <dl x-show="!loading && profile" x-cloak class="mt-4 grid gap-3 text-sm text-slate-200 sm:grid-cols-2">
-                <div>
-                    <dt class="text-xs uppercase tracking-[0.12em] text-slate-400">Name</dt>
-                    <dd class="mt-1 font-semibold text-white" x-text="profile?.name || '-'"></dd>
+            {{-- View mode --}}
+            <div x-show="!editMode" class="profile-form-grid">
+                <div class="profile-form-field">
+                    <div class="profile-form-label">Name</div>
+                    <div style="font-size:0.875rem;font-weight:600;color:#1e293b;padding:0.5rem 0;" x-text="profile?.name || '-'"></div>
                 </div>
-                <div>
-                    <dt class="text-xs uppercase tracking-[0.12em] text-slate-400">Email</dt>
-                    <dd class="mt-1 font-semibold text-white" x-text="profile?.email || '-'"></dd>
+                <div class="profile-form-field">
+                    <div class="profile-form-label">Email</div>
+                    <div style="font-size:0.875rem;font-weight:600;color:#1e293b;padding:0.5rem 0;" x-text="profile?.email || '-'"></div>
                 </div>
-                <div>
-                    <dt class="text-xs uppercase tracking-[0.12em] text-slate-400">Phone</dt>
-                    <dd class="mt-1 font-semibold text-white" x-text="profile?.phone || '-'"></dd>
+                <div class="profile-form-field">
+                    <div class="profile-form-label">Phone</div>
+                    <div style="font-size:0.875rem;font-weight:600;color:#1e293b;padding:0.5rem 0;" x-text="profile?.phone || '-'"></div>
                 </div>
-                <div>
-                    <dt class="text-xs uppercase tracking-[0.12em] text-slate-400">Status</dt>
-                    <dd class="mt-1 font-semibold text-white" x-text="profile?.status || '-'"></dd>
+                <div class="profile-form-field">
+                    <div class="profile-form-label">Status</div>
+                    <div style="font-size:0.875rem;font-weight:600;color:#1e293b;padding:0.5rem 0;" x-text="profile?.status || '-'"></div>
                 </div>
-                <div>
-                    <dt class="text-xs uppercase tracking-[0.12em] text-slate-400">Vehicle Type</dt>
-                    <dd class="mt-1 font-semibold text-white" x-text="profile?.vehicle_type || '-'"></dd>
+                <div class="profile-form-field">
+                    <div class="profile-form-label">Vehicle Type</div>
+                    <div style="font-size:0.875rem;font-weight:600;color:#1e293b;padding:0.5rem 0;" x-text="profile?.vehicle_type || '-'"></div>
                 </div>
-                <div>
-                    <dt class="text-xs uppercase tracking-[0.12em] text-slate-400">Vehicle Number</dt>
-                    <dd class="mt-1 font-semibold text-white" x-text="profile?.vehicle_number || '-'"></dd>
+                <div class="profile-form-field">
+                    <div class="profile-form-label">Vehicle Number</div>
+                    <div style="font-size:0.875rem;font-weight:600;color:#1e293b;padding:0.5rem 0;" x-text="profile?.vehicle_number || '-'"></div>
                 </div>
-            </dl>
-        </section>
-
-        <section class="rounded-3xl border border-sky-300/25 bg-sky-500/10 p-6">
-            <h2 class="text-sm font-semibold uppercase tracking-[0.12em] text-sky-100">Account</h2>
-            <p class="mt-3 text-sm text-sky-100">Manage your profile details and password from this page.</p>
-        </section>
-    </div>
-
-    <div class="mt-6 grid gap-6 lg:grid-cols-2">
-        <section class="rounded-3xl border border-slate-200/15 bg-slate-900/75 p-6 backdrop-blur-xl">
-            <div class="flex items-center justify-between gap-3">
-                <h2 class="text-lg font-bold text-white">Update Profile</h2>
-                <span class="rounded-full bg-slate-700 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-200">Driver</span>
-            </div>
-
-            <div class="mt-4" x-show="profileAlert" x-cloak>
-                <div class="rounded-xl border px-4 py-3 text-sm"
-                     :class="{
-                        'border-emerald-300/30 bg-emerald-400/10 text-emerald-100': profileAlert?.type === 'success',
-                        'border-rose-300/30 bg-rose-500/10 text-rose-100': profileAlert?.type === 'error'
-                     }">
-                    <span x-text="profileAlert?.message"></span>
+                <div class="profile-form-field">
+                    <div class="profile-form-label">License Number</div>
+                    <div style="font-size:0.875rem;font-weight:600;color:#1e293b;padding:0.5rem 0;" x-text="profile?.license_number || '-'"></div>
+                </div>
+                <div class="profile-form-field">
+                    <div class="profile-form-label">Base Location</div>
+                    <div style="font-size:0.875rem;font-weight:600;color:#1e293b;padding:0.5rem 0;" x-text="profile?.base_location || '-'"></div>
                 </div>
             </div>
 
-            <form class="mt-5 grid gap-4" @submit.prevent="updateProfile()">
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-100">Name</label>
+            {{-- Edit mode --}}
+            <form x-show="editMode" x-cloak @submit.prevent="saveProfile()" class="profile-form-grid">
+                <div class="profile-form-field">
+                    <label class="profile-form-label">Name</label>
                     <input x-model="profileForm.name" type="text" maxlength="255"
-                           class="w-full rounded-xl border border-slate-300/20 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/35">
+                           style="width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:0.55rem 0.875rem;font-size:0.875rem;color:#1e293b;outline:none;box-sizing:border-box;transition:border-color 0.15s,box-shadow 0.15s;"
+                           onfocus="this.style.borderColor='#10b981';this.style.boxShadow='0 0 0 3px rgba(16,185,129,0.12)'"
+                           onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
                 </div>
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-100">Phone</label>
+                <div class="profile-form-field">
+                    <label class="profile-form-label">Email <span style="color:#94a3b8;font-weight:400;">(locked)</span></label>
+                    <input :value="profile?.email" type="email" disabled
+                           style="width:100%;border:1px solid #f1f5f9;border-radius:10px;padding:0.55rem 0.875rem;font-size:0.875rem;color:#94a3b8;background:#f8fafc;cursor:not-allowed;box-sizing:border-box;">
+                </div>
+                <div class="profile-form-field">
+                    <label class="profile-form-label">Phone</label>
                     <input x-model="profileForm.phone" type="tel" maxlength="20"
-                           class="w-full rounded-xl border border-slate-300/20 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/35">
+                           style="width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:0.55rem 0.875rem;font-size:0.875rem;color:#1e293b;outline:none;box-sizing:border-box;transition:border-color 0.15s,box-shadow 0.15s;"
+                           onfocus="this.style.borderColor='#10b981';this.style.boxShadow='0 0 0 3px rgba(16,185,129,0.12)'"
+                           onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
                 </div>
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-100">Vehicle Type</label>
+                <div class="profile-form-field">
+                    <label class="profile-form-label">Vehicle Type</label>
                     <select x-model="profileForm.vehicle_type"
-                            class="w-full rounded-xl border border-slate-300/20 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/35">
-                        <option value="" class="text-slate-900">Select vehicle type</option>
+                            style="width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:0.55rem 0.875rem;font-size:0.875rem;color:#1e293b;background:#fff;outline:none;box-sizing:border-box;">
+                        <option value="">Select type</option>
                         <template x-for="type in vehicleTypeOptions" :key="type">
-                            <option :value="type" class="text-slate-900" x-text="type"></option>
+                            <option :value="type" x-text="type"></option>
                         </template>
                     </select>
                 </div>
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-100">Vehicle Number</label>
+                <div class="profile-form-field">
+                    <label class="profile-form-label">Vehicle Number</label>
                     <input x-model="profileForm.vehicle_number" type="text" maxlength="50"
-                           class="w-full rounded-xl border border-slate-300/20 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/35">
+                           style="width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:0.55rem 0.875rem;font-size:0.875rem;color:#1e293b;outline:none;box-sizing:border-box;transition:border-color 0.15s,box-shadow 0.15s;"
+                           onfocus="this.style.borderColor='#10b981';this.style.boxShadow='0 0 0 3px rgba(16,185,129,0.12)'"
+                           onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
                 </div>
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-100">License Number</label>
+                <div class="profile-form-field">
+                    <label class="profile-form-label">License Number</label>
                     <input x-model="profileForm.license_number" type="text" maxlength="50"
-                           class="w-full rounded-xl border border-slate-300/20 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/35">
+                           style="width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:0.55rem 0.875rem;font-size:0.875rem;color:#1e293b;outline:none;box-sizing:border-box;transition:border-color 0.15s,box-shadow 0.15s;"
+                           onfocus="this.style.borderColor='#10b981';this.style.boxShadow='0 0 0 3px rgba(16,185,129,0.12)'"
+                           onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
                 </div>
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-100">Base Location</label>
+                <div class="profile-form-field" style="grid-column:1/-1;">
+                    <label class="profile-form-label">Base Location</label>
                     <input x-model="profileForm.base_location" type="text" maxlength="255"
-                           class="w-full rounded-xl border border-slate-300/20 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/35">
+                           style="width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:0.55rem 0.875rem;font-size:0.875rem;color:#1e293b;outline:none;box-sizing:border-box;transition:border-color 0.15s,box-shadow 0.15s;"
+                           onfocus="this.style.borderColor='#10b981';this.style.boxShadow='0 0 0 3px rgba(16,185,129,0.12)'"
+                           onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
                 </div>
-                <div>
-                    <button type="submit" :disabled="profileSaving || loading"
-                            class="inline-flex items-center justify-center rounded-xl bg-sky-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60">
+                <div class="profile-form-actions" style="grid-column:1/-1;">
+                    <button type="submit" :disabled="profileSaving" class="profile-save-btn">
                         <span x-show="!profileSaving">Save Profile</span>
                         <span x-show="profileSaving" x-cloak>Saving...</span>
                     </button>
+                    <button type="button" @click="cancelEdit()" class="profile-discard-btn">Discard</button>
                 </div>
             </form>
-        </section>
+        </div>
+    </div>
 
-        <section class="rounded-3xl border border-slate-200/15 bg-slate-900/75 p-6 backdrop-blur-xl">
-            <h2 class="text-lg font-bold text-white">Change Password</h2>
-            <p class="mt-2 text-sm text-slate-300">Update your password and keep your account secure.</p>
-
-            <div class="mt-4" x-show="passwordAlert" x-cloak>
-                <div class="rounded-xl border px-4 py-3 text-sm"
-                     :class="{
-                        'border-emerald-300/30 bg-emerald-400/10 text-emerald-100': passwordAlert?.type === 'success',
-                        'border-rose-300/30 bg-rose-500/10 text-rose-100': passwordAlert?.type === 'error'
-                     }">
-                    <span x-text="passwordAlert?.message"></span>
-                </div>
+    {{-- Change Password Section --}}
+    <div class="profile-section">
+        <div class="profile-section-head">
+            <div class="profile-section-icon blue">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
             </div>
+            <div>
+                <h2 class="profile-section-title">Change Password</h2>
+            </div>
+        </div>
+        <div class="profile-section-body">
 
-            <form class="mt-5 grid gap-4" @submit.prevent="changePassword()">
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-100">Current Password</label>
-                    <div class="relative">
-                        <input x-model="passwordForm.current_password" :type="showCurrentPassword ? 'text' : 'password'" autocomplete="current-password"
-                               class="w-full rounded-xl border border-slate-300/20 bg-slate-950/70 px-4 py-3 pr-20 text-sm text-white outline-none transition focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/35">
-                        <button type="button" @click="showCurrentPassword = !showCurrentPassword"
-                                class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-3 py-1.5 text-xs font-semibold text-sky-200 hover:bg-sky-400/15">
-                            <span x-text="showCurrentPassword ? 'Hide' : 'Show'"></span>
-                        </button>
+            <div x-show="passwordAlert" x-cloak class="profile-alert" :class="passwordAlert?.type" x-text="passwordAlert?.message" style="margin-bottom:1rem;"></div>
+
+            <form @submit.prevent="changePassword()" class="profile-form-grid full">
+                <div class="profile-form-field" x-data="{ show: false }">
+                    <label class="profile-form-label">Current Password</label>
+                    <div style="position:relative;">
+                        <input x-model="passwordForm.current_password" :type="show ? 'text' : 'password'" autocomplete="current-password"
+                               style="width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:0.55rem 3.5rem 0.55rem 0.875rem;font-size:0.875rem;color:#1e293b;outline:none;box-sizing:border-box;transition:border-color 0.15s,box-shadow 0.15s;"
+                               onfocus="this.style.borderColor='#10b981';this.style.boxShadow='0 0 0 3px rgba(16,185,129,0.12)'"
+                               onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
+                        <button type="button" @click="show = !show"
+                                style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);padding:0.25rem 0.6rem;border-radius:6px;font-size:0.72rem;font-weight:600;color:#64748b;background:none;border:none;cursor:pointer;"
+                                x-text="show ? 'Hide' : 'Show'"></button>
                     </div>
                 </div>
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-100">New Password</label>
-                    <div class="relative">
-                        <input x-model="passwordForm.new_password" :type="showNewPassword ? 'text' : 'password'" autocomplete="new-password"
-                               class="w-full rounded-xl border border-slate-300/20 bg-slate-950/70 px-4 py-3 pr-20 text-sm text-white outline-none transition focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/35">
-                        <button type="button" @click="showNewPassword = !showNewPassword"
-                                class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-3 py-1.5 text-xs font-semibold text-sky-200 hover:bg-sky-400/15">
-                            <span x-text="showNewPassword ? 'Hide' : 'Show'"></span>
-                        </button>
+                <div class="profile-form-field" x-data="{ show: false }">
+                    <label class="profile-form-label">New Password</label>
+                    <div style="position:relative;">
+                        <input x-model="passwordForm.new_password" :type="show ? 'text' : 'password'" autocomplete="new-password"
+                               style="width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:0.55rem 3.5rem 0.55rem 0.875rem;font-size:0.875rem;color:#1e293b;outline:none;box-sizing:border-box;transition:border-color 0.15s,box-shadow 0.15s;"
+                               onfocus="this.style.borderColor='#10b981';this.style.boxShadow='0 0 0 3px rgba(16,185,129,0.12)'"
+                               onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
+                        <button type="button" @click="show = !show"
+                                style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);padding:0.25rem 0.6rem;border-radius:6px;font-size:0.72rem;font-weight:600;color:#64748b;background:none;border:none;cursor:pointer;"
+                                x-text="show ? 'Hide' : 'Show'"></button>
                     </div>
                 </div>
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-100">Confirm New Password</label>
-                    <div class="relative">
-                        <input x-model="passwordForm.confirm_password" :type="showConfirmPassword ? 'text' : 'password'" autocomplete="new-password"
-                               class="w-full rounded-xl border border-slate-300/20 bg-slate-950/70 px-4 py-3 pr-20 text-sm text-white outline-none transition focus:border-sky-300/70 focus:ring-2 focus:ring-sky-400/35">
-                        <button type="button" @click="showConfirmPassword = !showConfirmPassword"
-                                class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-3 py-1.5 text-xs font-semibold text-sky-200 hover:bg-sky-400/15">
-                            <span x-text="showConfirmPassword ? 'Hide' : 'Show'"></span>
-                        </button>
+                <div class="profile-form-field" x-data="{ show: false }">
+                    <label class="profile-form-label">Confirm New Password</label>
+                    <div style="position:relative;">
+                        <input x-model="passwordForm.confirm_password" :type="show ? 'text' : 'password'" autocomplete="new-password"
+                               style="width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:0.55rem 3.5rem 0.55rem 0.875rem;font-size:0.875rem;color:#1e293b;outline:none;box-sizing:border-box;transition:border-color 0.15s,box-shadow 0.15s;"
+                               onfocus="this.style.borderColor='#10b981';this.style.boxShadow='0 0 0 3px rgba(16,185,129,0.12)'"
+                               onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
+                        <button type="button" @click="show = !show"
+                                style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);padding:0.25rem 0.6rem;border-radius:6px;font-size:0.72rem;font-weight:600;color:#64748b;background:none;border:none;cursor:pointer;"
+                                x-text="show ? 'Hide' : 'Show'"></button>
                     </div>
                 </div>
-                <div>
-                    <button type="submit" :disabled="passwordSaving || loading"
-                            class="inline-flex items-center justify-center rounded-xl bg-sky-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60">
+                <div class="profile-form-actions">
+                    <button type="submit" :disabled="passwordSaving" class="profile-save-btn">
                         <span x-show="!passwordSaving">Change Password</span>
                         <span x-show="passwordSaving" x-cloak>Updating...</span>
                     </button>
                 </div>
             </form>
-        </section>
+        </div>
     </div>
-</main>
+
+</div>
 @endsection
