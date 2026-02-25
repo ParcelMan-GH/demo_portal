@@ -34,7 +34,7 @@ class DriverDeliveryService
         $query = DeliveryRun::query()
             ->where('assigned_driver_id', $driver->id)
             ->with([
-                'warehouse:id,name,code',
+                'warehouse:id,name,code,address,latitude,longitude,contact_phone',
                 'stops:id,delivery_run_id,recipient_name,recipient_phone,status,town,landmark,gh_post_address,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,arrived_at,delivered_at,failure_reason',
                 'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status',
                 'items.shipmentItem:id,shipment_id,description,tracking_code',
@@ -101,7 +101,7 @@ class DriverDeliveryService
         }
 
         $run->load([
-            'warehouse:id,name,code',
+            'warehouse:id,name,code,address,latitude,longitude,contact_phone',
             'stops:id,delivery_run_id,recipient_name,recipient_phone,status,region_id,district_id,town,latitude,longitude,gh_post_address,landmark,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,arrived_at,delivered_at,delivery_latitude,delivery_longitude,failure_reason,failure_notes',
             'stops.region:id,name',
             'stops.district:id,name',
@@ -128,6 +128,10 @@ class DriverDeliveryService
                 'id' => $run->warehouse->id,
                 'name' => $run->warehouse->name,
                 'code' => $run->warehouse->code,
+                'address' => $run->warehouse->address,
+                'latitude' => $run->warehouse->latitude,
+                'longitude' => $run->warehouse->longitude,
+                'contact_phone' => $run->warehouse->contact_phone,
             ] : null,
             'timeline' => [
                 'assigned' => ['at' => $run->assigned_at],

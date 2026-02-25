@@ -41,8 +41,8 @@ class DriverTransportService
         $query = TransportManifest::query()
             ->where('assigned_driver_id', $driver->id)
             ->with([
-                'originWarehouse:id,name,code',
-                'destinationWarehouse:id,name,code',
+                'originWarehouse:id,name,code,address,latitude,longitude,contact_phone',
+                'destinationWarehouse:id,name,code,address,latitude,longitude,contact_phone',
                 'items.shipmentItem.shipment:id,shipment_number',
                 'items.shipmentItem:id,shipment_id,description,tracking_code',
             ]);
@@ -104,8 +104,8 @@ class DriverTransportService
         }
 
         $manifest->load([
-            'originWarehouse:id,name,code',
-            'destinationWarehouse:id,name,code',
+            'originWarehouse:id,name,code,address,latitude,longitude,contact_phone',
+            'destinationWarehouse:id,name,code,address,latitude,longitude,contact_phone',
             'items.shipmentItem.shipment:id,shipment_number',
             'items.shipmentItem:id,shipment_id,description,tracking_code',
         ]);
@@ -128,11 +128,19 @@ class DriverTransportService
                 'id' => $manifest->originWarehouse->id,
                 'name' => $manifest->originWarehouse->name,
                 'code' => $manifest->originWarehouse->code,
+                'address' => $manifest->originWarehouse->address,
+                'latitude' => $manifest->originWarehouse->latitude,
+                'longitude' => $manifest->originWarehouse->longitude,
+                'contact_phone' => $manifest->originWarehouse->contact_phone,
             ] : null,
             'destination_warehouse' => $manifest->destinationWarehouse ? [
                 'id' => $manifest->destinationWarehouse->id,
                 'name' => $manifest->destinationWarehouse->name,
                 'code' => $manifest->destinationWarehouse->code,
+                'address' => $manifest->destinationWarehouse->address,
+                'latitude' => $manifest->destinationWarehouse->latitude,
+                'longitude' => $manifest->destinationWarehouse->longitude,
+                'contact_phone' => $manifest->destinationWarehouse->contact_phone,
             ] : null,
             'timeline' => [
                 'assigned' => ['at' => $manifest->assigned_at],

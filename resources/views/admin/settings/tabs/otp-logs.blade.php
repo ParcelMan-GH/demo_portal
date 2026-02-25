@@ -18,6 +18,7 @@
                 <option value="">All purposes</option>
                 <option value="login">Login</option>
                 <option value="registration">Registration</option>
+                <option value="delivery_verification">Delivery Verification</option>
             </select>
         </div>
     </div>
@@ -139,7 +140,7 @@ document.addEventListener('alpine:init', () => {
 
         formatPurpose(value) {
             if (!value) return '-';
-            return String(value).charAt(0).toUpperCase() + String(value).slice(1);
+            return String(value).split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
         },
 
         statusLabel(log) {

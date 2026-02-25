@@ -284,3 +284,12 @@ Route::prefix('warehouse')
         Route::post('deliveries/runs/{run}/dispatch', [WarehouseDeliveryRunController::class, 'dispatch'])->name('deliveries.runs.dispatch');
         Route::post('deliveries/runs/{run}/stops/{stop}/resend-code', [WarehouseDeliveryRunController::class, 'resendCode'])->name('deliveries.runs.stops.resend-code');
     });
+
+/*
+|--------------------------------------------------------------------------
+| Developer Docs
+|--------------------------------------------------------------------------
+*/
+Route::get('/docs/driver-flow', function () {
+    return view('docs.driver-flow-guide');
+})->name('docs.driver-flow');

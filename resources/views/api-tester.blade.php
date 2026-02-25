@@ -2817,13 +2817,36 @@
                 group: 'driver-transports',
                 userType: 'driver',
                 fields: [
-                    { name: 'status', queryName: 'status[]', type: 'multiselect', required: false, description: 'Transport statuses (array). Allowed: draft, assigned, loading, in_transit, arrived, received, cancelled', options: ['draft', 'assigned', 'loading', 'in_transit', 'arrived', 'received', 'cancelled'] },
+                    { name: 'status', queryName: 'status[]', type: 'multiselect', required: false, description: 'Filter by manifest status (array). See Field Reference below for all values.', options: ['draft', 'assigned', 'loading', 'in_transit', 'arrived', 'received', 'cancelled'] },
                     { name: 'search', type: 'string', required: false, description: 'Search by manifest number, shipment number, status', example: 'TM-2026' },
                     { name: 'limit', type: 'number', required: false, description: 'Number of rows to return (max 100)', example: '15' },
                     { name: 'offset', type: 'number', required: false, description: 'Rows to skip', example: '0' },
                     { name: 'sort_by', type: 'enum', required: false, description: 'Sort field', options: ['created_at', 'updated_at', 'id', 'manifest_number', 'status', 'assigned_at', 'dispatched_at', 'arrived_at'] },
                     { name: 'sort_order', type: 'enum', required: false, description: 'Sort direction', options: ['asc', 'desc'] }
                 ],
+                enums: {
+                    'Manifest status': [
+                        { value: 'draft',       description: 'Manifest created but no driver assigned yet' },
+                        { value: 'assigned',    description: 'Driver assigned — waiting for loading to begin' },
+                        { value: 'loading',     description: 'Driver is actively scanning items onto the vehicle (scan_out)' },
+                        { value: 'in_transit',  description: 'Vehicle has departed from origin warehouse' },
+                        { value: 'arrived',     description: 'Driver has arrived at the destination warehouse' },
+                        { value: 'received',    description: 'Destination warehouse has scanned in and accepted all items' },
+                        { value: 'cancelled',   description: 'Manifest was cancelled' },
+                    ],
+                    'Item line_status': [
+                        { value: 'pending',     description: 'Item is on the manifest but has not been scanned yet' },
+                        { value: 'loaded',      description: 'Driver scanned item OUT at origin — scan_out_count incremented, loaded_quantity set' },
+                        { value: 'received',    description: 'Destination warehouse scanned item IN — scan_in_count incremented, received_quantity set' },
+                        { value: 'short',       description: 'Item arrived but fewer units than expected_quantity' },
+                        { value: 'excess',      description: 'Item arrived with more units than expected_quantity' },
+                        { value: 'damaged',     description: 'Item arrived in damaged condition' },
+                    ],
+                    'Item scan counts': [
+                        { value: 'scan_out_count', description: 'How many times the driver scanned this item OUT at the origin warehouse during loading. Normally 1; increments on each scan of the same tracking code.' },
+                        { value: 'scan_in_count',  description: 'How many times the destination warehouse scanned this item IN on arrival. Normally 1; increments on each re-scan.' },
+                    ],
+                },
                 sampleBody: null,
                 exampleResponses: {
                     '200': {
@@ -2835,13 +2858,29 @@
                                     id: 4,
                                     manifest_number: 'TM-2026-AC01-KM01-0001',
                                     status: 'loading',
-                                    origin_warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01' },
-                                    destination_warehouse: { id: 2, name: 'Kumasi Hub', code: 'KM01' },
+                                    origin_warehouse: {
+                                        id: 1,
+                                        name: 'Accra Main Hub',
+                                        code: 'AC01',
+                                        address: '123 Ring Road, Accra',
+                                        latitude: '5.60391200',
+                                        longitude: '-0.18690900',
+                                        contact_phone: '+233201234567'
+                                    },
+                                    destination_warehouse: {
+                                        id: 2,
+                                        name: 'Kumasi Hub',
+                                        code: 'KM01',
+                                        address: '45 Adum Street, Kumasi',
+                                        latitude: '6.68702800',
+                                        longitude: '-1.62460600',
+                                        contact_phone: '+233209876543'
+                                    },
                                     timeline: {
-                                        assigned: { at: '2026-02-18T09:00:00Z' },
-                                        dispatched: { at: '2026-02-18T09:10:00Z' },
-                                        arrived: { at: null },
-                                        received: { at: null }
+                                        assigned:   { at: '2026-02-18T09:00:00.000000Z' },
+                                        dispatched: { at: '2026-02-18T09:10:00.000000Z' },
+                                        arrived:    { at: null },
+                                        received:   { at: null }
                                     },
                                     items: [
                                         {
@@ -2849,12 +2888,35 @@
                                             shipment_number: 'PCM-2026-00014',
                                             description: 'LED TV 50-inch',
                                             tracking_code: 'TRK5PNQ13E',
-                                            expected_quantity: 1,
-                                            loaded_quantity: 1,
+                                            expected_quantity: 2,
+                                            loaded_quantity: 2,
                                             received_quantity: 0,
-                                            line_status: 'loaded'
+                                            line_status: 'loaded',
+                                            scan_out_count: 1,
+                                            scan_in_count: 0,
+                                            loaded_at: '2026-02-18T09:12:00.000000Z',
+                                            received_at: null,
+                                            notes: null
+                                        },
+                                        {
+                                            shipment_item_id: 15,
+                                            shipment_number: 'PCM-2026-00015',
+                                            description: 'Laptop Bag',
+                                            tracking_code: 'TRKWCQ2TNJH',
+                                            expected_quantity: 5,
+                                            loaded_quantity: 0,
+                                            received_quantity: 0,
+                                            line_status: 'pending',
+                                            scan_out_count: 0,
+                                            scan_in_count: 0,
+                                            loaded_at: null,
+                                            received_at: null,
+                                            notes: null
                                         }
-                                    ]
+                                    ],
+                                    notes: null,
+                                    created_at: '2026-02-18T08:50:00.000000Z',
+                                    updated_at: '2026-02-18T09:12:00.000000Z'
                                 }
                             ],
                             pagination: {
@@ -2885,6 +2947,29 @@
                     { name: 'manifest', type: 'dropdown', required: true, description: 'Select a transport manifest', source: 'transports?limit=100', labelField: 'manifest_number', valueField: 'id' }
                 ],
                 fields: [],
+                enums: {
+                    'Manifest status': [
+                        { value: 'draft',       description: 'Manifest created but no driver assigned yet' },
+                        { value: 'assigned',    description: 'Driver assigned — waiting for loading to begin' },
+                        { value: 'loading',     description: 'Driver is actively scanning items onto the vehicle (scan_out)' },
+                        { value: 'in_transit',  description: 'Vehicle has departed from origin warehouse' },
+                        { value: 'arrived',     description: 'Driver has arrived at the destination warehouse' },
+                        { value: 'received',    description: 'Destination warehouse has scanned in and accepted all items' },
+                        { value: 'cancelled',   description: 'Manifest was cancelled' },
+                    ],
+                    'Item line_status': [
+                        { value: 'pending',     description: 'Item is on the manifest but has not been scanned yet' },
+                        { value: 'loaded',      description: 'Driver scanned item OUT at origin — scan_out_count incremented, loaded_quantity set' },
+                        { value: 'received',    description: 'Destination warehouse scanned item IN — scan_in_count incremented, received_quantity set' },
+                        { value: 'short',       description: 'Item arrived but fewer units than expected_quantity' },
+                        { value: 'excess',      description: 'Item arrived with more units than expected_quantity' },
+                        { value: 'damaged',     description: 'Item arrived in damaged condition' },
+                    ],
+                    'Item scan counts': [
+                        { value: 'scan_out_count', description: 'How many times the driver scanned this item OUT at the origin warehouse during loading.' },
+                        { value: 'scan_in_count',  description: 'How many times the destination warehouse scanned this item IN on arrival.' },
+                    ],
+                },
                 sampleBody: {},
                 exampleResponses: {
                     '200': {
@@ -2894,7 +2979,51 @@
                             transport: {
                                 id: 4,
                                 manifest_number: 'TM-2026-AC01-KM01-0001',
-                                status: 'loading'
+                                status: 'in_transit',
+                                origin_warehouse: {
+                                    id: 1,
+                                    name: 'Accra Main Hub',
+                                    code: 'AC01',
+                                    address: '123 Ring Road, Accra',
+                                    latitude: '5.60391200',
+                                    longitude: '-0.18690900',
+                                    contact_phone: '+233201234567'
+                                },
+                                destination_warehouse: {
+                                    id: 2,
+                                    name: 'Kumasi Hub',
+                                    code: 'KM01',
+                                    address: '45 Adum Street, Kumasi',
+                                    latitude: '6.68702800',
+                                    longitude: '-1.62460600',
+                                    contact_phone: '+233209876543'
+                                },
+                                timeline: {
+                                    assigned:   { at: '2026-02-18T09:00:00.000000Z' },
+                                    dispatched: { at: '2026-02-18T09:10:00.000000Z' },
+                                    arrived:    { at: null },
+                                    received:   { at: null }
+                                },
+                                items: [
+                                    {
+                                        shipment_item_id: 14,
+                                        shipment_number: 'PCM-2026-00014',
+                                        description: 'LED TV 50-inch',
+                                        tracking_code: 'TRK5PNQ13E',
+                                        expected_quantity: 2,
+                                        loaded_quantity: 2,
+                                        received_quantity: 0,
+                                        line_status: 'loaded',
+                                        scan_out_count: 1,
+                                        scan_in_count: 0,
+                                        loaded_at: '2026-02-18T09:12:00.000000Z',
+                                        received_at: null,
+                                        notes: null
+                                    }
+                                ],
+                                notes: null,
+                                created_at: '2026-02-18T08:50:00.000000Z',
+                                updated_at: '2026-02-18T09:15:00.000000Z'
                             }
                         }
                     },
@@ -2916,7 +3045,22 @@
                 fields: [],
                 sampleBody: {},
                 exampleResponses: {
-                    '200': { success: true, message: 'Loading started.' },
+                    '200': {
+                        success: true,
+                        message: 'Loading started.',
+                        data: {
+                            transport: {
+                                id: 4, manifest_number: 'TM-2026-AC01-KM01-0001', status: 'loading',
+                                origin_warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
+                                destination_warehouse: { id: 2, name: 'Kumasi Hub', code: 'KM01', address: '45 Adum Street, Kumasi', latitude: '6.68702800', longitude: '-1.62460600', contact_phone: '+233209876543' },
+                                timeline: { assigned: { at: '2026-02-18T09:00:00.000000Z' }, dispatched: { at: null }, arrived: { at: null }, received: { at: null } },
+                                items: [
+                                    { shipment_item_id: 14, shipment_number: 'PCM-2026-00014', description: 'LED TV 50-inch', tracking_code: 'TRK5PNQ13E', expected_quantity: 2, loaded_quantity: 0, received_quantity: 0, line_status: 'pending', scan_out_count: 0, scan_in_count: 0, loaded_at: null, received_at: null, notes: null }
+                                ],
+                                notes: null, created_at: '2026-02-18T08:50:00.000000Z', updated_at: '2026-02-18T09:00:00.000000Z'
+                            }
+                        }
+                    },
                     '400': { success: false, message: 'Manifest is not ready for loading.' }
                 }
             },
@@ -2924,22 +3068,35 @@
                 method: 'POST',
                 url: '/api/v1/driver/transports/{manifest}/scan-load',
                 name: 'Scan Load',
-                description: 'Scan a shipment item tracking code while loading transport manifest.',
+                description: 'Scan a shipment item tracking code to mark it as loaded onto the vehicle. Calling Start Loading first is not required — this endpoint works directly from <code>assigned</code> status and auto-transitions the manifest to <code>loading</code> on the first scan. Each scan increments <code>scan_out_count</code> and sets the item\'s <code>line_status</code> to <code>loaded</code>.',
                 auth: true,
                 group: 'driver-transports',
                 userType: 'driver',
                 useFormInputs: true,
                 urlParams: [
-                    { name: 'manifest', type: 'dropdown', required: true, description: 'Select an assigned/loading manifest', source: 'transports?status[]=assigned&status[]=loading&limit=100', labelField: 'manifest_number', valueField: 'id' }
+                    { name: 'manifest', type: 'dropdown', required: true, description: 'Select an assigned/loading manifest', source: 'transports?status[]=assigned&status[]=loading&limit=100', labelField: 'manifest_number', valueField: 'id', onSelect: 'handleScanLoadManifestSelection' }
                 ],
                 fields: [
-                    { name: 'tracking_code', type: 'string', required: true, description: 'Shipment item tracking code from manifest line', example: 'TRK5PNQ13E' }
+                    { name: 'tracking_code', type: 'dropdown', required: true, description: 'Select from items in the chosen manifest above', dependsOnUrlParam: 'manifest' }
                 ],
-                sampleBody: {
-                    tracking_code: 'TRK5PNQ13E'
-                },
+                sampleBody: {},
                 exampleResponses: {
-                    '200': { success: true, message: 'Item loaded successfully.' },
+                    '200': {
+                        success: true,
+                        message: 'Item loaded successfully.',
+                        data: {
+                            transport: {
+                                id: 4, manifest_number: 'TM-2026-AC01-KM01-0001', status: 'loading',
+                                origin_warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
+                                destination_warehouse: { id: 2, name: 'Kumasi Hub', code: 'KM01', address: '45 Adum Street, Kumasi', latitude: '6.68702800', longitude: '-1.62460600', contact_phone: '+233209876543' },
+                                timeline: { assigned: { at: '2026-02-18T09:00:00.000000Z' }, dispatched: { at: null }, arrived: { at: null }, received: { at: null } },
+                                items: [
+                                    { shipment_item_id: 14, shipment_number: 'PCM-2026-00014', description: 'LED TV 50-inch', tracking_code: 'TRK5PNQ13E', expected_quantity: 2, loaded_quantity: 2, received_quantity: 0, line_status: 'loaded', scan_out_count: 1, scan_in_count: 0, loaded_at: '2026-02-18T09:12:00.000000Z', received_at: null, notes: null }
+                                ],
+                                notes: null, created_at: '2026-02-18T08:50:00.000000Z', updated_at: '2026-02-18T09:12:00.000000Z'
+                            }
+                        }
+                    },
                     '400': { success: false, message: 'Tracking code not found in this manifest.' }
                 }
             },
@@ -2947,7 +3104,7 @@
                 method: 'POST',
                 url: '/api/v1/driver/transports/{manifest}/depart',
                 name: 'Depart',
-                description: 'Mark transport manifest as departed/in transit after loading scans.',
+                description: 'Confirm departure after all items are scanned. Transitions manifest to <code>in_transit</code>. All items must have <code>line_status: loaded</code> before this succeeds.',
                 auth: true,
                 group: 'driver-transports',
                 userType: 'driver',
@@ -2958,7 +3115,22 @@
                 fields: [],
                 sampleBody: {},
                 exampleResponses: {
-                    '200': { success: true, message: 'Manifest departed successfully.' },
+                    '200': {
+                        success: true,
+                        message: 'Manifest departed successfully.',
+                        data: {
+                            transport: {
+                                id: 4, manifest_number: 'TM-2026-AC01-KM01-0001', status: 'in_transit',
+                                origin_warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
+                                destination_warehouse: { id: 2, name: 'Kumasi Hub', code: 'KM01', address: '45 Adum Street, Kumasi', latitude: '6.68702800', longitude: '-1.62460600', contact_phone: '+233209876543' },
+                                timeline: { assigned: { at: '2026-02-18T09:00:00.000000Z' }, dispatched: { at: '2026-02-18T09:15:00.000000Z' }, arrived: { at: null }, received: { at: null } },
+                                items: [
+                                    { shipment_item_id: 14, shipment_number: 'PCM-2026-00014', description: 'LED TV 50-inch', tracking_code: 'TRK5PNQ13E', expected_quantity: 2, loaded_quantity: 2, received_quantity: 0, line_status: 'loaded', scan_out_count: 1, scan_in_count: 0, loaded_at: '2026-02-18T09:12:00.000000Z', received_at: null, notes: null }
+                                ],
+                                notes: null, created_at: '2026-02-18T08:50:00.000000Z', updated_at: '2026-02-18T09:15:00.000000Z'
+                            }
+                        }
+                    },
                     '400': { success: false, message: 'All manifest items must be scanned before departure.' }
                 }
             },
@@ -2966,7 +3138,7 @@
                 method: 'POST',
                 url: '/api/v1/driver/transports/{manifest}/arrive',
                 name: 'Arrive',
-                description: 'Mark transport manifest as arrived at destination warehouse.',
+                description: 'Record arrival at the destination warehouse. Transitions manifest to <code>arrived</code>. The destination warehouse staff will then scan items in via Incoming Manifests.',
                 auth: true,
                 group: 'driver-transports',
                 userType: 'driver',
@@ -2977,7 +3149,22 @@
                 fields: [],
                 sampleBody: {},
                 exampleResponses: {
-                    '200': { success: true, message: 'Arrival recorded successfully.' },
+                    '200': {
+                        success: true,
+                        message: 'Arrival recorded successfully.',
+                        data: {
+                            transport: {
+                                id: 4, manifest_number: 'TM-2026-AC01-KM01-0001', status: 'arrived',
+                                origin_warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
+                                destination_warehouse: { id: 2, name: 'Kumasi Hub', code: 'KM01', address: '45 Adum Street, Kumasi', latitude: '6.68702800', longitude: '-1.62460600', contact_phone: '+233209876543' },
+                                timeline: { assigned: { at: '2026-02-18T09:00:00.000000Z' }, dispatched: { at: '2026-02-18T09:15:00.000000Z' }, arrived: { at: '2026-02-18T13:40:00.000000Z' }, received: { at: null } },
+                                items: [
+                                    { shipment_item_id: 14, shipment_number: 'PCM-2026-00014', description: 'LED TV 50-inch', tracking_code: 'TRK5PNQ13E', expected_quantity: 2, loaded_quantity: 2, received_quantity: 0, line_status: 'loaded', scan_out_count: 1, scan_in_count: 0, loaded_at: '2026-02-18T09:12:00.000000Z', received_at: null, notes: null }
+                                ],
+                                notes: null, created_at: '2026-02-18T08:50:00.000000Z', updated_at: '2026-02-18T13:40:00.000000Z'
+                            }
+                        }
+                    },
                     '400': { success: false, message: 'Manifest is not in transit.' }
                 }
             },
@@ -3009,6 +3196,7 @@
                                     id: 3,
                                     run_number: 'DR-2026-AC01-0001',
                                     status: 'out_for_delivery',
+                                    warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
                                     timeline: {
                                         assigned: { at: '2026-02-18T10:00:00Z' },
                                         out_for_delivery: { at: '2026-02-18T10:30:00Z' },
@@ -3027,7 +3215,10 @@
                                                 max_attempts: 5
                                             }
                                         }
-                                    ]
+                                    ],
+                                    notes: null,
+                                    created_at: '2026-02-18T09:50:00.000000Z',
+                                    updated_at: '2026-02-18T10:30:00.000000Z'
                                 }
                             ],
                             pagination: {
@@ -3060,7 +3251,42 @@
                 fields: [],
                 sampleBody: {},
                 exampleResponses: {
-                    '200': { success: true, message: 'Delivery run retrieved successfully.' },
+                    '200': {
+                        success: true,
+                        message: 'Delivery run retrieved successfully.',
+                        data: {
+                            delivery: {
+                                id: 3,
+                                run_number: 'DR-2026-AC01-0001',
+                                status: 'out_for_delivery',
+                                warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
+                                timeline: {
+                                    assigned: { at: '2026-02-18T10:00:00.000000Z' },
+                                    out_for_delivery: { at: '2026-02-18T10:30:00.000000Z' },
+                                    completed: { at: null }
+                                },
+                                stops: [
+                                    {
+                                        id: 9,
+                                        recipient_name: 'Ama Mensah',
+                                        recipient_phone: '+233241234567',
+                                        status: 'pending',
+                                        location: { region: 'Greater Accra', district: 'Accra Metropolitan', town: 'Osu', latitude: '5.5558', longitude: '-0.1845', gh_post_address: 'GA-144-2020', landmark: 'Near Oxford Street' },
+                                        verification: { code_sent_at: '2026-02-18T10:30:00.000000Z', code_expires_at: '2026-02-19T10:30:00.000000Z', attempts: 0, max_attempts: 5 },
+                                        timeline: { arrived: { at: null }, delivered: { at: null } },
+                                        failure_reason: null,
+                                        failure_notes: null,
+                                        items: [
+                                            { shipment_item_id: 14, shipment_number: 'PCM-2026-00014', description: 'LED TV 50-inch', tracking_code: 'TRK5PNQ13E', expected_quantity: 1, delivered_quantity: 0, status: 'pending', notes: null, delivered_at: null }
+                                        ]
+                                    }
+                                ],
+                                notes: null,
+                                created_at: '2026-02-18T09:50:00.000000Z',
+                                updated_at: '2026-02-18T10:30:00.000000Z'
+                            }
+                        }
+                    },
                     '404': { success: false, message: 'Delivery run not found.' }
                 }
             },
@@ -3080,7 +3306,31 @@
                 fields: [],
                 sampleBody: {},
                 exampleResponses: {
-                    '200': { success: true, message: 'Arrival at recipient stop recorded.' },
+                    '200': {
+                        success: true,
+                        message: 'Arrival at recipient stop recorded.',
+                        data: {
+                            delivery: {
+                                id: 3, run_number: 'DR-2026-AC01-0001', status: 'out_for_delivery',
+                                warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
+                                timeline: { assigned: { at: '2026-02-18T10:00:00.000000Z' }, out_for_delivery: { at: '2026-02-18T10:30:00.000000Z' }, completed: { at: null } },
+                                stops: [
+                                    {
+                                        id: 9,
+                                        recipient_name: 'Ama Mensah', recipient_phone: '+233241234567', status: 'arrived',
+                                        location: { region: 'Greater Accra', district: 'Accra Metropolitan', town: 'Osu', latitude: '5.5558', longitude: '-0.1845', gh_post_address: 'GA-144-2020', landmark: 'Near Oxford Street' },
+                                        verification: { code_sent_at: '2026-02-18T10:30:00.000000Z', code_expires_at: '2026-02-19T10:30:00.000000Z', attempts: 0, max_attempts: 5 },
+                                        timeline: { arrived: { at: '2026-02-18T11:05:00.000000Z' }, delivered: { at: null } },
+                                        failure_reason: null, failure_notes: null,
+                                        items: [
+                                            { shipment_item_id: 14, shipment_number: 'PCM-2026-00014', description: 'LED TV 50-inch', tracking_code: 'TRK5PNQ13E', expected_quantity: 1, delivered_quantity: 0, status: 'pending', notes: null, delivered_at: null }
+                                        ]
+                                    }
+                                ],
+                                notes: null, created_at: '2026-02-18T09:50:00.000000Z', updated_at: '2026-02-18T11:05:00.000000Z'
+                            }
+                        }
+                    },
                     '400': { success: false, message: 'Delivery run is not active.' }
                 }
             },
@@ -3088,7 +3338,59 @@
                 method: 'POST',
                 url: '/api/v1/driver/deliveries/{run}/stops/{stop}/confirm',
                 name: 'Confirm Stop Delivery',
-                description: 'Confirm recipient delivery with verification code, GPS, proof photo, and per-item delivered quantities.',
+                description: 'Confirm that items have been delivered to a recipient at this stop.',
+                notes: `
+<strong>How a delivery run is structured</strong><br>
+A delivery run is a driver's route for the day. The run has multiple <strong>stops</strong> (one per recipient). Each stop can have one or more <strong>items</strong> (packages for that recipient). Call <code>GET /deliveries/{run}</code> first to get the full run with all stops and their items.
+<br><br>
+<strong>The <code>items[]</code> array</strong><br>
+When confirming a stop, you must report the outcome for every item at that stop. Get the item list from <code>stop.items[]</code> in the delivery response. For each item, send:
+<ul style="margin:6px 0 6px 16px;padding:0;">
+  <li><code>shipment_item_id</code> — the item ID from <code>stop.items[].shipment_item_id</code></li>
+  <li><code>delivered_quantity</code> — how many were actually handed to the recipient</li>
+  <li><code>notes</code> — optional note for this item</li>
+</ul>
+Only send items belonging to the current stop, not all items in the run. In this API tester the item rows are injected automatically when you select a stop — quantities are pre-filled with the expected values.
+<br><br>
+<strong>What <code>delivered_quantity</code> means</strong>
+<table class="docs-table" style="margin-top:6px;">
+  <thead><tr><th>Value</th><th>Outcome</th></tr></thead>
+  <tbody>
+    <tr><td class="docs-field-name">= <code>expected_quantity</code></td><td>Item marked <strong>delivered</strong> ✓</td></tr>
+    <tr><td class="docs-field-name">&lt; <code>expected_quantity</code></td><td>Item marked <strong>partial</strong> — some units missing</td></tr>
+    <tr><td class="docs-field-name"><code>0</code></td><td>Item marked <strong>failed</strong> — could not deliver</td></tr>
+  </tbody>
+</table>
+For packaged/bagged items where the driver cannot open and count, send <code>expected_quantity</code> as-is.
+<br><br>
+<strong>What happens after confirmation</strong>
+<ul style="margin:6px 0 6px 16px;padding:0;">
+  <li>All items fully delivered → stop becomes <code>delivered</code>; if this was the last stop, the run becomes <code>completed</code> and the driver is freed</li>
+  <li>Any item partial or failed → stop becomes <code>failed</code>; those items return to the destination warehouse queue for re-delivery</li>
+  <li>Run becomes <code>partially_delivered</code> while some stops are done and others remain</li>
+</ul>
+<br>
+<strong>Request body structure (JSON equivalent)</strong><br>
+<small style="color:#64748b;">The actual request uses <code>multipart/form-data</code> (to support the proof photo file upload), but the structure maps directly to this JSON shape:</small>
+<pre class="docs-code-block">{
+  "verification_code": "483219",
+  "latitude": "5.6037",
+  "longitude": "-0.1870",
+  "proof_photo": "&lt;file&gt;",
+  "items": [
+    {
+      "shipment_item_id": 14,
+      "delivered_quantity": 1,
+      "notes": "Handed to recipient directly"
+    },
+    {
+      "shipment_item_id": 15,
+      "delivered_quantity": 0,
+      "notes": "Item was damaged, could not deliver"
+    }
+  ]
+}</pre>
+Each object in <code>items[]</code> corresponds to one package at this stop. The <code>shipment_item_id</code> values come from <code>stop.items[].shipment_item_id</code> in the View Delivery Run response.`,
                 auth: true,
                 group: 'driver-deliveries',
                 userType: 'driver',
@@ -3103,20 +3405,39 @@
                     { name: 'latitude', type: 'string', required: true, description: 'Delivery GPS latitude', example: '5.6037' },
                     { name: 'longitude', type: 'string', required: true, description: 'Delivery GPS longitude', example: '-0.1870' },
                     { name: 'proof_photo', type: 'file', required: true, description: 'Delivery proof image', accept: 'image/jpeg,image/png,image/webp' },
-                    { name: 'items[0][shipment_item_id]', type: 'string', required: true, description: 'Shipment item ID at this stop', example: '14' },
-                    { name: 'items[0][delivered_quantity]', type: 'string', required: true, description: 'Delivered quantity for this line', example: '1' },
-                    { name: 'items[0][notes]', type: 'string', required: false, description: 'Optional line notes', example: 'Handed over to recipient' }
+                    { name: 'delivery_items', noticeOnly: true, type: 'string', required: false, description: 'Rows for each item at this stop are added automatically when you select a stop above. Quantities are pre-filled with expected values — only adjust if the actual delivered amount differs.' }
                 ],
                 sampleBody: {
                     verification_code: '483219',
                     latitude: '5.6037',
                     longitude: '-0.1870',
-                    'items[0][shipment_item_id]': '14',
-                    'items[0][delivered_quantity]': '1',
-                    'items[0][notes]': 'Delivered successfully'
                 },
                 exampleResponses: {
-                    '200': { success: true, message: 'Delivery stop confirmed successfully.' },
+                    '200': {
+                        success: true,
+                        message: 'Delivery stop confirmed successfully.',
+                        data: {
+                            delivery: {
+                                id: 3, run_number: 'DR-2026-AC01-0001', status: 'completed',
+                                warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
+                                timeline: { assigned: { at: '2026-02-18T10:00:00.000000Z' }, out_for_delivery: { at: '2026-02-18T10:30:00.000000Z' }, completed: { at: '2026-02-18T11:20:00.000000Z' } },
+                                stops: [
+                                    {
+                                        id: 9,
+                                        recipient_name: 'Ama Mensah', recipient_phone: '+233241234567', status: 'delivered',
+                                        location: { region: 'Greater Accra', district: 'Accra Metropolitan', town: 'Osu', latitude: '5.5558', longitude: '-0.1845', gh_post_address: 'GA-144-2020', landmark: 'Near Oxford Street' },
+                                        verification: { code_sent_at: '2026-02-18T10:30:00.000000Z', code_expires_at: '2026-02-19T10:30:00.000000Z', attempts: 1, max_attempts: 5 },
+                                        timeline: { arrived: { at: '2026-02-18T11:05:00.000000Z' }, delivered: { at: '2026-02-18T11:20:00.000000Z' } },
+                                        failure_reason: null, failure_notes: null,
+                                        items: [
+                                            { shipment_item_id: 14, shipment_number: 'PCM-2026-00014', description: 'LED TV 50-inch', tracking_code: 'TRK5PNQ13E', expected_quantity: 1, delivered_quantity: 1, status: 'delivered', notes: 'Handed to recipient', delivered_at: '2026-02-18T11:20:00.000000Z' }
+                                        ]
+                                    }
+                                ],
+                                notes: null, created_at: '2026-02-18T09:50:00.000000Z', updated_at: '2026-02-18T11:20:00.000000Z'
+                            }
+                        }
+                    },
                     '400_invalid_code': { success: false, message: 'Invalid verification code. 4 attempt(s) remaining.' },
                     '400_locked': { success: false, message: 'Verification code attempts exceeded. Ask warehouse manager to regenerate.', locked: true },
                     '422': { success: false, message: 'The proof photo field is required.' }
@@ -3144,7 +3465,31 @@
                     notes: 'Phone switched off after 3 attempts'
                 },
                 exampleResponses: {
-                    '200': { success: true, message: 'Delivery stop marked as failed.' },
+                    '200': {
+                        success: true,
+                        message: 'Delivery stop marked as failed.',
+                        data: {
+                            delivery: {
+                                id: 3, run_number: 'DR-2026-AC01-0001', status: 'partially_delivered',
+                                warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
+                                timeline: { assigned: { at: '2026-02-18T10:00:00.000000Z' }, out_for_delivery: { at: '2026-02-18T10:30:00.000000Z' }, completed: { at: null } },
+                                stops: [
+                                    {
+                                        id: 9,
+                                        recipient_name: 'Ama Mensah', recipient_phone: '+233241234567', status: 'failed',
+                                        location: { region: 'Greater Accra', district: 'Accra Metropolitan', town: 'Osu', latitude: '5.5558', longitude: '-0.1845', gh_post_address: 'GA-144-2020', landmark: 'Near Oxford Street' },
+                                        verification: { code_sent_at: '2026-02-18T10:30:00.000000Z', code_expires_at: '2026-02-19T10:30:00.000000Z', attempts: 0, max_attempts: 5 },
+                                        timeline: { arrived: { at: '2026-02-18T11:05:00.000000Z' }, delivered: { at: null } },
+                                        failure_reason: 'recipient_unreachable', failure_notes: 'Phone switched off after 3 attempts',
+                                        items: [
+                                            { shipment_item_id: 14, shipment_number: 'PCM-2026-00014', description: 'LED TV 50-inch', tracking_code: 'TRK5PNQ13E', expected_quantity: 1, delivered_quantity: 0, status: 'failed', notes: 'Phone switched off after 3 attempts', delivered_at: '2026-02-18T11:15:00.000000Z' }
+                                        ]
+                                    }
+                                ],
+                                notes: null, created_at: '2026-02-18T09:50:00.000000Z', updated_at: '2026-02-18T11:15:00.000000Z'
+                            }
+                        }
+                    },
                     '400': { success: false, message: 'Delivery run is not active.' }
                 }
             }
@@ -3324,7 +3669,7 @@
             document.getElementById('methodDisplay').textContent = selectedEndpoint.method;
             document.getElementById('methodDisplay').className = 'method-display method-' + selectedEndpoint.method;
             document.getElementById('urlInput').value = '{{ url('') }}' + selectedEndpoint.url;
-            document.getElementById('endpointDesc').textContent = selectedEndpoint.description;
+            document.getElementById('endpointDesc').innerHTML = selectedEndpoint.description;
             document.getElementById('sendBtn').disabled = false;
 
             // Handle params tab visibility and rendering
@@ -3419,6 +3764,16 @@
 
             let html = '';
 
+            // Overview / Notes
+            if (selectedEndpoint.notes) {
+                html += `
+                    <div class="docs-section">
+                        <div class="docs-section-title">📖 Overview</div>
+                        <div class="docs-notes">${selectedEndpoint.notes}</div>
+                    </div>
+                `;
+            }
+
             // Device Headers Info
             html += `
                 <div class="docs-section device-headers-info">
@@ -3479,6 +3834,24 @@
                         <div class="docs-hint">No request body required for this endpoint.</div>
                     </div>
                 `;
+            }
+
+            // Enum Reference
+            if (selectedEndpoint.enums && Object.keys(selectedEndpoint.enums).length > 0) {
+                html += `<div class="docs-section"><div class="docs-section-title">📖 Field Reference</div>`;
+                Object.entries(selectedEndpoint.enums).forEach(([groupName, values]) => {
+                    html += `
+                        <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin:10px 0 4px;">${groupName}</p>
+                        <table class="docs-table" style="margin-bottom:8px;">
+                            <thead><tr><th>Value</th><th>Meaning</th></tr></thead>
+                            <tbody>
+                    `;
+                    values.forEach(row => {
+                        html += `<tr><td class="docs-field-name"><code>${row.value}</code></td><td style="font-size:12px;color:#475569;">${row.description}</td></tr>`;
+                    });
+                    html += `</tbody></table>`;
+                });
+                html += `</div>`;
             }
 
             // Auth Info
@@ -4578,6 +4951,29 @@
             }
         }
 
+        // Populate tracking_code dropdown when a manifest is selected on Scan Load
+        window.handleScanLoadManifestSelection = function(manifest) {
+            const select = document.getElementById('form-field-tracking_code');
+            if (!select) return;
+
+            const items = manifest.items || [];
+            if (items.length === 0) {
+                select.innerHTML = '<option value="">-- No items in manifest --</option>';
+                select.disabled = true;
+                return;
+            }
+
+            let html = '<option value="">-- Select tracking code --</option>';
+            items.forEach(item => {
+                const code = item.tracking_code || '';
+                const desc = item.description ? ` — ${item.description}` : '';
+                const badge = item.line_status && item.line_status !== 'pending' ? ` [${item.line_status}]` : '';
+                html += `<option value="${code}">${code}${desc}${badge}</option>`;
+            });
+            select.innerHTML = html;
+            select.disabled = false;
+        };
+
         // Render form inputs for endpoints with useFormInputs: true
         async function renderFormInputs(fields, sampleBody) {
             const container = document.getElementById('formInputsContainer');
@@ -4588,7 +4984,7 @@
             fields.forEach(field => {
                 const value = sampleBody ? (sampleBody[field.name] || '') : '';
                 const disabledAttr = (field.readOnly || field.readonly || field.disabled) ? 'disabled' : '';
-                const optionLabel = field.labels && value ? (field.labels[value] || value) : (value || 'Not detected yet');
+                const optionLabel = field.labels && value ? (field.labels[value] || value) : (value || (field.noticeOnly ? '' : 'Not detected yet'));
 
                 if (field.noticeOnly) {
                     const noticeTitle = field.name.replace(/_/g, ' ');
@@ -4655,7 +5051,7 @@
                         <select id="form-field-${field.name}" class="form-input" style="flex: 1;" ${disabledAttr}>
                             <option value="">-- Select --</option>
                         </select>`;
-                    if (!field.dependsOn) {
+                    if (!field.dependsOn && !field.dependsOnUrlParam) {
                         // Add refresh button for dropdowns that don't depend on others
                         html += `<button type="button" onclick="refreshFormDropdown('${field.name}', '${field.source}')" style="padding: 6px 10px; font-size: 13px; cursor: pointer; border: 1px solid var(--border-color); border-radius: 3px; background: #f5f5f5; color: #333;">↻</button>`;
                     }
@@ -4738,14 +5134,15 @@
             }
 
             const input = document.getElementById('form-field-' + fieldName);
-            if (!input) {
-                noticeValue.textContent = 'Not detected yet';
-                return;
-            }
-
             const fieldConfig = Array.isArray(fields)
                 ? fields.find(field => field.name === fieldName)
                 : null;
+
+            if (!input) {
+                const isStaticNotice = fieldConfig && fieldConfig.noticeOnly && !fieldConfig.autoDetect;
+                noticeValue.textContent = isStaticNotice ? '' : 'Not detected yet';
+                return;
+            }
 
             let displayValue = '';
             if (fieldConfig && fieldConfig.type === 'enum' && fieldConfig.labels && input.value) {
@@ -4757,7 +5154,8 @@
                 displayValue = input.value || '';
             }
 
-            noticeValue.textContent = displayValue || 'Not detected yet';
+            const isStaticNotice = fieldConfig && fieldConfig.noticeOnly && !fieldConfig.autoDetect;
+            noticeValue.textContent = displayValue || (isStaticNotice ? '' : 'Not detected yet');
         }
 
         function isFormFieldVisible(fieldName, visited = new Set()) {
@@ -4899,11 +5297,12 @@
         // Initialize dependent dropdowns as disabled
         function initializeDependentDropdowns(fields) {
             fields.forEach(field => {
-                if (field.type === 'dropdown' && field.dependsOn) {
+                if (field.type === 'dropdown' && (field.dependsOn || field.dependsOnUrlParam)) {
                     const select = document.getElementById('form-field-' + field.name);
                     if (select) {
                         select.disabled = true;
-                        select.innerHTML = '<option value="">-- Select region first --</option>';
+                        const dep = field.dependsOn || field.dependsOnUrlParam;
+                        select.innerHTML = `<option value="">-- Select ${dep} first --</option>`;
                     }
                 }
             });
@@ -5105,19 +5504,49 @@
         function handleDeliveryStopSelection(stop) {
             if (!stop || !stop.id) return;
 
-            const itemIdInput = document.getElementById('form-field-items[0][shipment_item_id]');
-            const itemQtyInput = document.getElementById('form-field-items[0][delivered_quantity]');
-            if (!itemIdInput) return;
+            const container = document.getElementById('formInputsContainer');
+            if (!container) return;
+            const tbody = container.querySelector('table tbody');
+            if (!tbody) return;
+
+            // Remove previously injected item rows
+            tbody.querySelectorAll('[data-dynamic-item-row]').forEach(row => row.remove());
 
             const items = Array.isArray(stop.items) ? stop.items : [];
-            const firstItem = items.length > 0 ? items[0] : null;
+            if (items.length === 0) return;
 
-            if (firstItem && firstItem.shipment_item_id) {
-                itemIdInput.value = String(firstItem.shipment_item_id);
-                if (itemQtyInput && firstItem.expected_quantity) {
-                    itemQtyInput.value = String(firstItem.expected_quantity);
-                }
-            }
+            items.forEach((item, index) => {
+                const idField    = `items[${index}][shipment_item_id]`;
+                const qtyField   = `items[${index}][delivered_quantity]`;
+                const notesField = `items[${index}][notes]`;
+                const desc = item.description || ('Item #' + item.shipment_item_id);
+
+                const idRow = document.createElement('tr');
+                idRow.setAttribute('data-dynamic-item-row', '1');
+                idRow.innerHTML = `
+                    <td><span style="font-family:'SF Mono',Monaco,monospace;color:#0066b8;">${idField}</span>
+                        <span style="color:#c62828;font-size:10px;margin-left:4px;">*</span>
+                        <br><small style="color:#888;">${desc}</small></td>
+                    <td><input type="text" id="form-field-${idField}" class="form-input" value="${item.shipment_item_id}" style="background:#f5f5f5;" readonly></td>`;
+                tbody.appendChild(idRow);
+
+                const qtyRow = document.createElement('tr');
+                qtyRow.setAttribute('data-dynamic-item-row', '1');
+                qtyRow.innerHTML = `
+                    <td><span style="font-family:'SF Mono',Monaco,monospace;color:#0066b8;">${qtyField}</span>
+                        <span style="color:#c62828;font-size:10px;margin-left:4px;">*</span>
+                        <br><small style="color:#888;">Delivered qty (expected: ${item.expected_quantity})</small></td>
+                    <td><input type="text" id="form-field-${qtyField}" class="form-input" value="${item.expected_quantity}" placeholder="${item.expected_quantity}"></td>`;
+                tbody.appendChild(qtyRow);
+
+                const notesRow = document.createElement('tr');
+                notesRow.setAttribute('data-dynamic-item-row', '1');
+                notesRow.innerHTML = `
+                    <td><span style="font-family:'SF Mono',Monaco,monospace;color:#0066b8;">${notesField}</span>
+                        <br><small style="color:#888;">Optional notes for this item</small></td>
+                    <td><input type="text" id="form-field-${notesField}" class="form-input" value="" placeholder="e.g. Handed to recipient"></td>`;
+                tbody.appendChild(notesRow);
+            });
         }
 
         // Collect form input values
@@ -5157,6 +5586,15 @@
                 } else if (input && String(input.value ?? '').trim()) {
                     // Handle regular inputs
                     body[field.name] = input.value.trim();
+                }
+            });
+
+            // Collect dynamically injected item rows (e.g. Confirm Stop Delivery)
+            document.querySelectorAll('[data-dynamic-item-row] input').forEach(input => {
+                const fieldName = input.id.replace('form-field-', '');
+                const value = String(input.value ?? '').trim();
+                if (fieldName && value && !(fieldName in body)) {
+                    body[fieldName] = value;
                 }
             });
 

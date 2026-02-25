@@ -5,6 +5,7 @@ namespace App\Services\Warehouse;
 use App\Models\DeliveryRunStop;
 use App\Models\DeliveryVerificationAttempt;
 use App\Models\Driver;
+use App\Models\OtpCode;
 use App\Services\SmsService;
 use Illuminate\Support\Facades\Hash;
 
@@ -34,6 +35,15 @@ class DeliveryVerificationService
         );
 
         $sent = $this->smsService->send((string) $stop->recipient_phone, $message);
+
+        OtpCode::create([
+            'phone' => (string) $stop->recipient_phone,
+            'code' => $plainCode,
+            'purpose' => 'delivery_verification',
+            'expires_at' => $sentAt->copy()->addDay(),
+            'verified_at' => null,
+            'created_at' => $sentAt,
+        ]);
 
         return [
             'success' => true,
@@ -107,6 +117,14 @@ class DeliveryVerificationService
                 'locked' => $remainingAttempts === 0,
             ];
         }
+
+        OtpCode::where('phone', (string) $stop->recipient_phone)
+            ->where('purpose', 'delivery_verification')
+            ->where('code', $code)
+            ->whereNull('verified_at')
+            ->latest('created_at')
+            ->first()
+            ?->markVerified();
 
         return [
             'success' => true,

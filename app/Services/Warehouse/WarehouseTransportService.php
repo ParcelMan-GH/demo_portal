@@ -254,7 +254,6 @@ class WarehouseTransportService
         return [
             'success' => true,
             'message' => 'Loading started.',
-            'data' => ['manifest' => $manifest->fresh(['items.shipmentItem', 'originWarehouse', 'destinationWarehouse'])],
         ];
     }
 
@@ -297,10 +296,6 @@ class WarehouseTransportService
             return [
                 'success' => true,
                 'message' => 'Item loaded successfully.',
-                'data' => [
-                    'line' => $line->fresh('shipmentItem'),
-                    'manifest' => $manifest->fresh(['items.shipmentItem']),
-                ],
             ];
         });
     }
@@ -328,7 +323,6 @@ class WarehouseTransportService
         return [
             'success' => true,
             'message' => 'Manifest departed successfully.',
-            'data' => ['manifest' => $manifest->fresh(['items.shipmentItem'])],
         ];
     }
 
@@ -350,7 +344,6 @@ class WarehouseTransportService
         return [
             'success' => true,
             'message' => 'Arrival recorded successfully.',
-            'data' => ['manifest' => $manifest->fresh(['items.shipmentItem', 'destinationWarehouse'])],
         ];
     }
 

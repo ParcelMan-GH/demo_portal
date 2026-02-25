@@ -368,7 +368,6 @@ class WarehouseDeliveryService
         return [
             'success' => true,
             'message' => 'Arrival at recipient stop recorded.',
-            'data' => ['stop' => $stop->fresh()],
         ];
     }
 
@@ -508,6 +507,7 @@ class WarehouseDeliveryService
 
             $stop->update([
                 'status' => $allDelivered ? DeliveryRunStop::STATUS_DELIVERED : DeliveryRunStop::STATUS_FAILED,
+                'arrived_at' => $stop->arrived_at ?? $now,
                 'delivered_at' => $now,
                 'delivery_latitude' => $latitude,
                 'delivery_longitude' => $longitude,
@@ -533,10 +533,6 @@ class WarehouseDeliveryService
                 'message' => $allDelivered
                     ? 'Delivery stop confirmed successfully.'
                     : 'Delivery recorded with partial/failed line items.',
-                'data' => [
-                    'run' => $run->fresh(['stops', 'items.shipmentItem.shipment']),
-                    'stop' => $stop->fresh('items'),
-                ],
             ];
         });
     }
@@ -627,10 +623,6 @@ class WarehouseDeliveryService
             return [
                 'success' => true,
                 'message' => 'Delivery stop marked as failed.',
-                'data' => [
-                    'run' => $run->fresh(['stops', 'items.shipmentItem.shipment']),
-                    'stop' => $stop->fresh(),
-                ],
             ];
         });
     }
