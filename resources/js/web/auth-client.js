@@ -46,6 +46,33 @@ export function isUnauthorized(response, payload) {
     return response.status === 401 || payload?.message === 'Unauthenticated.';
 }
 
+function getDeviceHeaders() {
+    const ua = navigator.userAgent || '';
+    let deviceName = 'Web Browser';
+    if (/Edg\//.test(ua)) deviceName = 'Edge';
+    else if (/Chrome\//.test(ua)) deviceName = 'Chrome';
+    else if (/Firefox\//.test(ua)) deviceName = 'Firefox';
+    else if (/Safari\//.test(ua)) deviceName = 'Safari';
+
+    let osVersion = 'Unknown';
+    const win = ua.match(/Windows NT ([\d.]+)/);
+    const mac = ua.match(/Mac OS X ([\d_]+)/);
+    const android = ua.match(/Android ([\d.]+)/);
+    const ios = ua.match(/iPhone OS ([\d_]+)/);
+    if (win) osVersion = `Windows ${win[1]}`;
+    else if (mac) osVersion = `macOS ${mac[1].replace(/_/g, '.')}`;
+    else if (android) osVersion = `Android ${android[1]}`;
+    else if (ios) osVersion = `iOS ${ios[1].replace(/_/g, '.')}`;
+    else if (/Linux/.test(ua)) osVersion = 'Linux';
+
+    return {
+        'X-Device-Type': 'web',
+        'X-Device-Name': deviceName,
+        'X-OS-Version': osVersion,
+        'X-App-Version': '1.0.0',
+    };
+}
+
 export async function apiRequest(url, options = {}) {
     const method = options.method || 'GET';
     const role = options.role || null;
@@ -53,6 +80,7 @@ export async function apiRequest(url, options = {}) {
     const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
     const headers = {
         Accept: 'application/json',
+        ...getDeviceHeaders(),
         ...(options.headers || {}),
     };
 

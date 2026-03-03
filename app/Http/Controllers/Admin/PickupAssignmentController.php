@@ -8,6 +8,7 @@ use App\Models\PickupAssignment;
 use App\Models\Shipment;
 use App\Models\Warehouse;
 use App\Services\PickupAssignmentService;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -79,6 +80,28 @@ class PickupAssignmentController extends Controller
             $admin,
             $validated['notes'] ?? null,
             (int) $validated['target_warehouse_id']
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    /**
+     * Update the driver and/or target warehouse on an existing ASSIGNED pickup.
+     */
+    public function update(Request $request, PickupAssignment $pickupAssignment)
+    {
+        $this->authorizePermission('shipments.assign_driver');
+
+        $validated = $request->validate([
+            'driver_id'           => ['nullable', 'exists:drivers,id'],
+            'target_warehouse_id' => ['nullable', 'exists:warehouses,id'],
+        ]);
+
+        $result = $this->pickupAssignmentService->updateAssignment(
+            assignment:       $pickupAssignment,
+            newDriverId:      isset($validated['driver_id']) ? (int) $validated['driver_id'] : null,
+            newWarehouseId:   isset($validated['target_warehouse_id']) ? (int) $validated['target_warehouse_id'] : null,
+            pushService:      app(PushNotificationService::class)
         );
 
         return response()->json($result, $result['success'] ? 200 : 422);

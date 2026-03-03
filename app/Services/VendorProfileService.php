@@ -66,6 +66,7 @@ class VendorProfileService
             'business_name' => $vendor->business_name,
             'phone' => $vendor->phone,
             'email' => $vendor->email,
+            'created_at' => $vendor->created_at?->toISOString(),
         ];
     }
 }

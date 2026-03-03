@@ -40,10 +40,12 @@ Route::prefix('v1/auth/vendor')->group(function () {
 Route::prefix('v1/vendor')->middleware('auth:sanctum')->group(function () {
     Route::get('profile', [VendorProfileController::class, 'show']);
     Route::put('profile', [VendorProfileController::class, 'update']);
+    Route::post('fcm-token', [VendorProfileController::class, 'updateFcmToken']);
 
     // Location endpoints
     Route::get('regions', [VendorLocationController::class, 'regions']);
     Route::get('regions/{region}/districts', [VendorLocationController::class, 'districts']);
+    Route::get('locations/search', [VendorLocationController::class, 'searchLocations']);
 
     // Shipment endpoints
     Route::get('shipments', [VendorShipmentController::class, 'index']);
@@ -79,6 +81,7 @@ Route::prefix('v1/driver')->group(function () {
         Route::get('profile', [DriverProfileController::class, 'show']);
         Route::put('profile', [DriverProfileController::class, 'update']);
         Route::put('change-password', [DriverProfileController::class, 'changePassword']);
+        Route::post('fcm-token', [DriverProfileController::class, 'updateFcmToken']);
 
         // Pickup endpoints
         Route::get('pickups', [DriverAssignmentController::class, 'index']);

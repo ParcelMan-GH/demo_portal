@@ -9,20 +9,13 @@
     <div class="inv-hero">
         <div class="inv-hero-content">
             <div class="inv-hero-text">
-                <div class="inv-hero-title-icon">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                    <div class="inv-hero-text-group">
-                        <p>Driver Portal</p>
-                        <h1>My Pickups</h1>
-                    </div>
+                <span class="inv-hero-title-icon">
+                    <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                </span>
+                <div class="inv-hero-text-group">
+                    <h1>My Pickups</h1>
+                    <p>Manage and track your pickup assignments</p>
                 </div>
-            </div>
-            <div class="inv-search-bar" style="background:transparent;border:none;box-shadow:none;padding:0;margin:0;">
-                <input x-model="filters.search" type="text" placeholder="Search shipment, vendor, contact..."
-                       @keyup.enter="applyFilters()"
-                       class="inv-search-input" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);color:#fff;">
-                <button type="button" @click="applyFilters()" class="inv-search-btn">Search</button>
-                <button type="button" @click="resetFilters()" class="inv-search-btn" style="background:rgba(255,255,255,0.12);">Reset</button>
             </div>
         </div>
 
@@ -128,7 +121,8 @@
                                 Start En Route
                             </button>
                             <a :href="`/driver/pickups/${pickup.id}`" class="inv-btn-view">
-                                View
+                                View Details
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                             </a>
                         </div>
                     </div>
@@ -146,7 +140,7 @@
         </div>
 
         {{-- Pagination --}}
-        <div class="inv-pagination" x-show="pickups.length > 0">
+        <div class="inv-pagination" x-show="pickups.length > 0 && pagination.last_page > 1">
             <div class="inv-page-info">
                 Page <strong x-text="pagination.current_page"></strong> of <strong x-text="pagination.last_page"></strong>
                 &mdash; <strong x-text="pagination.total"></strong> total

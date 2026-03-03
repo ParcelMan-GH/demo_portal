@@ -66,6 +66,7 @@ enum ShipmentStatus: string
 
     /**
      * Check if shipment can be cancelled.
+     * Phase 3: Allow cancel through PICKUP_ASSIGNED (before driver picks up).
      */
     public function canBeCancelled(): bool
     {
@@ -73,6 +74,7 @@ enum ShipmentStatus: string
             self::DRAFT,
             self::SUBMITTED,
             self::INVOICE_SENT,
+            self::PICKUP_ASSIGNED,
         ]);
     }
 

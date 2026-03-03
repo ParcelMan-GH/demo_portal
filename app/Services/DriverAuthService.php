@@ -47,6 +47,12 @@ class DriverAuthService
         // Update last login
         $driver->last_login_at = now();
         $driver->status = 'available';
+
+        // Save FCM token if provided at login time
+        if (!empty($request->input('fcm_token'))) {
+            $driver->fcm_token = $request->input('fcm_token');
+        }
+
         $driver->save();
 
         // Create token

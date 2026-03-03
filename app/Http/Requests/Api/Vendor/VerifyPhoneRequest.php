@@ -22,7 +22,8 @@ class VerifyPhoneRequest extends FormRequest
                     $fail('Please enter a valid Ghana phone number.');
                 }
             }],
-            'otp' => ['required', 'string', 'size:6', 'regex:/^\d{6}$/'],
+            'otp'       => ['required', 'string', 'size:6', 'regex:/^\d{6}$/'],
+            'fcm_token' => ['nullable', 'string', 'max:512'],
         ];
     }
 

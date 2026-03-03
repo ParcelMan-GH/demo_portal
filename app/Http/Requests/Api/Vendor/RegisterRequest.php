@@ -24,7 +24,8 @@ class RegisterRequest extends FormRequest
                     $fail('Please enter a valid Ghana phone number.');
                 }
             }],
-            'email' => ['nullable', 'email', 'max:255'],
+            'email'     => ['nullable', 'email', 'max:255'],
+            'fcm_token' => ['nullable', 'string', 'max:512'],
         ];
     }
 

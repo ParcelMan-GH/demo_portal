@@ -31,6 +31,7 @@ class User extends Authenticatable
         'last_permission_cache_at',
         'created_by_user_id',
         'warehouse_id',
+        'fcm_token',
     ];
 
     /**

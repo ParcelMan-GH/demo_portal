@@ -293,25 +293,41 @@
                                             </div>
                                             <div>
                                                 <label class="form-label text-emerald-700">Location Method</label>
-                                                <select x-model="itemForm.delivery_location_method" class="vendor-input">
-                                                    <option value="dropdown">Region + district</option>
+                                                <select x-model="itemForm.delivery_location_method" class="vendor-input"
+                                                        @change="if($el.value !== 'dropdown') clearItemLocation();">
+                                                    <option value="dropdown">Location search</option>
                                                     <option value="coordinates">Coordinates</option>
                                                     <option value="gh_post">Ghana Post</option>
                                                 </select>
                                             </div>
-                                            <div x-show="itemForm.delivery_location_method === 'dropdown'" x-cloak>
-                                                <label class="form-label text-emerald-700">Region</label>
-                                                <select x-model="itemForm.delivery_region_id" @change="onItemRegionChange()" class="vendor-input">
-                                                    <option value="">Select</option>
-                                                    <template x-for="region in regions" :key="region.id"><option :value="region.id" x-text="region.name"></option></template>
-                                                </select>
-                                            </div>
-                                            <div x-show="itemForm.delivery_location_method === 'dropdown'" x-cloak>
-                                                <label class="form-label text-emerald-700">District</label>
-                                                <select x-model="itemForm.delivery_district_id" class="vendor-input">
-                                                    <option value="">Select</option>
-                                                    <template x-for="district in itemDistricts" :key="district.id"><option :value="district.id" x-text="district.name"></option></template>
-                                                </select>
+                                            <div class="sm:col-span-2" x-show="itemForm.delivery_location_method === 'dropdown'" x-cloak>
+                                                <label class="form-label text-emerald-700">Location <span class="text-red-400">*</span></label>
+                                                <div class="loc-typeahead">
+                                                    <div x-show="itemSelectedLocation" class="loc-selected">
+                                                        <span x-text="itemSelectedLocation?.display"></span>
+                                                        <button type="button" @click="clearItemLocation()" class="loc-clear-btn">×</button>
+                                                    </div>
+                                                    <div x-show="!itemSelectedLocation" class="relative">
+                                                        <input x-model="itemLocationQuery"
+                                                               @input.debounce.250ms="searchItemLocation()"
+                                                               type="text" class="vendor-input pr-10"
+                                                               placeholder="Type a town or city name...">
+                                                        <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <svg x-show="itemLocationSearching" class="h-4 w-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                                            <svg x-show="!itemLocationSearching" class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                                        </div>
+                                                        <div x-show="itemLocationResults.length > 0" x-cloak class="loc-dropdown">
+                                                            <template x-for="loc in itemLocationResults" :key="loc.id">
+                                                                <button type="button" @click="selectItemLocation(loc)" class="loc-option">
+                                                                    <div class="loc-option-name" x-text="loc.name"></div>
+                                                                    <div class="loc-option-sub" x-text="`${loc.district.name}, ${loc.region.name}`"></div>
+                                                                </button>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <input type="hidden" x-model="itemForm.delivery_region_id">
+                                                <input type="hidden" x-model="itemForm.delivery_district_id">
                                             </div>
                                             <div x-show="itemForm.delivery_location_method === 'coordinates'" x-cloak>
                                                 <label class="form-label text-emerald-700">Latitude</label>
@@ -325,7 +341,7 @@
                                                 <label class="form-label text-emerald-700">Ghana Post Address</label>
                                                 <input x-model="itemForm.delivery_gh_post_address" type="text" class="vendor-input">
                                             </div>
-                                            <div>
+                                            <div x-show="itemForm.delivery_location_method !== 'dropdown'" x-cloak>
                                                 <label class="form-label text-emerald-700">Town</label>
                                                 <input x-model="itemForm.delivery_town" type="text" class="vendor-input">
                                             </div>
@@ -582,25 +598,41 @@
                                                         </div>
                                                         <div>
                                                             <label class="form-label text-emerald-700">Location Method</label>
-                                                            <select x-model="editItemForm.delivery_location_method" class="vendor-input">
-                                                                <option value="dropdown">Region + district</option>
+                                                            <select x-model="editItemForm.delivery_location_method" class="vendor-input"
+                                                                    @change="if($el.value !== 'dropdown') clearEditItemLocation();">
+                                                                <option value="dropdown">Location search</option>
                                                                 <option value="coordinates">Coordinates</option>
                                                                 <option value="gh_post">Ghana Post</option>
                                                             </select>
                                                         </div>
-                                                        <div x-show="editItemForm.delivery_location_method === 'dropdown'" x-cloak>
-                                                            <label class="form-label text-emerald-700">Region</label>
-                                                            <select x-model="editItemForm.delivery_region_id" @change="onEditItemRegionChange()" class="vendor-input">
-                                                                <option value="">Select</option>
-                                                                <template x-for="region in regions" :key="region.id"><option :value="region.id" x-text="region.name"></option></template>
-                                                            </select>
-                                                        </div>
-                                                        <div x-show="editItemForm.delivery_location_method === 'dropdown'" x-cloak>
-                                                            <label class="form-label text-emerald-700">District</label>
-                                                            <select x-model="editItemForm.delivery_district_id" class="vendor-input">
-                                                                <option value="">Select</option>
-                                                                <template x-for="district in editItemDistricts" :key="district.id"><option :value="district.id" x-text="district.name"></option></template>
-                                                            </select>
+                                                        <div class="sm:col-span-2" x-show="editItemForm.delivery_location_method === 'dropdown'" x-cloak>
+                                                            <label class="form-label text-emerald-700">Location</label>
+                                                            <div class="loc-typeahead">
+                                                                <div x-show="editItemSelectedLocation" class="loc-selected">
+                                                                    <span x-text="editItemSelectedLocation?.display"></span>
+                                                                    <button type="button" @click="clearEditItemLocation()" class="loc-clear-btn">×</button>
+                                                                </div>
+                                                                <div x-show="!editItemSelectedLocation" class="relative">
+                                                                    <input x-model="editItemLocationQuery"
+                                                                           @input.debounce.250ms="searchEditItemLocation()"
+                                                                           type="text" class="vendor-input pr-10"
+                                                                           placeholder="Type a town or city name...">
+                                                                    <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                                                                        <svg x-show="editItemLocationSearching" class="h-4 w-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                                                        <svg x-show="!editItemLocationSearching" class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                                                    </div>
+                                                                    <div x-show="editItemLocationResults.length > 0" x-cloak class="loc-dropdown">
+                                                                        <template x-for="loc in editItemLocationResults" :key="loc.id">
+                                                                            <button type="button" @click="selectEditItemLocation(loc)" class="loc-option">
+                                                                                <div class="loc-option-name" x-text="loc.name"></div>
+                                                                                <div class="loc-option-sub" x-text="`${loc.district.name}, ${loc.region.name}`"></div>
+                                                                            </button>
+                                                                        </template>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <input type="hidden" x-model="editItemForm.delivery_region_id">
+                                                            <input type="hidden" x-model="editItemForm.delivery_district_id">
                                                         </div>
                                                         <div x-show="editItemForm.delivery_location_method === 'coordinates'" x-cloak>
                                                             <label class="form-label text-emerald-700">Latitude</label>
@@ -614,7 +646,7 @@
                                                             <label class="form-label text-emerald-700">Ghana Post Address</label>
                                                             <input x-model="editItemForm.delivery_gh_post_address" type="text" class="vendor-input">
                                                         </div>
-                                                        <div>
+                                                        <div x-show="editItemForm.delivery_location_method !== 'dropdown'" x-cloak>
                                                             <label class="form-label text-emerald-700">Town</label>
                                                             <input x-model="editItemForm.delivery_town" type="text" class="vendor-input">
                                                         </div>

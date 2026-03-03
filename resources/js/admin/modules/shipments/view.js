@@ -77,11 +77,39 @@ function shipmentShow() {
         availableDrivers: [],
         availableWarehouses: [],
 
+        // Modal states
+        assignDriverModalOpen: false,
+
+        // Edit assignment form state
+        editAssignmentOpen: false,
+        editAssignmentForm: {
+            driver_id: '',
+            target_warehouse_id: '',
+            submitting: false,
+            loadingDrivers: false,
+            loadingWarehouses: false,
+        },
+        availableDriversForEdit: [],
+
         // Tracking state
         tracking: {
             data: [],
             loading: false
         },
+
+        // Payments tab (Phase 4)
+        paymentsLoaded: false,
+        paymentsData: { payments: [], summary: { total_invoiced: 0, total_paid: 0, balance_due: 0 } },
+        paymentForm: {
+            open: false,
+            submitting: false,
+            amount: '',
+            payment_method: '',
+            reference_number: '',
+            notes: '',
+            payment_date: '',
+        },
+        isSuperAdmin: false,
 
         shipmentDestinationMode() {
             const mode = this.shipment?.destination_mode;
@@ -189,6 +217,7 @@ function shipmentShow() {
             this.config = window.shipmentShowConfig;
             this.shipment = this.config.shipment;
             this.canManage = this.config.canManage;
+            this.isSuperAdmin = this.config.isSuperAdmin ?? false;
             this.invoice = this.config.invoice;
             this.invoiceHistory = this.config.invoiceHistory || [];
             if (!this.invoice && this.invoiceHistory.length > 0) {
@@ -235,12 +264,15 @@ function shipmentShow() {
         },
 
         canCreateInvoice() {
-            return this.canManage && this.shipment.status === 'submitted' && !this.hasActiveInvoice();
+            // Phase 3: Invoice can be created at 'submitted' (old flow) OR 'at_warehouse' (new flow after pickup)
+            const invoiceableStatuses = ['submitted', 'at_warehouse'];
+            return this.canManage && invoiceableStatuses.includes(this.shipment.status) && !this.hasActiveInvoice();
         },
 
         activeInvoiceBlockReason() {
-            if (this.shipment.status !== 'submitted') {
-                return 'Invoice can only be created when shipment is in submitted status.';
+            const invoiceableStatuses = ['submitted', 'at_warehouse'];
+            if (!invoiceableStatuses.includes(this.shipment.status)) {
+                return 'Invoice can be created when the shipment is submitted or received at warehouse.';
             }
             if (this.hasActiveInvoice()) {
                 return 'Shipment already has an active invoice (pending, sent, or accepted).';
@@ -591,6 +623,50 @@ function shipmentShow() {
             }
         },
 
+        async adminAcceptInvoice(invoiceId = null) {
+            const targetId = invoiceId || this.invoice?.id;
+            if (!targetId) return;
+
+            const confirmed = window.confirm(
+                'Accept this invoice on behalf of the vendor?\n\n' +
+                'This is an admin override action. The invoice will be marked as accepted ' +
+                'and the shipment will proceed to the next stage.\n\n' +
+                'This action will be recorded in the audit log.'
+            );
+            if (!confirmed) return;
+
+            const adminNotes = window.prompt('Optional notes for this override (visible in audit log):') ?? '';
+            if (adminNotes === null) return;
+
+            try {
+                const endpoint = `/admin/invoices/${targetId}/admin-accept`;
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ admin_notes: adminNotes || null })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to accept invoice');
+                }
+
+                if (window.showToast) {
+                    window.showToast(data.message || 'Invoice accepted on behalf of vendor', 'success');
+                }
+                window.location.reload();
+            } catch (error) {
+                this.invoiceUiError = error.message || 'Failed to accept invoice';
+                if (window.showToast) {
+                    window.showToast(error.message || 'Failed to accept invoice', 'error');
+                }
+            }
+        },
+
         async loadAvailableDrivers() {
             this.assignmentForm.loadingDrivers = true;
             try {
@@ -648,6 +724,88 @@ function shipmentShow() {
             }
 
             return Boolean(this.assignment.picked_up_at || this.assignment.completed_at);
+        },
+
+        canEditCurrentAssignment() {
+            return this.assignment && this.assignment.status === 'assigned';
+        },
+
+        async openEditAssignment() {
+            this.editAssignmentForm.driver_id = this.assignment?.driver_id ?? '';
+            this.editAssignmentForm.target_warehouse_id = this.assignment?.target_warehouse_id ?? '';
+            this.editAssignmentOpen = true;
+
+            // Load available drivers for the edit form (all active, not busy — server filters)
+            this.editAssignmentForm.loadingDrivers = true;
+            this.editAssignmentForm.loadingWarehouses = true;
+            try {
+                const [driversRes, warehousesRes] = await Promise.all([
+                    fetch(this.config.availableDriversEndpoint + '?assignment_type=pickup'),
+                    fetch(this.config.availableWarehousesEndpoint),
+                ]);
+                const driversData = await driversRes.json();
+                const warehousesData = await warehousesRes.json();
+
+                // Include the current driver even if busy (since they're already assigned here)
+                let drivers = driversData.data || [];
+                const currentDriverId = this.assignment?.driver_id;
+                if (currentDriverId && !drivers.find(d => d.id == currentDriverId)) {
+                    const currentDriver = this.assignment?.driver;
+                    if (currentDriver) {
+                        drivers = [currentDriver, ...drivers];
+                    }
+                }
+                this.availableDriversForEdit = drivers;
+                this.availableWarehouses = warehousesData.data || [];
+            } catch (e) {
+                console.error('Failed to load edit assignment options:', e);
+            } finally {
+                this.editAssignmentForm.loadingDrivers = false;
+                this.editAssignmentForm.loadingWarehouses = false;
+            }
+        },
+
+        async updateAssignment() {
+            if (!this.assignment || !this.assignment.id || !this.canEditCurrentAssignment()) {
+                return;
+            }
+
+            this.editAssignmentForm.submitting = true;
+            try {
+                const endpoint = this.buildAssignmentEndpoint(this.config.updateAssignmentEndpointTemplate, this.assignment.id);
+                const response = await fetch(endpoint, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        driver_id: this.editAssignmentForm.driver_id || null,
+                        target_warehouse_id: this.editAssignmentForm.target_warehouse_id || null,
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    if (window.showToast) {
+                        window.showToast(result.message || 'Assignment updated.', 'success');
+                    }
+                    window.location.reload();
+                } else {
+                    if (window.showToast) {
+                        window.showToast(result.message || 'Failed to update assignment.', 'error');
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to update assignment:', e);
+                if (window.showToast) {
+                    window.showToast('An unexpected error occurred.', 'error');
+                }
+            } finally {
+                this.editAssignmentForm.submitting = false;
+            }
         },
 
         assignmentStatusClass(status) {
@@ -799,7 +957,7 @@ function shipmentShow() {
                     window.showToast('Driver assigned successfully', 'success');
                 }
 
-                // Reload page to reflect changes
+                this.assignDriverModalOpen = false;
                 window.location.reload();
             } catch (error) {
                 console.error('Assign driver error:', error);
@@ -829,6 +987,77 @@ function shipmentShow() {
                 return `0.00 ${currency || 'GHS'}`;
             }
             return `${value.toFixed(2)} ${currency || 'GHS'}`;
+        },
+
+        async loadPayments() {
+            try {
+                const endpoint = this.config.paymentsDataEndpoint;
+                const response = await fetch(endpoint, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+                const data = await response.json();
+                this.paymentsData = data;
+                this.paymentsLoaded = true;
+            } catch (e) {
+                console.error('Failed to load payments:', e);
+                this.paymentsLoaded = true;
+            }
+        },
+
+        async submitPayment() {
+            this.paymentForm.submitting = true;
+            try {
+                const endpoint = this.config.storePaymentEndpoint;
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        amount: this.paymentForm.amount,
+                        payment_method: this.paymentForm.payment_method,
+                        reference_number: this.paymentForm.reference_number || null,
+                        notes: this.paymentForm.notes || null,
+                        payment_date: this.paymentForm.payment_date,
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || 'Failed to record payment');
+                if (window.showToast) window.showToast(data.message || 'Payment recorded', 'success');
+                this.paymentForm = { open: false, submitting: false, amount: '', payment_method: '', reference_number: '', notes: '', payment_date: '' };
+                await this.loadPayments();
+            } catch (e) {
+                console.error('Failed to record payment:', e);
+                if (window.showToast) window.showToast(e.message || 'Failed to record payment', 'error');
+            } finally {
+                this.paymentForm.submitting = false;
+            }
+        },
+
+        async voidPayment(paymentId) {
+            if (!confirm('Void this payment? This cannot be undone.')) return;
+            try {
+                const endpoint = (this.config.destroyPaymentEndpointTemplate || '').replace('__PAYMENT__', paymentId);
+                const response = await fetch(endpoint, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || 'Failed to void payment');
+                if (window.showToast) window.showToast(data.message || 'Payment voided', 'success');
+                await this.loadPayments();
+            } catch (e) {
+                console.error('Failed to void payment:', e);
+                if (window.showToast) window.showToast(e.message || 'Failed to void payment', 'error');
+            }
         }
     };
 }

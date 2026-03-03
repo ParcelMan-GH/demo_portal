@@ -25,6 +25,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Register model observers
+        \App\Models\Shipment::observe(\App\Observers\ShipmentObserver::class);
+        \App\Models\Invoice::observe(\App\Observers\InvoiceObserver::class);
+        \App\Models\PickupAssignment::observe(\App\Observers\PickupAssignmentObserver::class);
+        \App\Models\TransportManifest::observe(\App\Observers\TransportManifestObserver::class);
+        \App\Models\DeliveryRunStop::observe(\App\Observers\DeliveryRunStopObserver::class);
+
         // Register authorization gates for permissions
         $this->registerPermissionGates();
 

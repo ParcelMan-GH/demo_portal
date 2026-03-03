@@ -208,6 +208,14 @@ class Shipment extends Model
     }
 
     /**
+     * Get all recorded payments for this shipment.
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(\App\Models\ShipmentPayment::class)->latest('payment_date');
+    }
+
+    /**
      * Get the latest pickup assignment for this shipment.
      */
     public function pickupAssignment(): HasOne
@@ -225,10 +233,11 @@ class Shipment extends Model
 
     /**
      * Check if shipment can be invoiced.
+     * Phase 3: Invoice can be created when submitted (old flow) OR at_warehouse (new flow).
      */
     public function canBeInvoiced(): bool
     {
-        return $this->status === ShipmentStatus::SUBMITTED
+        return in_array($this->status, [ShipmentStatus::SUBMITTED, ShipmentStatus::AT_WAREHOUSE])
             && !$this->invoices()
                 ->whereIn('status', InvoiceStatus::activeValues())
                 ->exists();
@@ -236,10 +245,11 @@ class Shipment extends Model
 
     /**
      * Check if shipment can have a driver assigned.
+     * Phase 3: Assignment allowed immediately on SUBMITTED (no invoice required first).
      */
     public function canBeAssigned(): bool
     {
-        return $this->status === ShipmentStatus::INVOICE_ACCEPTED;
+        return in_array($this->status, [ShipmentStatus::SUBMITTED, ShipmentStatus::INVOICE_ACCEPTED]);
     }
 
     /**

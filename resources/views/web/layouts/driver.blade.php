@@ -16,6 +16,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     @vite(['resources/css/pages/driver-portal.css', 'resources/js/app.js'])
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.7.2/css/lightgallery.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.7.2/css/lg-thumbnail.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.7.2/css/lg-zoom.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
 </head>
 <body class="min-h-screen bg-gray-50 text-slate-800 antialiased" x-data="driverLayoutPage()">
@@ -321,6 +324,11 @@
         </div>
     </footer>
 
+    {{-- Lightgallery plugins --}}
+    <script src="https://cdn.jsdelivr.net/npm/lightgallery@2.7.2/lightgallery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lightgallery@2.7.2/plugins/thumbnail/lg-thumbnail.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lightgallery@2.7.2/plugins/zoom/lg-zoom.min.js"></script>
+
     {{-- Toast notification container --}}
     <div id="driver-toast-container" class="vendor-toast-container"></div>
 
@@ -380,6 +388,13 @@
                 },
 
                 async loadDriverInfo() {
+                    // Show cached name instantly (stored at login time)
+                    const cached = localStorage.getItem('parcelman_driver_name');
+                    if (cached) {
+                        this.driverName = cached;
+                        this.driverInitial = cached.charAt(0).toUpperCase();
+                    }
+
                     const token = localStorage.getItem('parcelman_driver_token');
                     if (!token) return;
 
@@ -392,8 +407,10 @@
                         });
                         const data = await response.json();
                         if (data?.success && data?.data?.user) {
-                            this.driverName = data.data.user.name || 'Driver';
-                            this.driverInitial = (data.data.user.name || 'D').charAt(0).toUpperCase();
+                            const name = data.data.user.name || 'Driver';
+                            this.driverName = name;
+                            this.driverInitial = name.charAt(0).toUpperCase();
+                            localStorage.setItem('parcelman_driver_name', name);
                         }
                     } catch {}
                 },
@@ -422,10 +439,34 @@
                         }
                     } catch {}
                     localStorage.removeItem('parcelman_driver_token');
+                    localStorage.removeItem('parcelman_driver_name');
                     window.location.href = '/driver/login';
                 },
             };
         }
     </script>
+    @php
+        $pushEnabled = \App\Models\PlatformSetting::getValue('push_notifications_enabled');
+        $fcmApiKey   = \App\Models\PlatformSetting::getValue('firebase_web_api_key');
+    @endphp
+    @if($pushEnabled && $fcmApiKey)
+    <script>
+        window.__fcmConfig = {
+            apiKey:            @json(\App\Models\PlatformSetting::getValue('firebase_web_api_key')),
+            authDomain:        @json(\App\Models\PlatformSetting::getValue('firebase_auth_domain')),
+            projectId:         @json(\App\Models\PlatformSetting::getValue('firebase_project_id')),
+            messagingSenderId: @json(\App\Models\PlatformSetting::getValue('firebase_messaging_sender_id')),
+            appId:             @json(\App\Models\PlatformSetting::getValue('firebase_app_id')),
+            vapidKey:          @json(\App\Models\PlatformSetting::getValue('firebase_vapid_key')),
+        };
+        window.__fcmEndpoint = {
+            url: '/api/v1/driver/fcm-token',
+            headers: {
+                'Authorization': 'Bearer ' + (localStorage.getItem('parcelman_driver_token') || ''),
+            },
+        };
+    </script>
+    @vite(['resources/js/web/firebase-push.js'])
+    @endif
 </body>
 </html>

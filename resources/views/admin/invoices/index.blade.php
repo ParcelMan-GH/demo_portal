@@ -1,0 +1,469 @@
+@extends('admin.layouts.app')
+
+@section('title', 'Invoices')
+@section('breadcrumb-parent', 'Operations')
+@section('breadcrumb-current', 'Invoices')
+
+@section('content')
+
+<div class="space-y-6" x-data="invoicesTable">
+    <!-- Invoices Datatable -->
+    <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">
+        <!-- Card Header -->
+        <div class="px-6 py-5 border-b border-slate-200/50">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100">
+                        <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900">Invoices</h2>
+                        <p class="mt-0.5 text-sm text-slate-500">View and manage all shipment invoices</p>
+                    </div>
+                </div>
+                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="meta.total + ' Total Invoices'"></span>
+            </div>
+        </div>
+
+        <!-- Table Controls -->
+        <div class="p-6 pb-0">
+            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <!-- Filters Row -->
+                <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+
+                    <!-- Search: invoice # or shipment # -->
+                    <div class="relative flex-1 max-w-xs">
+                        <input
+                            type="text"
+                            x-model="search"
+                            @@input.debounce.500ms="loadData()"
+                            placeholder="Search invoice or shipment #..."
+                            class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400 transition-colors"
+                        >
+                        <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+
+                    <!-- Status Filter -->
+                    <div x-data="{ open: false }" class="relative w-full sm:w-44">
+                        <button
+                            type="button"
+                            @@click="open = !open"
+                            class="w-full inline-flex items-center justify-between px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors"
+                        >
+                            <span x-text="statusFilterName || 'All statuses'"></span>
+                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div
+                            x-show="open"
+                            @@click.away="open = false"
+                            x-transition
+                            class="absolute left-0 mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/85 shadow-2xl p-2 z-50 backdrop-blur-xl"
+                            style="display: none;"
+                        >
+                            <button
+                                type="button"
+                                @@click="statusFilter = ''; statusFilterName = ''; loadData(); open = false"
+                                class="w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
+                                :class="statusFilter === '' ? 'bg-white/70 shadow-sm' : ''"
+                            >
+                                <svg x-show="statusFilter === ''" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>All statuses</span>
+                            </button>
+                            @foreach($statuses as $status)
+                            <button
+                                type="button"
+                                @@click="statusFilter = '{{ $status['value'] }}'; statusFilterName = '{{ $status['label'] }}'; loadData(); open = false"
+                                class="mt-1 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
+                                :class="statusFilter === '{{ $status['value'] }}' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''"
+                            >
+                                <svg x-show="statusFilter === '{{ $status['value'] }}'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>{{ $status['label'] }}</span>
+                            </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <!-- Date Range: From -->
+                    <div class="relative w-full sm:w-40">
+                        <input
+                            type="date"
+                            x-model="dateFrom"
+                            @@change="loadData()"
+                            class="w-full pl-3 pr-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                            placeholder="From date"
+                        >
+                    </div>
+
+                    <!-- Date Range: To -->
+                    <div class="relative w-full sm:w-40">
+                        <input
+                            type="date"
+                            x-model="dateTo"
+                            @@change="loadData()"
+                            class="w-full pl-3 pr-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                            placeholder="To date"
+                        >
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="px-6 py-4">
+            <div class="rounded-xl border border-slate-200/50 relative">
+                <!-- Loading overlay -->
+                <div x-show="loading" x-transition.opacity.duration.150ms class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10" style="display: none;"></div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[900px] md:min-w-full divide-y divide-slate-200/50 text-xs">
+                        <thead class="bg-slate-50/50">
+                            <tr>
+                                <th @@click="sort('invoice_number')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <div class="flex items-center">
+                                        INVOICE #
+                                        <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'invoice_number' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                        </svg>
+                                    </div>
+                                </th>
+                                <th class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                    SHIPMENT #
+                                </th>
+                                <th class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                    VENDOR
+                                </th>
+                                <th @@click="sort('total_amount')" class="px-4 py-2 text-right text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <div class="flex items-center justify-end">
+                                        AMOUNT
+                                        <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'total_amount' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                        </svg>
+                                    </div>
+                                </th>
+                                <th @@click="sort('status')" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <div class="flex items-center justify-center">
+                                        STATUS
+                                        <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'status' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                        </svg>
+                                    </div>
+                                </th>
+                                <th @@click="sort('sent_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <div class="flex items-center">
+                                        SENT AT
+                                        <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'sent_at' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                        </svg>
+                                    </div>
+                                </th>
+                                <th class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                    ACCEPTED / REJECTED AT
+                                </th>
+                                <th @@click="sort('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <div class="flex items-center">
+                                        CREATED AT
+                                        <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'created_at' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                        </svg>
+                                    </div>
+                                </th>
+                                <th class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                    ACTIONS
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-transparent divide-y divide-slate-100/50">
+                            <template x-if="invoices.length === 0 && !loading">
+                                <tr>
+                                    <td colspan="9" class="px-4 py-8 text-center text-gray-500 text-xs">
+                                        <div class="flex flex-col items-center gap-2">
+                                            <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                            </svg>
+                                            <span>No invoices found</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+
+                            <template x-for="invoice in invoices" :key="invoice.id">
+                                <tr class="hover:bg-slate-50/70">
+                                    <!-- Invoice Number -->
+                                    <td class="px-4 py-2.5 whitespace-nowrap">
+                                        <span class="text-xs font-semibold text-slate-900" x-text="invoice.invoice_number"></span>
+                                    </td>
+
+                                    <!-- Shipment Number -->
+                                    <td class="px-4 py-2.5 whitespace-nowrap">
+                                        <template x-if="invoice.shipment_url">
+                                            <a
+                                                :href="invoice.shipment_url"
+                                                class="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                                                x-text="invoice.shipment_number"
+                                            ></a>
+                                        </template>
+                                        <template x-if="!invoice.shipment_url">
+                                            <span class="text-xs text-slate-400" x-text="invoice.shipment_number || '—'"></span>
+                                        </template>
+                                    </td>
+
+                                    <!-- Vendor -->
+                                    <td class="px-4 py-2.5 whitespace-nowrap">
+                                        <div class="text-xs font-semibold text-slate-900" x-text="invoice.vendor_name || '—'"></div>
+                                        <div class="text-[10px] text-slate-500" x-text="invoice.vendor_business_name"></div>
+                                    </td>
+
+                                    <!-- Amount -->
+                                    <td class="px-4 py-2.5 whitespace-nowrap text-right">
+                                        <span
+                                            class="text-xs font-semibold text-slate-900"
+                                            x-text="invoice.currency + ' ' + invoice.total_amount.toFixed(2)"
+                                        ></span>
+                                    </td>
+
+                                    <!-- Status Badge -->
+                                    <td class="px-4 py-2.5 whitespace-nowrap text-center">
+                                        <span
+                                            class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                            :class="{
+                                                'bg-slate-100 text-slate-700':   invoice.status === 'pending',
+                                                'bg-blue-100 text-blue-700':     invoice.status === 'sent',
+                                                'bg-emerald-100 text-emerald-700': invoice.status === 'accepted',
+                                                'bg-rose-100 text-rose-700':     invoice.status === 'rejected',
+                                                'bg-gray-100 text-gray-500':     invoice.status === 'cancelled'
+                                            }"
+                                            x-text="invoice.status_label"
+                                        ></span>
+                                    </td>
+
+                                    <!-- Sent At -->
+                                    <td class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="invoice.sent_at ? formatDateTime(invoice.sent_at) : '—'"></td>
+
+                                    <!-- Accepted / Rejected At -->
+                                    <td class="px-4 py-2.5 whitespace-nowrap text-xs">
+                                        <template x-if="invoice.accepted_at">
+                                            <span class="text-emerald-700" x-text="formatDateTime(invoice.accepted_at)"></span>
+                                        </template>
+                                        <template x-if="!invoice.accepted_at && invoice.rejected_at">
+                                            <span class="text-rose-600" x-text="formatDateTime(invoice.rejected_at)"></span>
+                                        </template>
+                                        <template x-if="!invoice.accepted_at && !invoice.rejected_at">
+                                            <span class="text-slate-400">—</span>
+                                        </template>
+                                    </td>
+
+                                    <!-- Created At -->
+                                    <td class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(invoice.created_at)"></td>
+
+                                    <!-- Actions -->
+                                    <td class="px-4 py-2.5 whitespace-nowrap text-center text-xs font-medium">
+                                        <a
+                                            :href="'{{ route('admin.invoices.show', ['invoice' => '__ID__']) }}'.replace('__ID__', invoice.id)"
+                                            class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors inline-flex"
+                                            title="View invoice"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                            </svg>
+                                        </a>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="px-4 py-2.5 border-t border-slate-200/50 bg-slate-50/30">
+                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div class="text-xs text-slate-600">
+                            Showing
+                            <span x-text="meta.from"></span>
+                            to
+                            <span x-text="meta.to"></span>
+                            of
+                            <span x-text="meta.total"></span>
+                            results
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-medium text-slate-600">Rows per page</span>
+                                <div x-data="{ open: false }" class="relative">
+                                    <button
+                                        type="button"
+                                        @@click="open = !open"
+                                        class="inline-flex items-center justify-between gap-1.5 px-2.5 py-1 min-w-[60px] border border-slate-200/70 rounded-lg bg-white/70 backdrop-blur-sm text-xs font-medium text-slate-700 hover:bg-white/90 transition-colors"
+                                    >
+                                        <span x-text="perPage"></span>
+                                        <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                    </button>
+                                    <div
+                                        x-show="open"
+                                        @@click.away="open = false"
+                                        x-transition
+                                        class="absolute bottom-full mb-1 right-0 w-16 rounded-lg border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-lg p-1 z-[9999]"
+                                        style="display: none;"
+                                    >
+                                        <button type="button" @@click="perPage = 10; loadData(); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 10 ? 'bg-slate-100/70' : ''">10</button>
+                                        <button type="button" @@click="perPage = 25; loadData(); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 25 ? 'bg-slate-100/70' : ''">25</button>
+                                        <button type="button" @@click="perPage = 50; loadData(); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 50 ? 'bg-slate-100/70' : ''">50</button>
+                                        <button type="button" @@click="perPage = 100; loadData(); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 100 ? 'bg-slate-100/70' : ''">100</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-xs font-medium text-slate-600">
+                                Page
+                                <span x-text="meta.current_page"></span>
+                                of
+                                <span x-text="meta.last_page"></span>
+                            </div>
+
+                            <div class="flex space-x-1">
+                                <button
+                                    @@click="firstPage()"
+                                    :disabled="meta.current_page === 1"
+                                    :class="meta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
+                                    class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
+                                >
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/>
+                                    </svg>
+                                </button>
+                                <button
+                                    @@click="previousPage()"
+                                    :disabled="meta.current_page === 1"
+                                    :class="meta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
+                                    class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
+                                >
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                    </svg>
+                                </button>
+                                <button
+                                    @@click="nextPage()"
+                                    :disabled="meta.current_page === meta.last_page"
+                                    :class="meta.current_page === meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
+                                    class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
+                                >
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
+                                <button
+                                    @@click="lastPage()"
+                                    :disabled="meta.current_page === meta.last_page"
+                                    :class="meta.current_page === meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
+                                    class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
+                                >
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@endsection
+
+@push('scripts')
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('invoicesTable', () => ({
+        invoices: [],
+        loading: false,
+        search: '',
+        statusFilter: '',
+        statusFilterName: '',
+        dateFrom: '',
+        dateTo: '',
+        sortBy: 'created_at',
+        sortDirection: 'desc',
+        perPage: 50,
+        meta: {
+            current_page: 1,
+            from: 0,
+            to: 0,
+            total: 0,
+            last_page: 1,
+        },
+
+        init() {
+            this.loadData();
+        },
+
+        loadData(page = 1) {
+            this.loading = true;
+            const params = new URLSearchParams({
+                page,
+                per_page: this.perPage,
+                sort: this.sortBy,
+                direction: this.sortDirection,
+            });
+            if (this.search)       params.set('search', this.search);
+            if (this.statusFilter) params.set('status', this.statusFilter);
+            if (this.dateFrom)     params.set('date_from', this.dateFrom);
+            if (this.dateTo)       params.set('date_to', this.dateTo);
+
+            fetch(`{{ route('admin.invoices.data') }}?${params.toString()}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            })
+                .then(r => r.json())
+                .then(json => {
+                    this.invoices = json.data;
+                    this.meta     = json.meta;
+                })
+                .finally(() => { this.loading = false; });
+        },
+
+        sort(column) {
+            if (this.sortBy === column) {
+                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.sortBy        = column;
+                this.sortDirection = 'asc';
+            }
+            this.loadData();
+        },
+
+        firstPage()    { if (this.meta.current_page > 1) this.loadData(1); },
+        previousPage() { if (this.meta.current_page > 1) this.loadData(this.meta.current_page - 1); },
+        nextPage()     { if (this.meta.current_page < this.meta.last_page) this.loadData(this.meta.current_page + 1); },
+        lastPage()     { if (this.meta.current_page < this.meta.last_page) this.loadData(this.meta.last_page); },
+
+        formatDateTime(value) {
+            if (!value) return '—';
+            const d = new Date(value);
+            if (isNaN(d)) return value;
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        },
+    }));
+});
+</script>
+@endpush

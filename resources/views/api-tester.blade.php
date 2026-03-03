@@ -356,11 +356,13 @@
                 group: 'auth',
                 fields: [
                     { name: 'phone', type: 'string', required: true, description: 'Ghana phone (0244xxx or +233244xxx)', example: '+233244123456' },
-                    { name: 'otp', type: 'string', required: true, description: 'Exactly 6 digits sent via SMS', example: '123456' }
+                    { name: 'otp', type: 'string', required: true, description: 'Exactly 6 digits sent via SMS', example: '123456' },
+                    { name: 'fcm_token', type: 'string', required: false, description: 'Firebase Cloud Messaging device token for push notifications (captured at login time)', example: 'fBXQ4v...' }
                 ],
                 sampleBody: {
                     phone: '+233244123456',
-                    otp: '123456'
+                    otp: '123456',
+                    fcm_token: 'fBXQ4v...'
                 },
                 exampleResponses: {
                     '200_existing': {
@@ -402,13 +404,15 @@
                     { name: 'name', type: 'string', required: true, description: 'Vendor\'s full name', example: 'John Doe' },
                     { name: 'business_name', type: 'string', required: false, description: 'Business name (optional)', example: 'John\'s Delivery' },
                     { name: 'phone', type: 'string', required: true, description: 'Ghana phone (0244xxx or +233244xxx)', example: '+233244123456' },
-                    { name: 'email', type: 'string', required: false, description: 'Email address (optional)', example: 'john@example.com' }
+                    { name: 'email', type: 'string', required: false, description: 'Email address (optional)', example: 'john@example.com' },
+                    { name: 'fcm_token', type: 'string', required: false, description: 'Firebase Cloud Messaging device token for push notifications (captured at registration time)', example: 'fBXQ4v...' }
                 ],
                 sampleBody: {
                     name: 'John Doe',
                     business_name: 'John\'s Delivery',
                     phone: '+233244123456',
-                    email: 'john@example.com'
+                    email: 'john@example.com',
+                    fcm_token: 'fBXQ4v...'
                 },
                 exampleResponses: {
                     '200': {
@@ -526,6 +530,34 @@
                     }
                 }
             },
+            {
+                method: 'POST',
+                url: '/api/v1/vendor/fcm-token',
+                name: 'Update FCM Token',
+                description: 'Save or update the Firebase Cloud Messaging push notification token for this vendor\'s device. Call this after obtaining a token from the Firebase SDK on the client side.',
+                auth: true,
+                group: 'profile',
+                fields: [
+                    { name: 'fcm_token', type: 'string', required: true, description: 'Firebase Cloud Messaging device token', example: 'fBXQ4v...' }
+                ],
+                sampleBody: {
+                    fcm_token: 'fBXQ4v...'
+                },
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'FCM token updated successfully.'
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    },
+                    '422': {
+                        success: false,
+                        message: 'The fcm token field is required.'
+                    }
+                }
+            },
             // ==================== DRIVER ENDPOINTS ====================
             // Driver Auth Endpoints
             {
@@ -538,11 +570,13 @@
                 userType: 'driver',
                 fields: [
                     { name: 'email', type: 'string', required: true, description: 'Driver\'s email address', example: 'driver@example.com' },
-                    { name: 'password', type: 'string', required: true, description: 'Driver\'s password', example: 'password123' }
+                    { name: 'password', type: 'string', required: true, description: 'Driver\'s password', example: 'password123' },
+                    { name: 'fcm_token', type: 'string', required: false, description: 'Firebase Cloud Messaging device token for push notifications (captured at login time)', example: 'fBXQ4v...' }
                 ],
                 sampleBody: {
                     email: 'driver@example.com',
-                    password: 'password123'
+                    password: 'password123',
+                    fcm_token: 'fBXQ4v...'
                 },
                 exampleResponses: {
                     '200': {
@@ -741,6 +775,35 @@
                     }
                 }
             },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/fcm-token',
+                name: 'Update FCM Token',
+                description: 'Save or update the Firebase Cloud Messaging push notification token for this driver\'s device. Call this after obtaining a token from the Firebase SDK on the client side.',
+                auth: true,
+                group: 'driver-profile',
+                userType: 'driver',
+                fields: [
+                    { name: 'fcm_token', type: 'string', required: true, description: 'Firebase Cloud Messaging device token', example: 'fBXQ4v...' }
+                ],
+                sampleBody: {
+                    fcm_token: 'fBXQ4v...'
+                },
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'FCM token updated successfully.'
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    },
+                    '422': {
+                        success: false,
+                        message: 'The fcm token field is required.'
+                    }
+                }
+            },
             // ============ LOCATION ENDPOINTS ============
             {
                 method: 'GET',
@@ -816,6 +879,54 @@
                     '404': {
                         success: false,
                         message: 'Region not found.'
+                    }
+                }
+            },
+            {
+                method: 'GET',
+                url: '/api/v1/vendor/locations/search',
+                name: 'Search Locations',
+                description: 'Typeahead search for Ghana towns and cities. Returns matching locations with their district and region. Requires at least 2 characters. Results are ranked with prefix matches first (max 12 results).',
+                auth: true,
+                group: 'location',
+                userType: 'vendor',
+                fields: [
+                    { name: 'q', type: 'string', required: true, description: 'Search query (min 2 characters). Matches town/city names that start with or contain the query.', example: 'Kasoa' }
+                ],
+                sampleBody: null,
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Search results retrieved.',
+                        data: {
+                            locations: [
+                                {
+                                    id: 45,
+                                    name: 'Kasoa',
+                                    type: 'town',
+                                    district: { id: 12, name: 'Awutu Senya East' },
+                                    region: { id: 3, name: 'Central Region' },
+                                    display: 'Kasoa, Awutu Senya East, Central Region'
+                                },
+                                {
+                                    id: 46,
+                                    name: 'Kasoa New Market',
+                                    type: 'town',
+                                    district: { id: 12, name: 'Awutu Senya East' },
+                                    region: { id: 3, name: 'Central Region' },
+                                    display: 'Kasoa New Market, Awutu Senya East, Central Region'
+                                }
+                            ]
+                        }
+                    },
+                    '200_empty': {
+                        success: true,
+                        message: 'Search results retrieved.',
+                        data: { locations: [] }
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
                     }
                 }
             },
@@ -1098,10 +1209,11 @@
                     { name: 'pickup_contact_name', type: 'string', required: true, description: 'Pickup contact full name', example: 'Kwame Mensah' },
                     { name: 'pickup_contact_phone', type: 'string', required: true, description: 'Pickup contact phone number', example: '+233244123456' },
                     { name: 'pickup_contact_phone_confirm', type: 'string', required: true, description: 'Confirm pickup phone (must match)', example: '+233244123456' },
-                    { name: '_pickup_location_method', type: 'enum', uiOnly: true, required: false, description: 'Pickup location input method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' } },
-                    { name: 'pickup_region_id', type: 'dropdown', required: false, description: 'Pickup region', source: 'regions', labelField: 'name', valueField: 'id', example: '1', showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
-                    { name: 'pickup_district_id', type: 'dropdown', required: false, description: 'Pickup district', dependsOn: 'pickup_region_id', example: '1', showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
-                    { name: 'pickup_town', type: 'string', required: false, description: 'Pickup town/area', example: 'Osu Oxford Street', showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: '_pickup_location_method', type: 'enum', uiOnly: true, required: false, description: 'Pickup location input method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Location Search (town/city)', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' } },
+                    { name: '_pickup_location_search', type: 'location-search', uiOnly: true, required: false, description: 'Search for a town or city — selecting a result auto-fills the region ID, district ID and town below', fills: { region_id: 'pickup_region_id', district_id: 'pickup_district_id', town: 'pickup_town' }, showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: 'pickup_region_id', type: 'string', required: false, description: 'Auto-filled from location search (region ID)', example: '1', readonly: true, showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: 'pickup_district_id', type: 'string', required: false, description: 'Auto-filled from location search (district ID)', example: '3', readonly: true, showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: 'pickup_town', type: 'string', required: false, description: 'Auto-filled from location search (town name)', example: 'Osu', readonly: true, showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
                     { name: 'pickup_latitude', type: 'number', required: false, description: 'Pickup GPS latitude (-90 to 90)', example: '5.5913', showWhen: { field: '_pickup_location_method', value: 'coordinates' } },
                     { name: 'pickup_longitude', type: 'number', required: false, description: 'Pickup GPS longitude (-180 to 180)', example: '-0.1864', showWhen: { field: '_pickup_location_method', value: 'coordinates' } },
                     { name: 'pickup_gh_post_address', type: 'string', required: false, description: 'Pickup Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_pickup_location_method', value: 'gh_post' } },
@@ -1111,10 +1223,11 @@
                     { name: 'delivery_recipient_name', type: 'string', required: false, description: 'Delivery recipient full name (single mode only)', example: 'Ama Mensah', showWhen: { field: 'destination_mode', value: 'single' } },
                     { name: 'delivery_recipient_phone', type: 'string', required: false, description: 'Delivery recipient phone (single mode only)', example: '+233241234567', showWhen: { field: 'destination_mode', value: 'single' } },
                     { name: 'delivery_recipient_phone_confirm', type: 'string', required: false, description: 'Confirm delivery phone (single mode only)', example: '+233241234567', showWhen: { field: 'destination_mode', value: 'single' } },
-                    { name: '_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Delivery location input method (single mode only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: 'destination_mode', value: 'single' } },
-                    { name: 'delivery_region_id', type: 'dropdown', required: false, description: 'Delivery region', source: 'regions', labelField: 'name', valueField: 'id', example: '1', showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
-                    { name: 'delivery_district_id', type: 'dropdown', required: false, description: 'Delivery district', dependsOn: 'delivery_region_id', example: '1', showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
-                    { name: 'delivery_town', type: 'string', required: false, description: 'Delivery town/area', example: 'Tema', showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: '_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Delivery location input method (single mode only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Location Search (town/city)', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: '_delivery_location_search', type: 'location-search', uiOnly: true, required: false, description: 'Search for a town or city — selecting a result auto-fills the region ID, district ID and town below', fills: { region_id: 'delivery_region_id', district_id: 'delivery_district_id', town: 'delivery_town' }, showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_region_id', type: 'string', required: false, description: 'Auto-filled from location search (region ID)', example: '1', readonly: true, showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_district_id', type: 'string', required: false, description: 'Auto-filled from location search (district ID)', example: '3', readonly: true, showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_town', type: 'string', required: false, description: 'Auto-filled from location search (town name)', example: 'Tema', readonly: true, showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
                     { name: 'delivery_latitude', type: 'number', required: false, description: 'Delivery GPS latitude (-90 to 90)', example: '5.6037', showWhen: { field: '_delivery_location_method', value: 'coordinates' } },
                     { name: 'delivery_longitude', type: 'number', required: false, description: 'Delivery GPS longitude (-180 to 180)', example: '-0.1870', showWhen: { field: '_delivery_location_method', value: 'coordinates' } },
                     { name: 'delivery_gh_post_address', type: 'string', required: false, description: 'Delivery Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_delivery_location_method', value: 'gh_post' } },
@@ -1426,10 +1539,11 @@
                     { name: 'pickup_contact_name', type: 'string', required: false, description: 'Pickup contact full name', example: 'Kwame Mensah' },
                     { name: 'pickup_contact_phone', type: 'string', required: false, description: 'Pickup contact phone number', example: '+233244123456' },
                     { name: 'pickup_contact_phone_confirm', type: 'string', required: false, description: 'Confirm pickup phone (required if changing)', example: '+233244123456' },
-                    { name: '_pickup_location_method', type: 'enum', uiOnly: true, required: false, description: 'Pickup location input method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' } },
-                    { name: 'pickup_region_id', type: 'dropdown', required: false, description: 'Pickup region', source: 'regions', labelField: 'name', valueField: 'id', example: '1', showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
-                    { name: 'pickup_district_id', type: 'dropdown', required: false, description: 'Pickup district', dependsOn: 'pickup_region_id', example: '1', showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
-                    { name: 'pickup_town', type: 'string', required: false, description: 'Pickup town/area', example: 'Osu East', showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: '_pickup_location_method', type: 'enum', uiOnly: true, required: false, description: 'Pickup location input method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Location Search (town/city)', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' } },
+                    { name: '_pickup_location_search', type: 'location-search', uiOnly: true, required: false, description: 'Search for a town or city — selecting a result auto-fills the region ID, district ID and town below', fills: { region_id: 'pickup_region_id', district_id: 'pickup_district_id', town: 'pickup_town' }, showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: 'pickup_region_id', type: 'string', required: false, description: 'Auto-filled from location search (region ID)', example: '1', readonly: true, showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: 'pickup_district_id', type: 'string', required: false, description: 'Auto-filled from location search (district ID)', example: '3', readonly: true, showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
+                    { name: 'pickup_town', type: 'string', required: false, description: 'Auto-filled from location search (town name)', example: 'Osu', readonly: true, showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
                     { name: 'pickup_latitude', type: 'number', required: false, description: 'Pickup GPS latitude (-90 to 90)', example: '5.5913', showWhen: { field: '_pickup_location_method', value: 'coordinates' } },
                     { name: 'pickup_longitude', type: 'number', required: false, description: 'Pickup GPS longitude (-180 to 180)', example: '-0.1864', showWhen: { field: '_pickup_location_method', value: 'coordinates' } },
                     { name: 'pickup_gh_post_address', type: 'string', required: false, description: 'Pickup Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_pickup_location_method', value: 'gh_post' } },
@@ -1439,10 +1553,11 @@
                     { name: 'delivery_recipient_name', type: 'string', required: false, description: 'Delivery recipient full name (single mode only)', example: 'Ama Mensah', showWhen: { field: 'destination_mode', value: 'single' } },
                     { name: 'delivery_recipient_phone', type: 'string', required: false, description: 'Delivery recipient phone (single mode only)', example: '+233241234567', showWhen: { field: 'destination_mode', value: 'single' } },
                     { name: 'delivery_recipient_phone_confirm', type: 'string', required: false, description: 'Confirm delivery phone (required if changing)', example: '+233241234567', showWhen: { field: 'destination_mode', value: 'single' } },
-                    { name: '_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Delivery location input method (single mode only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: 'destination_mode', value: 'single' } },
-                    { name: 'delivery_region_id', type: 'dropdown', required: false, description: 'Delivery region', source: 'regions', labelField: 'name', valueField: 'id', example: '1', showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
-                    { name: 'delivery_district_id', type: 'dropdown', required: false, description: 'Delivery district', dependsOn: 'delivery_region_id', example: '1', showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
-                    { name: 'delivery_town', type: 'string', required: false, description: 'Delivery town/area', example: 'Tema', showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: '_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Delivery location input method (single mode only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Location Search (town/city)', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: '_delivery_location_search', type: 'location-search', uiOnly: true, required: false, description: 'Search for a town or city — selecting a result auto-fills the region ID, district ID and town below', fills: { region_id: 'delivery_region_id', district_id: 'delivery_district_id', town: 'delivery_town' }, showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_region_id', type: 'string', required: false, description: 'Auto-filled from location search (region ID)', example: '1', readonly: true, showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_district_id', type: 'string', required: false, description: 'Auto-filled from location search (district ID)', example: '3', readonly: true, showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_town', type: 'string', required: false, description: 'Auto-filled from location search (town name)', example: 'Tema', readonly: true, showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
                     { name: 'delivery_latitude', type: 'number', required: false, description: 'Delivery GPS latitude (-90 to 90)', example: '5.6037', showWhen: { field: '_delivery_location_method', value: 'coordinates' } },
                     { name: 'delivery_longitude', type: 'number', required: false, description: 'Delivery GPS longitude (-180 to 180)', example: '-0.1870', showWhen: { field: '_delivery_location_method', value: 'coordinates' } },
                     { name: 'delivery_gh_post_address', type: 'string', required: false, description: 'Delivery Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_delivery_location_method', value: 'gh_post' } },
@@ -1575,10 +1690,11 @@
                     { name: 'delivery_recipient_name', type: 'string', required: false, description: 'Item recipient name (required for per_item mode)', example: 'Ama Mensah', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
                     { name: 'delivery_recipient_phone', type: 'string', required: false, description: 'Item recipient phone (required for per_item mode)', example: '+233241234567', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
                     { name: 'delivery_recipient_phone_confirm', type: 'string', required: false, description: 'Confirm item recipient phone', example: '+233241234567', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
-                    { name: '_item_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Item delivery location method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
-                    { name: 'delivery_region_id', type: 'dropdown', required: false, description: 'Item delivery region', source: 'regions', labelField: 'name', valueField: 'id', showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
-                    { name: 'delivery_district_id', type: 'dropdown', required: false, description: 'Item delivery district', dependsOn: 'delivery_region_id', showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
-                    { name: 'delivery_town', type: 'string', required: false, description: 'Item delivery town/area', example: 'Tema', showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: '_item_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Item delivery location method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Location Search (town/city)', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: '_item_delivery_location_search', type: 'location-search', uiOnly: true, required: false, description: 'Search for a town or city — selecting a result auto-fills the region ID, district ID and town below', fills: { region_id: 'delivery_region_id', district_id: 'delivery_district_id', town: 'delivery_town' }, showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_region_id', type: 'string', required: false, description: 'Auto-filled from location search (region ID)', example: '1', readonly: true, showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_district_id', type: 'string', required: false, description: 'Auto-filled from location search (district ID)', example: '3', readonly: true, showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_town', type: 'string', required: false, description: 'Auto-filled from location search (town name)', example: 'Tema', readonly: true, showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
                     { name: 'delivery_latitude', type: 'number', required: false, description: 'Item delivery GPS latitude', example: '5.6037', showWhen: { field: '_item_delivery_location_method', value: 'coordinates' } },
                     { name: 'delivery_longitude', type: 'number', required: false, description: 'Item delivery GPS longitude', example: '-0.1870', showWhen: { field: '_item_delivery_location_method', value: 'coordinates' } },
                     { name: 'delivery_gh_post_address', type: 'string', required: false, description: 'Item delivery Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_item_delivery_location_method', value: 'gh_post' } },
@@ -1641,10 +1757,11 @@
                     { name: 'delivery_recipient_name', type: 'string', required: false, description: 'Item recipient name (per_item mode)', example: 'Ama Mensah', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
                     { name: 'delivery_recipient_phone', type: 'string', required: false, description: 'Item recipient phone (per_item mode)', example: '+233241234567', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
                     { name: 'delivery_recipient_phone_confirm', type: 'string', required: false, description: 'Confirm item recipient phone', example: '+233241234567', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
-                    { name: '_item_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Item delivery location method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Region/District Dropdown', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
-                    { name: 'delivery_region_id', type: 'dropdown', required: false, description: 'Item delivery region', source: 'regions', labelField: 'name', valueField: 'id', showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
-                    { name: 'delivery_district_id', type: 'dropdown', required: false, description: 'Item delivery district', dependsOn: 'delivery_region_id', showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
-                    { name: 'delivery_town', type: 'string', required: false, description: 'Item delivery town/area', example: 'Tema', showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: '_item_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Item delivery location method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Location Search (town/city)', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: '_item_delivery_location_search', type: 'location-search', uiOnly: true, required: false, description: 'Search for a town or city — selecting a result auto-fills the region ID, district ID and town below', fills: { region_id: 'delivery_region_id', district_id: 'delivery_district_id', town: 'delivery_town' }, showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_region_id', type: 'string', required: false, description: 'Auto-filled from location search (region ID)', example: '1', readonly: true, showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_district_id', type: 'string', required: false, description: 'Auto-filled from location search (district ID)', example: '3', readonly: true, showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
+                    { name: 'delivery_town', type: 'string', required: false, description: 'Auto-filled from location search (town name)', example: 'Tema', readonly: true, showWhen: { field: '_item_delivery_location_method', value: 'dropdown' } },
                     { name: 'delivery_latitude', type: 'number', required: false, description: 'Item delivery GPS latitude', example: '5.6037', showWhen: { field: '_item_delivery_location_method', value: 'coordinates' } },
                     { name: 'delivery_longitude', type: 'number', required: false, description: 'Item delivery GPS longitude', example: '-0.1870', showWhen: { field: '_item_delivery_location_method', value: 'coordinates' } },
                     { name: 'delivery_gh_post_address', type: 'string', required: false, description: 'Item delivery Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_item_delivery_location_method', value: 'gh_post' } },
@@ -5056,6 +5173,21 @@ Each object in <code>items[]</code> corresponds to one package at this stop. The
                         html += `<button type="button" onclick="refreshFormDropdown('${field.name}', '${field.source}')" style="padding: 6px 10px; font-size: 13px; cursor: pointer; border: 1px solid var(--border-color); border-radius: 3px; background: #f5f5f5; color: #333;">↻</button>`;
                     }
                     html += `</div>`;
+                } else if (field.type === 'location-search') {
+                    // Render location typeahead search
+                    const fillsJson = JSON.stringify(field.fills || {}).replace(/"/g, '&quot;');
+                    html += `
+                        <div id="loc-widget-${field.name}" style="position:relative;">
+                            <div id="loc-chip-${field.name}" style="display:none; align-items:center; gap:6px; padding:6px 10px; background:#e8f5e9; border:1px solid #a5d6a7; border-radius:4px; margin-bottom:4px; font-size:13px;">
+                                <span id="loc-chip-text-${field.name}"></span>
+                                <button type="button" onclick="clearLocationSearch('${field.name}', JSON.parse(this.dataset.fills))" data-fills="${fillsJson}" style="background:none;border:none;cursor:pointer;color:#2e7d32;font-size:16px;padding:0 0 0 4px;line-height:1;font-weight:bold;">×</button>
+                            </div>
+                            <input type="text" id="loc-input-${field.name}" class="form-input" placeholder="Type a town or city name..."
+                                   oninput="debouncedLocationSearch('${field.name}', JSON.parse(this.dataset.fills))" data-fills="${fillsJson}"
+                                   autocomplete="off" style="width:100%;">
+                            <div id="loc-results-${field.name}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:9999; background:#fff; border:1px solid #ccc; border-top:none; border-radius:0 0 4px 4px; max-height:220px; overflow-y:auto; box-shadow:0 4px 10px rgba(0,0,0,0.12);">
+                            </div>
+                        </div>`;
                 } else if (field.type === 'file') {
                     // Render file input
                     const multipleAttr = field.multiple ? 'multiple' : '';
@@ -5884,6 +6016,117 @@ Each object in <code>items[]</code> corresponds to one package at this stop. The
                     if (preview) preview.style.display = 'none';
                     if (closeRow) closeRow.style.display = 'block';
                 }
+            }
+        }
+
+        // ============================================================
+        // Location Search Typeahead (for location-search field type)
+        // ============================================================
+        const _locSearchTimers = {};
+        const _locSearchResults = {};
+
+        function debouncedLocationSearch(fieldName, fills) {
+            clearTimeout(_locSearchTimers[fieldName]);
+            _locSearchTimers[fieldName] = setTimeout(() => _doLocationSearch(fieldName, fills), 300);
+        }
+
+        async function _doLocationSearch(fieldName, fills) {
+            const input = document.getElementById('loc-input-' + fieldName);
+            const resultsDiv = document.getElementById('loc-results-' + fieldName);
+            if (!input || !resultsDiv) return;
+
+            const q = input.value.trim();
+            if (q.length < 2) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            const token = document.getElementById('bearerToken')?.value?.trim() || '';
+            resultsDiv.innerHTML = '<div style="padding:10px;color:#888;font-size:12px;">Searching...</div>';
+            resultsDiv.style.display = 'block';
+
+            try {
+                const resp = await fetch(`{{ url('') }}/api/v1/vendor/locations/search?q=${encodeURIComponent(q)}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': token ? 'Bearer ' + token : ''
+                    }
+                });
+                const data = await resp.json();
+                const locations = data?.data?.locations || [];
+                _locSearchResults[fieldName] = locations;
+
+                if (locations.length === 0) {
+                    resultsDiv.innerHTML = '<div style="padding:10px;color:#888;font-size:13px;">No locations found</div>';
+                } else {
+                    resultsDiv.innerHTML = locations.map((loc, i) => `
+                        <div onclick="_selectLocationResult('${fieldName}', ${i})"
+                             style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;"
+                             onmouseover="this.style.background='#f0f7ff'"
+                             onmouseout="this.style.background=''">
+                            <div style="font-size:13px;font-weight:600;color:#1a1a1a;">${loc.name}</div>
+                            <div style="font-size:11px;color:#666;margin-top:2px;">${loc.district.name}, ${loc.region.name}</div>
+                        </div>`).join('');
+                }
+                resultsDiv.style.display = 'block';
+            } catch (e) {
+                resultsDiv.style.display = 'none';
+            }
+        }
+
+        function _selectLocationResult(fieldName, index) {
+            const loc = (_locSearchResults[fieldName] || [])[index];
+            if (!loc) return;
+
+            // Determine fills from data attribute
+            const input = document.getElementById('loc-input-' + fieldName);
+            let fills = {};
+            try { fills = JSON.parse(input?.dataset?.fills || '{}'); } catch(e) {}
+
+            // Show chip, hide input
+            const chip = document.getElementById('loc-chip-' + fieldName);
+            const chipText = document.getElementById('loc-chip-text-' + fieldName);
+            const resultsDiv = document.getElementById('loc-results-' + fieldName);
+            if (chip) chip.style.display = 'flex';
+            if (chipText) chipText.textContent = loc.display;
+            if (input) input.style.display = 'none';
+            if (resultsDiv) resultsDiv.style.display = 'none';
+
+            // Fill target fields
+            if (fills.region_id) {
+                const el = document.getElementById('form-field-' + fills.region_id);
+                if (el) el.value = loc.region.id;
+            }
+            if (fills.district_id) {
+                const el = document.getElementById('form-field-' + fills.district_id);
+                if (el) el.value = loc.district.id;
+            }
+            if (fills.town) {
+                const el = document.getElementById('form-field-' + fills.town);
+                if (el) el.value = loc.name;
+            }
+        }
+
+        function clearLocationSearch(fieldName, fills) {
+            const chip = document.getElementById('loc-chip-' + fieldName);
+            const input = document.getElementById('loc-input-' + fieldName);
+            const resultsDiv = document.getElementById('loc-results-' + fieldName);
+            if (chip) chip.style.display = 'none';
+            if (input) { input.style.display = ''; input.value = ''; }
+            if (resultsDiv) resultsDiv.style.display = 'none';
+            _locSearchResults[fieldName] = [];
+
+            if (fills && fills.region_id) {
+                const el = document.getElementById('form-field-' + fills.region_id);
+                if (el) el.value = '';
+            }
+            if (fills && fills.district_id) {
+                const el = document.getElementById('form-field-' + fills.district_id);
+                if (el) el.value = '';
+            }
+            if (fills && fills.town) {
+                const el = document.getElementById('form-field-' + fills.town);
+                if (el) el.value = '';
             }
         }
     </script>

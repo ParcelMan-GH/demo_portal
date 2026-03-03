@@ -348,15 +348,14 @@ function driverPickupShowPage() {
         actionLoading: false,
         itemActionLoading: {},
         itemForms: {},
-        arriveForm: {
-            latitude: '',
-            longitude: '',
-        },
+        showFinalizeModal: false,
         finalizeForm: {
-            latitude: '',
-            longitude: '',
             notes: '',
         },
+        _lgInstance: null,
+        editingConfirmation: {},
+        confirmItemModalOpen: false,
+        confirmItemModalItem: null,
 
         async init() {
             this.pickupId = this.$el.dataset.pickupId;
@@ -371,6 +370,90 @@ function driverPickupShowPage() {
         statusLabel,
         formatDateTime,
 
+        toggleEditConfirmation(itemId) {
+            this.editingConfirmation[itemId] = !this.editingConfirmation[itemId];
+        },
+
+        openConfirmItemModal(item) {
+            this.confirmItemModalItem = item;
+            // Ensure form exists for this item
+            if (!this.itemForms[item.id]) {
+                this.itemForms[item.id] = {
+                    confirmed_quantity: item.quantity,
+                    notes: '',
+                    photos: [],
+                    remove_photo_ids: [],
+                };
+            }
+            this.confirmItemModalOpen = true;
+        },
+
+        closeConfirmItemModal() {
+            this.confirmItemModalOpen = false;
+            this.confirmItemModalItem = null;
+        },
+
+        openLightbox(url, name) {
+            this.openLightboxAt([{ url, original_name: name || '' }], 0);
+        },
+
+        openLightboxAt(images, startIndex) {
+            const els = (Array.isArray(images) ? images : []).map(img => ({
+                src: img.url,
+                thumb: img.url,
+                subHtml: img.original_name
+                    ? `<div class="lg-sub-html"><p>${img.original_name}</p></div>`
+                    : '',
+            }));
+            if (!els.length) return;
+
+            // Destroy any previous instance
+            if (this._lgInstance) {
+                try { this._lgInstance.destroy(); } catch {}
+                this._lgInstance = null;
+            }
+
+            let container = document.getElementById('_lg_container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = '_lg_container';
+                document.body.appendChild(container);
+            }
+
+            this._lgInstance = window.lightGallery(container, {
+                dynamic: true,
+                dynamicEl: els,
+                plugins: [window.lgZoom, window.lgThumbnail],
+                thumbnail: true,
+                animateThumb: true,
+                showThumbByDefault: true,
+                toggleThumb: false,
+                thumbWidth: 100,
+                thumbHeight: '65px',
+                thumbMargin: 4,
+                download: false,
+                zoomFromOrigin: false,
+                allowMediaOverlap: false,
+                speed: 300,
+                startAnimationDuration: 250,
+                loop: false,
+                mobileSettings: {
+                    controls: true,
+                    showCloseIcon: true,
+                    download: false,
+                },
+            });
+
+            this._lgInstance.openGallery(Math.max(0, Math.min(startIndex || 0, els.length - 1)));
+
+            container.addEventListener('lgAfterClose', () => {
+                if (this._lgInstance) {
+                    try { this._lgInstance.destroy(); } catch {}
+                    this._lgInstance = null;
+                }
+            }, { once: true });
+        },
+
         get canStartEnRoute() {
             return this.pickup?.status === 'assigned';
         },
@@ -384,7 +467,15 @@ function driverPickupShowPage() {
         },
 
         get canFinalize() {
-            return ['arrived', 'picking_up'].includes(this.pickup?.status || '');
+            if (!['arrived', 'picking_up'].includes(this.pickup?.status || '')) return false;
+            const items = this.pickup?.shipment?.items || [];
+            if (items.length === 0) return true;
+            return items.every((item) => item.pickup_confirmation != null);
+        },
+
+        get pendingItemsCount() {
+            const items = this.pickup?.shipment?.items || [];
+            return items.filter((item) => item.pickup_confirmation == null).length;
         },
 
         statusColor(status) {
@@ -430,10 +521,15 @@ function driverPickupShowPage() {
                 isCancelled,
                 currentIdx: Math.max(0, currentIdx),
                 total: statuses.length,
-                steps: statuses.map((s, i) => ({
-                    label: s === 'en_route' ? 'En Route' : (s === 'picking_up' ? 'Picking Up' : s.charAt(0).toUpperCase() + s.slice(1)),
-                    state: isCancelled ? 'pending' : (i < currentIdx ? 'done' : (i === currentIdx ? 'active' : 'pending')),
-                })),
+                steps: statuses.map((s, i) => {
+                    const timelineKeyMap = { assigned: 'assigned', en_route: 'en_route', arrived: 'arrived_pickup', picking_up: null, completed: 'completed' };
+                    const tKey = timelineKeyMap[s];
+                    return {
+                        label: s === 'en_route' ? 'En Route' : (s === 'picking_up' ? 'Picking Up' : s.charAt(0).toUpperCase() + s.slice(1)),
+                        state: isCancelled ? 'pending' : (i < currentIdx ? 'done' : (i === currentIdx ? 'active' : 'pending')),
+                        at: tKey ? (this.pickup?.timeline?.[tKey]?.at || null) : null,
+                    };
+                }),
             };
         },
 
@@ -560,16 +656,45 @@ function driverPickupShowPage() {
                 return;
             }
 
+            if (!navigator.geolocation) {
+                this.showAlert('error', 'Location services are not supported by your browser.');
+                return;
+            }
+
             this.actionLoading = true;
+
+            // Prompt browser for location — triggers permission dialog if not yet decided
+            let latitude = null;
+            let longitude = null;
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 12000,
+                        maximumAge: 0,
+                    });
+                });
+                latitude = pos.coords.latitude;
+                longitude = pos.coords.longitude;
+            } catch (err) {
+                this.actionLoading = false;
+                if (err.code === 1) {
+                    // Permission denied
+                    this.showAlert('error', 'Location access was denied. Please enable location in your browser or device settings and try again.');
+                } else if (err.code === 2) {
+                    this.showAlert('error', 'Your location could not be determined. Please check your GPS or Wi-Fi and try again.');
+                } else {
+                    this.showAlert('error', 'Location request timed out. Please try again.');
+                }
+                return;
+            }
+
             let result = null;
             try {
                 result = await apiRequest(`/api/v1/driver/pickups/${this.pickup.id}/arrive`, {
                     method: 'POST',
                     role: 'driver',
-                    data: {
-                        latitude: this.arriveForm.latitude,
-                        longitude: this.arriveForm.longitude,
-                    },
+                    data: { latitude, longitude },
                 });
             } catch {
                 this.showAlert('error', 'Unable to mark arrival right now.');
@@ -669,6 +794,9 @@ function driverPickupShowPage() {
                 return;
             }
 
+            this.editingConfirmation[item.id] = false;
+            this.confirmItemModalOpen = false;
+            this.confirmItemModalItem = null;
             this.showAlert('success', result.message);
             await this.loadPickup();
         },
@@ -678,22 +806,47 @@ function driverPickupShowPage() {
                 return;
             }
 
-            const latitude = String(this.finalizeForm.latitude || '').trim();
-            const longitude = String(this.finalizeForm.longitude || '').trim();
-            if ((latitude && !longitude) || (!latitude && longitude)) {
-                this.showAlert('error', 'Latitude and longitude must be provided together.');
+            if (!navigator.geolocation) {
+                this.showAlert('error', 'Location services are not supported by your browser.');
                 return;
             }
 
+            this.showFinalizeModal = false;
             this.actionLoading = true;
+
+            // Capture location automatically
+            let latitude = null;
+            let longitude = null;
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 12000,
+                        maximumAge: 0,
+                    });
+                });
+                latitude = pos.coords.latitude;
+                longitude = pos.coords.longitude;
+            } catch (err) {
+                this.actionLoading = false;
+                if (err.code === 1) {
+                    this.showAlert('error', 'Location access was denied. Please enable location in your browser or device settings and try again.');
+                } else if (err.code === 2) {
+                    this.showAlert('error', 'Your location could not be determined. Please check your GPS or Wi-Fi and try again.');
+                } else {
+                    this.showAlert('error', 'Location request timed out. Please try again.');
+                }
+                return;
+            }
+
             let result = null;
             try {
                 result = await apiRequest(`/api/v1/driver/pickups/${this.pickup.id}/confirm-pickup`, {
                     method: 'POST',
                     role: 'driver',
                     data: {
-                        latitude: latitude || null,
-                        longitude: longitude || null,
+                        latitude,
+                        longitude,
                         notes: String(this.finalizeForm.notes || '').trim() || null,
                     },
                 });

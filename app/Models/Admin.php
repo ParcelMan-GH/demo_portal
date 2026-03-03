@@ -26,6 +26,7 @@ class Admin extends Authenticatable
         'is_active',
         'last_login_at',
         'created_by_admin_id',
+        'fcm_token',
     ];
 
     /**

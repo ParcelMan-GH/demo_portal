@@ -339,5 +339,26 @@
          data-flash-success="{{ session('success') }}"
          data-flash-error="{{ session('error') }}"></div>
     @stack('scripts')
+    @php
+        $pushEnabled = \App\Models\PlatformSetting::getValue('push_notifications_enabled');
+        $fcmApiKey   = \App\Models\PlatformSetting::getValue('firebase_web_api_key');
+    @endphp
+    @if($pushEnabled && $fcmApiKey)
+    <script>
+        window.__fcmConfig = {
+            apiKey:            @json(\App\Models\PlatformSetting::getValue('firebase_web_api_key')),
+            authDomain:        @json(\App\Models\PlatformSetting::getValue('firebase_auth_domain')),
+            projectId:         @json(\App\Models\PlatformSetting::getValue('firebase_project_id')),
+            messagingSenderId: @json(\App\Models\PlatformSetting::getValue('firebase_messaging_sender_id')),
+            appId:             @json(\App\Models\PlatformSetting::getValue('firebase_app_id')),
+            vapidKey:          @json(\App\Models\PlatformSetting::getValue('firebase_vapid_key')),
+        };
+        window.__fcmEndpoint = {
+            url: '{{ route('admin.fcm-token') }}',
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        };
+    </script>
+    @vite(['resources/js/web/firebase-push.js'])
+    @endif
 </body>
 </html>

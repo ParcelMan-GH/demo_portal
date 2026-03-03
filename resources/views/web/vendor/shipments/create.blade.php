@@ -307,40 +307,59 @@
                                 <div class="mb-4 flex flex-wrap gap-x-5 gap-y-2">
                                     <label class="flex items-center gap-2 cursor-pointer">
                                         <input type="radio" x-model="form.pickup_location_method" value="dropdown"
-                                               @change="form.pickup_latitude = ''; form.pickup_longitude = '';"
+                                               @change="form.pickup_latitude = ''; form.pickup_longitude = ''; clearPickupLocation();"
                                                class="h-4 w-4 accent-slate-700">
-                                        <span class="text-xs font-medium text-slate-700">Region + District</span>
+                                        <span class="text-xs font-medium text-slate-700">Location Search</span>
                                     </label>
                                     <label class="flex items-center gap-2 cursor-pointer">
                                         <input type="radio" x-model="form.pickup_location_method" value="coordinates"
-                                               @change="form.pickup_town = ''; form.pickup_region_id = ''; form.pickup_district_id = '';"
+                                               @change="form.pickup_town = ''; form.pickup_region_id = ''; form.pickup_district_id = ''; clearPickupLocation();"
                                                class="h-4 w-4 accent-slate-700">
                                         <span class="text-xs font-medium text-slate-700">Coordinates</span>
                                     </label>
                                     <label class="flex items-center gap-2 cursor-pointer">
                                         <input type="radio" x-model="form.pickup_location_method" value="gh_post"
-                                               @change="form.pickup_latitude = ''; form.pickup_longitude = ''; form.pickup_town = '';"
+                                               @change="form.pickup_latitude = ''; form.pickup_longitude = ''; form.pickup_town = ''; clearPickupLocation();"
                                                class="h-4 w-4 accent-slate-700">
                                         <span class="text-xs font-medium text-slate-700">Ghana Post Address</span>
                                     </label>
                                 </div>
 
-                                {{-- Region/District --}}
-                                <div class="grid gap-4 sm:grid-cols-2" x-show="form.pickup_location_method === 'dropdown'" x-cloak>
-                                    <div>
-                                        <label class="form-label">Region <span class="text-red-400">*</span></label>
-                                        <select x-model="form.pickup_region_id" @change="onPickupRegionChange()" class="vendor-input" required>
-                                            <option value="">Select region</option>
-                                            <template x-for="region in regions" :key="region.id"><option :value="String(region.id)" x-text="region.name"></option></template>
-                                        </select>
+                                {{-- Location Typeahead (dropdown method) --}}
+                                <div x-show="form.pickup_location_method === 'dropdown'" x-cloak>
+                                    <div class="loc-typeahead">
+                                        <label class="form-label">Location <span class="text-red-400">*</span></label>
+                                        {{-- Selected location chip --}}
+                                        <div x-show="pickupSelectedLocation" class="loc-selected">
+                                            <span x-text="pickupSelectedLocation?.display"></span>
+                                            <button type="button" @click="clearPickupLocation()" class="loc-clear-btn">×</button>
+                                        </div>
+                                        {{-- Search input --}}
+                                        <div x-show="!pickupSelectedLocation" class="relative">
+                                            <input x-model="pickupLocationQuery"
+                                                   @input.debounce.250ms="searchPickupLocationTypeahead()"
+                                                   type="text"
+                                                   class="vendor-input pr-10"
+                                                   placeholder="Type a town or city name...">
+                                            <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                                                <svg x-show="pickupLocationSearching" class="h-4 w-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                                <svg x-show="!pickupLocationSearching" class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                            </div>
+                                            <div x-show="pickupLocationResults.length > 0" x-cloak class="loc-dropdown">
+                                                <template x-for="loc in pickupLocationResults" :key="loc.id">
+                                                    <button type="button" @click="selectPickupLocation(loc)" class="loc-option">
+                                                        <div class="loc-option-name" x-text="loc.name"></div>
+                                                        <div class="loc-option-sub" x-text="`${loc.district.name}, ${loc.region.name}`"></div>
+                                                    </button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        {{-- pickup_town is auto-filled from location search, no editable field needed --}}
+                                        <input type="hidden" x-model="form.pickup_town">
                                     </div>
-                                    <div>
-                                        <label class="form-label">District <span class="text-red-400">*</span></label>
-                                        <select x-model="form.pickup_district_id" class="vendor-input" required>
-                                            <option value="">Select district</option>
-                                            <template x-for="district in pickupDistricts" :key="district.id"><option :value="String(district.id)" x-text="district.name"></option></template>
-                                        </select>
-                                    </div>
+                                    {{-- Hidden fields for region/district IDs --}}
+                                    <input type="hidden" x-model="form.pickup_region_id">
+                                    <input type="hidden" x-model="form.pickup_district_id">
                                 </div>
 
                                 {{-- Coordinates with Map Search --}}
@@ -373,16 +392,10 @@
                                     <input type="hidden" x-model="form.pickup_longitude" required>
                                 </div>
 
-                                {{-- Town + Landmark (dropdown only) --}}
-                                <div class="mt-4 grid gap-4 sm:grid-cols-2" x-show="form.pickup_location_method === 'dropdown'" x-cloak>
-                                    <div>
-                                        <label class="form-label">Town <span class="text-red-400">*</span></label>
-                                        <input x-model="form.pickup_town" type="text" class="vendor-input" placeholder="Pickup town or city">
-                                    </div>
-                                    <div>
-                                        <label class="form-label">Landmark</label>
-                                        <input x-model="form.pickup_landmark" type="text" class="vendor-input" placeholder="Nearby landmark">
-                                    </div>
+                                {{-- Landmark (dropdown only, after typeahead) --}}
+                                <div class="mt-4" x-show="form.pickup_location_method === 'dropdown' && pickupSelectedLocation" x-cloak>
+                                    <label class="form-label">Landmark</label>
+                                    <input x-model="form.pickup_landmark" type="text" class="vendor-input" placeholder="Nearby landmark">
                                 </div>
 
                                 {{-- Ghana Post Address + Landmark --}}
@@ -502,40 +515,58 @@
                                 <div class="mb-4 flex flex-wrap gap-x-5 gap-y-2">
                                     <label class="flex items-center gap-2 cursor-pointer">
                                         <input type="radio" x-model="form.delivery_location_method" value="dropdown"
-                                               @change="form.delivery_latitude = ''; form.delivery_longitude = '';"
+                                               @change="form.delivery_latitude = ''; form.delivery_longitude = ''; clearDeliveryLocation();"
                                                class="h-4 w-4 accent-slate-700">
-                                        <span class="text-xs font-medium text-slate-700">Region + District</span>
+                                        <span class="text-xs font-medium text-slate-700">Location Search</span>
                                     </label>
                                     <label class="flex items-center gap-2 cursor-pointer">
                                         <input type="radio" x-model="form.delivery_location_method" value="coordinates"
-                                               @change="form.delivery_town = ''; form.delivery_region_id = ''; form.delivery_district_id = '';"
+                                               @change="form.delivery_town = ''; form.delivery_region_id = ''; form.delivery_district_id = ''; clearDeliveryLocation();"
                                                class="h-4 w-4 accent-slate-700">
                                         <span class="text-xs font-medium text-slate-700">Coordinates</span>
                                     </label>
                                     <label class="flex items-center gap-2 cursor-pointer">
                                         <input type="radio" x-model="form.delivery_location_method" value="gh_post"
-                                               @change="form.delivery_latitude = ''; form.delivery_longitude = ''; form.delivery_town = '';"
+                                               @change="form.delivery_latitude = ''; form.delivery_longitude = ''; form.delivery_town = ''; clearDeliveryLocation();"
                                                class="h-4 w-4 accent-slate-700">
                                         <span class="text-xs font-medium text-slate-700">Ghana Post Address</span>
                                     </label>
                                 </div>
 
-                                {{-- Region/District --}}
-                                <div class="grid gap-4 sm:grid-cols-2" x-show="form.delivery_location_method === 'dropdown'" x-cloak>
-                                    <div>
-                                        <label class="form-label">Region</label>
-                                        <select x-model="form.delivery_region_id" @change="onDeliveryRegionChange()" class="vendor-input">
-                                            <option value="">Select region</option>
-                                            <template x-for="region in regions" :key="region.id"><option :value="String(region.id)" x-text="region.name"></option></template>
-                                        </select>
+                                {{-- Location Typeahead (dropdown method) --}}
+                                <div x-show="form.delivery_location_method === 'dropdown'" x-cloak>
+                                    <div class="loc-typeahead">
+                                        <label class="form-label">Location</label>
+                                        {{-- Selected location chip --}}
+                                        <div x-show="deliverySelectedLocation" class="loc-selected">
+                                            <span x-text="deliverySelectedLocation?.display"></span>
+                                            <button type="button" @click="clearDeliveryLocation()" class="loc-clear-btn">×</button>
+                                        </div>
+                                        {{-- Search input --}}
+                                        <div x-show="!deliverySelectedLocation" class="relative">
+                                            <input x-model="deliveryLocationQuery"
+                                                   @input.debounce.250ms="searchDeliveryLocationTypeahead()"
+                                                   type="text"
+                                                   class="vendor-input pr-10"
+                                                   placeholder="Type a town or city name...">
+                                            <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                                                <svg x-show="deliveryLocationSearching" class="h-4 w-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                                <svg x-show="!deliveryLocationSearching" class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                            </div>
+                                            <div x-show="deliveryLocationResults.length > 0" x-cloak class="loc-dropdown">
+                                                <template x-for="loc in deliveryLocationResults" :key="loc.id">
+                                                    <button type="button" @click="selectDeliveryLocation(loc)" class="loc-option">
+                                                        <div class="loc-option-name" x-text="loc.name"></div>
+                                                        <div class="loc-option-sub" x-text="`${loc.district.name}, ${loc.region.name}`"></div>
+                                                    </button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        {{-- delivery_town is auto-filled from location search, no editable field needed --}}
+                                        <input type="hidden" x-model="form.delivery_town">
                                     </div>
-                                    <div>
-                                        <label class="form-label">District</label>
-                                        <select x-model="form.delivery_district_id" class="vendor-input">
-                                            <option value="">Select district</option>
-                                            <template x-for="district in deliveryDistricts" :key="district.id"><option :value="String(district.id)" x-text="district.name"></option></template>
-                                        </select>
-                                    </div>
+                                    <input type="hidden" x-model="form.delivery_region_id">
+                                    <input type="hidden" x-model="form.delivery_district_id">
                                 </div>
 
                                 {{-- Coordinates with Map Search --}}
@@ -568,16 +599,10 @@
                                     <input type="hidden" x-model="form.delivery_longitude">
                                 </div>
 
-                                {{-- Town + Landmark (dropdown only) --}}
-                                <div class="mt-4 grid gap-4 sm:grid-cols-2" x-show="form.delivery_location_method === 'dropdown'" x-cloak>
-                                    <div>
-                                        <label class="form-label">Town</label>
-                                        <input x-model="form.delivery_town" type="text" class="vendor-input" placeholder="Delivery town or city">
-                                    </div>
-                                    <div>
-                                        <label class="form-label">Landmark</label>
-                                        <input x-model="form.delivery_landmark" type="text" class="vendor-input" placeholder="Nearby landmark">
-                                    </div>
+                                {{-- Landmark (dropdown only, after typeahead) --}}
+                                <div class="mt-4" x-show="form.delivery_location_method === 'dropdown' && deliverySelectedLocation" x-cloak>
+                                    <label class="form-label">Landmark</label>
+                                    <input x-model="form.delivery_landmark" type="text" class="vendor-input" placeholder="Nearby landmark">
                                 </div>
 
                                 {{-- Ghana Post Address + Landmark --}}

@@ -39,6 +39,14 @@ class Region extends Model
     }
 
     /**
+     * Get the locations in this region.
+     */
+    public function locations(): HasMany
+    {
+        return $this->hasMany(Location::class);
+    }
+
+    /**
      * Scope a query to only include active regions.
      */
     public function scopeActive($query)

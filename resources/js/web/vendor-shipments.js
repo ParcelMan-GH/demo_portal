@@ -32,7 +32,7 @@ const DESTINATION_MODE_OPTIONS = [
 ];
 
 const LOCATION_METHOD_OPTIONS = [
-    { value: 'dropdown', label: 'Region + district' },
+    { value: 'dropdown', label: 'Location search' },
     { value: 'coordinates', label: 'Coordinates' },
     { value: 'gh_post', label: 'Ghana Post address' },
 ];
@@ -536,6 +536,15 @@ function vendorShipmentFormPage() {
         deliverySearchQuery: '',
         deliverySearchResults: [],
         deliverySearching: false,
+        // Location typeahead state (dropdown method)
+        pickupLocationQuery: '',
+        pickupLocationResults: [],
+        pickupLocationSearching: false,
+        pickupSelectedLocation: null,
+        deliveryLocationQuery: '',
+        deliveryLocationResults: [],
+        deliveryLocationSearching: false,
+        deliverySelectedLocation: null,
 
         async init() {
             this.mode = this.$el.dataset.mode || 'create';
@@ -840,6 +849,9 @@ function vendorShipmentFormPage() {
                 this.form.delivery_gh_post_address = '';
                 this.form.delivery_landmark = '';
                 this.form.delivery_instructions = '';
+                this.deliverySelectedLocation = null;
+                this.deliveryLocationQuery = '';
+                this.deliveryLocationResults = [];
             }
         },
 
@@ -885,6 +897,67 @@ function vendorShipmentFormPage() {
             this.form.delivery_longitude = result.lon;
             this.deliverySearchQuery = result.display_name;
             this.deliverySearchResults = [];
+        },
+
+        // Location typeahead methods (dropdown method)
+        async searchPickupLocationTypeahead() {
+            if (this.pickupLocationQuery.length < 2) { this.pickupLocationResults = []; return; }
+            this.pickupLocationSearching = true;
+            try {
+                const result = await apiRequest(
+                    `/api/v1/vendor/locations/search?q=${encodeURIComponent(this.pickupLocationQuery)}`,
+                    { role: 'vendor' }
+                );
+                this.pickupLocationResults = result.payload?.data?.locations || [];
+            } catch { this.pickupLocationResults = []; }
+            this.pickupLocationSearching = false;
+        },
+
+        selectPickupLocation(loc) {
+            this.pickupSelectedLocation = loc;
+            this.pickupLocationQuery = loc.display;
+            this.pickupLocationResults = [];
+            this.form.pickup_region_id = String(loc.region.id);
+            this.form.pickup_district_id = String(loc.district.id);
+            this.form.pickup_town = loc.name;
+        },
+
+        clearPickupLocation() {
+            this.pickupSelectedLocation = null;
+            this.pickupLocationQuery = '';
+            this.form.pickup_region_id = '';
+            this.form.pickup_district_id = '';
+            this.form.pickup_town = '';
+        },
+
+        async searchDeliveryLocationTypeahead() {
+            if (this.deliveryLocationQuery.length < 2) { this.deliveryLocationResults = []; return; }
+            this.deliveryLocationSearching = true;
+            try {
+                const result = await apiRequest(
+                    `/api/v1/vendor/locations/search?q=${encodeURIComponent(this.deliveryLocationQuery)}`,
+                    { role: 'vendor' }
+                );
+                this.deliveryLocationResults = result.payload?.data?.locations || [];
+            } catch { this.deliveryLocationResults = []; }
+            this.deliveryLocationSearching = false;
+        },
+
+        selectDeliveryLocation(loc) {
+            this.deliverySelectedLocation = loc;
+            this.deliveryLocationQuery = loc.display;
+            this.deliveryLocationResults = [];
+            this.form.delivery_region_id = String(loc.region.id);
+            this.form.delivery_district_id = String(loc.district.id);
+            this.form.delivery_town = loc.name;
+        },
+
+        clearDeliveryLocation() {
+            this.deliverySelectedLocation = null;
+            this.deliveryLocationQuery = '';
+            this.form.delivery_region_id = '';
+            this.form.delivery_district_id = '';
+            this.form.delivery_town = '';
         },
 
         async saveShipment() {
@@ -961,6 +1034,16 @@ function vendorShipmentShowPage() {
         imageUploadFiles: {},
         imageUploadState: {},
         confirmDialog: null,
+        // Location typeahead state for add-item form
+        itemLocationQuery: '',
+        itemLocationResults: [],
+        itemLocationSearching: false,
+        itemSelectedLocation: null,
+        // Location typeahead state for edit-item form
+        editItemLocationQuery: '',
+        editItemLocationResults: [],
+        editItemLocationSearching: false,
+        editItemSelectedLocation: null,
 
         async init() {
             this.shipmentId = this.$el.dataset.shipmentId;
@@ -1187,6 +1270,68 @@ function vendorShipmentShowPage() {
             }
         },
 
+        // Location typeahead for add-item form
+        async searchItemLocation() {
+            if (this.itemLocationQuery.length < 2) { this.itemLocationResults = []; return; }
+            this.itemLocationSearching = true;
+            try {
+                const result = await apiRequest(
+                    `/api/v1/vendor/locations/search?q=${encodeURIComponent(this.itemLocationQuery)}`,
+                    { role: 'vendor' }
+                );
+                this.itemLocationResults = result.payload?.data?.locations || [];
+            } catch { this.itemLocationResults = []; }
+            this.itemLocationSearching = false;
+        },
+
+        selectItemLocation(loc) {
+            this.itemSelectedLocation = loc;
+            this.itemLocationQuery = loc.display;
+            this.itemLocationResults = [];
+            this.itemForm.delivery_region_id = String(loc.region.id);
+            this.itemForm.delivery_district_id = String(loc.district.id);
+            this.itemForm.delivery_town = loc.name;
+        },
+
+        clearItemLocation() {
+            this.itemSelectedLocation = null;
+            this.itemLocationQuery = '';
+            this.itemForm.delivery_region_id = '';
+            this.itemForm.delivery_district_id = '';
+            this.itemForm.delivery_town = '';
+        },
+
+        // Location typeahead for edit-item form
+        async searchEditItemLocation() {
+            if (this.editItemLocationQuery.length < 2) { this.editItemLocationResults = []; return; }
+            this.editItemLocationSearching = true;
+            try {
+                const result = await apiRequest(
+                    `/api/v1/vendor/locations/search?q=${encodeURIComponent(this.editItemLocationQuery)}`,
+                    { role: 'vendor' }
+                );
+                this.editItemLocationResults = result.payload?.data?.locations || [];
+            } catch { this.editItemLocationResults = []; }
+            this.editItemLocationSearching = false;
+        },
+
+        selectEditItemLocation(loc) {
+            this.editItemSelectedLocation = loc;
+            this.editItemLocationQuery = loc.display;
+            this.editItemLocationResults = [];
+            this.editItemForm.delivery_region_id = String(loc.region.id);
+            this.editItemForm.delivery_district_id = String(loc.district.id);
+            this.editItemForm.delivery_town = loc.name;
+        },
+
+        clearEditItemLocation() {
+            this.editItemSelectedLocation = null;
+            this.editItemLocationQuery = '';
+            this.editItemForm.delivery_region_id = '';
+            this.editItemForm.delivery_district_id = '';
+            this.editItemForm.delivery_town = '';
+        },
+
         onItemImagesSelected(event, formType = 'create') {
             let files = Array.from(event.target.files || []);
             if (files.length > 5) {
@@ -1207,6 +1352,9 @@ function vendorShipmentShowPage() {
             this.itemErrors = [];
             this.itemForm = emptyItemForm();
             this.itemDistricts = [];
+            this.itemSelectedLocation = null;
+            this.itemLocationQuery = '';
+            this.itemLocationResults = [];
         },
 
         cancelAddItem() {
@@ -1214,6 +1362,9 @@ function vendorShipmentShowPage() {
             this.itemForm = emptyItemForm();
             this.itemDistricts = [];
             this.itemErrors = [];
+            this.itemSelectedLocation = null;
+            this.itemLocationQuery = '';
+            this.itemLocationResults = [];
         },
 
         async addItem() {
@@ -1297,6 +1448,9 @@ function vendorShipmentShowPage() {
             this.editItemForm = emptyItemForm();
             this.editItemDistricts = [];
             this.editItemErrors = [];
+            this.editItemSelectedLocation = null;
+            this.editItemLocationQuery = '';
+            this.editItemLocationResults = [];
         },
 
         async updateItem(item) {

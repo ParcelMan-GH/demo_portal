@@ -93,6 +93,11 @@ class VendorAuthService
             ->first();
 
         if ($vendor) {
+            // Save FCM token if provided at login time (web portal sends it during verify-phone)
+            if (!empty($request->input('fcm_token'))) {
+                $vendor->update(['fcm_token' => $request->input('fcm_token')]);
+            }
+
             $token = $vendor->createToken('vendor-app')->plainTextToken;
 
             $this->activityLogService->log(
@@ -168,6 +173,11 @@ class VendorAuthService
             'is_active' => true,
         ]);
 
+        // Save FCM token if provided at registration time
+        if (!empty($data['fcm_token'])) {
+            $vendor->update(['fcm_token' => $data['fcm_token']]);
+        }
+
         $token = $vendor->createToken('vendor-app')->plainTextToken;
 
         $this->activityLogService->log(
@@ -177,6 +187,8 @@ class VendorAuthService
             $request,
             ['phone' => $phone]
         );
+
+        event(new \App\Events\VendorRegistered($vendor));
 
         return [
             'success' => true,

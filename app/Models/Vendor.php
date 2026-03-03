@@ -16,6 +16,7 @@ class Vendor extends Model
         'phone',
         'email',
         'is_active',
+        'fcm_token',
     ];
 
     protected $casts = [

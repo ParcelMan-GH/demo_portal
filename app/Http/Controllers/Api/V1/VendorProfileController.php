@@ -46,4 +46,16 @@ class VendorProfileController extends Controller
 
         return response()->json($result);
     }
+
+    /**
+     * Update vendor FCM device token.
+     * POST /api/v1/vendor/fcm-token
+     */
+    public function updateFcmToken(Request $request): JsonResponse
+    {
+        $request->validate(['fcm_token' => ['required', 'string', 'max:512']]);
+        $vendor = $request->user();
+        $vendor->update(['fcm_token' => $request->fcm_token]);
+        return response()->json(['success' => true, 'message' => 'FCM token updated.']);
+    }
 }

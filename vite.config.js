@@ -15,6 +15,7 @@ export default defineConfig({
                 'resources/js/admin/app.js',
                 'resources/js/warehouse/app.js',
                 'resources/js/admin/modules/auth/login.js',
+                'resources/js/web/firebase-push.js',
             ],
             refresh: true,
         }),

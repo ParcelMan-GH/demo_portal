@@ -77,22 +77,6 @@
                 </a>
                 @endhasPermission
 
-                @hasPermission('shipments.view')
-                <a href="{{ route('admin.shipments.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.shipments.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                        </svg>
-                    </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Shipments</span>
-                    <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Shipments</span>
-                    </template>
-                </a>
-                @endhasPermission
-
                 @hasPermission('drivers.view')
                 <a href="{{ route('admin.drivers.index') }}"
                    class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.drivers.*') ? 'active text-white' : '' }}"
@@ -111,17 +95,105 @@
                 @endhasPermission
 
                 @hasPermission('shipments.view')
-                <a href="{{ route('admin.dashboard') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.deliveries.*') ? 'active text-white' : '' }}"
+                <a href="{{ route('admin.shipments.index') }}"
+                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.shipments.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                    </div>
+                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Shipments</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Shipments</span>
+                    </template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('invoices.view')
+                <a href="{{ route('admin.invoices.index') }}"
+                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.invoices.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                        </svg>
+                    </div>
+                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Invoices</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Invoices</span>
+                    </template>
+                </a>
+                @endhasPermission
+
+                <!-- LOGISTICS Section -->
+                <div class="mt-4 mb-2 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
+                    <div class="section-label flex items-center gap-3">
+                        <span x-show="!sidebarCollapsed" class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.12em] whitespace-nowrap">Logistics</span>
+                        <span x-show="sidebarCollapsed" x-cloak class="block w-8 h-[2px] bg-gradient-to-r from-slate-600 to-transparent mx-auto rounded-full"></span>
+                    </div>
+                </div>
+
+                @hasPermission('shipments.view')
+                <a href="{{ route('admin.shipments.index') }}?status=pickup_assigned"
+                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->is('admin/shipments') && request('status') === 'pickup_assigned' ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                        </svg>
+                    </div>
+                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Pickup Assignments</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Pickup Assignments</span>
+                    </template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('shipments.view')
+                <a href="{{ route('admin.delivery-runs.index') }}"
+                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.delivery-runs.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Deliveries</span>
+                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Delivery Runs</span>
                     <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Deliveries</span>
+                        <span class="sidebar-tooltip">Delivery Runs</span>
+                    </template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('shipments.view')
+                <a href="{{ route('admin.transport-manifests.index') }}"
+                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.transport-manifests.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                        </svg>
+                    </div>
+                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Transports</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Transport Manifests</span>
+                    </template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('shipments.view')
+                <a href="{{ route('admin.sort-batches.index') }}"
+                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.sort-batches.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                        </svg>
+                    </div>
+                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Sort Batches</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Sort Batches</span>
                     </template>
                 </a>
                 @endhasPermission
@@ -245,6 +317,54 @@
                 @endif
 
                 @hasPermission('settings.view')
+                <a href="{{ route('admin.locations.index') }}"
+                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.locations.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                        </svg>
+                    </div>
+                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Locations</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Locations</span>
+                    </template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('settings.view')
+                <a href="{{ route('admin.notifications.index') }}"
+                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.notifications.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                        </svg>
+                    </div>
+                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Notification Logs</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Notification Logs</span>
+                    </template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('settings.view')
+                <a href="{{ route('admin.marketing.index') }}"
+                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.marketing.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                        </svg>
+                    </div>
+                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Marketing</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Marketing Broadcasts</span>
+                    </template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('settings.view')
                 <a href="{{ route('admin.settings.index') }}"
                    class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.settings.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
@@ -323,18 +443,152 @@
                 </div>
 
                 <!-- Search (Center) -->
-                <div class="hidden md:flex flex-1 justify-center px-8">
+                <div class="hidden md:flex flex-1 justify-center px-8"
+                     x-data="{
+                         query: '',
+                         results: {},
+                         searching: false,
+                         open: false,
+                         _timer: null,
+                         search() {
+                             clearTimeout(this._timer);
+                             if (this.query.length < 2) { this.results = {}; this.open = false; return; }
+                             this._timer = setTimeout(async () => {
+                                 this.searching = true;
+                                 try {
+                                     const r = await fetch('/admin/search?q=' + encodeURIComponent(this.query), {
+                                         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+                                     });
+                                     this.results = (await r.json()).data || {};
+                                     this.open = true;
+                                 } catch(e) {}
+                                 this.searching = false;
+                             }, 300);
+                         },
+                         close() { this.open = false; this.query = ''; this.results = {}; }
+                     }"
+                     @keydown.escape.window="close()"
+                     @click.away="open = false">
                     <div class="relative w-full max-w-md">
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg x-show="!searching" class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                            <svg x-show="searching" x-cloak class="w-4 h-4 text-primary-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                             </svg>
                         </div>
                         <input type="text"
-                               placeholder="Search anything..."
+                               x-model="query"
+                               @input="search()"
+                               @focus="if(query.length >= 2) open = true"
+                               placeholder="Search shipments, vendors, drivers..."
                                class="w-full h-9 pl-10 pr-16 text-[13px] bg-slate-50/80 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-300 focus:bg-white transition-all placeholder-slate-400">
                         <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
                             <span class="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded-md border border-slate-200/60 font-medium tracking-wide">⌘K</span>
+                        </div>
+
+                        {{-- Results Dropdown --}}
+                        <div x-show="open"
+                             x-cloak
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 translate-y-1"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             class="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-xl rounded-xl shadow-xl shadow-slate-200/60 border border-slate-100/80 z-50 max-h-[420px] overflow-y-auto">
+
+                            {{-- Shipments --}}
+                            <template x-if="results.shipments && results.shipments.length">
+                                <div>
+                                    <div class="px-3 pt-2 pb-1">
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Shipments</span>
+                                    </div>
+                                    <template x-for="item in results.shipments" :key="item.id">
+                                        <a :href="item.url" @click="close()" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors">
+                                            <div class="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                                <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <p class="text-[12px] font-semibold text-slate-800 truncate" x-text="item.label"></p>
+                                                <p class="text-[11px] text-slate-400 truncate" x-text="item.sub"></p>
+                                            </div>
+                                            <span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap" x-text="item.status"></span>
+                                        </a>
+                                    </template>
+                                </div>
+                            </template>
+
+                            {{-- Vendors --}}
+                            <template x-if="results.vendors && results.vendors.length">
+                                <div>
+                                    <div class="px-3 pt-2 pb-1">
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Vendors</span>
+                                    </div>
+                                    <template x-for="item in results.vendors" :key="item.id">
+                                        <a :href="item.url" @click="close()" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors">
+                                            <div class="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                                <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <p class="text-[12px] font-semibold text-slate-800 truncate" x-text="item.label"></p>
+                                                <p class="text-[11px] text-slate-400 truncate" x-text="item.sub"></p>
+                                            </div>
+                                        </a>
+                                    </template>
+                                </div>
+                            </template>
+
+                            {{-- Drivers --}}
+                            <template x-if="results.drivers && results.drivers.length">
+                                <div>
+                                    <div class="px-3 pt-2 pb-1">
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Drivers</span>
+                                    </div>
+                                    <template x-for="item in results.drivers" :key="item.id">
+                                        <a :href="item.url" @click="close()" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors">
+                                            <div class="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                                <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <p class="text-[12px] font-semibold text-slate-800 truncate" x-text="item.label"></p>
+                                                <p class="text-[11px] text-slate-400 truncate" x-text="item.sub"></p>
+                                            </div>
+                                        </a>
+                                    </template>
+                                </div>
+                            </template>
+
+                            {{-- Invoices --}}
+                            <template x-if="results.invoices && results.invoices.length">
+                                <div>
+                                    <div class="px-3 pt-2 pb-1">
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Invoices</span>
+                                    </div>
+                                    <template x-for="item in results.invoices" :key="item.id">
+                                        <a :href="item.url" @click="close()" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors">
+                                            <div class="w-7 h-7 rounded-lg bg-rose-100 flex items-center justify-center flex-shrink-0">
+                                                <svg class="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <p class="text-[12px] font-semibold text-slate-800 truncate" x-text="item.label"></p>
+                                                <p class="text-[11px] text-slate-400 truncate" x-text="item.sub"></p>
+                                            </div>
+                                            <span class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap" x-text="item.status"></span>
+                                        </a>
+                                    </template>
+                                </div>
+                            </template>
+
+                            {{-- Empty state --}}
+                            <template x-if="open && !searching && !results.shipments?.length && !results.vendors?.length && !results.drivers?.length && !results.invoices?.length">
+                                <div class="px-4 py-6 text-center">
+                                    <p class="text-[12px] text-slate-400">No results for "<span x-text="query"></span>"</p>
+                                </div>
+                            </template>
+
+                            <div class="border-t border-slate-100/80 mt-1 px-3 py-2">
+                                <p class="text-[10px] text-slate-400">Press <kbd class="bg-slate-100 px-1 rounded text-[10px]">Esc</kbd> to close</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -350,18 +604,6 @@
                         <span class="mx-1.5 text-slate-300">|</span>
                         <span x-data x-init="setInterval(() => $el.textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), 1000)"></span>
                     </div>
-
-                    <!-- Dark Mode Toggle -->
-                    <button @click="darkMode = !darkMode"
-                            class="flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100/80 transition-all"
-                            title="Toggle Dark Mode">
-                        <svg x-show="!darkMode" class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                        </svg>
-                        <svg x-show="darkMode" x-cloak class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-                        </svg>
-                    </button>
 
                     <!-- Create Button with Dropdown -->
                     <div class="relative">
@@ -396,21 +638,21 @@
                                 New Vendor
                             </a>
                             @endhasPermission
-                            @hasPermission('shipments.create')
-                            <a href="#" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
-                                <svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                </svg>
-                                New Shipment
-                            </a>
-                            @endhasPermission
                             @hasPermission('drivers.create')
-                            <a href="#" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
+                            <a href="{{ route('admin.drivers.index') }}" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
                                 <svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                                 </svg>
                                 New Driver
+                            </a>
+                            @endhasPermission
+                            @hasPermission('shipments.assign_driver')
+                            <a href="{{ route('admin.shipments.index') }}?status=submitted" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
+                                <svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                                </svg>
+                                Assign Pickup
                             </a>
                             @endhasPermission
                             @hasPermission('users.create')
@@ -419,6 +661,14 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
                                 </svg>
                                 New User
+                            </a>
+                            @endhasPermission
+                            @hasPermission('settings.view')
+                            <a href="{{ route('admin.locations.index') }}" class="flex items-center px-3 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
+                                <svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                                </svg>
+                                New Location
                             </a>
                             @endhasPermission
                         </div>
@@ -467,7 +717,7 @@
                                 <p class="text-[11px] text-slate-400 mt-0.5">{{ Auth::guard('admin')->user()->email }}</p>
                             </div>
                             <div class="py-1">
-                                <a href="{{ route('admin.admins.show', Auth::guard('admin')->user()) }}" class="flex items-center px-3.5 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
+                                <a href="{{ route('admin.profile.edit') }}" class="flex items-center px-3.5 py-2 text-[12px] text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 transition-colors rounded-lg mx-1">
                                     <svg class="w-4 h-4 mr-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                     </svg>
@@ -508,5 +758,29 @@
          data-flash-success="{{ session('success') }}"
          data-flash-error="{{ session('error') }}"></div>
     @stack('scripts')
+    @php
+        $pushEnabled = \App\Models\PlatformSetting::getValue('push_notifications_enabled');
+        $fcmApiKey   = \App\Models\PlatformSetting::getValue('firebase_web_api_key');
+    @endphp
+    <script>
+        console.log('[FCM] push_enabled=' + @json((bool)$pushEnabled) + ' api_key_set=' + @json(!empty($fcmApiKey)));
+    </script>
+    @if($pushEnabled && $fcmApiKey)
+    <script>
+        window.__fcmConfig = {
+            apiKey:            @json(\App\Models\PlatformSetting::getValue('firebase_web_api_key')),
+            authDomain:        @json(\App\Models\PlatformSetting::getValue('firebase_auth_domain')),
+            projectId:         @json(\App\Models\PlatformSetting::getValue('firebase_project_id')),
+            messagingSenderId: @json(\App\Models\PlatformSetting::getValue('firebase_messaging_sender_id')),
+            appId:             @json(\App\Models\PlatformSetting::getValue('firebase_app_id')),
+            vapidKey:          @json(\App\Models\PlatformSetting::getValue('firebase_vapid_key')),
+        };
+        window.__fcmEndpoint = {
+            url: '{{ route('admin.fcm-token') }}',
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        };
+    </script>
+    @vite(['resources/js/web/firebase-push.js'])
+    @endif
 </body>
 </html>

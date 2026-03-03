@@ -34,6 +34,7 @@ class Driver extends Authenticatable
         'is_active',
         'task_capabilities',
         'last_login_at',
+        'fcm_token',
     ];
 
     protected $hidden = [

@@ -67,4 +67,16 @@ class DriverProfileController extends Controller
 
         return response()->json($result, $statusCode);
     }
+
+    /**
+     * Update driver FCM device token.
+     * POST /api/v1/driver/fcm-token
+     */
+    public function updateFcmToken(Request $request): JsonResponse
+    {
+        $request->validate(['fcm_token' => ['required', 'string', 'max:512']]);
+        $driver = $request->user();
+        $driver->update(['fcm_token' => $request->fcm_token]);
+        return response()->json(['success' => true, 'message' => 'FCM token updated.']);
+    }
 }

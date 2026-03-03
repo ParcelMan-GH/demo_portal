@@ -114,6 +114,28 @@ class InvoiceController extends Controller
     }
 
     /**
+     * Admin accepts an invoice on behalf of the vendor (Phase 3 override).
+     * Requires invoices.edit permission and the invoice to be in 'sent' status.
+     */
+    public function adminAccept(Request $request, Invoice $invoice)
+    {
+        $this->authorizePermission('invoices.edit');
+
+        $validated = $request->validate([
+            'admin_notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $admin = Auth::guard('admin')->user();
+        $result = $this->invoiceService->adminAcceptOnBehalfOfVendor(
+            $invoice,
+            $admin,
+            $validated['admin_notes'] ?? null
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    /**
      * Check if current admin has permission.
      */
     protected function authorizePermission(string $permission): void

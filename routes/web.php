@@ -1,6 +1,14 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\AdminDeliveryRunController;
+use App\Http\Controllers\Admin\AdminInvoiceListController;
+use App\Http\Controllers\Admin\AdminLocationController;
+use App\Http\Controllers\Admin\AdminProfileController;
+use App\Http\Controllers\Admin\AdminSearchController;
+use App\Http\Controllers\Admin\AdminSortBatchController;
+use App\Http\Controllers\Admin\AdminNotificationController;
+use App\Http\Controllers\Admin\AdminTransportManifestController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DriverController;
@@ -9,6 +17,8 @@ use App\Http\Controllers\Admin\PickupAssignmentController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\ShipmentController;
+use App\Http\Controllers\Admin\ShipmentPaymentController;
+use App\Http\Controllers\Admin\AdminMarketingController;
 use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
@@ -135,6 +145,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::middleware(['auth:admin', 'admin.audit', 'system.user'])->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
+        // Admin Self-Profile
+        Route::get('profile', [AdminProfileController::class, 'edit'])->name('profile.edit');
+        Route::put('profile', [AdminProfileController::class, 'update'])->name('profile.update');
+        Route::post('profile/change-password', [AdminProfileController::class, 'changePassword'])->name('profile.change-password');
+
+        // Global Search
+        Route::get('search', [AdminSearchController::class, 'search'])->name('search');
+
         // Role Management
         Route::get('roles/warehouse', [RoleController::class, 'warehouseIndex'])->name('roles.warehouse.index');
         Route::get('roles-data', [RoleController::class, 'data'])->name('roles.data');
@@ -182,11 +200,18 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::put('invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
         Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
+        Route::post('invoices/{invoice}/admin-accept', [InvoiceController::class, 'adminAccept'])->name('invoices.admin-accept');
+
+        // Shipment Payments (Phase 4)
+        Route::get('shipments/{shipment}/payments-data', [ShipmentPaymentController::class, 'data'])->name('shipments.payments.data');
+        Route::post('shipments/{shipment}/payments', [ShipmentPaymentController::class, 'store'])->name('shipments.payments.store');
+        Route::delete('payments/{payment}', [ShipmentPaymentController::class, 'destroy'])->name('payments.destroy');
 
         // Pickup Assignment Management
         Route::get('available-drivers', [PickupAssignmentController::class, 'availableDrivers'])->name('assignments.available-drivers');
         Route::get('available-warehouses', [PickupAssignmentController::class, 'availableWarehouses'])->name('assignments.available-warehouses');
         Route::post('shipments/{shipment}/assign-driver', [PickupAssignmentController::class, 'assign'])->name('assignments.assign');
+        Route::put('assignments/{pickupAssignment}/update', [PickupAssignmentController::class, 'update'])->name('assignments.update');
         Route::post('assignments/{pickupAssignment}/cancel', [PickupAssignmentController::class, 'cancel'])->name('assignments.cancel');
         Route::post('assignments/{pickupAssignment}/receive', [PickupAssignmentController::class, 'receive'])->name('assignments.receive');
 
@@ -218,6 +243,52 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::patch('warehouses/{warehouse}/toggle-active', [WarehouseController::class, 'toggleActive'])->name('warehouses.toggle-active');
         Route::get('warehouses-export', [WarehouseController::class, 'export'])->name('warehouses.export');
 
+        // Location Management
+        Route::get('locations', [AdminLocationController::class, 'index'])->name('locations.index');
+        Route::get('locations-data/regions', [AdminLocationController::class, 'regionsData'])->name('locations.regions.data');
+        Route::post('locations/regions', [AdminLocationController::class, 'storeRegion'])->name('locations.regions.store');
+        Route::put('locations/regions/{region}', [AdminLocationController::class, 'updateRegion'])->name('locations.regions.update');
+        Route::patch('locations/regions/{region}/toggle', [AdminLocationController::class, 'toggleRegion'])->name('locations.regions.toggle');
+        Route::delete('locations/regions/{region}', [AdminLocationController::class, 'destroyRegion'])->name('locations.regions.destroy');
+        Route::get('locations-data/districts', [AdminLocationController::class, 'districtsData'])->name('locations.districts.data');
+        Route::post('locations/districts', [AdminLocationController::class, 'storeDistrict'])->name('locations.districts.store');
+        Route::put('locations/districts/{district}', [AdminLocationController::class, 'updateDistrict'])->name('locations.districts.update');
+        Route::patch('locations/districts/{district}/toggle', [AdminLocationController::class, 'toggleDistrict'])->name('locations.districts.toggle');
+        Route::delete('locations/districts/{district}', [AdminLocationController::class, 'destroyDistrict'])->name('locations.districts.destroy');
+        Route::get('locations-data/towns', [AdminLocationController::class, 'townsData'])->name('locations.towns.data');
+        Route::post('locations/towns', [AdminLocationController::class, 'storeTown'])->name('locations.towns.store');
+        Route::put('locations/towns/{town}', [AdminLocationController::class, 'updateTown'])->name('locations.towns.update');
+        Route::patch('locations/towns/{town}/toggle', [AdminLocationController::class, 'toggleTown'])->name('locations.towns.toggle');
+        Route::delete('locations/towns/{town}', [AdminLocationController::class, 'destroyTown'])->name('locations.towns.destroy');
+
+        // Delivery Runs (admin read visibility)
+        Route::get('delivery-runs', [AdminDeliveryRunController::class, 'index'])->name('delivery-runs.index');
+        Route::get('delivery-runs-data', [AdminDeliveryRunController::class, 'data'])->name('delivery-runs.data');
+        Route::get('delivery-runs/{run}', [AdminDeliveryRunController::class, 'show'])->name('delivery-runs.show');
+
+        // Transport Manifests (admin read visibility)
+        Route::get('transport-manifests', [AdminTransportManifestController::class, 'index'])->name('transport-manifests.index');
+        Route::get('transport-manifests-data', [AdminTransportManifestController::class, 'data'])->name('transport-manifests.data');
+        Route::get('transport-manifests/{manifest}', [AdminTransportManifestController::class, 'show'])->name('transport-manifests.show');
+
+        // Sort Batches (admin read visibility)
+        Route::get('sort-batches', [AdminSortBatchController::class, 'index'])->name('sort-batches.index');
+        Route::get('sort-batches-data', [AdminSortBatchController::class, 'data'])->name('sort-batches.data');
+        Route::get('sort-batches/{batch}', [AdminSortBatchController::class, 'show'])->name('sort-batches.show');
+
+        // Invoice List (all invoices across all shipments)
+        Route::get('invoices', [AdminInvoiceListController::class, 'index'])->name('invoices.index');
+        Route::get('invoices-data', [AdminInvoiceListController::class, 'data'])->name('invoices.data');
+
+        // Notification Logs
+        Route::get('notifications', [AdminNotificationController::class, 'index'])->name('notifications.index');
+        Route::get('notifications-data', [AdminNotificationController::class, 'data'])->name('notifications.data');
+        Route::post('notifications/{notification}/mark-read', [AdminNotificationController::class, 'markRead'])->name('notifications.mark-read');
+
+        // Marketing Broadcasts
+        Route::get('marketing', [AdminMarketingController::class, 'index'])->name('marketing.index');
+        Route::post('marketing/send', [AdminMarketingController::class, 'send'])->name('marketing.send');
+
         // Settings Management
         Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::post('settings/save', [SettingsController::class, 'save'])->name('settings.save');
@@ -234,6 +305,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('settings/test-email', [SettingsController::class, 'testEmail'])->name('settings.test-email');
         Route::post('settings/test-sms', [SettingsController::class, 'testSms'])->name('settings.test-sms');
         Route::post('settings/clear-cache', [SettingsController::class, 'clearCache'])->name('settings.clear-cache');
+        Route::post('settings/upload-firebase-credentials', [SettingsController::class, 'uploadFirebaseCredentials'])->name('settings.upload-firebase-credentials');
+        Route::post('settings/test-push-notification', [SettingsController::class, 'testPushNotification'])->name('settings.test-push');
+
+        // Admin FCM token (for web push)
+        Route::post('fcm-token', function (\Illuminate\Http\Request $request) {
+            $request->validate(['fcm_token' => 'required|string|max:512']);
+            \Illuminate\Support\Facades\Auth::guard('admin')->user()->update(['fcm_token' => $request->fcm_token]);
+            return response()->json(['success' => true]);
+        })->name('fcm-token');
     });
 });
 

@@ -18,7 +18,9 @@ class InvoiceService
                 ->lockForUpdate()
                 ->find($shipment->id);
 
-            if (!$lockedShipment || $lockedShipment->status !== ShipmentStatus::SUBMITTED) {
+            // Phase 3: Invoice can be created at SUBMITTED (old flow) or AT_WAREHOUSE (new flow)
+            $invoiceableStatuses = [ShipmentStatus::SUBMITTED, ShipmentStatus::AT_WAREHOUSE];
+            if (!$lockedShipment || !in_array($lockedShipment->status, $invoiceableStatuses)) {
                 return [
                     'success' => false,
                     'message' => 'Shipment cannot be invoiced in its current status.',
@@ -263,6 +265,58 @@ class InvoiceService
                 'success' => true,
                 'message' => 'Invoice cancelled.',
                 'data' => ['invoice' => $lockedInvoice->fresh(['shipment'])],
+            ];
+        });
+    }
+
+    /**
+     * Admin/warehouse manager accepts an invoice on behalf of the vendor.
+     * Used when admin wants to proceed to sorting without waiting for vendor acceptance.
+     * This action is audited — the $admin user is recorded as having accepted it.
+     */
+    public function adminAcceptOnBehalfOfVendor(Invoice $invoice, User $admin, ?string $adminNotes = null): array
+    {
+        return DB::transaction(function () use ($invoice, $admin, $adminNotes) {
+            $lockedInvoice = Invoice::query()
+                ->with('shipment')
+                ->lockForUpdate()
+                ->find($invoice->id);
+
+            if (!$lockedInvoice || $lockedInvoice->status !== InvoiceStatus::SENT) {
+                return [
+                    'success' => false,
+                    'message' => 'Only sent invoices can be accepted on behalf of the vendor.',
+                ];
+            }
+
+            $lockedShipment = Shipment::query()
+                ->lockForUpdate()
+                ->find($lockedInvoice->shipment_id);
+
+            if (!$lockedShipment) {
+                return [
+                    'success' => false,
+                    'message' => 'Shipment not found for this invoice.',
+                ];
+            }
+
+            $lockedInvoice->update([
+                'status'      => InvoiceStatus::ACCEPTED,
+                'accepted_at' => now(),
+                'vendor_notes' => $adminNotes
+                    ? "[Admin override by {$admin->name}]: {$adminNotes}"
+                    : "[Admin override by {$admin->name}]: Accepted on behalf of vendor.",
+            ]);
+
+            $lockedShipment->update([
+                'status'             => ShipmentStatus::INVOICE_ACCEPTED,
+                'current_invoice_id' => $lockedInvoice->id,
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Invoice accepted on behalf of vendor.',
+                'data'    => ['invoice' => $lockedInvoice->fresh(['shipment'])],
             ];
         });
     }

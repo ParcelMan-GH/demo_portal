@@ -102,11 +102,12 @@ class SettingsController extends Controller
                 'mail_from_name' => ['label' => 'From Name', 'type' => 'text', 'default' => 'Parcelman Express'],
             ],
             'push' => [
-                'push_enabled' => ['label' => 'Enable Push Notifications', 'type' => 'toggle', 'default' => '0'],
-                'firebase_server_key' => ['label' => 'Firebase Server Key', 'type' => 'password', 'encrypted' => true, 'default' => ''],
-                'firebase_sender_id' => ['label' => 'Firebase Sender ID', 'type' => 'text', 'default' => ''],
-                'onesignal_app_id' => ['label' => 'OneSignal App ID', 'type' => 'text', 'default' => ''],
-                'onesignal_api_key' => ['label' => 'OneSignal API Key', 'type' => 'password', 'encrypted' => true, 'default' => ''],
+                'push_notifications_enabled' => ['label' => 'Enable Push Notifications', 'type' => 'toggle', 'default' => '0'],
+                'firebase_web_api_key' => ['label' => 'Web API Key', 'type' => 'text', 'default' => ''],
+                'firebase_auth_domain' => ['label' => 'Auth Domain', 'type' => 'text', 'default' => ''],
+                'firebase_messaging_sender_id' => ['label' => 'Messaging Sender ID', 'type' => 'text', 'default' => ''],
+                'firebase_app_id' => ['label' => 'Web App ID', 'type' => 'text', 'default' => ''],
+                'firebase_vapid_key' => ['label' => 'VAPID Key', 'type' => 'text', 'default' => ''],
             ],
         ];
 
@@ -321,6 +322,83 @@ class SettingsController extends Controller
             'success' => true,
             'path' => '/storage/' . $path,
             'message' => 'File uploaded successfully.',
+        ]);
+    }
+
+    /**
+     * Send a test push notification to the currently logged-in admin.
+     */
+    public function testPushNotification(Request $request): JsonResponse
+    {
+        $user = \Illuminate\Support\Facades\Auth::guard('admin')->user();
+
+        if (!$user->fcm_token) {
+            return response()->json([
+                'success'     => false,
+                'needs_token' => true,
+                'message'     => 'No FCM token found for your account.',
+            ]);
+        }
+
+        try {
+            $sent = app(\App\Services\PushNotificationService::class)->sendToAdmin(
+                $user,
+                'Test Notification',
+                'Push notifications are working correctly on Parcelman!',
+                ['test' => 'true'],
+                'test'
+            );
+
+            return response()->json([
+                'success' => $sent,
+                'message' => $sent
+                    ? 'Test notification sent! You should see it in your browser now.'
+                    : 'Send failed. Check your Firebase service account credentials.',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Upload Firebase service account credentials JSON file.
+     */
+    public function uploadFirebaseCredentials(Request $request): JsonResponse
+    {
+        $request->validate([
+            'credentials' => 'required|file|mimes:json|max:64',
+        ]);
+
+        $file = $request->file('credentials');
+        $content = file_get_contents($file->getRealPath());
+        $json = json_decode($content, true);
+
+        if (!$json || !isset($json['project_id'], $json['private_key'], $json['client_email'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid service account JSON. Must contain project_id, private_key, and client_email.',
+            ], 422);
+        }
+
+        $dir = storage_path('app/firebase');
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        file_put_contents($dir . '/firestore.json', $content);
+
+        PlatformSetting::setValue('firebase_project_id', $json['project_id']);
+        PlatformSetting::setValue('firebase_credentials_uploaded_at', now()->toIso8601String());
+
+        // Clear cached access token so the new credentials take effect immediately
+        \Illuminate\Support\Facades\Cache::forget('fcm_access_token');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Firebase credentials uploaded successfully. Project: ' . $json['project_id'],
         ]);
     }
 
@@ -803,8 +881,6 @@ class SettingsController extends Controller
             'twilio_sid',
             'twilio_token',
             'mail_password',
-            'firebase_server_key',
-            'onesignal_api_key',
         ];
 
         return in_array($key, $encryptedKeys);
