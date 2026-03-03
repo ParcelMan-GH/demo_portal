@@ -265,12 +265,12 @@
                             Finalize Pickup
                         </button>
                     </div>
-                    {{-- Hint: items still pending confirmation --}}
-                    <div x-show="!canFinalize && ['arrived','picking_up'].includes(pickup?.status || '')" x-cloak style="margin-top:0.625rem;">
-                        <div style="display:flex;flex-direction:row;align-items:center;gap:0.5rem;padding:0.5rem 0.875rem;border-radius:10px;background:rgba(251,191,36,0.18);border:1.5px solid rgba(251,191,36,0.55);">
-                            <svg width="16" height="16" style="flex-shrink:0;display:block;" fill="none" stroke="#fbbf24" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-                            <span style="font-size:0.8rem;font-weight:700;color:#fbbf24;line-height:1.2;" x-text="`${pendingItemsCount} item(s) still need confirmation before you can finalize`"></span>
-                        </div>
+                </div>
+                {{-- Hint: items still pending confirmation --}}
+                <div x-show="!canFinalize && ['arrived','picking_up'].includes(pickup?.status || '')" x-cloak style="margin-top:0.75rem;">
+                    <div style="display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;gap:0.5rem;padding:0.5rem 0.875rem;border-radius:10px;background:rgba(251,191,36,0.18);border:1.5px solid rgba(251,191,36,0.55);">
+                        <svg width="16" height="16" style="flex-shrink:0;" fill="none" stroke="#fbbf24" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                        <span style="font-size:0.8rem;font-weight:700;color:#fbbf24;line-height:1.2;" x-text="`${pendingItemsCount} item(s) still need confirmation before you can finalize`"></span>
                     </div>
                 </div>
             </div>
