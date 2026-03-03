@@ -18,13 +18,13 @@ class DatabaseSeeder extends Seeder
         $this->call([
             // PlatformSettingsSeeder::class,
             // GhanaLocationsSeeder::class,
-            // GhanaTownsSeeder::class,
-            PermissionSeeder::class,
-            RoleSeeder::class,
+            GhanaTownsSeeder::class,
+            // PermissionSeeder::class,
+            // RoleSeeder::class,
             // SuperAdminSeeder::class,
             // DriversSeeder::class,
             // ShipmentSettingsSeeder::class,
-            WarehouseSeeder::class
+            // WarehouseSeeder::class
         ]);
     }
 }

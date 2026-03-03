@@ -9,20 +9,13 @@
     <div class="inv-hero">
         <div class="inv-hero-content">
             <div class="inv-hero-text">
-                <div class="inv-hero-title-icon">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
-                    <div class="inv-hero-text-group">
-                        <p>Driver Portal</p>
-                        <h1>My Transports</h1>
-                    </div>
+                <span class="inv-hero-title-icon">
+                    <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                </span>
+                <div class="inv-hero-text-group">
+                    <h1>My Transports</h1>
+                    <p>Manage and track your transport assignments</p>
                 </div>
-            </div>
-            <div style="display:flex;gap:0.5rem;align-items:center;">
-                <input x-model="filters.search" type="text" placeholder="Search manifest, warehouse..."
-                       @keyup.enter="applyFilters()"
-                       class="inv-search-input" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);color:#fff;min-width:200px;">
-                <button type="button" @click="applyFilters()" class="inv-search-btn">Search</button>
-                <button type="button" @click="resetFilters()" class="inv-search-btn" style="background:rgba(255,255,255,0.12);">Reset</button>
             </div>
         </div>
 
@@ -129,7 +122,10 @@
                                     class="inv-btn-accept">
                                 Start Loading
                             </button>
-                            <a :href="`/driver/transports/${transport.id}`" class="inv-btn-view">View</a>
+                            <a :href="`/driver/transports/${transport.id}`" class="inv-btn-view">
+                                View Details
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -146,7 +142,7 @@
         </div>
 
         {{-- Pagination --}}
-        <div class="inv-pagination" x-show="transports.length > 0">
+        <div class="inv-pagination" x-show="transports.length > 0 && pagination.last_page > 1">
             <div class="inv-page-info">
                 Page <strong x-text="pagination.current_page"></strong> of <strong x-text="pagination.last_page"></strong>
                 &mdash; <strong x-text="pagination.total"></strong> total
