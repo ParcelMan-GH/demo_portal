@@ -32,6 +32,6 @@ class VendorActivityLog extends Model
      */
     public function vendor(): BelongsTo
     {
-        return $this->belongsTo(Vendor::class);
+        return $this->belongsTo(Vendor::class)->withTrashed();
     }
 }

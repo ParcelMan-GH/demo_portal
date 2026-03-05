@@ -135,8 +135,8 @@
                 </div>
 
                 @hasPermission('shipments.view')
-                <a href="{{ route('admin.shipments.index') }}?status=pickup_assigned"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->is('admin/shipments') && request('status') === 'pickup_assigned' ? 'active text-white' : '' }}"
+                <a href="{{ route('admin.pickups.index') }}"
+                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.pickups.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -416,7 +416,7 @@
         ></div>
 
         <!-- Main Content -->
-        <div class="flex-1 flex flex-col min-w-0 transition-all duration-300" :class="sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[260px]'" x-data="{ darkMode: false, createOpen: false }">
+        <div class="flex-1 flex flex-col min-w-0 transition-[margin-left] duration-300" :class="sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[260px]'" x-data="{ darkMode: false, createOpen: false }">
             <!-- Top Header -->
             <header class="admin-header h-[56px] flex items-center px-5 sticky top-0 z-30">
                 <!-- Left Section: Toggle + Breadcrumb -->

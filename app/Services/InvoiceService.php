@@ -18,13 +18,25 @@ class InvoiceService
                 ->lockForUpdate()
                 ->find($shipment->id);
 
-            // Phase 3: Invoice can be created at SUBMITTED (old flow) or AT_WAREHOUSE (new flow)
-            $invoiceableStatuses = [ShipmentStatus::SUBMITTED, ShipmentStatus::AT_WAREHOUSE];
-            if (!$lockedShipment || !in_array($lockedShipment->status, $invoiceableStatuses)) {
+            if (!$lockedShipment) {
                 return [
                     'success' => false,
-                    'message' => 'Shipment cannot be invoiced in its current status.',
+                    'message' => 'Shipment not found.',
                 ];
+            }
+
+            // Super admins can create invoices regardless of shipment status
+            $isSuperAdmin = $admin && method_exists($admin, 'isSuperAdmin') && $admin->isSuperAdmin();
+
+            if (!$isSuperAdmin) {
+                // Phase 3: Invoice can be created at SUBMITTED (old flow) or AT_WAREHOUSE (new flow)
+                $invoiceableStatuses = [ShipmentStatus::SUBMITTED, ShipmentStatus::AT_WAREHOUSE];
+                if (!in_array($lockedShipment->status, $invoiceableStatuses)) {
+                    return [
+                        'success' => false,
+                        'message' => 'Shipment cannot be invoiced in its current status.',
+                    ];
+                }
             }
 
             if ($this->hasActiveInvoice($lockedShipment)) {

@@ -391,6 +391,40 @@ function buildVendorsTable(config) {
             }
         },
 
+        async restoreVendor(vendor) {
+            if (!confirm(`Restore vendor "${vendor.name}"?`)) return;
+
+            try {
+                const response = await fetch(`${window.location.origin}/admin/vendors/${vendor.id}/restore`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': this.csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to restore vendor');
+                }
+
+                if (window.showToast) {
+                    window.showToast(data.message || 'Vendor restored successfully.', 'success');
+                }
+                this.loadData();
+            } catch (error) {
+                console.error('Error restoring vendor:', error);
+                if (window.showToast) {
+                    window.showToast(error.message || 'Failed to restore vendor.', 'error');
+                } else {
+                    alert(error.message || 'Failed to restore vendor. Please try again.');
+                }
+            }
+        },
+
         async exportData(format) {
             try {
                 const params = new URLSearchParams();

@@ -18,6 +18,7 @@ import './modules/roles/create.js';
 import './modules/roles/edit.js';
 import './modules/roles/show.js';
 import './modules/warehouses/index.js';
+import './modules/pickups/index.js';
 
 window.Alpine = Alpine;
 initAdminUtils();

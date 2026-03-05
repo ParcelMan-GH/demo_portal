@@ -106,9 +106,11 @@ class DriverController extends Controller
     {
         $this->authorizePermission('drivers.view');
 
-        // Assignment statistics
-        $assignmentsCount = $driver->pickupAssignments()->count();
+        // Statistics
+        $pickupsCount = $driver->pickupAssignments()->count();
         $completedCount = $driver->pickupAssignments()->where('status', 'completed')->count();
+        $transportManifestsCount = $driver->transportManifests()->count();
+        $deliveryRunsCount = $driver->deliveryRuns()->count();
         $activeAssignment = $driver->activeAssignment;
         $lastLogin = $driver->activityLogs()->where('action', 'driver_login')->latest('created_at')->first();
         $activityLogsCount = $driver->activityLogs()->count();
@@ -117,17 +119,14 @@ class DriverController extends Controller
 
         return view('admin.drivers.show', [
             'driver' => $driver,
-            'assignmentsCount' => $assignmentsCount,
+            'assignmentsCount' => $pickupsCount,
+            'pickupsCount' => $pickupsCount,
             'completedCount' => $completedCount,
+            'transportManifestsCount' => $transportManifestsCount,
+            'deliveryRunsCount' => $deliveryRunsCount,
             'activityLogsCount' => $activityLogsCount,
             'activeAssignment' => $activeAssignment,
             'lastLogin' => $lastLogin,
-            'stats' => [
-                'total_assignments' => $assignmentsCount,
-                'completed_assignments' => $completedCount,
-                'active_assignment' => $activeAssignment,
-                'last_login' => $lastLogin,
-            ],
             'canManage' => $canManage,
         ]);
     }
@@ -325,7 +324,7 @@ class DriverController extends Controller
     {
         $this->authorizePermission('drivers.view');
 
-        $query = $driver->pickupAssignments()->with(['shipment']);
+        $query = $driver->pickupAssignments()->with(['shipment.vendor']);
 
         // Search
         if ($search = $request->get('search')) {
@@ -373,16 +372,13 @@ class DriverController extends Controller
                 return [
                     'id' => $assignment->id,
                     'status' => $assignment->status->value,
-                    'shipment' => $assignment->shipment ? [
-                        'id' => $assignment->shipment->id,
-                        'shipment_number' => $assignment->shipment->shipment_number,
-                        'recipient_name' => $assignment->shipment->recipient_name,
-                        'recipient_phone' => $assignment->shipment->recipient_phone,
-                    ] : null,
+                    'shipment_number' => $assignment->shipment?->shipment_number,
+                    'vendor_name' => $assignment->shipment?->vendor?->name,
                     'assigned_at' => $assignment->assigned_at?->format('Y-m-d H:i:s'),
                     'completed_at' => $assignment->completed_at?->format('Y-m-d H:i:s'),
                     'notes' => $assignment->notes,
                     'created_at' => $assignment->created_at?->format('Y-m-d H:i:s'),
+                    'view_url' => $assignment->shipment ? route('admin.shipments.show', $assignment->shipment) : null,
                 ];
             }),
             'meta' => [
@@ -391,6 +387,147 @@ class DriverController extends Controller
                 'to' => $assignments->lastItem() ?? 0,
                 'total' => $assignments->total(),
                 'last_page' => $assignments->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
+     * Get transport manifests data for driver.
+     */
+    public function transportManifests(Request $request, Driver $driver)
+    {
+        $this->authorizePermission('drivers.view');
+
+        $query = $driver->transportManifests()->with(['originWarehouse', 'destinationWarehouse']);
+
+        // Search
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('manifest_number', 'like', "%{$search}%")
+                    ->orWhereHas('originWarehouse', function ($wq) use ($search) {
+                        $wq->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('destinationWarehouse', function ($wq) use ($search) {
+                        $wq->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        // Status filter
+        if ($status = $request->get('status')) {
+            $query->where('status', $status);
+        }
+
+        // Date range filter
+        if ($dateFrom = $request->get('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo = $request->get('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        // Sorting
+        $sortBy = $request->get('sort', 'created_at');
+        $sortDirection = $request->get('direction', 'desc');
+        $allowedSorts = ['manifest_number', 'status', 'assigned_at', 'received_at', 'created_at'];
+
+        if (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortDirection);
+        }
+
+        // Pagination
+        $perPage = min($request->get('per_page', 10), 50);
+        $manifests = $query->paginate($perPage);
+
+        return response()->json([
+            'data' => $manifests->map(function ($manifest) {
+                return [
+                    'id' => $manifest->id,
+                    'manifest_number' => $manifest->manifest_number,
+                    'origin_warehouse' => $manifest->originWarehouse?->name,
+                    'destination_warehouse' => $manifest->destinationWarehouse?->name,
+                    'status' => $manifest->status,
+                    'assigned_at' => $manifest->assigned_at?->format('Y-m-d H:i:s'),
+                    'received_at' => $manifest->received_at?->format('Y-m-d H:i:s'),
+                    'created_at' => $manifest->created_at?->format('Y-m-d H:i:s'),
+                    'view_url' => route('admin.transport-manifests.show', $manifest),
+                ];
+            }),
+            'meta' => [
+                'current_page' => $manifests->currentPage(),
+                'from' => $manifests->firstItem() ?? 0,
+                'to' => $manifests->lastItem() ?? 0,
+                'total' => $manifests->total(),
+                'last_page' => $manifests->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
+     * Get delivery runs data for driver.
+     */
+    public function deliveryRuns(Request $request, Driver $driver)
+    {
+        $this->authorizePermission('drivers.view');
+
+        $query = $driver->deliveryRuns()->with(['warehouse'])->withCount('stops');
+
+        // Search
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('run_number', 'like', "%{$search}%")
+                    ->orWhereHas('warehouse', function ($wq) use ($search) {
+                        $wq->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        // Status filter
+        if ($status = $request->get('status')) {
+            $query->where('status', $status);
+        }
+
+        // Date range filter
+        if ($dateFrom = $request->get('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo = $request->get('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        // Sorting
+        $sortBy = $request->get('sort', 'created_at');
+        $sortDirection = $request->get('direction', 'desc');
+        $allowedSorts = ['run_number', 'status', 'assigned_at', 'completed_at', 'created_at'];
+
+        if (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortDirection);
+        }
+
+        // Pagination
+        $perPage = min($request->get('per_page', 10), 50);
+        $runs = $query->paginate($perPage);
+
+        return response()->json([
+            'data' => $runs->map(function ($run) {
+                return [
+                    'id' => $run->id,
+                    'run_number' => $run->run_number,
+                    'warehouse' => $run->warehouse?->name,
+                    'stops_count' => $run->stops_count,
+                    'status' => $run->status,
+                    'assigned_at' => $run->assigned_at?->format('Y-m-d H:i:s'),
+                    'completed_at' => $run->completed_at?->format('Y-m-d H:i:s'),
+                    'created_at' => $run->created_at?->format('Y-m-d H:i:s'),
+                    'view_url' => route('admin.delivery-runs.show', $run),
+                ];
+            }),
+            'meta' => [
+                'current_page' => $runs->currentPage(),
+                'from' => $runs->firstItem() ?? 0,
+                'to' => $runs->lastItem() ?? 0,
+                'total' => $runs->total(),
+                'last_page' => $runs->lastPage(),
             ],
         ]);
     }

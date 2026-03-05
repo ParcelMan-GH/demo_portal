@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.audit' => \App\Http\Middleware\LogAdminAuditActivity::class,
             'warehouse.user' => \App\Http\Middleware\EnsureWarehouseUser::class,
             'system.user' => \App\Http\Middleware\EnsureSystemUser::class,
+            'vendor.active' => \App\Http\Middleware\EnsureVendorActive::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -652,7 +652,7 @@
                                 <!-- Vehicle Type -->
                                 <div>
                                     <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                        Vehicle Type <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                        Vehicle Type
                                     </label>
                                     <div class="relative">
                                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -681,7 +681,7 @@
                                 <!-- Vehicle Number -->
                                 <div>
                                     <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                        Vehicle Number <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                        Vehicle Number
                                     </label>
                                     <input
                                         type="text"
@@ -703,7 +703,7 @@
                                 <!-- License Number -->
                                 <div>
                                     <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                        License Number <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                        License Number
                                     </label>
                                     <input
                                         type="text"

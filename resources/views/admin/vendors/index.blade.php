@@ -98,6 +98,17 @@
                                 </svg>
                                 <span>Inactive</span>
                             </button>
+                            <button
+                                type="button"
+                                @@click="statusFilter = 'deleted'; statusFilterName = 'Deleted'; loadData(); open = false"
+                                class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
+                                :class="statusFilter === 'deleted' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''"
+                            >
+                                <svg x-show="statusFilter === 'deleted'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>Deleted</span>
+                            </button>
                         </div>
                     </div>
 
@@ -289,8 +300,8 @@
                             <td x-show="visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap text-xs">
                                 <span
                                     class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                    :class="vendor.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
-                                    x-text="vendor.is_active ? 'Active' : 'Inactive'"
+                                    :class="vendor.is_deleted ? 'bg-red-100 text-red-700' : (vendor.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600')"
+                                    x-text="vendor.is_deleted ? 'Deleted' : (vendor.is_active ? 'Active' : 'Inactive')"
                                 ></span>
                             </td>
                             <td x-show="visibleColumns.shipments" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 text-center" x-text="vendor.shipments_count"></td>
@@ -308,8 +319,20 @@
                                         </svg>
                                     </a>
 
+                                    <!-- Restore Button (for deleted vendors) -->
+                                    <template x-if="vendor.is_deleted && vendor.can_manage">
+                                        <button
+                                            @@click="restoreVendor(vendor)"
+                                            class="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                            title="Restore vendor">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                            </svg>
+                                        </button>
+                                    </template>
+
                                     <!-- Edit Button -->
-                                    <template x-if="vendor.can_manage">
+                                    <template x-if="!vendor.is_deleted && vendor.can_manage">
                                         <button
                                             @@click="openEditModal(vendor)"
                                             class="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
@@ -321,7 +344,7 @@
                                     </template>
 
                                     <!-- Toggle Status Button -->
-                                    <template x-if="vendor.can_manage">
+                                    <template x-if="!vendor.is_deleted && vendor.can_manage">
                                         <button
                                             @@click="toggleVendorStatus(vendor)"
                                             class="p-1.5 rounded-lg transition-colors"
@@ -334,7 +357,7 @@
                                     </template>
 
                                     <!-- Delete Button -->
-                                    <template x-if="vendor.can_manage">
+                                    <template x-if="!vendor.is_deleted && vendor.can_manage">
                                         <button
                                             @@click="openDeleteModal(vendor)"
                                             class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"

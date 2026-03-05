@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\PickupAssignmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\PickupAssignment;
@@ -9,6 +10,7 @@ use App\Models\Shipment;
 use App\Models\Warehouse;
 use App\Services\PickupAssignmentService;
 use App\Services\PushNotificationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -18,6 +20,98 @@ class PickupAssignmentController extends Controller
     public function __construct(
         private PickupAssignmentService $pickupAssignmentService
     ) {}
+
+    /**
+     * Show the pickup assignments listing page.
+     */
+    public function index()
+    {
+        $this->authorizePermission('shipments.view');
+
+        return view('admin.pickups.index', [
+            'statuses' => PickupAssignmentStatus::toArray(),
+        ]);
+    }
+
+    /**
+     * Get paginated pickup assignment data.
+     */
+    public function data(Request $request): JsonResponse
+    {
+        $this->authorizePermission('shipments.view');
+
+        $query = PickupAssignment::with(['shipment.vendor', 'driver', 'targetWarehouse', 'assignedBy']);
+
+        // Search
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('shipment', fn ($sq) => $sq->where('shipment_number', 'like', "%{$search}%"))
+                    ->orWhereHas('shipment.vendor', fn ($sq) => $sq->where('business_name', 'like', "%{$search}%"))
+                    ->orWhereHas('driver', fn ($sq) => $sq->where('name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%"))
+                    ->orWhereHas('targetWarehouse', fn ($sq) => $sq->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        // Status filter
+        if ($status = $request->get('status')) {
+            $query->where('status', $status);
+        }
+
+        // Date range on assigned_at
+        if ($dateFrom = $request->get('date_from')) {
+            $query->whereDate('assigned_at', '>=', $dateFrom);
+        }
+        if ($dateTo = $request->get('date_to')) {
+            $query->whereDate('assigned_at', '<=', $dateTo);
+        }
+
+        // Sorting
+        $sortBy = $request->get('sort', 'assigned_at');
+        $sortDirection = $request->get('direction', 'desc');
+        $allowedSorts = ['status', 'assigned_at', 'completed_at'];
+
+        if (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortDirection);
+        } else {
+            $query->orderBy('assigned_at', 'desc');
+        }
+
+        // Pagination
+        $perPage = min($request->get('per_page', 50), 100);
+        $assignments = $query->paginate($perPage);
+
+        return response()->json([
+            'data' => $assignments->map(function (PickupAssignment $a) {
+                return [
+                    'id' => $a->id,
+                    'shipment_id' => $a->shipment_id,
+                    'shipment_number' => $a->shipment?->shipment_number,
+                    'vendor_name' => $a->shipment?->vendor?->business_name ?? '-',
+                    'driver_id' => $a->driver_id,
+                    'driver_name' => $a->driver?->name ?? '-',
+                    'driver_phone' => $a->driver?->phone ?? '-',
+                    'target_warehouse' => $a->targetWarehouse?->name ?? '-',
+                    'target_warehouse_id' => $a->target_warehouse_id,
+                    'status' => $a->status instanceof PickupAssignmentStatus ? $a->status->value : $a->status,
+                    'status_label' => $a->status instanceof PickupAssignmentStatus ? $a->status->label() : ucfirst(str_replace('_', ' ', $a->status ?? '')),
+                    'assigned_by' => $a->assignedBy?->name ?? '-',
+                    'assigned_at' => $a->assigned_at?->format('Y-m-d H:i:s'),
+                    'en_route_at' => $a->en_route_at?->format('Y-m-d H:i:s'),
+                    'arrived_at' => $a->arrived_at?->format('Y-m-d H:i:s'),
+                    'picked_up_at' => $a->picked_up_at?->format('Y-m-d H:i:s'),
+                    'completed_at' => $a->completed_at?->format('Y-m-d H:i:s'),
+                    'received_at' => $a->received_at?->format('Y-m-d H:i:s'),
+                ];
+            }),
+            'meta' => [
+                'current_page' => $assignments->currentPage(),
+                'from' => $assignments->firstItem() ?? 0,
+                'to' => $assignments->lastItem() ?? 0,
+                'total' => $assignments->total(),
+                'last_page' => $assignments->lastPage(),
+            ],
+        ]);
+    }
 
     /**
      * Get available drivers, optionally filtered by vehicle type.

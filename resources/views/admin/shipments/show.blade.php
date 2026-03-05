@@ -49,18 +49,34 @@ $shipmentConfig = [
             </div>
 
             <div class="relative px-6 lg:px-8 py-6">
-                <!-- Top Row: Back Button -->
-                <div class="mb-6">
+                <!-- Top Row: Back Button + Action Buttons -->
+                <div class="flex items-center justify-between mb-6">
                     <a href="{{ route('admin.shipments.index') }}" class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium transition-all backdrop-blur-sm hover:shadow-md">
                         <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                         </svg>
                         <span class="text-xs">Back to Shipments</span>
                     </a>
+                    @if($canManage)
+                    <div class="flex items-center gap-2">
+                        <button
+                            x-show="['submitted', 'invoice_accepted'].includes(shipment.status)"
+                            x-cloak
+                            @@click="loadAssignmentDependencies(); assignDriverModalOpen = true"
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-300 text-xs font-semibold rounded-xl border border-violet-500/30 transition-all backdrop-blur-sm shadow-sm hover:shadow-md"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            Assign Driver
+                        </button>
+                    </div>
+                    @endif
                 </div>
 
                 <!-- Main Row: Profile LEFT, Summary + Actions RIGHT -->
-                <div class="flex flex-col lg:flex-row lg:items-center gap-6">
+                <div class="flex flex-col lg:flex-row lg:items-start gap-6">
                     <!-- LEFT: Shipment Info -->
                     <div class="flex items-start gap-5 lg:flex-shrink-0">
                         <!-- Icon -->
@@ -172,31 +188,12 @@ $shipmentConfig = [
                         </div>
                     </div>
 
-                    <!-- RIGHT: Action Buttons (row 1) + Summary Stats (row 2) -->
+                    <!-- RIGHT: Summary Stats + Action Buttons -->
                     <div class="flex flex-col gap-3 lg:ml-auto lg:items-end">
-                        <!-- Row 1: Action Buttons -->
-                        @if($canManage)
-                        <div class="flex items-center gap-2">
-                            {{-- Phase 3: Assign Driver button available from SUBMITTED (no invoice required) --}}
-                            <button
-                                x-show="['submitted', 'invoice_accepted'].includes(shipment.status)"
-                                x-cloak
-                                @@click="activeTab = 'assignment'; loadAssignmentDependencies()"
-                                class="inline-flex items-center gap-2 px-4 py-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-300 text-xs font-semibold rounded-xl border border-violet-500/30 transition-all backdrop-blur-sm shadow-sm hover:shadow-md"
-                            >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                </svg>
-                                Assign Driver
-                            </button>
-                        </div>
-                        @endif
-
-                        <!-- Row 2: Summary Stats - 4 compact cards in one row -->
-                        <div class="flex items-center gap-2 flex-wrap lg:flex-nowrap">
+                        <!-- Row 1: Summary Stats - 4 compact cards in one row, matched to profile badge height -->
+                        <div class="flex items-stretch gap-2 flex-wrap lg:flex-nowrap">
                             <!-- Items Count -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
+                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 h-20 lg:h-24 flex items-center gap-2.5 transition-colors">
                                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/30 to-blue-600/20 flex items-center justify-center flex-shrink-0">
                                     <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
@@ -209,7 +206,7 @@ $shipmentConfig = [
                             </div>
 
                             <!-- Invoice Status -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
+                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 h-20 lg:h-24 flex items-center gap-2.5 transition-colors">
                                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center flex-shrink-0">
                                     <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -222,7 +219,7 @@ $shipmentConfig = [
                             </div>
 
                             <!-- Assignment Status -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
+                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 h-20 lg:h-24 flex items-center gap-2.5 transition-colors">
                                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500/30 to-violet-600/20 flex items-center justify-center flex-shrink-0">
                                     <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
@@ -236,7 +233,7 @@ $shipmentConfig = [
                             </div>
 
                             <!-- Created Date -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2.5 flex items-center gap-2.5 transition-colors">
+                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 h-20 lg:h-24 flex items-center gap-2.5 transition-colors">
                                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500/30 to-amber-600/20 flex items-center justify-center flex-shrink-0">
                                     <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
@@ -248,6 +245,7 @@ $shipmentConfig = [
                                 </div>
                             </div>
                         </div>
+
                     </div>
                 </div>
             </div>
@@ -545,7 +543,7 @@ $shipmentConfig = [
                                         </svg>
                                     </span>
                                     <div>
-                                        <h3 class="text-sm font-bold text-slate-900">Invoice</h3>
+                                        <h3 class="text-sm font-bold text-slate-900">Active Invoice</h3>
                                         <template x-if="activeInvoice()">
                                             <p class="text-[10px] text-slate-400" x-text="'#' + activeInvoice().invoice_number"></p>
                                         </template>
@@ -553,7 +551,7 @@ $shipmentConfig = [
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <template x-if="activeInvoice()">
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1" :class="invoiceStatusClass(activeInvoice().status)" x-text="activeInvoice().status_label || activeInvoice().status"></span>
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 capitalize" :class="invoiceStatusClass(activeInvoice().status)" x-text="activeInvoice().status_label || activeInvoice().status"></span>
                                     </template>
                                     <button @@click="activeTab = 'invoice'" class="text-xs text-slate-400 hover:text-slate-600 font-medium transition-colors flex items-center gap-1">
                                         History <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
@@ -622,7 +620,7 @@ $shipmentConfig = [
                                             <button x-show="canManage && activeInvoice().status === 'pending'" @@click="sendInvoice(activeInvoice().id)" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold transition-colors">Send</button>
                                             <button x-show="canManage && activeInvoice().status === 'sent'" @@click="adminAcceptInvoice(activeInvoice().id)" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold transition-colors">Accept</button>
                                             <button @@click="openActiveInvoiceModal()" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 text-xs font-semibold transition-colors">View</button>
-                                            <button x-show="canManage && ['pending','sent','accepted'].includes(activeInvoice().status)" @@click="cancelInvoice(activeInvoice().id)" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-xs font-semibold transition-colors">Cancel</button>
+                                            <button x-show="canManage && ['pending','sent','accepted'].includes(activeInvoice().status)" @@click="openCancelInvoiceModal(activeInvoice().id)" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-xs font-semibold transition-colors">Cancel</button>
                                         </div>
                                     </div>
                                 </template>
@@ -643,15 +641,7 @@ $shipmentConfig = [
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <template x-if="assignment">
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1" :class="{
-                                            'bg-amber-50 text-amber-700 ring-amber-200': assignment.status === 'assigned',
-                                            'bg-blue-50 text-blue-700 ring-blue-200': assignment.status === 'en_route',
-                                            'bg-sky-50 text-sky-700 ring-sky-200': assignment.status === 'arrived',
-                                            'bg-teal-50 text-teal-700 ring-teal-200': assignment.status === 'picking_up',
-                                            'bg-emerald-50 text-emerald-700 ring-emerald-200': assignment.status === 'completed',
-                                            'bg-rose-50 text-rose-700 ring-rose-200': assignment.status === 'cancelled',
-                                            'bg-slate-100 text-slate-600 ring-slate-200': !['assigned','en_route','arrived','picking_up','completed','cancelled'].includes(assignment.status)
-                                        }" x-text="assignment.status_label || assignment.status"></span>
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 capitalize" :class="assignmentStatusClass(assignment.status)" x-text="assignment.status_label || (assignment.status ? assignment.status.replace(/_/g, ' ') : '')"></span>
                                     </template>
                                     <button @@click="activeTab = 'assignment'" class="text-xs text-slate-400 hover:text-slate-600 font-medium transition-colors flex items-center gap-1">
                                         History <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
@@ -767,7 +757,7 @@ $shipmentConfig = [
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                                 Edit
                                             </button>
-                                            <button type="button" x-show="canManage && canUnassignCurrentAssignment()" @@click="unassignDriver()" :disabled="assignmentActionLoading" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 text-xs font-semibold transition-colors disabled:opacity-50">
+                                            <button type="button" x-show="canManage && canUnassignCurrentAssignment()" @@click="openUnassignModal()" :disabled="assignmentActionLoading" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 text-xs font-semibold transition-colors disabled:opacity-50">
                                                 <span x-text="assignmentActionLoading ? '...' : 'Unassign'"></span>
                                             </button>
                                             <button type="button" x-show="canManage && canReceiveCurrentAssignment()" @@click="receiveAtWarehouse()" :disabled="assignmentActionLoading" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-semibold transition-colors disabled:opacity-50">
@@ -877,19 +867,6 @@ $shipmentConfig = [
                                     </div>
                                     <button
                                         type="button"
-                                        x-show="canManage"
-                                        @@click="openCreateInvoiceModal()"
-                                        :disabled="!canCreateInvoice()"
-                                        :title="!canCreateInvoice() ? activeInvoiceBlockReason() : 'Create invoice'"
-                                        class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                                        </svg>
-                                        Create Invoice
-                                    </button>
-                                    <button
-                                        type="button"
                                         x-show="activeInvoice()"
                                         @@click="openActiveInvoiceModal()"
                                         class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors"
@@ -948,7 +925,7 @@ $shipmentConfig = [
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12a7 7 0 1114 0A7 7 0 015 12z"/>
                                                                 </svg>
                                                             </button>
-                                                            <button x-show="canManage && ['pending', 'sent', 'accepted'].includes(historyInvoice.status)" @@click="cancelInvoice(historyInvoice.id)" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Cancel invoice">
+                                                            <button x-show="canManage && ['pending', 'sent', 'accepted'].includes(historyInvoice.status)" @@click="openCancelInvoiceModal(historyInvoice.id)" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Cancel invoice">
                                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                                                 </svg>
@@ -1052,15 +1029,7 @@ $shipmentConfig = [
                                         <!-- Status Badge -->
                                         <span
                                             class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1"
-                                            :class="{
-                                                'bg-amber-50 text-amber-700 ring-amber-200': assignment.status === 'assigned',
-                                                'bg-blue-50 text-blue-700 ring-blue-200': assignment.status === 'en_route',
-                                                'bg-sky-50 text-sky-700 ring-sky-200': assignment.status === 'arrived',
-                                                'bg-teal-50 text-teal-700 ring-teal-200': assignment.status === 'picking_up',
-                                                'bg-emerald-50 text-emerald-700 ring-emerald-200': assignment.status === 'completed',
-                                                'bg-rose-50 text-rose-700 ring-rose-200': assignment.status === 'cancelled',
-                                                'bg-slate-100 text-slate-600 ring-slate-200': !['assigned','en_route','arrived','picking_up','completed','cancelled'].includes(assignment.status)
-                                            }"
+                                            :class="assignmentStatusClass(assignment.status)"
                                             x-text="assignment.status_label || (assignment.status ? assignment.status.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) : 'Unknown')"
                                         ></span>
                                         <!-- Edit -->
@@ -1079,7 +1048,7 @@ $shipmentConfig = [
                                         <button
                                             type="button"
                                             x-show="canManage && canUnassignCurrentAssignment()"
-                                            @@click="unassignDriver()"
+                                            @@click="openUnassignModal()"
                                             :disabled="assignmentActionLoading"
                                             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
@@ -1770,8 +1739,9 @@ $shipmentConfig = [
     {{-- ═══════════════════════════════════════════════════════════════════ --}}
 
     <!-- ══ MODAL: Create Invoice ════════════════════════════════════════ -->
-    <div x-show="invoiceModalOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="invoiceModalOpen = false"></div>
+    <div x-show="invoiceModalOpen" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="invoiceModalOpen = false">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="invoiceModalOpen = false"></div>
+        <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
         <div class="relative z-10 bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl max-h-[95vh] overflow-y-auto">
             <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
                 <div class="flex items-center gap-3">
@@ -1819,6 +1789,21 @@ $shipmentConfig = [
                                 class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all" placeholder="0.00">
                         </div>
                     </div>
+                    <div class="mb-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 p-[1px] shadow-lg shadow-emerald-500/15">
+                        <div class="rounded-[11px] bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3.5">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-semibold text-emerald-200 uppercase tracking-wider">Invoice Total</span>
+                                <div class="flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                    <span class="text-[10px] text-emerald-300 font-medium" x-text="[invoiceForm.pickup_fee, invoiceForm.transport_fee, invoiceForm.handling_fee, invoiceForm.other_fee].filter(f => parseFloat(f || 0) > 0).length + ' fee(s)'"></span>
+                                </div>
+                            </div>
+                            <div class="flex items-baseline justify-end gap-1.5">
+                                <span class="text-sm font-semibold text-emerald-200">GHS</span>
+                                <span class="text-2xl font-extrabold text-white tracking-tight" x-text="(parseFloat(invoiceForm.pickup_fee || 0) + parseFloat(invoiceForm.transport_fee || 0) + parseFloat(invoiceForm.handling_fee || 0) + parseFloat(invoiceForm.other_fee || 0)).toFixed(2)"></span>
+                            </div>
+                        </div>
+                    </div>
                     <div class="mb-4">
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5">Notes <span class="text-slate-400 font-normal">(optional)</span></label>
                         <textarea x-model="invoiceForm.notes" rows="2"
@@ -1846,11 +1831,13 @@ $shipmentConfig = [
                 </form>
             </div>
         </div>
+        </div>
     </div>
 
     <!-- ══ MODAL: Invoice Detail ════════════════════════════════════════ -->
-    <div x-show="invoiceDetailModalOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="invoiceDetailModalOpen = false"></div>
+    <div x-show="invoiceDetailModalOpen" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="invoiceDetailModalOpen = false">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="invoiceDetailModalOpen = false"></div>
+        <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
         <div class="relative z-10 bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl max-h-[95vh] overflow-y-auto">
             <template x-if="invoiceDetail">
                 <div>
@@ -1933,7 +1920,7 @@ $shipmentConfig = [
                                 Admin Accept
                             </button>
                             <button type="button" x-show="canManage && ['pending','sent'].includes(invoiceDetail.status)"
-                                @@click="cancelInvoice(invoiceDetail.id)"
+                                @@click="openCancelInvoiceModal(invoiceDetail.id)"
                                 class="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 text-sm font-semibold rounded-xl shadow-sm transition-colors">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                 Cancel Invoice
@@ -1943,11 +1930,13 @@ $shipmentConfig = [
                 </div>
             </template>
         </div>
+        </div>
     </div>
 
     <!-- ══ MODAL: Assign Driver ════════════════════════════════════════ -->
-    <div x-show="assignDriverModalOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="assignDriverModalOpen = false"></div>
+    <div x-show="assignDriverModalOpen" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="assignDriverModalOpen = false">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="assignDriverModalOpen = false"></div>
+        <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
         <div class="relative z-10 bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl max-h-[95vh] overflow-y-auto">
             <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
                 <div class="flex items-center gap-3">
@@ -2027,11 +2016,13 @@ $shipmentConfig = [
                 </form>
             </div>
         </div>
+        </div>
     </div>
 
     <!-- ══ MODAL: Edit Assignment ══════════════════════════════════════ -->
-    <div x-show="editAssignmentOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="editAssignmentOpen = false"></div>
+    <div x-show="editAssignmentOpen" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="editAssignmentOpen = false">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="editAssignmentOpen = false"></div>
+        <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
         <div class="relative z-10 bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl max-h-[95vh] overflow-y-auto">
             <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
                 <div class="flex items-center gap-3">
@@ -2101,11 +2092,81 @@ $shipmentConfig = [
                 </form>
             </div>
         </div>
+        </div>
+    </div>
+
+    {{-- Unassign Driver Modal --}}
+    <div x-show="showUnassignModal" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="showUnassignModal = false">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="showUnassignModal = false"></div>
+        <div class="relative flex min-h-full items-center justify-center p-4">
+            <div x-show="showUnassignModal" x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200/50 overflow-hidden">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">Unassign Driver</h3>
+                            <p class="text-xs text-slate-500">This action cannot be undone</p>
+                        </div>
+                    </div>
+                    <button @@click="showUnassignModal = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="px-5 py-4">
+                    <label for="unassign-reason" class="block text-xs font-semibold text-slate-700 mb-1.5">Reason for unassignment <span class="text-rose-500">*</span></label>
+                    <textarea id="unassign-reason" x-model="unassignReason" rows="3" placeholder="Provide a reason for unassigning this driver..." class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-rose-400/50 focus:border-rose-300 transition-colors resize-none"></textarea>
+                    <p class="text-[10px] text-slate-400 mt-1">Minimum 3 characters required</p>
+                </div>
+                <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+                    <button type="button" @@click="showUnassignModal = false" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">Cancel</button>
+                    <button type="button" @@click="confirmUnassign()" :disabled="assignmentActionLoading || !unassignReason.trim()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg x-show="assignmentActionLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                        <span x-text="assignmentActionLoading ? 'Unassigning...' : 'Unassign Driver'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Cancel Invoice Modal --}}
+    <div x-show="showCancelInvoiceModal" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="showCancelInvoiceModal = false">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="showCancelInvoiceModal = false"></div>
+        <div class="relative flex min-h-full items-center justify-center p-4">
+            <div x-show="showCancelInvoiceModal" x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200/50 overflow-hidden">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">Cancel Invoice</h3>
+                            <p class="text-xs text-slate-500">This action cannot be undone</p>
+                        </div>
+                    </div>
+                    <button @@click="showCancelInvoiceModal = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="px-5 py-4">
+                    <p class="text-sm text-slate-600 mb-3">Are you sure you want to cancel this invoice? This will void the invoice and cannot be reversed.</p>
+                    <label for="cancel-invoice-reason" class="block text-xs font-semibold text-slate-700 mb-1.5">Cancellation reason <span class="text-slate-400">(optional)</span></label>
+                    <textarea id="cancel-invoice-reason" x-model="cancelInvoiceReason" rows="3" placeholder="Provide a reason for cancellation..." class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-rose-400/50 focus:border-rose-300 transition-colors resize-none"></textarea>
+                </div>
+                <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+                    <button type="button" @@click="showCancelInvoiceModal = false" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">Go Back</button>
+                    <button type="button" @@click="confirmCancelInvoice()" :disabled="cancelInvoiceLoading" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg x-show="cancelInvoiceLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                        <span x-text="cancelInvoiceLoading ? 'Cancelling...' : 'Cancel Invoice'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
 </div>
 
 @endsection
-
 
 

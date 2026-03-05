@@ -289,7 +289,14 @@ class VendorController extends Controller
 
         // Status filter
         if ($request->has('status') && $request->get('status') !== '') {
-            $query->where('is_active', $request->get('status') === 'active');
+            $status = $request->get('status');
+            if ($status === 'deleted') {
+                $query->onlyTrashed();
+            } elseif ($status === 'active') {
+                $query->where('is_active', true);
+            } elseif ($status === 'inactive') {
+                $query->where('is_active', false);
+            }
         }
 
         // Date range filter
@@ -324,6 +331,8 @@ class VendorController extends Controller
                     'email' => $vendor->email,
                     'phone' => $vendor->phone,
                     'is_active' => $vendor->is_active,
+                    'is_deleted' => $vendor->trashed(),
+                    'deleted_at' => $vendor->deleted_at?->format('Y-m-d H:i:s'),
                     'shipments_count' => $vendor->shipments()->count(),
                     'created_at' => $vendor->created_at->format('Y-m-d H:i:s'),
                     'can_manage' => $canManage,
@@ -431,6 +440,11 @@ class VendorController extends Controller
         $vendor->is_active = !$vendor->is_active;
         $vendor->save();
 
+        // Revoke all API tokens when deactivating
+        if (!$vendor->is_active) {
+            $vendor->tokens()->delete();
+        }
+
         return response()->json([
             'success' => true,
             'message' => $vendor->is_active ? 'Vendor activated.' : 'Vendor deactivated.',
@@ -439,17 +453,63 @@ class VendorController extends Controller
     }
 
     /**
-     * Delete a vendor.
+     * Soft-delete a vendor.
      */
     public function destroy(Vendor $vendor)
     {
         $this->authorizePermission('vendors.delete');
+
+        // Revoke all API tokens
+        $vendor->tokens()->delete();
+
+        // Mangle phone to free it for re-registration
+        $vendor->phone = $vendor->phone . '_deleted_' . time();
+        $vendor->save();
 
         $vendor->delete();
 
         return response()->json([
             'success' => true,
             'message' => 'Vendor deleted successfully.',
+        ]);
+    }
+
+    /**
+     * Restore a soft-deleted vendor.
+     */
+    public function restore(Vendor $vendor)
+    {
+        $this->authorizePermission('vendors.edit');
+
+        if (!$vendor->trashed()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vendor is not deleted.',
+            ], 422);
+        }
+
+        // Recover the original phone by stripping the _deleted_ suffix
+        $originalPhone = preg_replace('/_deleted_\d+$/', '', $vendor->phone);
+
+        // Check if the phone is now taken by another active vendor
+        $phoneTaken = Vendor::where('phone', $originalPhone)
+            ->where('id', '!=', $vendor->id)
+            ->exists();
+
+        if ($phoneTaken) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot restore: this phone number is now registered to another vendor.',
+            ], 422);
+        }
+
+        $vendor->phone = $originalPhone;
+        $vendor->save();
+        $vendor->restore();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Vendor restored successfully.',
         ]);
     }
 
@@ -472,7 +532,14 @@ class VendorController extends Controller
         }
 
         if ($request->has('status') && $request->get('status') !== '') {
-            $query->where('is_active', $request->get('status') === 'active');
+            $status = $request->get('status');
+            if ($status === 'deleted') {
+                $query->onlyTrashed();
+            } elseif ($status === 'active') {
+                $query->where('is_active', true);
+            } elseif ($status === 'inactive') {
+                $query->where('is_active', false);
+            }
         }
 
         if ($dateFrom = $request->get('date_from')) {
@@ -485,13 +552,15 @@ class VendorController extends Controller
         $vendors = $query->orderBy('created_at', 'desc')->get();
 
         $rows = $vendors->map(function ($vendor) {
+            $status = $vendor->trashed() ? 'Deleted' : ($vendor->is_active ? 'Active' : 'Inactive');
+
             return [
                 'ID' => $vendor->id,
                 'Name' => $vendor->name,
                 'Business Name' => $vendor->business_name,
                 'Email' => $vendor->email,
                 'Phone' => $vendor->phone,
-                'Status' => $vendor->is_active ? 'Active' : 'Inactive',
+                'Status' => $status,
                 'Created At' => $vendor->created_at->format('Y-m-d H:i:s'),
             ];
         })->values()->toArray();

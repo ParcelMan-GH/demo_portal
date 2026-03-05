@@ -175,16 +175,18 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('vendors', [VendorController::class, 'index'])->name('vendors.index');
         Route::get('vendors-data', [VendorController::class, 'data'])->name('vendors.data');
         Route::post('vendors', [VendorController::class, 'store'])->name('vendors.store');
-        Route::get('vendors/{vendor}', [VendorController::class, 'showPage'])->name('vendors.show');
-        Route::get('vendors/{vendor}/json', [VendorController::class, 'show'])->name('vendors.show.json');
+        Route::get('vendors/{vendor}', [VendorController::class, 'showPage'])->name('vendors.show')->withTrashed();
+        Route::get('vendors/{vendor}/json', [VendorController::class, 'show'])->name('vendors.show.json')->withTrashed();
         Route::put('vendors/{vendor}', [VendorController::class, 'update'])->name('vendors.update');
-        Route::delete('vendors/{vendor}', [VendorController::class, 'destroy'])->name('vendors.destroy');
+        Route::delete('vendors/{vendor}', [VendorController::class, 'destroy'])->name('vendors.destroy')->withTrashed();
         Route::patch('vendors/{vendor}/toggle-active', [VendorController::class, 'toggleActive'])
             ->name('vendors.toggle-active');
+        Route::patch('vendors/{vendor}/restore', [VendorController::class, 'restore'])
+            ->name('vendors.restore')->withTrashed();
         Route::get('vendors-export', [VendorController::class, 'export'])->name('vendors.export');
-        Route::get('vendors/{vendor}/shipments', [VendorController::class, 'shipments'])->name('vendors.shipments');
-        Route::get('vendors/{vendor}/activity-logs', [VendorController::class, 'activityLogs'])->name('vendors.activity-logs');
-        Route::get('vendors/{vendor}/otp-logs', [VendorController::class, 'otpLogs'])->name('vendors.otp-logs');
+        Route::get('vendors/{vendor}/shipments', [VendorController::class, 'shipments'])->name('vendors.shipments')->withTrashed();
+        Route::get('vendors/{vendor}/activity-logs', [VendorController::class, 'activityLogs'])->name('vendors.activity-logs')->withTrashed();
+        Route::get('vendors/{vendor}/otp-logs', [VendorController::class, 'otpLogs'])->name('vendors.otp-logs')->withTrashed();
 
         // Shipment Management
         Route::get('shipments', [ShipmentController::class, 'index'])->name('shipments.index');
@@ -201,11 +203,18 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
         Route::post('invoices/{invoice}/admin-accept', [InvoiceController::class, 'adminAccept'])->name('invoices.admin-accept');
+        Route::get('invoices/{invoice}/download', [InvoiceController::class, 'download'])->name('invoices.download');
+        Route::get('invoices/{invoice}/payments-data', [InvoiceController::class, 'paymentsData'])->name('invoices.payments.data');
+        Route::post('invoices/{invoice}/payments', [InvoiceController::class, 'recordPayment'])->name('invoices.payments.store');
 
         // Shipment Payments (Phase 4)
         Route::get('shipments/{shipment}/payments-data', [ShipmentPaymentController::class, 'data'])->name('shipments.payments.data');
         Route::post('shipments/{shipment}/payments', [ShipmentPaymentController::class, 'store'])->name('shipments.payments.store');
         Route::delete('payments/{payment}', [ShipmentPaymentController::class, 'destroy'])->name('payments.destroy');
+
+        // Pickup Assignments Page
+        Route::get('pickups', [PickupAssignmentController::class, 'index'])->name('pickups.index');
+        Route::get('pickups-data', [PickupAssignmentController::class, 'data'])->name('pickups.data');
 
         // Pickup Assignment Management
         Route::get('available-drivers', [PickupAssignmentController::class, 'availableDrivers'])->name('assignments.available-drivers');
@@ -227,6 +236,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('drivers-export', [DriverController::class, 'export'])->name('drivers.export');
         Route::get('drivers/{driver}/assignments', [DriverController::class, 'assignments'])->name('drivers.assignments');
         Route::get('drivers/{driver}/activity-logs', [DriverController::class, 'activityLogs'])->name('drivers.activity-logs');
+        Route::get('drivers/{driver}/transport-manifests', [DriverController::class, 'transportManifests'])->name('drivers.transport-manifests');
+        Route::get('drivers/{driver}/delivery-runs', [DriverController::class, 'deliveryRuns'])->name('drivers.delivery-runs');
 
         // Warehouse Management
         Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
@@ -279,6 +290,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Invoice List (all invoices across all shipments)
         Route::get('invoices', [AdminInvoiceListController::class, 'index'])->name('invoices.index');
         Route::get('invoices-data', [AdminInvoiceListController::class, 'data'])->name('invoices.data');
+        Route::get('invoices-export', [AdminInvoiceListController::class, 'export'])->name('invoices.export');
 
         // Notification Logs
         Route::get('notifications', [AdminNotificationController::class, 'index'])->name('notifications.index');

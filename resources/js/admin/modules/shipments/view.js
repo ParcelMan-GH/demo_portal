@@ -79,6 +79,12 @@ function shipmentShow() {
 
         // Modal states
         assignDriverModalOpen: false,
+        showUnassignModal: false,
+        unassignReason: '',
+        showCancelInvoiceModal: false,
+        cancelInvoiceReason: '',
+        cancelInvoiceId: null,
+        cancelInvoiceLoading: false,
 
         // Edit assignment form state
         editAssignmentOpen: false,
@@ -264,18 +270,24 @@ function shipmentShow() {
         },
 
         canCreateInvoice() {
+            // Super admins can create invoices regardless of shipment status
+            if (this.isSuperAdmin) {
+                return this.canManage && !this.hasActiveInvoice();
+            }
             // Phase 3: Invoice can be created at 'submitted' (old flow) OR 'at_warehouse' (new flow after pickup)
             const invoiceableStatuses = ['submitted', 'at_warehouse'];
             return this.canManage && invoiceableStatuses.includes(this.shipment.status) && !this.hasActiveInvoice();
         },
 
         activeInvoiceBlockReason() {
-            const invoiceableStatuses = ['submitted', 'at_warehouse'];
-            if (!invoiceableStatuses.includes(this.shipment.status)) {
-                return 'Invoice can be created when the shipment is submitted or received at warehouse.';
-            }
             if (this.hasActiveInvoice()) {
                 return 'Shipment already has an active invoice (pending, sent, or accepted).';
+            }
+            if (!this.isSuperAdmin) {
+                const invoiceableStatuses = ['submitted', 'at_warehouse'];
+                if (!invoiceableStatuses.includes(this.shipment.status)) {
+                    return 'Invoice can be created when the shipment is submitted or received at warehouse.';
+                }
             }
             return '';
         },
@@ -309,15 +321,13 @@ function shipmentShow() {
                 return;
             }
 
-            this.invoice = targetInvoice;
-            this.invoiceDetail = targetInvoice;
-            this.invoiceDetailModalOpen = true;
+            window.open('/admin/invoices/' + targetInvoice.id, '_blank');
         },
 
         openActiveInvoiceModal() {
             const active = this.activeInvoice();
             if (active) {
-                this.openInvoiceDetailModal(active.id);
+                window.open('/admin/invoices/' + active.id, '_blank');
             }
         },
 
@@ -444,19 +454,26 @@ function shipmentShow() {
         },
 
         viewInvoice(invoiceId) {
-            const selected = this.invoiceHistory.find(row => Number(row.id) === Number(invoiceId));
-            if (selected) {
-                this.invoice = selected;
-                this.invoiceDetail = selected;
-                this.invoiceDetailModalOpen = true;
+            if (invoiceId) {
+                window.open('/admin/invoices/' + invoiceId, '_blank');
             }
         },
 
         invoiceStatusClass(status) {
-            if (status === 'pending' || status === 'sent') return 'bg-amber-100 text-amber-700';
-            if (status === 'accepted') return 'bg-emerald-100 text-emerald-700';
-            if (status === 'rejected') return 'bg-rose-100 text-rose-700';
-            return 'bg-slate-100 text-slate-700';
+            if (status === 'pending' || status === 'sent') return 'bg-amber-50 text-amber-700 ring-amber-200';
+            if (status === 'accepted') return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+            if (status === 'rejected' || status === 'cancelled') return 'bg-rose-50 text-rose-700 ring-rose-200';
+            return 'bg-slate-50 text-slate-600 ring-slate-200';
+        },
+
+        assignmentStatusClass(status) {
+            if (status === 'assigned') return 'bg-amber-50 text-amber-700 ring-amber-200';
+            if (status === 'en_route') return 'bg-blue-50 text-blue-700 ring-blue-200';
+            if (status === 'arrived') return 'bg-sky-50 text-sky-700 ring-sky-200';
+            if (status === 'picking_up') return 'bg-teal-50 text-teal-700 ring-teal-200';
+            if (status === 'completed') return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+            if (status === 'cancelled') return 'bg-rose-50 text-rose-700 ring-rose-200';
+            return 'bg-slate-50 text-slate-600 ring-slate-200';
         },
 
         exportInvoiceData(format) {
@@ -585,15 +602,21 @@ function shipmentShow() {
             }
         },
 
-        async cancelInvoice(invoiceId = null) {
+        openCancelInvoiceModal(invoiceId = null) {
             const targetId = invoiceId || this.invoice?.id;
             if (!targetId) return;
+            this.cancelInvoiceId = targetId;
+            this.cancelInvoiceReason = '';
+            this.cancelInvoiceLoading = false;
+            this.showCancelInvoiceModal = true;
+        },
 
-            const reason = window.prompt('Optional cancellation reason:');
-            if (reason === null) return;
+        async confirmCancelInvoice() {
+            if (!this.cancelInvoiceId) return;
+            this.cancelInvoiceLoading = true;
 
             try {
-                const endpoint = this.buildInvoiceEndpoint(this.config.invoiceCancelEndpointTemplate, targetId);
+                const endpoint = this.buildInvoiceEndpoint(this.config.invoiceCancelEndpointTemplate, this.cancelInvoiceId);
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
@@ -602,7 +625,7 @@ function shipmentShow() {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     },
                     body: JSON.stringify({
-                        cancel_reason: reason || null
+                        cancel_reason: this.cancelInvoiceReason.trim() || null
                     })
                 });
 
@@ -611,11 +634,14 @@ function shipmentShow() {
                     throw new Error(data.message || 'Failed to cancel invoice');
                 }
 
+                this.showCancelInvoiceModal = false;
+
                 if (window.showToast) {
                     window.showToast(data.message || 'Invoice cancelled', 'success');
                 }
                 window.location.reload();
             } catch (error) {
+                this.cancelInvoiceLoading = false;
                 this.invoiceUiError = error.message || 'Failed to cancel invoice';
                 if (window.showToast) {
                     window.showToast(error.message || 'Failed to cancel invoice', 'error');
@@ -820,15 +846,16 @@ function shipmentShow() {
             return (template || '').replace('__ASSIGNMENT__', assignmentId);
         },
 
-        async unassignDriver() {
+        openUnassignModal() {
             if (!this.assignment || !this.assignment.id || !this.canUnassignCurrentAssignment()) {
                 return;
             }
+            this.unassignReason = '';
+            this.showUnassignModal = true;
+        },
 
-            const reason = window.prompt('Provide reason for unassignment:');
-            if (reason === null) return;
-
-            if (!reason.trim()) {
+        async confirmUnassign() {
+            if (!this.unassignReason.trim()) {
                 if (window.showToast) {
                     window.showToast('Unassignment reason is required.', 'error');
                 }
@@ -847,7 +874,7 @@ function shipmentShow() {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     },
                     body: JSON.stringify({
-                        cancellation_reason: reason.trim()
+                        cancellation_reason: this.unassignReason.trim()
                     })
                 });
 
@@ -855,6 +882,8 @@ function shipmentShow() {
                 if (!response.ok) {
                     throw new Error(data.message || 'Failed to unassign driver');
                 }
+
+                this.showUnassignModal = false;
 
                 if (window.showToast) {
                     window.showToast(data.message || 'Driver unassigned successfully', 'success');

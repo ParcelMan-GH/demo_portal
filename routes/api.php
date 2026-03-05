@@ -31,13 +31,13 @@ Route::prefix('v1/auth/vendor')->group(function () {
     Route::post('register', [VendorAuthController::class, 'register']);
 
     // Authenticated routes
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'vendor.active'])->group(function () {
         Route::post('logout', [VendorAuthController::class, 'logout']);
     });
 });
 
 // API v1 - Vendor Profile (Authenticated)
-Route::prefix('v1/vendor')->middleware('auth:sanctum')->group(function () {
+Route::prefix('v1/vendor')->middleware(['auth:sanctum', 'vendor.active'])->group(function () {
     Route::get('profile', [VendorProfileController::class, 'show']);
     Route::put('profile', [VendorProfileController::class, 'update']);
     Route::post('fcm-token', [VendorProfileController::class, 'updateFcmToken']);
