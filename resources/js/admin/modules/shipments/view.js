@@ -103,9 +103,34 @@ function shipmentShow() {
             loading: false
         },
 
-        // Payments tab (Phase 4)
+        // Payments tab
         paymentsLoaded: false,
         paymentsData: { payments: [], summary: { total_invoiced: 0, total_paid: 0, balance_due: 0 } },
+        paymentSearch: '',
+        paymentSortBy: 'payment_date',
+        paymentSortDir: 'desc',
+        paymentPage: 1,
+        paymentPerPage: 10,
+        paymentColumns: [
+            { key: 'payment_date', label: 'Date' },
+            { key: 'amount', label: 'Amount' },
+            { key: 'method', label: 'Method' },
+            { key: 'reference', label: 'Reference' },
+            { key: 'invoice', label: 'Invoice' },
+            { key: 'recorded_by', label: 'Recorded By' },
+            { key: 'notes', label: 'Notes' },
+            { key: 'actions', label: 'Actions' },
+        ],
+        paymentVisibleColumns: {
+            payment_date: true,
+            amount: true,
+            method: true,
+            reference: true,
+            invoice: true,
+            recorded_by: true,
+            notes: true,
+            actions: true,
+        },
         paymentForm: {
             open: false,
             submitting: false,
@@ -1034,6 +1059,160 @@ function shipmentShow() {
                 console.error('Failed to load payments:', e);
                 this.paymentsLoaded = true;
             }
+        },
+
+        filteredPayments() {
+            let list = this.paymentsData.payments || [];
+            if (this.paymentSearch) {
+                const q = this.paymentSearch.toLowerCase();
+                list = list.filter(p =>
+                    (p.payment_date || '').toLowerCase().includes(q) ||
+                    (p.method_label || '').toLowerCase().includes(q) ||
+                    (p.reference_number || '').toLowerCase().includes(q) ||
+                    (p.recorded_by || '').toLowerCase().includes(q) ||
+                    (p.invoice_number || '').toLowerCase().includes(q) ||
+                    (p.notes || '').toLowerCase().includes(q) ||
+                    String(p.amount).includes(q)
+                );
+            }
+            const dir = this.paymentSortDir === 'asc' ? 1 : -1;
+            const key = this.paymentSortBy;
+            list = [...list].sort((a, b) => {
+                const av = key === 'amount' ? parseFloat(a[key]) : (a[key] || '');
+                const bv = key === 'amount' ? parseFloat(b[key]) : (b[key] || '');
+                if (av < bv) return -1 * dir;
+                if (av > bv) return 1 * dir;
+                return 0;
+            });
+            return list;
+        },
+
+        paginatedPayments() {
+            const all = this.filteredPayments();
+            const start = (this.paymentPage - 1) * this.paymentPerPage;
+            return all.slice(start, start + this.paymentPerPage);
+        },
+
+        paymentLastPage() {
+            return Math.max(1, Math.ceil(this.filteredPayments().length / this.paymentPerPage));
+        },
+
+        sortPayments(column) {
+            if (this.paymentSortBy === column) {
+                this.paymentSortDir = this.paymentSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.paymentSortBy = column;
+                this.paymentSortDir = 'asc';
+            }
+            this.paymentPage = 1;
+        },
+
+        togglePaymentColumn(key) {
+            this.paymentVisibleColumns[key] = !this.paymentVisibleColumns[key];
+        },
+
+        exportPayments(format) {
+            const data = this.filteredPayments();
+            if (!data.length) { alert('No data to export'); return; }
+
+            const rows = data.map(p => ({
+                'Date': p.payment_date || '',
+                'Amount': p.formatted_amount || p.amount || '',
+                'Method': p.method_label || '',
+                'Reference': p.reference_number || '',
+                'Invoice': p.invoice_number || '',
+                'Recorded By': p.recorded_by || '',
+                'Notes': p.notes || '',
+            }));
+
+            if (format === 'csv') {
+                const headers = Object.keys(rows[0]);
+                const csvContent = [
+                    headers.join(','),
+                    ...rows.map(row =>
+                        headers.map(h => {
+                            let cell = row[h] ?? '';
+                            cell = String(cell).replace(/"/g, '""');
+                            return `"${cell}"`;
+                        }).join(',')
+                    )
+                ].join('\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'shipment-payments.csv';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+        },
+
+        printPayments() {
+            const data = this.filteredPayments();
+            if (!data.length) { alert('No data to print'); return; }
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) { alert('Pop-up blocked. Please allow pop-ups to print.'); return; }
+
+            const doc = printWindow.document;
+            const headers = ['Date', 'Amount', 'Method', 'Reference', 'Invoice', 'Recorded By', 'Notes'];
+
+            doc.title = 'Shipment Payments';
+            doc.body.innerHTML = '';
+
+            const style = doc.createElement('style');
+            style.textContent = [
+                'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 20px; }',
+                'h1 { font-size: 24px; margin-bottom: 20px; color: #1e293b; }',
+                'table { width: 100%; border-collapse: collapse; margin-top: 20px; }',
+                'th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; font-size: 12px; }',
+                'th { background-color: #f1f5f9; font-weight: 600; color: #475569; }',
+                'tr:nth-child(even) { background-color: #f8fafc; }',
+            ].join('\n');
+            doc.head.appendChild(style);
+
+            const title = doc.createElement('h1');
+            title.textContent = 'Shipment Payments — ' + (this.shipment?.tracking_number || '');
+            doc.body.appendChild(title);
+
+            const meta = doc.createElement('p');
+            meta.style.color = '#64748b';
+            meta.style.fontSize = '14px';
+            meta.style.marginBottom = '20px';
+            meta.textContent = 'Generated on ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            doc.body.appendChild(meta);
+
+            const table = doc.createElement('table');
+            const thead = doc.createElement('thead');
+            const headRow = doc.createElement('tr');
+            headers.forEach(h => { const th = doc.createElement('th'); th.textContent = h; headRow.appendChild(th); });
+            thead.appendChild(headRow);
+            table.appendChild(thead);
+
+            const tbody = doc.createElement('tbody');
+            data.forEach(p => {
+                const tr = doc.createElement('tr');
+                ['GHS ' + (p.formatted_amount || p.amount), p.method_label, p.reference_number || '—', p.invoice_number || '—', p.recorded_by || '—', p.notes || '—'].forEach((val, i) => {
+                    const td = doc.createElement('td');
+                    td.textContent = i === 0 ? p.payment_date : val;
+                    tr.appendChild(td);
+                });
+                // Fix: first column is date, then amount with currency
+                tr.innerHTML = '';
+                [p.payment_date, 'GHS ' + (p.formatted_amount || p.amount), p.method_label, p.reference_number || '—', p.invoice_number || '—', p.recorded_by || '—', p.notes || '—'].forEach(val => {
+                    const td = doc.createElement('td');
+                    td.textContent = val || '—';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            doc.body.appendChild(table);
+
+            setTimeout(() => printWindow.print(), 250);
         },
 
         async submitPayment() {

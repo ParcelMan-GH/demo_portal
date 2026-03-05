@@ -1446,92 +1446,347 @@ $shipmentConfig = [
             <!-- Payments Tab -->
             <div x-show="activeTab === 'payments'" x-cloak>
 
-                <!-- Section Header -->
-                <div class="flex items-center justify-between mb-5">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center shadow-sm">
-                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900">Payment History</h3>
-                            <p class="text-xs text-slate-500">Track all payments recorded for this shipment</p>
+                <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">
+                    <!-- Card Header -->
+                    <div class="px-6 py-5 border-b border-slate-200/50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-teal-100">
+                                    <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 class="text-lg font-semibold text-slate-900">Payments</h2>
+                                    <p class="mt-0.5 text-sm text-slate-500">Payment transactions for this shipment</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="filteredPayments().length + ' Total Payments'"></span>
+                                <button x-show="canManage" @@click="paymentForm.open = true; paymentForm.payment_date = new Date().toISOString().split('T')[0]"
+                                    class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-xs font-semibold rounded-xl hover:bg-slate-800 transition-colors shadow-sm">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                    Record Payment
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <button x-show="canManage && !paymentForm.open" @@click="paymentForm.open = true; paymentForm.payment_date = new Date().toISOString().split('T')[0]"
-                        class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 shadow-sm transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                        </svg>
-                        Record Payment
-                    </button>
-                </div>
 
-                <!-- Gradient Stat Cards -->
-                <div class="grid grid-cols-3 gap-4 mb-6">
-                    <!-- Total Invoiced -->
-                    <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 p-5 shadow-md">
-                        <div class="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/5 -translate-y-8 translate-x-8"></div>
-                        <div class="relative">
-                            <div class="flex items-center gap-2 mb-3">
-                                <div class="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center">
-                                    <svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                    </svg>
+                    <!-- Summary Cards -->
+                    <div class="px-6 pt-5">
+                        <div class="grid grid-cols-3 gap-4 mb-4">
+                            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 p-5 shadow-md">
+                                <div class="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/5 -translate-y-8 translate-x-8"></div>
+                                <div class="relative">
+                                    <div class="flex items-center gap-2 mb-3">
+                                        <div class="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center">
+                                            <svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                            </svg>
+                                        </div>
+                                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Invoiced</p>
+                                    </div>
+                                    <p class="text-2xl font-bold text-white" x-text="'GHS ' + (paymentsData.summary?.total_invoiced || 0).toFixed(2)">GHS 0.00</p>
                                 </div>
-                                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Invoiced</p>
                             </div>
-                            <p class="text-2xl font-bold text-white" x-text="'GHS ' + (paymentsData.summary?.total_invoiced || 0).toFixed(2)">GHS 0.00</p>
+                            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-5 shadow-md">
+                                <div class="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/10 -translate-y-8 translate-x-8"></div>
+                                <div class="relative">
+                                    <div class="flex items-center gap-2 mb-3">
+                                        <div class="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+                                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                        </div>
+                                        <p class="text-xs font-semibold text-emerald-100 uppercase tracking-wider">Total Paid</p>
+                                    </div>
+                                    <p class="text-2xl font-bold text-white" x-text="'GHS ' + (paymentsData.summary?.total_paid || 0).toFixed(2)">GHS 0.00</p>
+                                </div>
+                            </div>
+                            <div class="relative overflow-hidden rounded-2xl p-5 shadow-md"
+                                :class="(paymentsData.summary?.balance_due || 0) > 0 ? 'bg-gradient-to-br from-rose-500 to-pink-600' : 'bg-gradient-to-br from-emerald-500 to-teal-600'">
+                                <div class="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/10 -translate-y-8 translate-x-8"></div>
+                                <div class="relative">
+                                    <div class="flex items-center gap-2 mb-3">
+                                        <div class="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+                                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                        </div>
+                                        <p class="text-xs font-semibold text-white/80 uppercase tracking-wider">Balance Due</p>
+                                    </div>
+                                    <p class="text-2xl font-bold text-white" x-text="'GHS ' + (paymentsData.summary?.balance_due || 0).toFixed(2)">GHS 0.00</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <!-- Total Paid -->
-                    <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-5 shadow-md">
-                        <div class="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/10 -translate-y-8 translate-x-8"></div>
-                        <div class="relative">
-                            <div class="flex items-center gap-2 mb-3">
-                                <div class="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
-                                    <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+
+                    <!-- Table Controls -->
+                    <div class="px-6 pb-0">
+                        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                            <!-- Left: Search -->
+                            <div class="flex flex-wrap items-center gap-3">
+                                <div class="relative w-full sm:w-64">
+                                    <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                                     </svg>
+                                    <input type="text" x-model="paymentSearch" @@input="paymentPage = 1" placeholder="Search payments..." class="w-full pl-10 pr-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300">
                                 </div>
-                                <p class="text-xs font-semibold text-emerald-100 uppercase tracking-wider">Total Paid</p>
                             </div>
-                            <p class="text-2xl font-bold text-white" x-text="'GHS ' + (paymentsData.summary?.total_paid || 0).toFixed(2)">GHS 0.00</p>
+
+                            <!-- Right: Export & View -->
+                            <div class="flex items-center gap-2">
+                                <!-- Export -->
+                                <div x-data="{ open: false }" class="relative">
+                                    <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                                        <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                        </svg>
+                                        Export
+                                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                    </button>
+                                    <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50" style="display: none;">
+                                        <button type="button" @@click="exportPayments('csv'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                            CSV
+                                        </button>
+                                        <div class="border-t border-slate-200/50 my-1"></div>
+                                        <button type="button" @@click="printPayments(); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                            Print
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Customize Columns -->
+                                <div x-data="{ open: false }" class="relative">
+                                    <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                                        <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/>
+                                        </svg>
+                                        View
+                                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                    </button>
+                                    <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50" style="display: none;">
+                                        <template x-for="col in paymentColumns" :key="col.key">
+                                            <button type="button" @@click="togglePaymentColumn(col.key)" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70">
+                                                <span x-text="col.label"></span>
+                                                <svg x-show="paymentVisibleColumns[col.key]" class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                </svg>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <!-- Balance Due -->
-                    <div class="relative overflow-hidden rounded-2xl p-5 shadow-md"
-                        :class="(paymentsData.summary?.balance_due || 0) > 0 ? 'bg-gradient-to-br from-rose-500 to-pink-600' : 'bg-gradient-to-br from-emerald-500 to-teal-600'">
-                        <div class="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/10 -translate-y-8 translate-x-8"></div>
-                        <div class="relative">
-                            <div class="flex items-center gap-2 mb-3">
-                                <div class="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
-                                    <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+
+                    <!-- Table -->
+                    <div class="px-6 py-4">
+                        <div class="rounded-xl border border-slate-200/50 relative">
+                            <!-- Loading overlay -->
+                            <div x-show="!paymentsLoaded" x-transition.opacity.duration.150ms class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center" style="display: none;">
+                                <div class="flex items-center gap-2 text-slate-400 text-sm">
+                                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                                     </svg>
+                                    Loading payments...
                                 </div>
-                                <p class="text-xs font-semibold text-white/80 uppercase tracking-wider">Balance Due</p>
                             </div>
-                            <p class="text-2xl font-bold text-white" x-text="'GHS ' + (paymentsData.summary?.balance_due || 0).toFixed(2)">GHS 0.00</p>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full min-w-[900px] md:min-w-full divide-y divide-slate-200/50 text-xs">
+                                    <thead class="bg-slate-50/50">
+                                        <tr>
+                                            <th x-show="paymentVisibleColumns.payment_date" @@click="sortPayments('payment_date')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                                <div class="flex items-center">
+                                                    DATE
+                                                    <svg class="w-2.5 h-2.5 ml-1" :class="paymentSortBy === 'payment_date' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                                    </svg>
+                                                </div>
+                                            </th>
+                                            <th x-show="paymentVisibleColumns.amount" @@click="sortPayments('amount')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                                <div class="flex items-center">
+                                                    AMOUNT
+                                                    <svg class="w-2.5 h-2.5 ml-1" :class="paymentSortBy === 'amount' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                                    </svg>
+                                                </div>
+                                            </th>
+                                            <th x-show="paymentVisibleColumns.method" @@click="sortPayments('method_label')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                                <div class="flex items-center">
+                                                    METHOD
+                                                    <svg class="w-2.5 h-2.5 ml-1" :class="paymentSortBy === 'method_label' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                                    </svg>
+                                                </div>
+                                            </th>
+                                            <th x-show="paymentVisibleColumns.reference" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                                REFERENCE
+                                            </th>
+                                            <th x-show="paymentVisibleColumns.invoice" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                                INVOICE
+                                            </th>
+                                            <th x-show="paymentVisibleColumns.recorded_by" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                                RECORDED BY
+                                            </th>
+                                            <th x-show="paymentVisibleColumns.notes" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                                NOTES
+                                            </th>
+                                            <th x-show="paymentVisibleColumns.actions" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                                ACTIONS
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-transparent divide-y divide-slate-100/50">
+                                        <template x-if="paymentsLoaded && filteredPayments().length === 0">
+                                            <tr>
+                                                <td colspan="8" class="px-4 py-8 text-center text-gray-500 text-xs">
+                                                    <div class="flex flex-col items-center gap-2">
+                                                        <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                                        </svg>
+                                                        <span>No payments found</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </template>
+
+                                        <template x-for="payment in paginatedPayments()" :key="payment.id">
+                                            <tr class="hover:bg-slate-50/70 transition-colors">
+                                                <td x-show="paymentVisibleColumns.payment_date" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="payment.payment_date"></td>
+                                                <td x-show="paymentVisibleColumns.amount" class="px-4 py-2.5 whitespace-nowrap">
+                                                    <span class="text-xs font-semibold text-emerald-700" x-text="'GHS ' + payment.formatted_amount"></span>
+                                                </td>
+                                                <td x-show="paymentVisibleColumns.method" class="px-4 py-2.5 whitespace-nowrap">
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700" x-text="payment.method_label"></span>
+                                                </td>
+                                                <td x-show="paymentVisibleColumns.reference" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-500 font-mono" x-text="payment.reference_number || '—'"></td>
+                                                <td x-show="paymentVisibleColumns.invoice" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-500" x-text="payment.invoice_number || '—'"></td>
+                                                <td x-show="paymentVisibleColumns.recorded_by" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="payment.recorded_by || '—'"></td>
+                                                <td x-show="paymentVisibleColumns.notes" class="px-4 py-2.5 text-xs text-slate-500 max-w-[150px] truncate" x-text="payment.notes || '—'"></td>
+                                                <td x-show="paymentVisibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center">
+                                                    <button x-show="isSuperAdmin" @@click="voidPayment(payment.id)"
+                                                        class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors inline-flex" title="Void payment">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                        </svg>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Pagination -->
+                            <div x-show="paymentsLoaded && filteredPayments().length > 0" class="px-4 py-2.5 border-t border-slate-200/50 bg-slate-50/30">
+                                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                    <div class="text-xs text-slate-600">
+                                        Showing
+                                        <span x-text="Math.min(((paymentPage - 1) * paymentPerPage) + 1, filteredPayments().length)"></span>
+                                        to
+                                        <span x-text="Math.min(paymentPage * paymentPerPage, filteredPayments().length)"></span>
+                                        of
+                                        <span x-text="filteredPayments().length"></span>
+                                        results
+                                    </div>
+
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-medium text-slate-600">Rows per page</span>
+                                            <div x-data="{ open: false }" class="relative">
+                                                <button type="button" @@click="open = !open"
+                                                    class="inline-flex items-center justify-between gap-1.5 px-2.5 py-1 min-w-[60px] border border-slate-200/70 rounded-lg bg-white/70 backdrop-blur-sm text-xs font-medium text-slate-700 hover:bg-white/90 transition-colors">
+                                                    <span x-text="paymentPerPage"></span>
+                                                    <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                                    </svg>
+                                                </button>
+                                                <div x-show="open" @@click.away="open = false" x-transition
+                                                    class="absolute bottom-full mb-1 right-0 w-16 rounded-lg border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-lg p-1 z-[9999]" style="display: none;">
+                                                    <button type="button" @@click="paymentPerPage = 10; paymentPage = 1; open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="paymentPerPage == 10 ? 'bg-slate-100/70' : ''">10</button>
+                                                    <button type="button" @@click="paymentPerPage = 25; paymentPage = 1; open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="paymentPerPage == 25 ? 'bg-slate-100/70' : ''">25</button>
+                                                    <button type="button" @@click="paymentPerPage = 50; paymentPage = 1; open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="paymentPerPage == 50 ? 'bg-slate-100/70' : ''">50</button>
+                                                    <button type="button" @@click="paymentPerPage = 100; paymentPage = 1; open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="paymentPerPage == 100 ? 'bg-slate-100/70' : ''">100</button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="text-xs font-medium text-slate-600">
+                                            Page <span x-text="paymentPage"></span> of <span x-text="paymentLastPage()"></span>
+                                        </div>
+
+                                        <div class="flex space-x-1">
+                                            <button @@click="paymentPage = 1" :disabled="paymentPage === 1"
+                                                :class="paymentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
+                                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/></svg>
+                                            </button>
+                                            <button @@click="paymentPage = Math.max(1, paymentPage - 1)" :disabled="paymentPage === 1"
+                                                :class="paymentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
+                                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                            </button>
+                                            <button @@click="paymentPage = Math.min(paymentLastPage(), paymentPage + 1)" :disabled="paymentPage >= paymentLastPage()"
+                                                :class="paymentPage >= paymentLastPage() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
+                                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                            </button>
+                                            <button @@click="paymentPage = paymentLastPage()" :disabled="paymentPage >= paymentLastPage()"
+                                                :class="paymentPage >= paymentLastPage() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
+                                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Record Payment Form -->
-                <div x-show="paymentForm.open" x-cloak class="bg-slate-50 rounded-2xl border border-slate-200 p-6 mb-6">
-                    <h4 class="text-sm font-bold text-slate-800 mb-4">Record Payment</h4>
-                    <form @@submit.prevent="submitPayment()">
+            <!-- Record Payment Modal -->
+            <div x-show="paymentForm.open" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="paymentForm.open = false"></div>
+                <div class="relative z-10 bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl max-h-[95vh] overflow-y-auto">
+                    <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center">
+                                <svg class="w-4.5 h-4.5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-sm font-bold text-slate-900">Record Payment</h3>
+                        </div>
+                        <button @@click="paymentForm.open = false" class="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <form @@submit.prevent="submitPayment()" class="px-6 py-5">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Amount <span class="text-rose-500">*</span></label>
                                 <input type="number" step="0.01" min="0.01" x-model="paymentForm.amount" required
-                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300">
+                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400/50 focus:border-teal-300">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Payment Method <span class="text-rose-500">*</span></label>
                                 <select x-model="paymentForm.payment_method" required
-                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300">
+                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400/50 focus:border-teal-300">
                                     <option value="">Select method</option>
                                     <option value="cash">Cash</option>
                                     <option value="bank_transfer">Bank Transfer</option>
@@ -1542,96 +1797,34 @@ $shipmentConfig = [
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Payment Date <span class="text-rose-500">*</span></label>
                                 <input type="date" x-model="paymentForm.payment_date" required
-                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300">
+                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400/50 focus:border-teal-300">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Reference Number</label>
                                 <input type="text" x-model="paymentForm.reference_number"
-                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300" placeholder="Optional">
+                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400/50 focus:border-teal-300" placeholder="Optional">
                             </div>
                             <div class="col-span-2">
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Notes</label>
                                 <textarea x-model="paymentForm.notes" rows="2"
-                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300" placeholder="Optional notes"></textarea>
+                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400/50 focus:border-teal-300" placeholder="Optional notes"></textarea>
                             </div>
                         </div>
-                        <div class="flex items-center gap-2 mt-4">
-                            <button type="submit" :disabled="paymentForm.submitting"
-                                class="px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50">
-                                <span x-text="paymentForm.submitting ? 'Saving...' : 'Record Payment'"></span>
-                            </button>
+                        <div class="flex justify-end gap-2 mt-5 pt-4 border-t border-slate-100">
                             <button type="button" @@click="paymentForm.open = false"
-                                class="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-200 transition-colors">
+                                class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
                                 Cancel
+                            </button>
+                            <button type="submit" :disabled="paymentForm.submitting"
+                                class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-teal-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                                <svg x-show="paymentForm.submitting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span x-text="paymentForm.submitting ? 'Saving...' : 'Record Payment'"></span>
                             </button>
                         </div>
                     </form>
-                </div>
-
-                <!-- Payments Table -->
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div class="px-6 py-4 border-b border-slate-100">
-                        <h4 class="text-sm font-bold text-slate-800">Transactions</h4>
-                    </div>
-
-                    <!-- Loading -->
-                    <div x-show="!paymentsLoaded" class="flex items-center justify-center py-10 text-slate-400 text-sm gap-2">
-                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                        </svg>
-                        Loading payments...
-                    </div>
-
-                    <!-- Empty state -->
-                    <div x-show="paymentsLoaded && paymentsData.payments && !paymentsData.payments.length"
-                        class="flex flex-col items-center justify-center py-10 text-slate-400">
-                        <svg class="w-10 h-10 mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-                        </svg>
-                        <p class="text-sm font-medium">No payments recorded</p>
-                    </div>
-
-                    <!-- Table -->
-                    <table x-show="paymentsLoaded && paymentsData.payments && paymentsData.payments.length" class="w-full">
-                        <thead>
-                            <tr class="bg-slate-50/70 border-b border-slate-100">
-                                <th class="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
-                                <th class="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Amount</th>
-                                <th class="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Method</th>
-                                <th class="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Reference</th>
-                                <th class="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Invoice</th>
-                                <th class="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Recorded By</th>
-                                <th class="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Notes</th>
-                                <th class="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="payment in paymentsData.payments" :key="payment.id">
-                                <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                                    <td class="px-4 py-3 text-xs text-slate-600" x-text="payment.payment_date"></td>
-                                    <td class="px-4 py-3">
-                                        <span class="text-sm font-semibold text-emerald-700" x-text="'GHS ' + payment.formatted_amount"></span>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700" x-text="payment.method_label"></span>
-                                    </td>
-                                    <td class="px-4 py-3 text-xs text-slate-500 font-mono" x-text="payment.reference_number || '—'"></td>
-                                    <td class="px-4 py-3 text-xs text-slate-500" x-text="payment.invoice_number || '—'"></td>
-                                    <td class="px-4 py-3 text-xs text-slate-600" x-text="payment.recorded_by || '—'"></td>
-                                    <td class="px-4 py-3 text-xs text-slate-500" x-text="payment.notes || '—'"></td>
-                                    <td class="px-4 py-3">
-                                        <button x-show="isSuperAdmin" @@click="voidPayment(payment.id)"
-                                            class="p-1 rounded text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Void payment">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                            </svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
                 </div>
             </div>
 

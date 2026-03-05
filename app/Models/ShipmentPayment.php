@@ -42,7 +42,7 @@ class ShipmentPayment extends Model
 
     public function recordedBy(): BelongsTo
     {
-        return $this->belongsTo(Admin::class, 'recorded_by_admin_id');
+        return $this->belongsTo(User::class, 'recorded_by_admin_id');
     }
 
     public function methodLabel(): string

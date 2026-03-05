@@ -141,10 +141,10 @@ $invoiceConfig = [
                     </div>
 
                     <!-- RIGHT: Summary Stats -->
-                    <div class="flex-1 lg:ml-auto">
+                    <div class="lg:ml-auto">
                         <div class="flex flex-col gap-3">
                             <!-- Amount Cards -->
-                            <div class="grid grid-cols-3 gap-3">
+                            <div class="grid grid-cols-3 gap-3 max-w-sm">
                                 <div class="bg-white/5 rounded-xl p-3 border border-white/10">
                                     <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Amount</p>
                                     <p class="text-lg font-bold text-white mt-1">{{ $invoice->currency ?: 'GHS' }} {{ number_format((float) $invoice->total_amount, 2) }}</p>
