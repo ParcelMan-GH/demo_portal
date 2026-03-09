@@ -100,7 +100,9 @@ function shipmentShow() {
         // Tracking state
         tracking: {
             data: [],
-            loading: false
+            items: [],
+            loading: false,
+            itemsExpanded: {},
         },
 
         // Payments tab
@@ -139,6 +141,11 @@ function shipmentShow() {
             reference_number: '',
             notes: '',
             payment_date: '',
+        },
+        voidConfirm: {
+            open: false,
+            paymentId: null,
+            loading: false,
         },
         isSuperAdmin: false,
 
@@ -278,12 +285,123 @@ function shipmentShow() {
             try {
                 const response = await fetch(this.config.trackingEndpoint);
                 const data = await response.json();
-                this.tracking.data = data.data || data;
+                this.tracking.data  = data.data  || [];
+                this.tracking.items = data.items || [];
             } catch (error) {
                 console.error('Failed to load tracking:', error);
             } finally {
                 this.tracking.loading = false;
             }
+        },
+
+        itemsAreDivergent() {
+            const batchIds = this.tracking.items.map(i => i.sort_batch?.id ?? null).filter(Boolean);
+            return batchIds.length > 0 && new Set(batchIds).size > 1;
+        },
+
+        toggleItemDetails(itemId) {
+            this.tracking.itemsExpanded[itemId] = !this.tracking.itemsExpanded[itemId];
+        },
+
+        isItemExpanded(itemId) {
+            return !!this.tracking.itemsExpanded[itemId];
+        },
+
+        itemPipelineStages(item) {
+            const isTransfer = item.sort_batch?.dispatch_mode === 'transfer';
+            return [
+                {
+                    key: 'warehouse', label: 'At Warehouse',
+                    completed: ['at_warehouse','sorted','in_transit','at_destination','out_for_delivery','delivered','returned'].includes(item.status),
+                    active: item.status === 'at_warehouse',
+                    failed: false,
+                },
+                {
+                    key: 'sorted', label: 'Sorted',
+                    completed: !!item.sort_batch?.sealed_at,
+                    active: !!(item.sort_batch && !item.sort_batch.sealed_at),
+                    failed: false,
+                },
+                {
+                    key: 'transit', label: isTransfer ? 'In Transit' : 'Out for Delivery',
+                    completed: isTransfer ? !!item.transport_manifest?.received_at : !!item.delivery_run?.completed_at,
+                    active: isTransfer
+                        ? !!(item.transport_manifest && !item.transport_manifest.received_at)
+                        : !!(item.delivery_run && !item.delivery_run.completed_at),
+                    failed: false,
+                },
+                {
+                    key: 'delivered', label: 'Delivered',
+                    completed: item.delivery_outcome?.status === 'delivered',
+                    active: item.delivery_outcome?.status === 'pending' && !!item.delivery_run?.dispatched_at,
+                    failed: item.delivery_outcome?.status === 'failed',
+                },
+            ];
+        },
+
+        itemStatusBadgeClass(status) {
+            const map = {
+                pending:          'bg-slate-100 text-slate-600',
+                picked_up:        'bg-violet-100 text-violet-700',
+                at_warehouse:     'bg-blue-100 text-blue-700',
+                sorted:           'bg-indigo-100 text-indigo-700',
+                in_transit:       'bg-orange-100 text-orange-700',
+                at_destination:   'bg-teal-100 text-teal-700',
+                out_for_delivery: 'bg-amber-100 text-amber-700',
+                delivered:        'bg-emerald-100 text-emerald-700',
+                returned:         'bg-rose-100 text-rose-700',
+            };
+            return map[status] || 'bg-slate-100 text-slate-600';
+        },
+
+        timelineEventDotClass(status) {
+            const map = {
+                created:               'bg-slate-400',
+                submitted:             'bg-blue-400',
+                invoice_sent:          'bg-sky-500',
+                invoice_accepted:      'bg-cyan-500',
+                invoice_rejected:      'bg-rose-500',
+                invoice_cancelled:     'bg-rose-400',
+                pickup_assigned:       'bg-violet-500',
+                en_route:              'bg-violet-400',
+                arrived:               'bg-violet-600',
+                picked_up:             'bg-purple-500',
+                arrived_warehouse:     'bg-indigo-400',
+                at_warehouse:          'bg-indigo-500',
+                sorted:                'bg-indigo-600',
+                in_transit:            'bg-orange-500',
+                at_destination:        'bg-teal-500',
+                received_at_destination: 'bg-teal-600',
+                out_for_delivery:      'bg-amber-500',
+                delivered:             'bg-emerald-500',
+                cancelled:             'bg-rose-500',
+            };
+            return map[status] || 'bg-slate-400';
+        },
+
+        timelineEventBadgeClass(status) {
+            const map = {
+                created:               'bg-slate-100 text-slate-700',
+                submitted:             'bg-blue-100 text-blue-700',
+                invoice_sent:          'bg-sky-100 text-sky-700',
+                invoice_accepted:      'bg-cyan-100 text-cyan-700',
+                invoice_rejected:      'bg-rose-100 text-rose-700',
+                invoice_cancelled:     'bg-rose-100 text-rose-600',
+                pickup_assigned:       'bg-violet-100 text-violet-700',
+                en_route:              'bg-violet-100 text-violet-600',
+                arrived:               'bg-violet-100 text-violet-800',
+                picked_up:             'bg-purple-100 text-purple-700',
+                arrived_warehouse:     'bg-indigo-100 text-indigo-600',
+                at_warehouse:          'bg-indigo-100 text-indigo-700',
+                sorted:                'bg-indigo-100 text-indigo-800',
+                in_transit:            'bg-orange-100 text-orange-700',
+                at_destination:        'bg-teal-100 text-teal-700',
+                received_at_destination: 'bg-teal-100 text-teal-800',
+                out_for_delivery:      'bg-amber-100 text-amber-700',
+                delivered:             'bg-emerald-100 text-emerald-700',
+                cancelled:             'bg-rose-100 text-rose-700',
+            };
+            return map[status] || 'bg-slate-100 text-slate-700';
         },
 
         activeStatuses() {
@@ -1247,10 +1365,15 @@ function shipmentShow() {
             }
         },
 
-        async voidPayment(paymentId) {
-            if (!confirm('Void this payment? This cannot be undone.')) return;
+        voidPayment(paymentId) {
+            this.voidConfirm.paymentId = paymentId;
+            this.voidConfirm.open = true;
+        },
+
+        async confirmVoidPayment() {
+            this.voidConfirm.loading = true;
             try {
-                const endpoint = (this.config.destroyPaymentEndpointTemplate || '').replace('__PAYMENT__', paymentId);
+                const endpoint = (this.config.destroyPaymentEndpointTemplate || '').replace('__PAYMENT__', this.voidConfirm.paymentId);
                 const response = await fetch(endpoint, {
                     method: 'DELETE',
                     headers: {
@@ -1260,11 +1383,13 @@ function shipmentShow() {
                 });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.message || 'Failed to void payment');
+                this.voidConfirm = { open: false, paymentId: null, loading: false };
                 if (window.showToast) window.showToast(data.message || 'Payment voided', 'success');
                 await this.loadPayments();
             } catch (e) {
                 console.error('Failed to void payment:', e);
                 if (window.showToast) window.showToast(e.message || 'Failed to void payment', 'error');
+                this.voidConfirm.loading = false;
             }
         }
     };

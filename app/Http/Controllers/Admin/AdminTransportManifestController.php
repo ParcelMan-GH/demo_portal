@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\DriversExport;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\TransportManifest;
 use App\Models\Warehouse;
+use App\Support\GenericPdfExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
 
 class AdminTransportManifestController extends Controller
 {
@@ -158,6 +161,72 @@ class AdminTransportManifestController extends Controller
         $statusLabel = $this->formatStatusLabel($manifest->status);
 
         return view('admin.transport-manifests.show', compact('manifest', 'statusLabel'));
+    }
+
+    /**
+     * Export transport manifests data (JSON / Excel / PDF).
+     */
+    public function export(Request $request)
+    {
+        $query = TransportManifest::with(['originWarehouse', 'destinationWarehouse', 'assignedDriver'])
+            ->withCount('items');
+
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('manifest_number', 'like', "%{$search}%")
+                    ->orWhereHas('assignedDriver', fn($dq) => $dq->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('originWarehouse', fn($wq) => $wq->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('destinationWarehouse', fn($wq) => $wq->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        if ($status = $request->get('status')) {
+            $query->where('status', $status);
+        }
+
+        if ($originWarehouseId = $request->get('origin_warehouse_id')) {
+            $query->where('origin_warehouse_id', $originWarehouseId);
+        }
+
+        if ($destinationWarehouseId = $request->get('destination_warehouse_id')) {
+            $query->where('destination_warehouse_id', $destinationWarehouseId);
+        }
+
+        if ($dateFrom = $request->get('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo = $request->get('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        $manifests = $query->orderBy('created_at', 'desc')->get();
+
+        $rows = $manifests->map(fn(TransportManifest $m) => [
+            'Manifest #'    => $m->manifest_number,
+            'From'          => $m->originWarehouse?->name ?? '—',
+            'To'            => $m->destinationWarehouse?->name ?? '—',
+            'Driver'        => $m->assignedDriver?->name ?? '—',
+            'Driver Phone'  => $m->assignedDriver?->phone ?? '—',
+            'Items'         => $m->items_count,
+            'Status'        => $this->formatStatusLabel($m->status),
+            'Dispatched At' => $m->dispatched_at?->format('Y-m-d H:i:s') ?? '—',
+            'Arrived At'    => $m->arrived_at?->format('Y-m-d H:i:s') ?? '—',
+            'Received At'   => $m->received_at?->format('Y-m-d H:i:s') ?? '—',
+            'Created At'    => $m->created_at->format('Y-m-d H:i:s'),
+        ])->values()->toArray();
+
+        $format = $request->input('format', 'json');
+
+        if ($format === 'excel') {
+            return Excel::download(new DriversExport($rows), 'transport_manifests_' . date('Y-m-d_His') . '.xlsx');
+        }
+
+        if ($format === 'pdf') {
+            return GenericPdfExporter::download($rows, 'transport_manifests_' . date('Y-m-d_His') . '.pdf', 'Transport Manifests');
+        }
+
+        return response()->json(['data' => $rows]);
     }
 
     /**

@@ -594,12 +594,12 @@ document.addEventListener('alpine:init', () => {
 
             loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
                 .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
-                .then(() => loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js'))
                 .then(() => {
-                    window.$ = window.jQuery = window.$ || window.jQuery;
+                    window.$ = window.jQuery = window.jQuery || window.$;
                     window.moment = window.moment || moment;
-                    setupPicker();
-                });
+                    return loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js');
+                })
+                .then(setupPicker);
         },
 
         clearDateFilter() {

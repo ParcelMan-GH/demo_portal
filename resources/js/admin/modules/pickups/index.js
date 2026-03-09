@@ -130,25 +130,31 @@ function buildPickupsTable(config) {
             if (!input) return;
 
             const loadDateRangePicker = () => {
-                if (typeof $ === 'undefined' || typeof $.fn.daterangepicker === 'undefined') {
-                    // Load dependencies
-                    const momentScript = document.createElement('script');
-                    momentScript.src = 'https://cdn.jsdelivr.net/npm/moment@2.30.1/moment.min.js';
-                    momentScript.onload = () => {
-                        const drpCss = document.createElement('link');
-                        drpCss.rel = 'stylesheet';
-                        drpCss.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
-                        document.head.appendChild(drpCss);
-
-                        const drpScript = document.createElement('script');
-                        drpScript.src = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js';
-                        drpScript.onload = () => this.setupDateRangePicker(input);
-                        document.head.appendChild(drpScript);
-                    };
-                    document.head.appendChild(momentScript);
-                } else {
+                if (window.$ && window.$.fn && window.$.fn.daterangepicker) {
                     this.setupDateRangePicker(input);
+                    return;
                 }
+                const loadScript = (id, src) => new Promise(resolve => {
+                    if (document.getElementById(id)) return resolve();
+                    const s = document.createElement('script');
+                    s.id = id; s.src = src; s.onload = resolve;
+                    document.body.appendChild(s);
+                });
+                const cssId = 'daterangepicker-css';
+                if (!document.getElementById(cssId)) {
+                    const link = document.createElement('link');
+                    link.id = cssId; link.rel = 'stylesheet';
+                    link.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
+                    document.head.appendChild(link);
+                }
+                loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
+                    .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
+                    .then(() => {
+                        window.$ = window.jQuery = window.jQuery || window.$;
+                        window.moment = window.moment || moment;
+                        return loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js');
+                    })
+                    .then(() => this.setupDateRangePicker(input));
             };
 
             if (document.readyState === 'complete') {
@@ -159,15 +165,24 @@ function buildPickupsTable(config) {
         },
 
         setupDateRangePicker(input) {
-            if (typeof $ === 'undefined' || typeof $.fn.daterangepicker === 'undefined') return;
+            if (!window.$ || !window.$.fn || !window.$.fn.daterangepicker) return;
 
-            $(input).daterangepicker({
+            window.$(input).daterangepicker({
                 autoUpdateInput: false,
-                locale: { cancelLabel: 'Clear', format: 'YYYY-MM-DD' },
+                alwaysShowCalendars: true,
                 opens: 'left',
+                locale: { format: 'YYYY-MM-DD', cancelLabel: 'Clear' },
+                ranges: {
+                    'Today':       [window.moment(), window.moment()],
+                    'Yesterday':   [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
+                    'Last 7 Days': [window.moment().subtract(6, 'days'), window.moment()],
+                    'Last 30 Days':[window.moment().subtract(29, 'days'), window.moment()],
+                    'This Month':  [window.moment().startOf('month'), window.moment().endOf('month')],
+                    'Last Month':  [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
+                },
             });
 
-            $(input).on('apply.daterangepicker', (ev, picker) => {
+            window.$(input).on('apply.daterangepicker', (ev, picker) => {
                 this.assignedFrom = picker.startDate.format('YYYY-MM-DD');
                 this.assignedTo = picker.endDate.format('YYYY-MM-DD');
                 input.value = this.assignedFrom + ' - ' + this.assignedTo;
@@ -175,7 +190,7 @@ function buildPickupsTable(config) {
                 this.loadData();
             });
 
-            $(input).on('cancel.daterangepicker', () => {
+            window.$(input).on('cancel.daterangepicker', () => {
                 this.assignedFrom = '';
                 this.assignedTo = '';
                 input.value = '';

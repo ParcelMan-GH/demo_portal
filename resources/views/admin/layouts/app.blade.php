@@ -39,14 +39,14 @@
                 <!-- Dashboard -->
                 @hasPermission('dashboard.view')
                 <a href="{{ route('admin.dashboard') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.dashboard') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.dashboard') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Dashboard</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Dashboard</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Dashboard</span>
                     </template>
@@ -54,7 +54,7 @@
                 @endhasPermission
 
                 <!-- OPERATIONS Section -->
-                <div class="mt-4 mb-2 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
+                <div class="mt-3 mb-1 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
                     <div class="section-label flex items-center gap-3">
                         <span x-show="!sidebarCollapsed" class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.12em] whitespace-nowrap">Operations</span>
                         <span x-show="sidebarCollapsed" x-cloak class="block w-8 h-[2px] bg-gradient-to-r from-slate-600 to-transparent mx-auto rounded-full"></span>
@@ -63,14 +63,14 @@
 
                 @hasPermission('vendors.view')
                 <a href="{{ route('admin.vendors.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.vendors.*') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.vendors.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Vendors</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Vendors</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Vendors</span>
                     </template>
@@ -79,7 +79,7 @@
 
                 @hasPermission('drivers.view')
                 <a href="{{ route('admin.drivers.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.drivers.*') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.drivers.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -87,7 +87,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Drivers</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Drivers</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Drivers</span>
                     </template>
@@ -96,14 +96,14 @@
 
                 @hasPermission('shipments.view')
                 <a href="{{ route('admin.shipments.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.shipments.*') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.shipments.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Shipments</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Shipments</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Shipments</span>
                     </template>
@@ -112,14 +112,14 @@
 
                 @hasPermission('invoices.view')
                 <a href="{{ route('admin.invoices.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.invoices.*') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.invoices.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Invoices</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Invoices</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Invoices</span>
                     </template>
@@ -127,7 +127,7 @@
                 @endhasPermission
 
                 <!-- LOGISTICS Section -->
-                <div class="mt-4 mb-2 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
+                <div class="mt-3 mb-1 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
                     <div class="section-label flex items-center gap-3">
                         <span x-show="!sidebarCollapsed" class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.12em] whitespace-nowrap">Logistics</span>
                         <span x-show="sidebarCollapsed" x-cloak class="block w-8 h-[2px] bg-gradient-to-r from-slate-600 to-transparent mx-auto rounded-full"></span>
@@ -136,14 +136,14 @@
 
                 @hasPermission('shipments.view')
                 <a href="{{ route('admin.pickups.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.pickups.*') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.pickups.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Pickup Assignments</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Pickup Assignments</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Pickup Assignments</span>
                     </template>
@@ -152,14 +152,14 @@
 
                 @hasPermission('shipments.view')
                 <a href="{{ route('admin.delivery-runs.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.delivery-runs.*') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.delivery-runs.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Delivery Runs</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Delivery Runs</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Delivery Runs</span>
                     </template>
@@ -168,14 +168,14 @@
 
                 @hasPermission('shipments.view')
                 <a href="{{ route('admin.transport-manifests.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.transport-manifests.*') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.transport-manifests.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Transports</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Transports</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Transport Manifests</span>
                     </template>
@@ -184,14 +184,14 @@
 
                 @hasPermission('shipments.view')
                 <a href="{{ route('admin.sort-batches.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.sort-batches.*') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.sort-batches.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Sort Batches</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Sort Batches</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Sort Batches</span>
                     </template>
@@ -199,7 +199,7 @@
                 @endhasPermission
 
                 <!-- SYSTEM Section -->
-                <div class="mt-4 mb-2 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
+                <div class="mt-3 mb-1 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
                     <div class="section-label flex items-center gap-3">
                         <span x-show="!sidebarCollapsed" class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.12em] whitespace-nowrap">System</span>
                         <span x-show="sidebarCollapsed" x-cloak class="block w-8 h-[2px] bg-gradient-to-r from-slate-600 to-transparent mx-auto rounded-full"></span>
@@ -219,14 +219,14 @@
                 @if($canSeeWarehouses || $canSeeRoles)
                 <div x-data="{ expanded: {{ $warehouseMgmtActive ? 'true' : 'false' }} }" class="relative">
                     <button @click="expanded = !expanded"
-                            class="summary-item nav-item relative w-full flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ $warehouseMgmtActive ? 'active text-white' : '' }} cursor-pointer"
+                            class="summary-item nav-item relative w-full flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ $warehouseMgmtActive ? 'active text-white' : '' }} cursor-pointer"
                             :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                         <div class="nav-icon-wrap">
                             <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
                             </svg>
                         </div>
-                        <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300"
+                        <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300"
                               :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Warehouse Management</span>
                         <span x-show="!sidebarCollapsed"
                               class="ml-auto flex items-center justify-center w-5 h-5 rounded-md text-slate-400 transition-all duration-200">
@@ -269,14 +269,14 @@
                 @if($canSeeUsers || $canSeeRoles)
                 <div x-data="{ expanded: {{ $userMgmtActive ? 'true' : 'false' }} }" class="relative">
                     <button @click="expanded = !expanded"
-                            class="summary-item nav-item relative w-full flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ $userMgmtActive ? 'active text-white' : '' }} cursor-pointer"
+                            class="summary-item nav-item relative w-full flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ $userMgmtActive ? 'active text-white' : '' }} cursor-pointer"
                             :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                         <div class="nav-icon-wrap">
                             <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                             </svg>
                         </div>
-                        <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300"
+                        <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300"
                               :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">User Management</span>
                         <span x-show="!sidebarCollapsed"
                               class="ml-auto flex items-center justify-center w-5 h-5 rounded-md text-slate-400 transition-all duration-200">
@@ -318,14 +318,14 @@
 
                 @hasPermission('settings.view')
                 <a href="{{ route('admin.locations.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.locations.*') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.locations.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Locations</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Locations</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Locations</span>
                     </template>
@@ -334,14 +334,14 @@
 
                 @hasPermission('settings.view')
                 <a href="{{ route('admin.notifications.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.notifications.*') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.notifications.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Notification Logs</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Notification Logs</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Notification Logs</span>
                     </template>
@@ -350,14 +350,14 @@
 
                 @hasPermission('settings.view')
                 <a href="{{ route('admin.marketing.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.marketing.*') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.marketing.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Marketing</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Marketing</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Marketing Broadcasts</span>
                     </template>
@@ -366,7 +366,7 @@
 
                 @hasPermission('settings.view')
                 <a href="{{ route('admin.settings.index') }}"
-                   class="nav-item relative flex items-center py-2 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.settings.*') ? 'active text-white' : '' }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.settings.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -374,7 +374,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
                     </div>
-                    <span class="text-[13px] font-medium ml-3 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Settings</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Settings</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Settings</span>
                     </template>

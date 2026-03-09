@@ -46,7 +46,7 @@
                         </svg>
                     </div>
 
-                    <div class="relative w-full sm:w-56" x-data="{ open: false }">
+                    <div class="relative w-full sm:w-52" x-data="{ open: false }">
                         <button
                             type="button"
                             @@click="open = !open"
@@ -85,7 +85,20 @@
                             </template>
                         </div>
                     </div>
-                </div>
+                        {{-- Date Range --}}
+                        <div class="relative w-full sm:w-52">
+                            <input
+                                type="text"
+                                x-ref="dateRange"
+                                placeholder="Date range"
+                                class="w-full pl-10 pr-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 cursor-pointer"
+                                readonly
+                            >
+                            <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M4 11h16M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                    </div>
 
                 <div class="flex flex-wrap items-center justify-end gap-3">
                     <div class="relative" x-data="{ open: false }">

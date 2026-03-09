@@ -10,6 +10,7 @@ $shipmentConfig = [
     'itemsEndpoint' => route('admin.shipments.items', $shipment),
     'trackingEndpoint' => route('admin.shipments.tracking', $shipment),
     'invoiceStoreEndpoint' => route('admin.invoices.store', $shipment),
+    'invoiceDownloadUrlTemplate' => route('admin.invoices.download', ['invoice' => '__INVOICE__']),
     'invoiceSendEndpointTemplate' => route('admin.invoices.send', ['invoice' => '__INVOICE__']),
     'invoiceCancelEndpointTemplate' => route('admin.invoices.cancel', ['invoice' => '__INVOICE__']),
     'assignDriverEndpoint' => route('admin.assignments.assign', $shipment),
@@ -23,10 +24,15 @@ $shipmentConfig = [
     'paymentsDataEndpoint' => route('admin.shipments.payments.data', $shipment),
     'storePaymentEndpoint' => route('admin.shipments.payments.store', $shipment),
     'destroyPaymentEndpointTemplate' => route('admin.payments.destroy', ['payment' => '__PAYMENT__']),
+    'downloadReceiptUrlTemplate' => route('admin.payments.download', ['payment' => '__PAYMENT__']),
+    'printReceiptUrlTemplate' => route('admin.payments.print', ['payment' => '__PAYMENT__']),
     'invoice' => $currentInvoice,
     'invoiceHistory' => $invoiceHistory,
     'assignment' => $currentAssignment,
     'assignmentHistory' => $assignmentHistory,
+    'sortBatchShowUrlTemplate' => route('admin.sort-batches.show', ['batch' => '__ID__']),
+    'transportManifestShowUrlTemplate' => route('admin.transport-manifests.show', ['manifest' => '__ID__']),
+    'deliveryRunShowUrlTemplate' => route('admin.delivery-runs.show', ['run' => '__ID__']),
 ];
 @endphp
 
@@ -256,103 +262,93 @@ $shipmentConfig = [
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex min-h-[680px]">
 
         <!-- Sidebar Nav -->
-        <aside class="w-60 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col py-5 px-3">
+        <aside class="w-52 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col py-4 px-2.5">
 
             <!-- Section: Shipment -->
-            <p class="px-2 mb-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Shipment</p>
+            <p class="px-1.5 mb-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Shipment</p>
 
             <!-- Overview -->
             <button @@click="activeTab = 'overview'"
-                class="group flex items-center gap-3 w-full px-2.5 py-2 rounded-xl mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'overview'
-                    ? 'bg-sky-50 ring-1 ring-sky-100 shadow-sm'
-                    : 'hover:bg-slate-50'">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'overview' ? 'bg-sky-500 shadow-md shadow-sky-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3.5 h-3.5 transition-colors" :class="activeTab === 'overview' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-0.5 transition-all duration-150 text-left"
+                :class="activeTab === 'overview' ? 'bg-sky-50 ring-1 ring-sky-100 shadow-sm' : 'hover:bg-slate-50'">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'overview' ? 'bg-sky-500 shadow-sm shadow-sky-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'overview' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 7h18M3 12h18M3 17h18"/>
                     </svg>
                 </div>
-                <span class="text-sm transition-colors" :class="activeTab === 'overview' ? 'font-bold text-sky-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Overview</span>
+                <span class="text-xs transition-colors" :class="activeTab === 'overview' ? 'font-bold text-sky-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Overview</span>
             </button>
 
             <!-- Invoice -->
             <button @@click="activeTab = 'invoice'; loadInvoiceHistory()"
-                class="group flex items-center gap-3 w-full px-2.5 py-2 rounded-xl mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'invoice'
-                    ? 'bg-emerald-50 ring-1 ring-emerald-100 shadow-sm'
-                    : 'hover:bg-slate-50'">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'invoice' ? 'bg-emerald-500 shadow-md shadow-emerald-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3.5 h-3.5 transition-colors" :class="activeTab === 'invoice' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-0.5 transition-all duration-150 text-left"
+                :class="activeTab === 'invoice' ? 'bg-emerald-50 ring-1 ring-emerald-100 shadow-sm' : 'hover:bg-slate-50'">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'invoice' ? 'bg-emerald-500 shadow-sm shadow-emerald-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'invoice' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
                 </div>
-                <span class="flex-1 text-sm transition-colors" :class="activeTab === 'invoice' ? 'font-bold text-emerald-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Invoice</span>
-                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-[10px] font-bold rounded-full transition-all"
-                    :class="activeTab === 'invoice' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-100 text-slate-500'">{{ count($invoiceHistory) }}</span>
+                <span class="flex-1 text-xs transition-colors" :class="activeTab === 'invoice' ? 'font-bold text-emerald-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Invoice</span>
+                <span class="inline-flex items-center justify-center min-w-[1.125rem] h-4 px-1 text-[9px] font-bold rounded-full transition-all"
+                    :class="activeTab === 'invoice' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'">{{ count($invoiceHistory) }}</span>
             </button>
 
             <!-- Assignment -->
             <button @@click="activeTab = 'assignment'"
-                class="group flex items-center gap-3 w-full px-2.5 py-2 rounded-xl mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'assignment'
-                    ? 'bg-violet-50 ring-1 ring-violet-100 shadow-sm'
-                    : 'hover:bg-slate-50'">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'assignment' ? 'bg-violet-500 shadow-md shadow-violet-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3.5 h-3.5 transition-colors" :class="activeTab === 'assignment' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-0.5 transition-all duration-150 text-left"
+                :class="activeTab === 'assignment' ? 'bg-violet-50 ring-1 ring-violet-100 shadow-sm' : 'hover:bg-slate-50'">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'assignment' ? 'bg-violet-500 shadow-sm shadow-violet-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'assignment' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                     </svg>
                 </div>
-                <span class="flex-1 text-sm transition-colors" :class="activeTab === 'assignment' ? 'font-bold text-violet-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Assignment</span>
-                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-[10px] font-bold rounded-full transition-all"
-                    :class="activeTab === 'assignment' ? 'bg-violet-500 text-white shadow-sm' : 'bg-slate-100 text-slate-500'">{{ $currentAssignment ? '1' : '0' }}</span>
+                <span class="flex-1 text-xs transition-colors" :class="activeTab === 'assignment' ? 'font-bold text-violet-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Assignment</span>
+                <span class="inline-flex items-center justify-center min-w-[1.125rem] h-4 px-1 text-[9px] font-bold rounded-full transition-all"
+                    :class="activeTab === 'assignment' ? 'bg-violet-500 text-white' : 'bg-slate-100 text-slate-500'">{{ $currentAssignment ? '1' : '0' }}</span>
             </button>
 
             <!-- Divider: Finance -->
-            <div class="flex items-center gap-2 mt-4 mb-2 px-1">
+            <div class="flex items-center gap-2 mt-3 mb-1.5 px-1">
                 <div class="flex-1 h-px bg-slate-100"></div>
-                <p class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Finance</p>
+                <p class="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Finance</p>
                 <div class="flex-1 h-px bg-slate-100"></div>
             </div>
 
             <!-- Payments -->
             <button @@click="activeTab = 'payments'; if (!paymentsLoaded) loadPayments()"
-                class="group flex items-center gap-3 w-full px-2.5 py-2 rounded-xl mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'payments'
-                    ? 'bg-teal-50 ring-1 ring-teal-100 shadow-sm'
-                    : 'hover:bg-slate-50'">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'payments' ? 'bg-teal-500 shadow-md shadow-teal-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3.5 h-3.5 transition-colors" :class="activeTab === 'payments' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-0.5 transition-all duration-150 text-left"
+                :class="activeTab === 'payments' ? 'bg-teal-50 ring-1 ring-teal-100 shadow-sm' : 'hover:bg-slate-50'">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'payments' ? 'bg-teal-500 shadow-sm shadow-teal-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'payments' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
                     </svg>
                 </div>
-                <span class="text-sm transition-colors" :class="activeTab === 'payments' ? 'font-bold text-teal-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Payments</span>
+                <span class="text-xs transition-colors" :class="activeTab === 'payments' ? 'font-bold text-teal-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Payments</span>
             </button>
 
             <!-- Divider: Logistics -->
-            <div class="flex items-center gap-2 mt-4 mb-2 px-1">
+            <div class="flex items-center gap-2 mt-3 mb-1.5 px-1">
                 <div class="flex-1 h-px bg-slate-100"></div>
-                <p class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Logistics</p>
+                <p class="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Logistics</p>
                 <div class="flex-1 h-px bg-slate-100"></div>
             </div>
 
             <!-- Tracking -->
             <button @@click="activeTab = 'tracking'; loadTracking()"
-                class="group flex items-center gap-3 w-full px-2.5 py-2 rounded-xl transition-all duration-150 text-left"
-                :class="activeTab === 'tracking'
-                    ? 'bg-amber-50 ring-1 ring-amber-100 shadow-sm'
-                    : 'hover:bg-slate-50'">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'tracking' ? 'bg-amber-500 shadow-md shadow-amber-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3.5 h-3.5 transition-colors" :class="activeTab === 'tracking' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg transition-all duration-150 text-left"
+                :class="activeTab === 'tracking' ? 'bg-amber-50 ring-1 ring-amber-100 shadow-sm' : 'hover:bg-slate-50'">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'tracking' ? 'bg-amber-500 shadow-sm shadow-amber-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'tracking' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                     </svg>
                 </div>
-                <span class="text-sm transition-colors" :class="activeTab === 'tracking' ? 'font-bold text-amber-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Tracking</span>
+                <span class="text-xs transition-colors" :class="activeTab === 'tracking' ? 'font-bold text-amber-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Tracking</span>
             </button>
 
         </aside>
@@ -534,30 +530,37 @@ $shipmentConfig = [
                     <div class="xl:col-span-2 space-y-4">
 
                         <!-- Widget 1: Invoice -->
-                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                                <div class="flex items-center gap-2.5">
-                                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex-shrink-0">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                        </svg>
-                                    </span>
-                                    <div>
-                                        <h3 class="text-sm font-bold text-slate-900">Active Invoice</h3>
+                        <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200/80">
+                            <!-- Gradient Header -->
+                            <div class="bg-gradient-to-br from-emerald-500 to-teal-600 px-5 py-4">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+                                            <svg class="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h3 class="text-sm font-bold text-white leading-none">Active Invoice</h3>
+                                            <template x-if="activeInvoice()">
+                                                <p class="text-[11px] text-white/60 mt-0.5" x-text="'#' + activeInvoice().invoice_number"></p>
+                                            </template>
+                                            <template x-if="!activeInvoice()">
+                                                <p class="text-[11px] text-white/50 mt-0.5">No active invoice</p>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-col items-end gap-1.5">
                                         <template x-if="activeInvoice()">
-                                            <p class="text-[10px] text-slate-400" x-text="'#' + activeInvoice().invoice_number"></p>
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold bg-white/20 text-white ring-1 ring-white/30 capitalize" x-text="activeInvoice().status_label || activeInvoice().status"></span>
                                         </template>
+                                        <button @@click="activeTab = 'invoice'" class="text-[11px] text-white/60 hover:text-white font-medium transition-colors flex items-center gap-0.5">
+                                            History <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                        </button>
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <template x-if="activeInvoice()">
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 capitalize" :class="invoiceStatusClass(activeInvoice().status)" x-text="activeInvoice().status_label || activeInvoice().status"></span>
-                                    </template>
-                                    <button @@click="activeTab = 'invoice'" class="text-xs text-slate-400 hover:text-slate-600 font-medium transition-colors flex items-center gap-1">
-                                        History <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                                    </button>
-                                </div>
                             </div>
+                            <!-- Body -->
                             <div class="p-5">
                                 <template x-if="invoiceUiError">
                                     <div class="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700" x-text="invoiceUiError"></div>
@@ -566,22 +569,22 @@ $shipmentConfig = [
                                 <template x-if="!activeInvoice()">
                                     <div>
                                         <template x-if="canCreateInvoice()">
-                                            <div class="text-center py-5">
-                                                <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto mb-3">
-                                                    <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <div class="text-center py-4">
+                                                <div class="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto mb-3">
+                                                    <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                     </svg>
                                                 </div>
-                                                <p class="text-sm text-slate-500 mb-3">No invoice yet</p>
-                                                <button x-show="canManage" @@click="openCreateInvoiceModal()" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-500/25 transition-all">
+                                                <p class="text-sm font-medium text-slate-500 mb-3">No invoice yet</p>
+                                                <button x-show="canManage" @@click="openCreateInvoiceModal()" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-500/25 transition-all">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                                     Create Invoice
                                                 </button>
                                             </div>
                                         </template>
                                         <template x-if="!canCreateInvoice()">
-                                            <div class="text-center py-5">
-                                                <svg class="w-10 h-10 mx-auto mb-2 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <div class="text-center py-4">
+                                                <svg class="w-9 h-9 mx-auto mb-2 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                 </svg>
                                                 <p class="text-xs text-slate-400" x-text="activeInvoiceBlockReason()"></p>
@@ -592,35 +595,58 @@ $shipmentConfig = [
                                 <!-- Has active invoice -->
                                 <template x-if="activeInvoice()">
                                     <div>
-                                        <div class="space-y-1.5 mb-4">
-                                            <div class="flex items-center justify-between text-xs">
+                                        <!-- Fee rows -->
+                                        <div class="mb-4">
+                                            <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 text-xs mb-0.5">
                                                 <span class="text-slate-500">Pickup Fee</span>
-                                                <span class="font-semibold text-slate-800" x-text="formatMoney(activeInvoice().pickup_fee, activeInvoice().currency)"></span>
+                                                <span class="font-bold text-slate-700" x-text="formatMoney(activeInvoice().pickup_fee, activeInvoice().currency)"></span>
                                             </div>
-                                            <div class="flex items-center justify-between text-xs">
+                                            <div class="flex items-center justify-between px-3 py-2 text-xs mb-0.5">
                                                 <span class="text-slate-500">Transport Fee</span>
-                                                <span class="font-semibold text-slate-800" x-text="formatMoney(activeInvoice().transport_fee, activeInvoice().currency)"></span>
+                                                <span class="font-bold text-slate-700" x-text="formatMoney(activeInvoice().transport_fee, activeInvoice().currency)"></span>
                                             </div>
-                                            <div class="flex items-center justify-between text-xs">
+                                            <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 text-xs mb-0.5">
                                                 <span class="text-slate-500">Handling Fee</span>
-                                                <span class="font-semibold text-slate-800" x-text="formatMoney(activeInvoice().handling_fee, activeInvoice().currency)"></span>
+                                                <span class="font-bold text-slate-700" x-text="formatMoney(activeInvoice().handling_fee, activeInvoice().currency)"></span>
                                             </div>
                                             <template x-if="activeInvoice().other_fee > 0">
-                                                <div class="flex items-center justify-between text-xs">
+                                                <div class="flex items-center justify-between px-3 py-2 text-xs mb-0.5">
                                                     <span class="text-slate-500">Other Fee</span>
-                                                    <span class="font-semibold text-slate-800" x-text="formatMoney(activeInvoice().other_fee, activeInvoice().currency)"></span>
+                                                    <span class="font-bold text-slate-700" x-text="formatMoney(activeInvoice().other_fee, activeInvoice().currency)"></span>
                                                 </div>
                                             </template>
-                                            <div class="flex items-center justify-between py-2 border-t border-slate-100 mt-1">
-                                                <span class="text-sm font-bold text-slate-900">Total</span>
-                                                <span class="text-base font-bold text-emerald-600" x-text="formatMoney(activeInvoice().total_amount, activeInvoice().currency)"></span>
+                                            <!-- Total featured -->
+                                            <div class="mt-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl px-4 py-3 flex items-center justify-between shadow-sm shadow-emerald-200/60">
+                                                <span class="text-[11px] font-bold text-white/70 uppercase tracking-wide">Total</span>
+                                                <span class="text-base font-black text-white" x-text="formatMoney(activeInvoice().total_amount, activeInvoice().currency)"></span>
                                             </div>
                                         </div>
-                                        <div class="flex flex-wrap gap-2">
-                                            <button x-show="canManage && activeInvoice().status === 'pending'" @@click="sendInvoice(activeInvoice().id)" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold transition-colors">Send</button>
-                                            <button x-show="canManage && activeInvoice().status === 'sent'" @@click="adminAcceptInvoice(activeInvoice().id)" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold transition-colors">Accept</button>
-                                            <button @@click="openActiveInvoiceModal()" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 text-xs font-semibold transition-colors">View</button>
-                                            <button x-show="canManage && ['pending','sent','accepted'].includes(activeInvoice().status)" @@click="openCancelInvoiceModal(activeInvoice().id)" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-xs font-semibold transition-colors">Cancel</button>
+                                        <!-- Action buttons -->
+                                        <div class="flex flex-wrap justify-end gap-2">
+                                            <a :href="config.invoiceDownloadUrlTemplate.replace('__INVOICE__', activeInvoice().id)" target="_blank"
+                                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold transition-colors">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                                PDF
+                                            </a>
+                                            <button x-show="canManage && activeInvoice().status === 'pending'" @@click="sendInvoice(activeInvoice().id)"
+                                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-bold shadow-sm hover:opacity-90 transition-opacity">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                                                Send
+                                            </button>
+                                            <button x-show="canManage && activeInvoice().status === 'sent'" @@click="adminAcceptInvoice(activeInvoice().id)"
+                                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold shadow-sm hover:opacity-90 transition-opacity">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                Accept
+                                            </button>
+                                            <button @@click="openActiveInvoiceModal()"
+                                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold transition-colors">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                View
+                                            </button>
+                                            <button x-show="canManage && ['pending','sent','accepted'].includes(activeInvoice().status)" @@click="openCancelInvoiceModal(activeInvoice().id)"
+                                                class="inline-flex items-center px-3 py-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 text-xs font-semibold transition-colors">
+                                                Cancel
+                                            </button>
                                         </div>
                                     </div>
                                 </template>
@@ -628,26 +654,38 @@ $shipmentConfig = [
                         </div>
 
                         <!-- Widget 2: Pickup Assignment -->
-                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                                <div class="flex items-center gap-2.5">
-                                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-violet-100 text-violet-700 flex-shrink-0">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                        </svg>
-                                    </span>
-                                    <h3 class="text-sm font-bold text-slate-900">Assignment</h3>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <template x-if="assignment">
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 capitalize" :class="assignmentStatusClass(assignment.status)" x-text="assignment.status_label || (assignment.status ? assignment.status.replace(/_/g, ' ') : '')"></span>
-                                    </template>
-                                    <button @@click="activeTab = 'assignment'" class="text-xs text-slate-400 hover:text-slate-600 font-medium transition-colors flex items-center gap-1">
-                                        History <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                                    </button>
+                        <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200/80">
+                            <!-- Gradient Header -->
+                            <div class="bg-gradient-to-br from-violet-500 to-purple-600 px-5 py-4">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h3 class="text-sm font-bold text-white leading-none">Pickup Assignment</h3>
+                                            <template x-if="assignment">
+                                                <p class="text-[11px] text-white/60 mt-0.5" x-text="assignment.driver?.name || 'Driver assigned'"></p>
+                                            </template>
+                                            <template x-if="!assignment">
+                                                <p class="text-[11px] text-white/50 mt-0.5">No driver assigned</p>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-col items-end gap-1.5">
+                                        <template x-if="assignment">
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold bg-white/20 text-white ring-1 ring-white/30 capitalize" x-text="assignment.status_label || (assignment.status ? assignment.status.replace(/_/g, ' ') : '')"></span>
+                                        </template>
+                                        <button @@click="activeTab = 'assignment'" class="text-[11px] text-white/60 hover:text-white font-medium transition-colors flex items-center gap-0.5">
+                                            History <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
+                            <!-- Body -->
                             <div class="p-5">
                                 <template x-if="assignmentUiError">
                                     <div class="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700" x-text="assignmentUiError"></div>
@@ -656,23 +694,23 @@ $shipmentConfig = [
                                 <template x-if="!assignment">
                                     <div>
                                         <template x-if="['submitted', 'invoice_accepted'].includes(shipment.status)">
-                                            <div class="text-center py-5">
-                                                <div class="w-12 h-12 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center mx-auto mb-3">
-                                                    <svg class="w-6 h-6 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <div class="text-center py-4">
+                                                <div class="w-11 h-11 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center mx-auto mb-3">
+                                                    <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                                                     </svg>
                                                 </div>
-                                                <p class="text-sm text-slate-500 mb-3">No driver assigned</p>
-                                                <button x-show="canManage" @@click="loadAssignmentDependencies(); assignDriverModalOpen = true" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white text-xs font-bold rounded-xl shadow-lg shadow-violet-500/25 transition-all">
+                                                <p class="text-sm font-medium text-slate-500 mb-3">No driver assigned</p>
+                                                <button x-show="canManage" @@click="loadAssignmentDependencies(); assignDriverModalOpen = true" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-lg shadow-violet-500/25 transition-all">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                                     Assign Driver
                                                 </button>
                                             </div>
                                         </template>
                                         <template x-if="!['submitted', 'invoice_accepted'].includes(shipment.status)">
-                                            <div class="text-center py-5">
-                                                <svg class="w-10 h-10 mx-auto mb-2 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <div class="text-center py-4">
+                                                <svg class="w-9 h-9 mx-auto mb-2 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                                                 </svg>
                                                 <p class="text-xs text-slate-400">No pickup assignment</p>
@@ -684,84 +722,80 @@ $shipmentConfig = [
                                 <template x-if="assignment">
                                     <div>
                                         <!-- Driver info -->
-                                        <div class="flex items-center gap-3 mb-3">
-                                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-sm flex-shrink-0">
+                                        <div class="flex items-center gap-3 mb-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                                            <div class="w-10 h-10 rounded-full ring-2 ring-violet-200 bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-black text-sm shadow-sm flex-shrink-0">
                                                 <span x-text="(assignment.driver?.name || '?').charAt(0).toUpperCase()"></span>
                                             </div>
                                             <div class="flex-1 min-w-0">
-                                                <p class="text-sm font-bold text-slate-900 truncate" x-text="assignment.driver?.name || 'Unknown'"></p>
-                                                <p class="text-xs text-slate-500" x-text="assignment.driver?.phone || '—'"></p>
+                                                <p class="text-sm font-bold text-slate-900 truncate leading-none" x-text="assignment.driver?.name || 'Unknown Driver'"></p>
+                                                <p class="text-xs text-slate-400 mt-0.5" x-text="assignment.driver?.phone || '—'"></p>
                                             </div>
                                         </div>
                                         <!-- Warehouse -->
-                                        <div class="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-amber-50 border border-amber-100">
-                                            <svg class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                                            </svg>
-                                            <div class="min-w-0">
-                                                <p class="text-xs font-bold text-slate-800 truncate" x-text="assignment.target_warehouse?.name || 'No warehouse'"></p>
-                                                <p class="text-[10px] text-amber-600" x-text="assignment.target_warehouse?.code || ''"></p>
+                                        <div class="flex items-center gap-2.5 mb-4 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-100/80">
+                                            <div class="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                                <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                                </svg>
                                             </div>
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-[10px] font-bold text-amber-600 uppercase tracking-wide leading-none mb-0.5">Target Warehouse</p>
+                                                <p class="text-xs font-bold text-slate-800 truncate" x-text="assignment.target_warehouse?.name || 'No warehouse'"></p>
+                                            </div>
+                                            <template x-if="assignment.target_warehouse?.code">
+                                                <span class="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md flex-shrink-0" x-text="assignment.target_warehouse.code"></span>
+                                            </template>
                                         </div>
-                                        <!-- Compact 7-step progress stepper -->
-                                        <div class="overflow-x-auto -mx-1 px-1 mb-4">
-                                            <div class="relative flex min-w-[280px]">
-                                                <div class="absolute top-3 left-[calc(100%/14)] right-[calc(100%/14)] h-px bg-slate-200"></div>
-                                                <div class="relative flex-1 flex flex-col items-center gap-1 z-10">
-                                                    <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center bg-white" :class="assignment.assigned_at ? 'border-violet-500 bg-violet-500 text-white' : 'border-slate-200 text-slate-300'">
-                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                                    </div>
-                                                    <p class="text-[8px] font-semibold text-center" :class="assignment.assigned_at ? 'text-violet-700' : 'text-slate-400'">Assigned</p>
+                                        <!-- Progress: 2-row pill bars -->
+                                        <div class="mb-4">
+                                            <div class="grid grid-cols-4 gap-1 mb-2">
+                                                <div>
+                                                    <div class="h-1.5 rounded-full mb-1 transition-colors" :class="assignment.assigned_at ? 'bg-violet-500' : 'bg-slate-200'"></div>
+                                                    <p class="text-[9px] text-center font-semibold leading-none" :class="assignment.assigned_at ? 'text-violet-600' : 'text-slate-300'">Assigned</p>
                                                 </div>
-                                                <div class="relative flex-1 flex flex-col items-center gap-1 z-10">
-                                                    <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center bg-white" :class="assignment.en_route_at ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-200 text-slate-300'">
-                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                                    </div>
-                                                    <p class="text-[8px] font-semibold text-center" :class="assignment.en_route_at ? 'text-blue-700' : 'text-slate-400'">En Route</p>
+                                                <div>
+                                                    <div class="h-1.5 rounded-full mb-1 transition-colors" :class="assignment.en_route_at ? 'bg-blue-500' : 'bg-slate-200'"></div>
+                                                    <p class="text-[9px] text-center font-semibold leading-none" :class="assignment.en_route_at ? 'text-blue-600' : 'text-slate-300'">En Route</p>
                                                 </div>
-                                                <div class="relative flex-1 flex flex-col items-center gap-1 z-10">
-                                                    <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center bg-white" :class="assignment.arrived_at ? 'border-amber-500 bg-amber-500 text-white' : 'border-slate-200 text-slate-300'">
-                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                                    </div>
-                                                    <p class="text-[8px] font-semibold text-center" :class="assignment.arrived_at ? 'text-amber-700' : 'text-slate-400'">Arrived</p>
+                                                <div>
+                                                    <div class="h-1.5 rounded-full mb-1 transition-colors" :class="assignment.arrived_at ? 'bg-amber-500' : 'bg-slate-200'"></div>
+                                                    <p class="text-[9px] text-center font-semibold leading-none" :class="assignment.arrived_at ? 'text-amber-600' : 'text-slate-300'">Arrived</p>
                                                 </div>
-                                                <div class="relative flex-1 flex flex-col items-center gap-1 z-10">
-                                                    <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center bg-white" :class="['picking_up','completed'].includes(assignment.status) ? 'border-teal-400 bg-teal-400 text-white' : 'border-slate-200 text-slate-300'">
-                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                                    </div>
-                                                    <p class="text-[8px] font-semibold text-center" :class="['picking_up','completed'].includes(assignment.status) ? 'text-teal-700' : 'text-slate-400'">Pick Up</p>
+                                                <div>
+                                                    <div class="h-1.5 rounded-full mb-1 transition-colors" :class="['picking_up','completed'].includes(assignment.status) ? 'bg-teal-400' : 'bg-slate-200'"></div>
+                                                    <p class="text-[9px] text-center font-semibold leading-none" :class="['picking_up','completed'].includes(assignment.status) ? 'text-teal-600' : 'text-slate-300'">Picking Up</p>
                                                 </div>
-                                                <div class="relative flex-1 flex flex-col items-center gap-1 z-10">
-                                                    <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center bg-white" :class="assignment.picked_up_at ? 'border-teal-600 bg-teal-600 text-white' : 'border-slate-200 text-slate-300'">
-                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                                    </div>
-                                                    <p class="text-[8px] font-semibold text-center" :class="assignment.picked_up_at ? 'text-teal-700' : 'text-slate-400'">Picked</p>
+                                            </div>
+                                            <div class="grid grid-cols-3 gap-1">
+                                                <div>
+                                                    <div class="h-1.5 rounded-full mb-1 transition-colors" :class="assignment.picked_up_at ? 'bg-teal-600' : 'bg-slate-200'"></div>
+                                                    <p class="text-[9px] text-center font-semibold leading-none" :class="assignment.picked_up_at ? 'text-teal-700' : 'text-slate-300'">Picked Up</p>
                                                 </div>
-                                                <div class="relative flex-1 flex flex-col items-center gap-1 z-10">
-                                                    <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center bg-white" :class="assignment.arrived_warehouse_at ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-slate-200 text-slate-300'">
-                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                                    </div>
-                                                    <p class="text-[8px] font-semibold text-center" :class="assignment.arrived_warehouse_at ? 'text-indigo-700' : 'text-slate-400'">At WH</p>
+                                                <div>
+                                                    <div class="h-1.5 rounded-full mb-1 transition-colors" :class="assignment.arrived_warehouse_at ? 'bg-indigo-500' : 'bg-slate-200'"></div>
+                                                    <p class="text-[9px] text-center font-semibold leading-none" :class="assignment.arrived_warehouse_at ? 'text-indigo-600' : 'text-slate-300'">At Warehouse</p>
                                                 </div>
-                                                <div class="relative flex-1 flex flex-col items-center gap-1 z-10">
-                                                    <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center bg-white" :class="assignment.received_at ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-200 text-slate-300'">
-                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                                    </div>
-                                                    <p class="text-[8px] font-semibold text-center" :class="assignment.received_at ? 'text-emerald-700' : 'text-slate-400'">Received</p>
+                                                <div>
+                                                    <div class="h-1.5 rounded-full mb-1 transition-colors" :class="assignment.received_at ? 'bg-emerald-500' : 'bg-slate-200'"></div>
+                                                    <p class="text-[9px] text-center font-semibold leading-none" :class="assignment.received_at ? 'text-emerald-600' : 'text-slate-300'">Received</p>
                                                 </div>
                                             </div>
                                         </div>
                                         <!-- Action buttons -->
-                                        <div class="flex flex-wrap gap-2">
-                                            <button type="button" x-show="canManage && canEditCurrentAssignment()" @@click="openEditAssignment()" class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 text-xs font-semibold shadow-sm transition-colors">
+                                        <div class="flex flex-wrap justify-end gap-2">
+                                            <button type="button" x-show="canManage && canEditCurrentAssignment()" @@click="openEditAssignment()"
+                                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 text-xs font-semibold transition-colors">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                                 Edit
                                             </button>
-                                            <button type="button" x-show="canManage && canUnassignCurrentAssignment()" @@click="openUnassignModal()" :disabled="assignmentActionLoading" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 text-xs font-semibold transition-colors disabled:opacity-50">
+                                            <button type="button" x-show="canManage && canUnassignCurrentAssignment()" @@click="openUnassignModal()" :disabled="assignmentActionLoading"
+                                                class="inline-flex items-center px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 text-xs font-semibold transition-colors disabled:opacity-50">
                                                 <span x-text="assignmentActionLoading ? '...' : 'Unassign'"></span>
                                             </button>
-                                            <button type="button" x-show="canManage && canReceiveCurrentAssignment()" @@click="receiveAtWarehouse()" :disabled="assignmentActionLoading" class="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-semibold transition-colors disabled:opacity-50">
-                                                <span x-text="assignmentActionLoading ? '...' : 'Receive'"></span>
+                                            <button type="button" x-show="canManage && canReceiveCurrentAssignment()" @@click="receiveAtWarehouse()" :disabled="assignmentActionLoading"
+                                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                <span x-text="assignmentActionLoading ? 'Saving...' : 'Receive'"></span>
                                             </button>
                                         </div>
                                     </div>
@@ -1463,7 +1497,13 @@ $shipmentConfig = [
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="filteredPayments().length + ' Total Payments'"></span>
-                                <button x-show="canManage" @@click="paymentForm.open = true; paymentForm.payment_date = new Date().toISOString().split('T')[0]"
+                                <template x-if="canManage && !config.invoice">
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        No active invoice
+                                    </span>
+                                </template>
+                                <button x-show="canManage && config.invoice" @@click="paymentForm.open = true; paymentForm.payment_date = new Date().toISOString().split('T')[0]"
                                     class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-xs font-semibold rounded-xl hover:bg-slate-800 transition-colors shadow-sm">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -1677,13 +1717,21 @@ $shipmentConfig = [
                                                 <td x-show="paymentVisibleColumns.invoice" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-500" x-text="payment.invoice_number || '—'"></td>
                                                 <td x-show="paymentVisibleColumns.recorded_by" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="payment.recorded_by || '—'"></td>
                                                 <td x-show="paymentVisibleColumns.notes" class="px-4 py-2.5 text-xs text-slate-500 max-w-[150px] truncate" x-text="payment.notes || '—'"></td>
-                                                <td x-show="paymentVisibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center">
-                                                    <button x-show="isSuperAdmin" @@click="voidPayment(payment.id)"
-                                                        class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors inline-flex" title="Void payment">
-                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                                        </svg>
-                                                    </button>
+                                                <td x-show="paymentVisibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap">
+                                                    <div class="flex items-center justify-end gap-1">
+                                                        <a :href="config.downloadReceiptUrlTemplate.replace('__PAYMENT__', payment.id)" target="_blank"
+                                                            class="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors inline-flex" title="Download receipt PDF">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                                        </a>
+                                                        <a :href="config.printReceiptUrlTemplate.replace('__PAYMENT__', payment.id)" target="_blank"
+                                                            class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors inline-flex" title="Print receipt">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                                        </a>
+                                                        <button x-show="isSuperAdmin" @@click="voidPayment(payment.id)"
+                                                            class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors inline-flex" title="Void payment">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         </template>
@@ -1828,100 +1876,578 @@ $shipmentConfig = [
                 </div>
             </div>
 
+            <!-- Void Payment Confirm Modal -->
+            <div x-show="voidConfirm.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="voidConfirm.open = false"></div>
+                <div class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">Void this payment?</h3>
+                            <p class="text-xs text-slate-500 mt-1 leading-relaxed">This action is permanent and cannot be undone. The payment record will be removed.</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 mt-5">
+                        <button type="button" @@click="voidConfirm.open = false" :disabled="voidConfirm.loading"
+                            class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors disabled:opacity-50">
+                            Cancel
+                        </button>
+                        <button type="button" @@click="confirmVoidPayment()" :disabled="voidConfirm.loading"
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg x-show="voidConfirm.loading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span x-text="voidConfirm.loading ? 'Voiding...' : 'Yes, Void Payment'"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Tracking Tab -->
             <div x-show="activeTab === 'tracking'" x-cloak>
 
-                <!-- Section Header -->
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-900">Shipment Timeline</h3>
-                        <p class="text-xs text-slate-500">Complete status history for this shipment</p>
-                    </div>
-                </div>
-
                 <!-- Loading -->
-                <div x-show="tracking.loading" class="flex flex-col items-center justify-center py-16 gap-3">
-                    <svg class="animate-spin w-7 h-7 text-indigo-400" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p class="text-xs text-slate-400 font-medium">Loading timeline...</p>
+                <div x-show="tracking.loading" class="flex flex-col items-center justify-center py-20 gap-4">
+                    <div class="flex gap-1.5">
+                        <div class="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style="animation-delay:0ms"></div>
+                        <div class="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style="animation-delay:120ms"></div>
+                        <div class="w-2 h-2 rounded-full bg-violet-500 animate-bounce" style="animation-delay:240ms"></div>
+                    </div>
+                    <p class="text-xs text-slate-400 font-semibold tracking-wide uppercase">Loading tracking data</p>
                 </div>
 
-                <!-- Empty State -->
-                <template x-if="tracking.data.length === 0 && !tracking.loading">
-                    <div class="flex flex-col items-center justify-center py-16 text-center">
-                        <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                            <svg class="w-7 h-7 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </div>
-                        <p class="text-slate-600 text-sm font-semibold mb-1">No tracking events yet</p>
-                        <p class="text-slate-400 text-xs max-w-xs">Status updates will appear here as this shipment moves through the delivery pipeline</p>
-                    </div>
-                </template>
+                <!-- Content (loaded) -->
+                <template x-if="!tracking.loading">
+                    <div class="space-y-10">
 
-                <!-- Timeline -->
-                <template x-if="tracking.data.length > 0 && !tracking.loading">
-                    <div class="max-w-2xl mx-auto">
-                        <div class="relative pl-8 space-y-6">
-                            <!-- Vertical Line -->
-                            <div class="absolute left-[11px] top-3 bottom-3 w-0.5 bg-slate-200"></div>
-
-                            <template x-for="(event, index) in tracking.data" :key="index">
-                                <div class="relative flex items-start gap-4">
-                                    <!-- Status Dot -->
-                                    <div
-                                        class="absolute left-[-21px] w-4 h-4 rounded-full border-3 border-white shadow-sm"
-                                        :class="{
-                                            'bg-slate-400': event.status === 'draft',
-                                            'bg-blue-500': ['submitted', 'invoice_sent', 'invoice_accepted'].includes(event.status),
-                                            'bg-violet-500': ['pickup_assigned', 'picked_up', 'arrived_warehouse', 'at_warehouse', 'sorted'].includes(event.status),
-                                            'bg-amber-500': ['in_transit', 'at_destination', 'out_for_delivery'].includes(event.status),
-                                            'bg-emerald-500': event.status === 'delivered',
-                                            'bg-rose-500': event.status === 'cancelled'
-                                        }"
-                                    ></div>
-
-                                    <!-- Event Card -->
-                                    <div class="flex-1 bg-white rounded-xl border border-slate-200 p-4 hover:shadow-sm transition-shadow">
-                                        <div class="flex items-center justify-between mb-1">
-                                            <span
-                                                class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
-                                                :class="{
-                                                    'bg-slate-100 text-slate-700': event.status === 'draft',
-                                                    'bg-blue-100 text-blue-700': ['submitted', 'invoice_sent', 'invoice_accepted'].includes(event.status),
-                                                    'bg-violet-100 text-violet-700': ['pickup_assigned', 'picked_up', 'arrived_warehouse', 'at_warehouse', 'sorted'].includes(event.status),
-                                                    'bg-amber-100 text-amber-700': ['in_transit', 'at_destination', 'out_for_delivery'].includes(event.status),
-                                                    'bg-emerald-100 text-emerald-700': event.status === 'delivered',
-                                                    'bg-rose-100 text-rose-700': event.status === 'cancelled'
-                                                }"
-                                                x-text="event.status_label || event.status"
-                                            ></span>
-                                            <span class="text-[10px] text-slate-400 font-medium" x-text="formatDateTime(event.created_at)"></span>
-                                        </div>
-                                        <template x-if="event.description">
-                                            <p class="text-xs text-slate-600 mt-1" x-text="event.description"></p>
-                                        </template>
-                                        <template x-if="event.location">
-                                            <p class="text-xs text-slate-400 mt-1 flex items-center gap-1">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                                </svg>
-                                                <span x-text="event.location"></span>
-                                            </p>
-                                        </template>
+                        {{-- ─── SECTION 1: Shipment Timeline ─── --}}
+                        <div>
+                            <!-- Section Header -->
+                            <div class="flex items-center justify-between mb-6">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-200/60 flex-shrink-0">
+                                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
                                     </div>
+                                    <div>
+                                        <h3 class="text-base font-bold text-slate-900">Shipment Timeline</h3>
+                                        <p class="text-xs text-slate-400 mt-0.5">Full pipeline history from creation to delivery</p>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full" x-text="tracking.data.length + ' events'"></span>
+                            </div>
+
+                            <!-- Empty Timeline -->
+                            <template x-if="tracking.data.length === 0">
+                                <div class="flex flex-col items-center justify-center py-14 text-center bg-gradient-to-br from-slate-50 to-slate-100/40 rounded-2xl border border-dashed border-slate-200">
+                                    <div class="w-14 h-14 rounded-2xl bg-white shadow-sm border border-slate-200 flex items-center justify-center mb-4">
+                                        <svg class="w-7 h-7 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                    </div>
+                                    <p class="text-slate-600 text-sm font-bold mb-1">No events yet</p>
+                                    <p class="text-slate-400 text-xs max-w-xs leading-relaxed">Timeline events appear as this shipment progresses through the pipeline</p>
+                                </div>
+                            </template>
+
+                            <!-- Timeline Events -->
+                            <template x-if="tracking.data.length > 0">
+                                <div>
+                                    <template x-for="(event, index) in tracking.data" :key="index">
+                                        <div>
+                                            <!-- Short connector between cards (not before first) -->
+                                            <div x-show="index > 0" class="flex justify-start pl-[22px] my-0.5">
+                                                <div class="w-px h-4 bg-slate-200"></div>
+                                            </div>
+
+                                            <!-- Event Card — icon inside, left side -->
+                                            <div class="flex items-start gap-3 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200 transition-all duration-200 overflow-hidden p-3.5">
+
+                                                <!-- Colored icon square inside the card -->
+                                                <div class="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center shadow-sm mt-0.5"
+                                                     :class="timelineEventDotClass(event.status)">
+                                                    <template x-if="['created','submitted'].includes(event.status)">
+                                                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                    </template>
+                                                    <template x-if="event.status.startsWith('invoice')">
+                                                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                    </template>
+                                                    <template x-if="['pickup_assigned','en_route','arrived','picked_up','arrived_warehouse','at_warehouse'].includes(event.status)">
+                                                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                                    </template>
+                                                    <template x-if="event.status === 'sorted'">
+                                                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                                    </template>
+                                                    <template x-if="['in_transit','at_destination','received_at_destination'].includes(event.status)">
+                                                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>
+                                                    </template>
+                                                    <template x-if="['out_for_delivery','delivered'].includes(event.status)">
+                                                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                                                    </template>
+                                                </div>
+
+                                                <!-- Content -->
+                                                <div class="flex-1 min-w-0">
+                                                    <!-- Badge + timestamp row -->
+                                                    <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                                                        <span class="inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                                                              :class="timelineEventBadgeClass(event.status)"
+                                                              x-text="event.status_label"></span>
+                                                        <span class="text-[10px] text-slate-400 font-medium whitespace-nowrap flex items-center gap-1">
+                                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                            <span x-text="formatDateTime(event.created_at)"></span>
+                                                        </span>
+                                                    </div>
+                                                    <!-- Label -->
+                                                    <p class="text-sm font-bold text-slate-800 leading-snug" x-text="event.label"></p>
+                                                    <!-- Location + description -->
+                                                    <div class="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5">
+                                                        <template x-if="event.location">
+                                                            <span class="text-[11px] text-slate-500 flex items-center gap-1">
+                                                                <svg class="w-3 h-3 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                                                                <span x-text="event.location"></span>
+                                                            </span>
+                                                        </template>
+                                                        <template x-if="event.description">
+                                                            <span class="text-[11px] text-slate-400" x-text="event.description"></span>
+                                                        </template>
+                                                    </div>
+                                                    <!-- Entity link pills -->
+                                                    <div class="mt-2.5 flex flex-wrap gap-2" x-show="event.meta && (event.meta.batch_id || event.meta.manifest_id || event.meta.run_id)">
+                                                        <template x-if="event.meta && event.meta.batch_id">
+                                                            <a :href="config.sortBatchShowUrlTemplate.replace('__ID__', event.meta.batch_id)"
+                                                               class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100 text-[10px] font-bold text-indigo-600 hover:bg-indigo-100 transition-colors">
+                                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                                                <span x-text="event.meta.batch_number"></span>
+                                                                <svg class="w-2.5 h-2.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                                            </a>
+                                                        </template>
+                                                        <template x-if="event.meta && event.meta.manifest_id">
+                                                            <a :href="config.transportManifestShowUrlTemplate.replace('__ID__', event.meta.manifest_id)"
+                                                               class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-100 text-[10px] font-bold text-orange-600 hover:bg-orange-100 transition-colors">
+                                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                                <span x-text="event.meta.manifest_number"></span>
+                                                                <svg class="w-2.5 h-2.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                                            </a>
+                                                        </template>
+                                                        <template x-if="event.meta && event.meta.run_id">
+                                                            <a :href="config.deliveryRunShowUrlTemplate.replace('__ID__', event.meta.run_id)"
+                                                               class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-100 text-[10px] font-bold text-amber-600 hover:bg-amber-100 transition-colors">
+                                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                                                                <span x-text="event.meta.run_number"></span>
+                                                                <svg class="w-2.5 h-2.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                                            </a>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
                             </template>
                         </div>
+
+                        {{-- ─── SECTION 2: Items Journey ─── --}}
+                        <template x-if="tracking.items.length > 0">
+                            <div>
+                                <!-- Section Header -->
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-md shadow-teal-200/50 flex-shrink-0">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h3 class="text-base font-bold text-slate-900">Items Journey</h3>
+                                            <p class="text-xs text-slate-400 mt-0.5">Individual item tracking through the pipeline</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full" x-text="tracking.items.length + ' item' + (tracking.items.length === 1 ? '' : 's')"></span>
+                                </div>
+
+                                <!-- Divergence Warning -->
+                                <template x-if="itemsAreDivergent()">
+                                    <div class="flex items-start gap-3 p-3.5 bg-amber-50 border border-amber-200/70 rounded-xl mb-4">
+                                        <svg class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                                        </svg>
+                                        <div>
+                                            <p class="text-xs font-bold text-amber-800">Items Separated</p>
+                                            <p class="text-xs text-amber-600 mt-0.5 leading-relaxed">Items have been placed into different sort batches. Check each item below for its individual route.</p>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <!-- Item Cards (stacked, full width) -->
+                                <div class="space-y-3">
+                                    <template x-for="(item, idx) in tracking.items" :key="item.id">
+                                        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
+
+                                            <!-- Item Info Row -->
+                                            <div class="flex items-center gap-3.5 px-4 py-3.5">
+                                                <!-- Status icon -->
+                                                <div class="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
+                                                     :class="timelineEventDotClass(item.status)">
+                                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/>
+                                                    </svg>
+                                                </div>
+                                                <!-- Item meta (grows) -->
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="flex items-center gap-2 mb-0.5">
+                                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest" x-text="'Item #' + (idx + 1)"></span>
+                                                        <template x-if="item.tracking_code">
+                                                            <span class="text-[10px] font-mono text-slate-400" x-text="'· ' + item.tracking_code"></span>
+                                                        </template>
+                                                    </div>
+                                                    <p class="text-sm font-bold text-slate-800 truncate" x-text="item.description || 'No description'"></p>
+                                                </div>
+                                                <!-- Right: qty + status badge -->
+                                                <div class="flex items-center gap-2.5 flex-shrink-0">
+                                                    <span class="text-xs text-slate-500">Qty <span class="font-bold text-slate-700" x-text="item.quantity"></span></span>
+                                                    <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
+                                                          :class="itemStatusBadgeClass(item.status)"
+                                                          x-text="item.status_label"></span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Pipeline Stepper -->
+                                            <div class="px-4 pt-3 pb-4 border-t border-slate-100 bg-slate-50/40">
+                                                <div class="relative flex items-start">
+                                                    <div class="absolute top-3.5 left-3.5 right-3.5 h-px bg-slate-200 z-0"></div>
+                                                    <template x-for="(stage, si) in itemPipelineStages(item)" :key="stage.key">
+                                                        <div class="relative z-10 flex flex-col items-center" style="flex:1;">
+                                                            <div class="w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all duration-300"
+                                                                 :class="{
+                                                                     'border-emerald-500 bg-emerald-500 shadow-md shadow-emerald-200/60': stage.completed && !stage.failed,
+                                                                     'border-rose-500 bg-rose-500 shadow-md shadow-rose-200/60': stage.failed,
+                                                                     'border-indigo-400 bg-white ring-4 ring-indigo-100': stage.active && !stage.completed && !stage.failed,
+                                                                     'border-slate-200 bg-white': !stage.completed && !stage.active && !stage.failed
+                                                                 }">
+                                                                <template x-if="stage.completed && !stage.failed">
+                                                                    <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                                                </template>
+                                                                <template x-if="stage.failed">
+                                                                    <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                                </template>
+                                                                <template x-if="stage.active && !stage.completed && !stage.failed">
+                                                                    <div class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></div>
+                                                                </template>
+                                                                <template x-if="!stage.completed && !stage.active && !stage.failed">
+                                                                    <div class="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+                                                                </template>
+                                                            </div>
+                                                            <span class="text-[9px] font-semibold text-center leading-tight mt-1.5 px-1 whitespace-nowrap"
+                                                                  :class="{
+                                                                      'text-emerald-600': stage.completed && !stage.failed,
+                                                                      'text-rose-500': stage.failed,
+                                                                      'text-indigo-600': stage.active && !stage.completed,
+                                                                      'text-slate-400': !stage.completed && !stage.active && !stage.failed
+                                                                  }"
+                                                                  x-text="stage.label"></span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+
+                                            <!-- Quantity Audit Row -->
+                                            <div class="px-4 py-3 border-t border-slate-100 bg-white">
+                                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Quantity Audit</p>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    <!-- Vendor declared -->
+                                                    <div class="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                                                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Declared</span>
+                                                        <span class="text-xs font-bold text-slate-700" x-text="item.quantities.vendor_declared"></span>
+                                                    </div>
+                                                    <!-- Driver confirmed -->
+                                                    <template x-if="item.quantities.driver_confirmed !== null">
+                                                        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border"
+                                                             :class="item.quantities.driver_confirmed !== item.quantities.driver_expected ? 'bg-rose-50 border-rose-200' : 'bg-violet-50 border-violet-100'">
+                                                            <span class="text-[9px] font-bold uppercase tracking-wide"
+                                                                  :class="item.quantities.driver_confirmed !== item.quantities.driver_expected ? 'text-rose-400' : 'text-violet-400'">Driver</span>
+                                                            <span class="text-xs font-bold"
+                                                                  :class="item.quantities.driver_confirmed !== item.quantities.driver_expected ? 'text-rose-700' : 'text-violet-700'"
+                                                                  x-text="item.quantities.driver_confirmed + (item.quantities.driver_expected ? ' / ' + item.quantities.driver_expected : '')"></span>
+                                                        </div>
+                                                    </template>
+                                                    <!-- Warehouse received -->
+                                                    <template x-if="item.quantities.warehouse_received !== null">
+                                                        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border"
+                                                             :class="item.quantities.warehouse_received !== item.quantities.warehouse_expected ? 'bg-rose-50 border-rose-200' : 'bg-blue-50 border-blue-100'">
+                                                            <span class="text-[9px] font-bold uppercase tracking-wide"
+                                                                  :class="item.quantities.warehouse_received !== item.quantities.warehouse_expected ? 'text-rose-400' : 'text-blue-400'">Warehouse</span>
+                                                            <span class="text-xs font-bold"
+                                                                  :class="item.quantities.warehouse_received !== item.quantities.warehouse_expected ? 'text-rose-700' : 'text-blue-700'"
+                                                                  x-text="item.quantities.warehouse_received + (item.quantities.warehouse_expected ? ' / ' + item.quantities.warehouse_expected : '')"></span>
+                                                            <template x-if="item.quantities.warehouse_damaged > 0">
+                                                                <span class="text-[9px] font-bold text-rose-500" x-text="'(' + item.quantities.warehouse_damaged + ' dmg)'"></span>
+                                                            </template>
+                                                        </div>
+                                                    </template>
+                                                    <!-- Manifest loaded → received -->
+                                                    <template x-if="item.quantities.manifest_loaded !== null">
+                                                        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border"
+                                                             :class="item.quantities.manifest_received !== null && item.quantities.manifest_received !== item.quantities.manifest_loaded ? 'bg-rose-50 border-rose-200' : 'bg-orange-50 border-orange-100'">
+                                                            <span class="text-[9px] font-bold uppercase tracking-wide"
+                                                                  :class="item.quantities.manifest_received !== null && item.quantities.manifest_received !== item.quantities.manifest_loaded ? 'text-rose-400' : 'text-orange-400'">Transit</span>
+                                                            <span class="text-xs font-bold"
+                                                                  :class="item.quantities.manifest_received !== null && item.quantities.manifest_received !== item.quantities.manifest_loaded ? 'text-rose-700' : 'text-orange-700'"
+                                                                  x-text="item.quantities.manifest_received !== null ? item.quantities.manifest_received + ' / ' + item.quantities.manifest_loaded : item.quantities.manifest_loaded"></span>
+                                                        </div>
+                                                    </template>
+                                                    <!-- Delivered -->
+                                                    <template x-if="item.quantities.delivery_actual !== null">
+                                                        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border"
+                                                             :class="item.quantities.delivery_actual !== item.quantities.delivery_expected ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-100'">
+                                                            <span class="text-[9px] font-bold uppercase tracking-wide"
+                                                                  :class="item.quantities.delivery_actual !== item.quantities.delivery_expected ? 'text-rose-400' : 'text-emerald-400'">Delivered</span>
+                                                            <span class="text-xs font-bold"
+                                                                  :class="item.quantities.delivery_actual !== item.quantities.delivery_expected ? 'text-rose-700' : 'text-emerald-700'"
+                                                                  x-text="item.quantities.delivery_actual + (item.quantities.delivery_expected ? ' / ' + item.quantities.delivery_expected : '')"></span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+
+                                            <!-- Toggle -->
+                                            <button type="button" @@click="toggleItemDetails(item.id)"
+                                                    class="w-full flex items-center justify-between px-4 py-2.5 border-t border-slate-100 text-[11px] font-semibold text-slate-500 hover:text-indigo-600 hover:bg-slate-50/50 transition-all">
+                                                <span x-text="isItemExpanded(item.id) ? 'Hide journey details' : 'View full journey details'"></span>
+                                                <svg class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"
+                                                     :class="isItemExpanded(item.id) ? 'rotate-180' : ''"
+                                                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                                </svg>
+                                            </button>
+
+                                            <!-- Expanded Details -->
+                                            <div x-show="isItemExpanded(item.id)" x-cloak class="border-t border-slate-100 bg-slate-50/60 divide-y divide-slate-100">
+
+                                                <!-- Sort Batch -->
+                                                <template x-if="item.sort_batch">
+                                                    <div class="p-4">
+                                                        <div class="flex items-center justify-between mb-2.5">
+                                                            <div class="flex items-center gap-2">
+                                                                <div class="w-5 h-5 rounded-md bg-indigo-100 flex items-center justify-center">
+                                                                    <svg class="w-3 h-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                                                </div>
+                                                                <span class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Sort Batch</span>
+                                                            </div>
+                                                            <a :href="item.sort_batch.show_url" class="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded-md text-[10px] font-bold text-indigo-600 hover:bg-indigo-100 transition-colors">
+                                                                <span x-text="item.sort_batch.batch_number"></span>
+                                                                <svg class="w-2.5 h-2.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                                            </a>
+                                                        </div>
+                                                        <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                                                            <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                <span class="text-slate-400">Mode</span>
+                                                                <span class="font-semibold text-slate-700" x-text="item.sort_batch.dispatch_mode_label"></span>
+                                                            </div>
+                                                            <template x-if="item.sort_batch.origin_warehouse || item.sort_batch.destination_warehouse">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Route</span>
+                                                                    <span class="font-semibold text-slate-700 text-right" x-text="(item.sort_batch.origin_warehouse || '?') + ' → ' + (item.sort_batch.destination_warehouse || '?')"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.sort_batch.quantity_allocated">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Qty allocated</span>
+                                                                    <span class="font-semibold text-slate-700" x-text="item.sort_batch.quantity_allocated"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.sort_batch.sealed_at">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Sealed</span>
+                                                                    <span class="font-semibold text-slate-700" x-text="formatDateTime(item.sort_batch.sealed_at)"></span>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Transport Manifest -->
+                                                <template x-if="item.sort_batch && item.sort_batch.dispatch_mode === 'transfer' && item.transport_manifest">
+                                                    <div class="p-4">
+                                                        <div class="flex items-center justify-between mb-2.5">
+                                                            <div class="flex items-center gap-2">
+                                                                <div class="w-5 h-5 rounded-md bg-orange-100 flex items-center justify-center">
+                                                                    <svg class="w-3 h-3 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>
+                                                                </div>
+                                                                <span class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Transport Manifest</span>
+                                                            </div>
+                                                            <a :href="item.transport_manifest.show_url" class="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 border border-orange-100 rounded-md text-[10px] font-bold text-orange-600 hover:bg-orange-100 transition-colors">
+                                                                <span x-text="item.transport_manifest.manifest_number"></span>
+                                                                <svg class="w-2.5 h-2.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                                            </a>
+                                                        </div>
+                                                        <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                                                            <template x-if="item.transport_manifest.driver_name">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Driver</span>
+                                                                    <span class="font-semibold text-slate-700" x-text="item.transport_manifest.driver_name"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.transport_manifest.origin_warehouse || item.transport_manifest.destination_warehouse">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Route</span>
+                                                                    <span class="font-semibold text-slate-700 text-right" x-text="(item.transport_manifest.origin_warehouse || '?') + ' → ' + (item.transport_manifest.destination_warehouse || '?')"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.transport_manifest.dispatched_at">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Dispatched</span>
+                                                                    <span class="font-semibold text-slate-700" x-text="formatDateTime(item.transport_manifest.dispatched_at)"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.transport_manifest.arrived_at">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Arrived</span>
+                                                                    <span class="font-semibold text-slate-700" x-text="formatDateTime(item.transport_manifest.arrived_at)"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.transport_manifest.received_at">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Received</span>
+                                                                    <span class="font-semibold text-emerald-600" x-text="formatDateTime(item.transport_manifest.received_at)"></span>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Delivery Run -->
+                                                <template x-if="item.delivery_run">
+                                                    <div class="p-4">
+                                                        <div class="flex items-center justify-between mb-2.5">
+                                                            <div class="flex items-center gap-2">
+                                                                <div class="w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center">
+                                                                    <svg class="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                                                </div>
+                                                                <span class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Delivery Run</span>
+                                                            </div>
+                                                            <a :href="item.delivery_run.show_url" class="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-100 rounded-md text-[10px] font-bold text-amber-600 hover:bg-amber-100 transition-colors">
+                                                                <span x-text="item.delivery_run.run_number"></span>
+                                                                <svg class="w-2.5 h-2.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                                            </a>
+                                                        </div>
+                                                        <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                                                            <template x-if="item.delivery_run.driver_name">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Driver</span>
+                                                                    <span class="font-semibold text-slate-700" x-text="item.delivery_run.driver_name"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.delivery_run.warehouse">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">From warehouse</span>
+                                                                    <span class="font-semibold text-slate-700" x-text="item.delivery_run.warehouse"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.delivery_run.dispatched_at">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Dispatched</span>
+                                                                    <span class="font-semibold text-slate-700" x-text="formatDateTime(item.delivery_run.dispatched_at)"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.delivery_run.completed_at">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Completed</span>
+                                                                    <span class="font-semibold text-emerald-600" x-text="formatDateTime(item.delivery_run.completed_at)"></span>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Delivery Stop -->
+                                                <template x-if="item.delivery_stop">
+                                                    <div class="p-4">
+                                                        <div class="flex items-center gap-2 mb-2.5">
+                                                            <div class="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center">
+                                                                <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                                                            </div>
+                                                            <span class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Delivery Stop</span>
+                                                        </div>
+                                                        <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                                                            <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                <span class="text-slate-400">Recipient</span>
+                                                                <span class="font-semibold text-slate-700" x-text="item.delivery_stop.recipient_name"></span>
+                                                            </div>
+                                                            <template x-if="item.delivery_stop.recipient_phone">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Phone</span>
+                                                                    <span class="font-semibold text-slate-700" x-text="item.delivery_stop.recipient_phone"></span>
+                                                                </div>
+                                                            </template>
+                                                            <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                <span class="text-slate-400">Status</span>
+                                                                <span class="font-bold capitalize px-2 py-0.5 rounded-md text-[10px]"
+                                                                      :class="{
+                                                                          'bg-emerald-100 text-emerald-700': item.delivery_stop.status === 'delivered',
+                                                                          'bg-rose-100 text-rose-600': item.delivery_stop.status === 'failed',
+                                                                          'bg-amber-100 text-amber-700': item.delivery_stop.status === 'arrived',
+                                                                          'bg-slate-100 text-slate-500': item.delivery_stop.status === 'pending'
+                                                                      }"
+                                                                      x-text="item.delivery_stop.status"></span>
+                                                            </div>
+                                                            <template x-if="item.delivery_stop.arrived_at">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Arrived at stop</span>
+                                                                    <span class="font-semibold text-slate-700" x-text="formatDateTime(item.delivery_stop.arrived_at)"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.delivery_stop.delivered_at">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Delivered</span>
+                                                                    <span class="font-semibold text-emerald-600" x-text="formatDateTime(item.delivery_stop.delivered_at)"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.delivery_stop.failure_reason">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Failure reason</span>
+                                                                    <span class="font-semibold text-rose-600 text-right max-w-[60%]" x-text="item.delivery_stop.failure_reason"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.delivery_outcome">
+                                                                <div class="flex justify-between items-center px-3 py-2 text-[11px]">
+                                                                    <span class="text-slate-400">Qty delivered</span>
+                                                                    <span class="font-semibold text-slate-700" x-text="(item.delivery_outcome.delivered_quantity ?? '—') + ' / ' + (item.delivery_outcome.expected_quantity ?? '—')"></span>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="item.delivery_stop.has_proof_photo">
+                                                                <div class="flex items-center gap-2 px-3 py-2 bg-emerald-50">
+                                                                    <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                                                    <span class="text-[10px] font-bold text-emerald-700">Proof photo captured</span>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Not in pipeline yet -->
+                                                <template x-if="!item.sort_batch && !item.delivery_run && !item.delivery_stop">
+                                                    <div class="px-4 py-5 text-center">
+                                                        <p class="text-[11px] text-slate-400 italic">This item has not entered the sorting pipeline yet.</p>
+                                                    </div>
+                                                </template>
+
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
                     </div>
                 </template>
+
             </div>
 
         </div>

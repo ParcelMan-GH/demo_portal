@@ -472,6 +472,263 @@ function warehouseUsersTable(config) {
     };
 }
 
+// ─── Client-side inventory table factory ────────────────────────────────────
+function clientSideTable({ items = [], columns = [], visibleColumns = {}, defaultSort = '', defaultSortDir = 'desc', title = 'Export', filename = 'export' }) {
+    return {
+        allItems: items,
+        items: [],
+        columns: columns,
+        visibleColumns: { ...visibleColumns },
+        search: '',
+        sortBy: defaultSort,
+        sortDir: defaultSortDir,
+        perPage: 25,
+        currentPage: 1,
+        meta: { total: 0, last_page: 1, current_page: 1, from: 0, to: 0 },
+        _title: title,
+        _filename: filename,
+
+        init() {
+            this.recompute();
+            this.$watch('search', () => { this.currentPage = 1; this.recompute(); });
+            this.$watch('perPage', () => { this.currentPage = 1; this.recompute(); });
+        },
+
+        recompute() {
+            let data = this.allItems;
+            if (this.search.trim()) {
+                const q = this.search.toLowerCase();
+                data = data.filter(row =>
+                    Object.values(row).some(v => String(v ?? '').toLowerCase().includes(q))
+                );
+            }
+            if (this.sortBy) {
+                data = [...data].sort((a, b) => {
+                    const va = a[this.sortBy] ?? '';
+                    const vb = b[this.sortBy] ?? '';
+                    const cmp = String(va).localeCompare(String(vb), undefined, { numeric: true });
+                    return this.sortDir === 'asc' ? cmp : -cmp;
+                });
+            }
+            const total = data.length;
+            const lastPage = Math.max(1, Math.ceil(total / this.perPage));
+            if (this.currentPage > lastPage) this.currentPage = lastPage;
+            const from = total === 0 ? 0 : (this.currentPage - 1) * this.perPage + 1;
+            const to = Math.min(this.currentPage * this.perPage, total);
+            this.meta = { total, last_page: lastPage, current_page: this.currentPage, from, to };
+            this.items = data.slice((this.currentPage - 1) * this.perPage, this.currentPage * this.perPage);
+        },
+
+        sort(col) {
+            if (this.sortBy === col) {
+                this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.sortBy = col;
+                this.sortDir = 'asc';
+            }
+            this.currentPage = 1;
+            this.recompute();
+        },
+
+        toggleColumn(key) {
+            this.visibleColumns[key] = !this.visibleColumns[key];
+        },
+
+        visibleColumnCount() {
+            return Object.values(this.visibleColumns).filter(Boolean).length;
+        },
+
+        setPerPage(n) { this.perPage = n; },
+        firstPage()   { if (this.currentPage !== 1)                     { this.currentPage = 1;                   this.recompute(); } },
+        prevPage()    { if (this.currentPage > 1)                        { this.currentPage--;                     this.recompute(); } },
+        nextPage()    { if (this.currentPage < this.meta.last_page)      { this.currentPage++;                     this.recompute(); } },
+        lastPage()    { if (this.currentPage !== this.meta.last_page)    { this.currentPage = this.meta.last_page; this.recompute(); } },
+
+        exportData(format) {
+            let data = this.allItems;
+            if (this.search.trim()) {
+                const q = this.search.toLowerCase();
+                data = data.filter(row => Object.values(row).some(v => String(v ?? '').toLowerCase().includes(q)));
+            }
+            if (this.sortBy) {
+                data = [...data].sort((a, b) => {
+                    const cmp = String(a[this.sortBy] ?? '').localeCompare(String(b[this.sortBy] ?? ''), undefined, { numeric: true });
+                    return this.sortDir === 'asc' ? cmp : -cmp;
+                });
+            }
+            if (format === 'csv')   this.downloadCSV(data);
+            if (format === 'print') this.openPrintWindow(data);
+        },
+
+        printData() { this.exportData('print'); },
+
+        downloadCSV(data) {
+            if (!data.length) { window.showToast?.('No data to export', 'warning'); return; }
+            const exportCols = this.columns.filter(c => c.exportable !== false);
+            const headers = exportCols.map(c => c.label);
+            const keys    = exportCols.map(c => c.key);
+            let csv = headers.join(',') + '\n';
+            data.forEach(row => {
+                csv += keys.map(k => `"${String(row[k] ?? '').replace(/"/g, '""')}"`).join(',') + '\n';
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url  = URL.createObjectURL(blob);
+            const a    = Object.assign(document.createElement('a'), { href: url, download: this._filename + '.csv' });
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        },
+
+        openPrintWindow(data) {
+            if (!data.length) { window.showToast?.('No data to print.', 'warning'); return; }
+            const win = window.open('', '_blank');
+            if (!win) { window.showToast?.('Pop-up blocked. Allow pop-ups to print.', 'warning'); return; }
+            const exportCols = this.columns.filter(c => c.exportable !== false);
+            const headers    = exportCols.map(c => c.label);
+            const keys       = exportCols.map(c => c.key);
+            const rows = data.map(row =>
+                `<tr>${keys.map(k => `<td>${String(row[k] ?? '-').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>`).join('')}</tr>`
+            ).join('');
+            win.document.write(
+                `<!DOCTYPE html><html><head><title>${this._title}</title>` +
+                `<style>body{font-family:sans-serif;padding:20px}h1{font-size:20px;margin-bottom:16px;color:#1e293b}` +
+                `table{width:100%;border-collapse:collapse}th,td{border:1px solid #e2e8f0;padding:8px 12px;text-align:left;font-size:12px}` +
+                `th{background:#f1f5f9;font-weight:600;color:#475569}tr:nth-child(even){background:#f8fafc}</style></head>` +
+                `<body><h1>${this._title}</h1><table><thead><tr>` +
+                `${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></body></html>`
+            );
+            win.document.close();
+            setTimeout(() => win.print(), 250);
+        },
+    };
+}
+
+function warehouseReceivedItemsTable(items) {
+    return clientSideTable({
+        items: Array.isArray(items) ? items : [],
+        columns: [
+            { key: 'confirmed_at',    label: 'Confirmed At' },
+            { key: 'shipment_number', label: 'Shipment' },
+            { key: 'item_description',label: 'Item', exportable: true },
+            { key: 'qty',             label: 'Qty' },
+            { key: 'driver',          label: 'Driver' },
+            { key: 'notes',           label: 'Notes', exportable: true },
+            { key: 'actions',         label: 'Actions', exportable: false },
+        ],
+        visibleColumns: { confirmed_at: true, shipment_number: true, item_description: true, qty: true, driver: true, notes: true, actions: true },
+        defaultSort: 'confirmed_at',
+        defaultSortDir: 'desc',
+        title: 'Received Items',
+        filename: 'received-items',
+    });
+}
+
+function warehouseReceivedPickupsTable(items) {
+    return clientSideTable({
+        items: Array.isArray(items) ? items : [],
+        columns: [
+            { key: 'shipment_number',     label: 'Shipment' },
+            { key: 'driver',              label: 'Driver' },
+            { key: 'status_label',        label: 'Status' },
+            { key: 'arrived_warehouse_at',label: 'Arrived Warehouse' },
+            { key: 'received_at',         label: 'Received At' },
+            { key: 'notes',               label: 'Notes', exportable: true },
+            { key: 'actions',             label: 'Actions', exportable: false },
+        ],
+        visibleColumns: { shipment_number: true, driver: true, status_label: true, arrived_warehouse_at: true, received_at: true, notes: true, actions: true },
+        defaultSort: 'received_at',
+        defaultSortDir: 'desc',
+        title: 'Received Pickups',
+        filename: 'received-pickups',
+    });
+}
+
+function warehousePendingReceiptsTable(items) {
+    return clientSideTable({
+        items: Array.isArray(items) ? items : [],
+        columns: [
+            { key: 'shipment_number',     label: 'Shipment' },
+            { key: 'driver',              label: 'Driver' },
+            { key: 'status_label',        label: 'Status' },
+            { key: 'assigned_at',         label: 'Assigned At' },
+            { key: 'arrived_warehouse_at',label: 'Arrived Warehouse' },
+            { key: 'actions',             label: 'Actions', exportable: false },
+        ],
+        visibleColumns: { shipment_number: true, driver: true, status_label: true, assigned_at: true, arrived_warehouse_at: true, actions: true },
+        defaultSort: 'assigned_at',
+        defaultSortDir: 'desc',
+        title: 'Pending Receipts',
+        filename: 'pending-receipts',
+    });
+}
+
+function warehouseSortBatchesTable(items) {
+    return clientSideTable({
+        items: Array.isArray(items) ? items : [],
+        columns: [
+            { key: 'batch_number',   label: 'Batch #' },
+            { key: 'direction',      label: 'Direction' },
+            { key: 'other_warehouse',label: 'Other Warehouse' },
+            { key: 'dispatch_mode',  label: 'Mode' },
+            { key: 'status',         label: 'Status' },
+            { key: 'items',          label: 'Items' },
+            { key: 'sealed_at',      label: 'Sealed At' },
+            { key: 'created_at',     label: 'Created' },
+            { key: 'actions',        label: 'Actions', exportable: false },
+        ],
+        visibleColumns: { batch_number: true, direction: true, other_warehouse: true, dispatch_mode: true, status: true, items: true, sealed_at: true, created_at: true, actions: true },
+        defaultSort: 'created_at',
+        defaultSortDir: 'desc',
+        title: 'Sort Batches',
+        filename: 'sort-batches',
+    });
+}
+
+function warehouseManifestsTable(items) {
+    return clientSideTable({
+        items: Array.isArray(items) ? items : [],
+        columns: [
+            { key: 'manifest_number', label: 'Manifest #' },
+            { key: 'direction',       label: 'Direction' },
+            { key: 'other_warehouse', label: 'Other Warehouse' },
+            { key: 'driver',          label: 'Driver' },
+            { key: 'status',          label: 'Status' },
+            { key: 'items',           label: 'Items' },
+            { key: 'dispatched_at',   label: 'Dispatched' },
+            { key: 'arrived_at',      label: 'Arrived' },
+            { key: 'created_at',      label: 'Created' },
+            { key: 'actions',         label: 'Actions', exportable: false },
+        ],
+        visibleColumns: { manifest_number: true, direction: true, other_warehouse: true, driver: true, status: true, items: true, dispatched_at: true, arrived_at: true, created_at: true, actions: true },
+        defaultSort: 'created_at',
+        defaultSortDir: 'desc',
+        title: 'Transport Manifests',
+        filename: 'transport-manifests',
+    });
+}
+
+function warehouseDeliveryRunsTable(items) {
+    return clientSideTable({
+        items: Array.isArray(items) ? items : [],
+        columns: [
+            { key: 'run_number',    label: 'Run #' },
+            { key: 'driver',        label: 'Driver' },
+            { key: 'status',        label: 'Status' },
+            { key: 'stops',         label: 'Stops' },
+            { key: 'dispatched_at', label: 'Dispatched' },
+            { key: 'completed_at',  label: 'Completed' },
+            { key: 'created_at',    label: 'Created' },
+            { key: 'actions',       label: 'Actions', exportable: false },
+        ],
+        visibleColumns: { run_number: true, driver: true, status: true, stops: true, dispatched_at: true, completed_at: true, created_at: true, actions: true },
+        defaultSort: 'created_at',
+        defaultSortDir: 'desc',
+        title: 'Delivery Runs',
+        filename: 'delivery-runs',
+    });
+}
+
 function warehouseShow() {
     return {
         config: {},
@@ -656,6 +913,12 @@ function registerWarehouseShowPage() {
         const resolvedConfig = componentConfig || window.warehouseUsersTableConfig || {};
         return warehouseUsersTable(resolvedConfig);
     });
+    Alpine.data('warehouseReceivedItemsTable',  (items = []) => warehouseReceivedItemsTable(items));
+    Alpine.data('warehouseReceivedPickupsTable', (items = []) => warehouseReceivedPickupsTable(items));
+    Alpine.data('warehousePendingReceiptsTable', (items = []) => warehousePendingReceiptsTable(items));
+    Alpine.data('warehouseSortBatchesTable',     (items = []) => warehouseSortBatchesTable(items));
+    Alpine.data('warehouseManifestsTable',       (items = []) => warehouseManifestsTable(items));
+    Alpine.data('warehouseDeliveryRunsTable',    (items = []) => warehouseDeliveryRunsTable(items));
 }
 
 if (window.Alpine) {

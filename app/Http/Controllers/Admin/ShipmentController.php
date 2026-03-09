@@ -275,158 +275,292 @@ class ShipmentController extends Controller
     {
         $this->authorizePermission('shipments.view');
 
+        // Unified eager-load covering all pipeline stages
+        $shipment->loadMissing([
+            'invoices',
+            'pickupAssignments.driver',
+            'pickupAssignments.targetWarehouse',
+            'pickupAssignments.receivedWarehouse',
+            'pickupAssignments.warehouseReceipt',
+            'items.pickupConfirmations',
+            'items.warehouseReceiptItems',
+            'items.transportManifestItems',
+            'items.sortBatchItems.sortBatch.originWarehouse',
+            'items.sortBatchItems.sortBatch.destinationWarehouse',
+            'items.sortBatchItems.sortBatch.transportManifest.assignedDriver',
+            'items.sortBatchItems.sortBatch.transportManifest.originWarehouse',
+            'items.sortBatchItems.sortBatch.transportManifest.destinationWarehouse',
+            'items.sortBatchItems.sortBatch.deliveryRun.assignedDriver',
+            'items.sortBatchItems.sortBatch.deliveryRun.warehouse',
+            'items.deliveryRunItems.stop',
+            'items.deliveryRunItems.run',
+        ]);
+
         $timeline = [];
 
+        // --- Shipment created ---
         $createdAt = $shipment->created_at->format('Y-m-d H:i:s');
         $timeline[] = [
             'status' => 'created',
             'label' => 'Shipment Created',
-            'status_label' => 'Shipment Created',
+            'status_label' => 'Created',
             'timestamp' => $createdAt,
             'created_at' => $createdAt,
         ];
 
+        // --- Submitted ---
         if ($shipment->submitted_at) {
             $submittedAt = $shipment->submitted_at->format('Y-m-d H:i:s');
             $timeline[] = [
                 'status' => 'submitted',
                 'label' => 'Submitted for Processing',
-                'status_label' => 'Submitted for Processing',
+                'status_label' => 'Submitted',
                 'timestamp' => $submittedAt,
                 'created_at' => $submittedAt,
             ];
         }
 
-        $shipment->loadMissing('invoices');
+        // --- Invoice lifecycle ---
         foreach ($shipment->invoices as $invoice) {
             if ($invoice->sent_at) {
-                $sentAt = $invoice->sent_at->format('Y-m-d H:i:s');
-                $timeline[] = [
-                    'status' => 'invoice_sent',
-                    'label' => "Invoice Sent ({$invoice->invoice_number})",
-                    'status_label' => 'Invoice Sent',
-                    'timestamp' => $sentAt,
-                    'created_at' => $sentAt,
-                ];
+                $ts = $invoice->sent_at->format('Y-m-d H:i:s');
+                $timeline[] = ['status' => 'invoice_sent', 'label' => "Invoice Sent ({$invoice->invoice_number})", 'status_label' => 'Invoice Sent', 'timestamp' => $ts, 'created_at' => $ts];
             }
             if ($invoice->accepted_at) {
-                $acceptedAt = $invoice->accepted_at->format('Y-m-d H:i:s');
-                $timeline[] = [
-                    'status' => 'invoice_accepted',
-                    'label' => "Invoice Accepted ({$invoice->invoice_number})",
-                    'status_label' => 'Invoice Accepted',
-                    'timestamp' => $acceptedAt,
-                    'created_at' => $acceptedAt,
-                ];
+                $ts = $invoice->accepted_at->format('Y-m-d H:i:s');
+                $timeline[] = ['status' => 'invoice_accepted', 'label' => "Invoice Accepted ({$invoice->invoice_number})", 'status_label' => 'Invoice Accepted', 'timestamp' => $ts, 'created_at' => $ts];
             }
             if ($invoice->rejected_at) {
-                $rejectedAt = $invoice->rejected_at->format('Y-m-d H:i:s');
-                $timeline[] = [
-                    'status' => 'invoice_rejected',
-                    'label' => "Invoice Rejected ({$invoice->invoice_number})",
-                    'status_label' => 'Invoice Rejected',
-                    'timestamp' => $rejectedAt,
-                    'created_at' => $rejectedAt,
-                ];
+                $ts = $invoice->rejected_at->format('Y-m-d H:i:s');
+                $timeline[] = ['status' => 'invoice_rejected', 'label' => "Invoice Rejected ({$invoice->invoice_number})", 'status_label' => 'Invoice Rejected', 'timestamp' => $ts, 'created_at' => $ts];
             }
             if ($invoice->cancelled_at) {
-                $cancelledAt = $invoice->cancelled_at->format('Y-m-d H:i:s');
+                $ts = $invoice->cancelled_at->format('Y-m-d H:i:s');
+                $timeline[] = ['status' => 'invoice_cancelled', 'label' => "Invoice Cancelled ({$invoice->invoice_number})", 'status_label' => 'Invoice Cancelled', 'timestamp' => $ts, 'created_at' => $ts];
+            }
+        }
+
+        // --- Pickup assignment lifecycle ---
+        foreach ($shipment->pickupAssignments->sortBy('id') as $assignment) {
+            if ($assignment->assigned_at) {
+                $ts = $assignment->assigned_at->format('Y-m-d H:i:s');
+                $label = 'Pickup Driver Assigned: ' . ($assignment->driver?->name ?? 'Unknown');
+                $timeline[] = ['status' => 'pickup_assigned', 'label' => $label, 'status_label' => 'Driver Assigned', 'timestamp' => $ts, 'created_at' => $ts];
+            }
+            if ($assignment->en_route_at) {
+                $ts = $assignment->en_route_at->format('Y-m-d H:i:s');
+                $timeline[] = ['status' => 'en_route', 'label' => 'Driver En Route to Vendor', 'status_label' => 'En Route', 'timestamp' => $ts, 'created_at' => $ts];
+            }
+            if ($assignment->arrived_at) {
+                $ts = $assignment->arrived_at->format('Y-m-d H:i:s');
+                $timeline[] = ['status' => 'arrived', 'label' => 'Driver Arrived at Vendor', 'status_label' => 'Driver Arrived', 'timestamp' => $ts, 'created_at' => $ts];
+            }
+            if ($assignment->picked_up_at) {
+                $ts = $assignment->picked_up_at->format('Y-m-d H:i:s');
+                $timeline[] = ['status' => 'picked_up', 'label' => 'Items Picked Up', 'status_label' => 'Picked Up', 'timestamp' => $ts, 'created_at' => $ts];
+            }
+            if ($assignment->arrived_warehouse_at) {
+                $ts = $assignment->arrived_warehouse_at->format('Y-m-d H:i:s');
+                $location = $assignment->targetWarehouse?->name ?? $assignment->receivedWarehouse?->name;
+                $timeline[] = ['status' => 'arrived_warehouse', 'label' => 'Driver Arrived at Warehouse', 'status_label' => 'Arrived Warehouse', 'timestamp' => $ts, 'created_at' => $ts, 'location' => $location];
+            }
+            if ($assignment->received_at) {
+                $ts = $assignment->received_at->format('Y-m-d H:i:s');
+                $location = $assignment->receivedWarehouse?->name ?? $assignment->targetWarehouse?->name;
                 $timeline[] = [
-                    'status' => 'invoice_cancelled',
-                    'label' => "Invoice Cancelled ({$invoice->invoice_number})",
-                    'status_label' => 'Invoice Cancelled',
-                    'timestamp' => $cancelledAt,
-                    'created_at' => $cancelledAt,
+                    'status' => 'at_warehouse', 'label' => 'Received at Warehouse', 'status_label' => 'At Warehouse',
+                    'timestamp' => $ts, 'created_at' => $ts, 'location' => $location,
+                    'description' => $assignment->receive_notes ? 'Notes: ' . $assignment->receive_notes : null,
                 ];
             }
         }
 
-        $shipment->loadMissing([
-            'pickupAssignments.driver',
-            'pickupAssignments.targetWarehouse',
-            'pickupAssignments.receivedWarehouse',
-        ]);
+        // --- Sort batch, manifest, delivery run events ---
+        $allSortBatches = $shipment->items
+            ->flatMap(fn($item) => $item->sortBatchItems)
+            ->filter(fn($sbi) => is_null($sbi->removed_at))
+            ->map(fn($sbi) => $sbi->sortBatch)
+            ->filter()
+            ->unique('id');
 
-        foreach ($shipment->pickupAssignments->sortBy('id') as $assignment) {
-            if ($assignment->assigned_at) {
-                $assignedAt = $assignment->assigned_at->format('Y-m-d H:i:s');
-                $label = 'Driver Assigned: ' . ($assignment->driver?->name ?? 'Unknown');
+        foreach ($allSortBatches as $batch) {
+            if ($batch->sealed_at) {
+                $ts = $batch->sealed_at->format('Y-m-d H:i:s');
+                $modeLabel = $batch->dispatch_mode === 'transfer' ? 'Inter-warehouse Transfer' : 'Local Delivery';
                 $timeline[] = [
-                    'status' => 'pickup_assigned',
-                    'label' => $label,
-                    'status_label' => $label,
-                    'timestamp' => $assignedAt,
-                    'created_at' => $assignedAt,
+                    'status' => 'sorted',
+                    'label' => 'Sorted — Batch ' . $batch->batch_number,
+                    'status_label' => 'Sorted',
+                    'timestamp' => $ts, 'created_at' => $ts,
+                    'location' => $batch->originWarehouse?->name,
+                    'description' => 'Dispatch mode: ' . $modeLabel,
+                    'meta' => ['batch_id' => $batch->id, 'batch_number' => $batch->batch_number],
                 ];
             }
-            if ($assignment->en_route_at) {
-                $enRouteAt = $assignment->en_route_at->format('Y-m-d H:i:s');
+        }
+
+        $allManifests = $allSortBatches->map(fn($b) => $b->transportManifest)->filter()->unique('id');
+        foreach ($allManifests as $manifest) {
+            if ($manifest->dispatched_at) {
+                $ts = $manifest->dispatched_at->format('Y-m-d H:i:s');
                 $timeline[] = [
-                    'status' => 'en_route',
-                    'label' => 'Driver En Route',
-                    'status_label' => 'Driver En Route',
-                    'timestamp' => $enRouteAt,
-                    'created_at' => $enRouteAt,
+                    'status' => 'in_transit',
+                    'label' => 'In Transit — Manifest ' . $manifest->manifest_number,
+                    'status_label' => 'In Transit',
+                    'timestamp' => $ts, 'created_at' => $ts,
+                    'location' => ($manifest->originWarehouse?->name ?? '?') . ' → ' . ($manifest->destinationWarehouse?->name ?? '?'),
+                    'description' => 'Driver: ' . ($manifest->assignedDriver?->name ?? 'Unknown'),
+                    'meta' => ['manifest_id' => $manifest->id, 'manifest_number' => $manifest->manifest_number],
                 ];
             }
-            if ($assignment->arrived_at) {
-                $arrivedAt = $assignment->arrived_at->format('Y-m-d H:i:s');
+            if ($manifest->arrived_at) {
+                $ts = $manifest->arrived_at->format('Y-m-d H:i:s');
                 $timeline[] = [
-                    'status' => 'arrived',
-                    'label' => 'Driver Arrived',
-                    'status_label' => 'Driver Arrived',
-                    'timestamp' => $arrivedAt,
-                    'created_at' => $arrivedAt,
+                    'status' => 'at_destination',
+                    'label' => 'Arrived at Destination — Manifest ' . $manifest->manifest_number,
+                    'status_label' => 'At Destination',
+                    'timestamp' => $ts, 'created_at' => $ts,
+                    'location' => $manifest->destinationWarehouse?->name,
+                    'meta' => ['manifest_id' => $manifest->id, 'manifest_number' => $manifest->manifest_number],
                 ];
             }
-            if ($assignment->picked_up_at) {
-                $pickedUpAt = $assignment->picked_up_at->format('Y-m-d H:i:s');
+            if ($manifest->received_at) {
+                $ts = $manifest->received_at->format('Y-m-d H:i:s');
                 $timeline[] = [
-                    'status' => 'picked_up',
-                    'label' => 'Items Picked Up',
-                    'status_label' => 'Items Picked Up',
-                    'timestamp' => $pickedUpAt,
-                    'created_at' => $pickedUpAt,
+                    'status' => 'received_at_destination',
+                    'label' => 'Received at Destination Warehouse',
+                    'status_label' => 'Received',
+                    'timestamp' => $ts, 'created_at' => $ts,
+                    'location' => $manifest->destinationWarehouse?->name,
+                    'meta' => ['manifest_id' => $manifest->id, 'manifest_number' => $manifest->manifest_number],
                 ];
             }
+        }
 
-            if ($assignment->arrived_warehouse_at) {
-                $arrivedWarehouseAt = $assignment->arrived_warehouse_at->format('Y-m-d H:i:s');
-                $location = $assignment->targetWarehouse?->name
-                    ?? $assignment->receivedWarehouse?->name;
-
+        $allDeliveryRuns = $allSortBatches->map(fn($b) => $b->deliveryRun)->filter()->unique('id');
+        foreach ($allDeliveryRuns as $run) {
+            if ($run->dispatched_at) {
+                $ts = $run->dispatched_at->format('Y-m-d H:i:s');
                 $timeline[] = [
-                    'status' => 'arrived_warehouse',
-                    'label' => 'Arrived at Warehouse',
-                    'status_label' => 'Arrived at Warehouse',
-                    'timestamp' => $arrivedWarehouseAt,
-                    'created_at' => $arrivedWarehouseAt,
-                    'location' => $location,
+                    'status' => 'out_for_delivery',
+                    'label' => 'Out for Delivery — Run ' . $run->run_number,
+                    'status_label' => 'Out for Delivery',
+                    'timestamp' => $ts, 'created_at' => $ts,
+                    'location' => $run->warehouse?->name,
+                    'description' => 'Driver: ' . ($run->assignedDriver?->name ?? 'Unknown'),
+                    'meta' => ['run_id' => $run->id, 'run_number' => $run->run_number],
                 ];
             }
-
-            if ($assignment->received_at) {
-                $receivedAt = $assignment->received_at->format('Y-m-d H:i:s');
-                $location = $assignment->receivedWarehouse?->name
-                    ?? $assignment->targetWarehouse?->name;
-
+            if ($run->completed_at) {
+                $ts = $run->completed_at->format('Y-m-d H:i:s');
                 $timeline[] = [
-                    'status' => 'at_warehouse',
-                    'label' => 'Received at Warehouse',
-                    'status_label' => 'Received at Warehouse',
-                    'timestamp' => $receivedAt,
-                    'created_at' => $receivedAt,
-                    'location' => $location,
-                    'description' => $assignment->receive_notes
-                        ? 'Notes: ' . $assignment->receive_notes
-                        : null,
+                    'status' => 'delivered',
+                    'label' => 'Delivery Run Completed — Run ' . $run->run_number,
+                    'status_label' => 'Delivered',
+                    'timestamp' => $ts, 'created_at' => $ts,
+                    'meta' => ['run_id' => $run->id, 'run_number' => $run->run_number],
                 ];
             }
         }
 
         usort($timeline, fn($a, $b) => strcmp((string) $a['created_at'], (string) $b['created_at']));
 
-        return response()->json(['data' => $timeline]);
+        // --- Per-item journey data ---
+        $itemsData = $shipment->items->map(function ($item) {
+            $activeSortBatchItem = $item->sortBatchItems->whereNull('removed_at')->first();
+            $sortBatch = $activeSortBatchItem?->sortBatch;
+            $manifest = $sortBatch?->transportManifest;
+            $deliveryRun = $sortBatch?->deliveryRun;
+            $deliveryRunItem = $item->deliveryRunItems->first();
+            $stop = $deliveryRunItem?->stop;
+
+            return [
+                'id' => $item->id,
+                'description' => $item->description,
+                'quantity' => $item->quantity,
+                'tracking_code' => $item->tracking_code,
+                'status' => $item->status->value,
+                'status_label' => $item->status->label(),
+
+                'sort_batch' => $sortBatch ? [
+                    'id' => $sortBatch->id,
+                    'batch_number' => $sortBatch->batch_number,
+                    'status' => $sortBatch->status,
+                    'dispatch_mode' => $sortBatch->dispatch_mode,
+                    'dispatch_mode_label' => $sortBatch->dispatch_mode === 'transfer' ? 'Inter-warehouse Transfer' : 'Local Delivery',
+                    'origin_warehouse' => $sortBatch->originWarehouse?->name,
+                    'destination_warehouse' => $sortBatch->destinationWarehouse?->name,
+                    'added_at' => $activeSortBatchItem?->added_at?->format('Y-m-d H:i:s'),
+                    'sealed_at' => $sortBatch->sealed_at?->format('Y-m-d H:i:s'),
+                    'quantity_allocated' => $activeSortBatchItem?->quantity_allocated,
+                    'show_url' => route('admin.sort-batches.show', $sortBatch->id),
+                ] : null,
+
+                'transport_manifest' => $manifest ? [
+                    'id' => $manifest->id,
+                    'manifest_number' => $manifest->manifest_number,
+                    'status' => $manifest->status,
+                    'driver_name' => $manifest->assignedDriver?->name,
+                    'origin_warehouse' => $manifest->originWarehouse?->name,
+                    'destination_warehouse' => $manifest->destinationWarehouse?->name,
+                    'assigned_at' => $manifest->assigned_at?->format('Y-m-d H:i:s'),
+                    'dispatched_at' => $manifest->dispatched_at?->format('Y-m-d H:i:s'),
+                    'arrived_at' => $manifest->arrived_at?->format('Y-m-d H:i:s'),
+                    'received_at' => $manifest->received_at?->format('Y-m-d H:i:s'),
+                    'show_url' => route('admin.transport-manifests.show', $manifest->id),
+                ] : null,
+
+                'delivery_run' => $deliveryRun ? [
+                    'id' => $deliveryRun->id,
+                    'run_number' => $deliveryRun->run_number,
+                    'status' => $deliveryRun->status,
+                    'driver_name' => $deliveryRun->assignedDriver?->name,
+                    'warehouse' => $deliveryRun->warehouse?->name,
+                    'assigned_at' => $deliveryRun->assigned_at?->format('Y-m-d H:i:s'),
+                    'dispatched_at' => $deliveryRun->dispatched_at?->format('Y-m-d H:i:s'),
+                    'completed_at' => $deliveryRun->completed_at?->format('Y-m-d H:i:s'),
+                    'show_url' => route('admin.delivery-runs.show', $deliveryRun->id),
+                ] : null,
+
+                'delivery_stop' => $stop ? [
+                    'recipient_name' => $stop->recipient_name,
+                    'recipient_phone' => $stop->recipient_phone,
+                    'status' => $stop->status,
+                    'arrived_at' => $stop->arrived_at?->format('Y-m-d H:i:s'),
+                    'delivered_at' => $stop->delivered_at?->format('Y-m-d H:i:s'),
+                    'failure_reason' => $stop->failure_reason,
+                    'has_proof_photo' => !empty($stop->proof_photo_path),
+                ] : null,
+
+                'delivery_outcome' => $deliveryRunItem ? [
+                    'status' => $deliveryRunItem->status,
+                    'expected_quantity' => $deliveryRunItem->expected_quantity,
+                    'delivered_quantity' => $deliveryRunItem->delivered_quantity,
+                    'delivered_at' => $deliveryRunItem->delivered_at?->format('Y-m-d H:i:s'),
+                    'notes' => $deliveryRunItem->notes,
+                ] : null,
+
+                'quantities' => [
+                    'vendor_declared'      => $item->quantity,
+                    'driver_expected'      => $item->pickupConfirmations->sum('expected_quantity') ?: null,
+                    'driver_confirmed'     => $item->pickupConfirmations->sum('confirmed_quantity') ?: null,
+                    'warehouse_expected'   => $item->warehouseReceiptItems->sum('expected_quantity') ?: null,
+                    'warehouse_received'   => $item->warehouseReceiptItems->sum('received_quantity') ?: null,
+                    'warehouse_damaged'    => $item->warehouseReceiptItems->sum('damaged_quantity') ?: null,
+                    'allocated'            => $activeSortBatchItem?->quantity_allocated,
+                    'manifest_expected'    => $item->transportManifestItems->sum('expected_quantity') ?: null,
+                    'manifest_loaded'      => $item->transportManifestItems->sum('loaded_quantity') ?: null,
+                    'manifest_received'    => $item->transportManifestItems->sum('received_quantity') ?: null,
+                    'delivery_expected'    => $deliveryRunItem?->expected_quantity,
+                    'delivery_actual'      => $deliveryRunItem?->delivered_quantity,
+                ],
+            ];
+        })->values()->toArray();
+
+        return response()->json([
+            'data' => $timeline,
+            'items' => $itemsData,
+        ]);
     }
 
     public function export(Request $request)

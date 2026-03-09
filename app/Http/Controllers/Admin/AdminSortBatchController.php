@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\DriversExport;
 use App\Http\Controllers\Controller;
 use App\Models\SortBatch;
 use App\Models\Warehouse;
+use App\Support\GenericPdfExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
 
 class AdminSortBatchController extends Controller
 {
@@ -103,6 +106,54 @@ class AdminSortBatchController extends Controller
                 'last_page'    => $batches->lastPage(),
             ],
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $query = SortBatch::with(['originWarehouse', 'destinationWarehouse', 'createdBy'])
+            ->withCount('activeItems');
+
+        if ($search = $request->get('search')) {
+            $query->where('batch_number', 'like', "%{$search}%");
+        }
+
+        if ($status = $request->get('status')) {
+            $query->where('status', $status);
+        }
+
+        if ($dispatchMode = $request->get('dispatch_mode')) {
+            $query->where('dispatch_mode', $dispatchMode);
+        }
+
+        if ($originWarehouseId = $request->get('origin_warehouse_id')) {
+            $query->where('origin_warehouse_id', $originWarehouseId);
+        }
+
+        $batches = $query->orderBy('created_at', 'desc')->get();
+
+        $rows = $batches->map(fn(SortBatch $b) => [
+            'Batch #'       => $b->batch_number,
+            'From'          => $b->originWarehouse?->name ?? '—',
+            'To'            => $b->destinationWarehouse?->name ?? '—',
+            'Mode'          => $b->dispatch_mode === SortBatch::DISPATCH_TRANSFER ? 'Transfer' : 'Local Delivery',
+            'Items'         => $b->active_items_count,
+            'Status'        => ucfirst($b->status),
+            'Created By'    => $b->createdBy?->name ?? '—',
+            'Sealed At'     => $b->sealed_at?->format('Y-m-d H:i:s') ?? '—',
+            'Created At'    => $b->created_at->format('Y-m-d H:i:s'),
+        ])->values()->toArray();
+
+        $format = $request->input('format', 'json');
+
+        if ($format === 'excel') {
+            return Excel::download(new DriversExport($rows), 'sort_batches_' . date('Y-m-d_His') . '.xlsx');
+        }
+
+        if ($format === 'pdf') {
+            return GenericPdfExporter::download($rows, 'sort_batches_' . date('Y-m-d_His') . '.pdf', 'Sort Batches');
+        }
+
+        return response()->json(['data' => $rows]);
     }
 
     public function show(SortBatch $batch): View

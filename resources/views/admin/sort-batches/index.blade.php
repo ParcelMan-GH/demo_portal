@@ -187,6 +187,67 @@
                     </div>
 
                 </div>
+
+                <!-- Right Controls: Export + View -->
+                <div class="flex flex-wrap items-center justify-end gap-3">
+                    <!-- Export -->
+                    <div x-data="{ open: false }" class="relative">
+                        <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            Export
+                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50" style="display: none;">
+                            <button type="button" @@click="exportData('excel'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                Excel
+                            </button>
+                            <button type="button" @@click="exportData('pdf'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                PDF
+                            </button>
+                            <button type="button" @@click="exportData('csv'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                CSV
+                            </button>
+                            <div class="border-t border-slate-200/50 my-1"></div>
+                            <button type="button" @@click="printData(); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                Print
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- View (column toggle) -->
+                    <div x-data="{ open: false }" class="relative">
+                        <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/>
+                            </svg>
+                            View
+                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div x-show="open" @@click.away="open = false" x-transition
+                             class="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50"
+                             style="display: none;">
+                            <template x-for="col in columns" :key="col.key">
+                                <button type="button" @@click="toggleColumn(col.key)"
+                                        class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70">
+                                    <span x-text="col.label"></span>
+                                    <svg x-show="visibleColumns[col.key]" class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -200,7 +261,7 @@
                     <table class="w-full min-w-[900px] md:min-w-full divide-y divide-slate-200/50 text-xs">
                         <thead class="bg-slate-50/50">
                             <tr>
-                                <th @@click="sort('batch_number')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                <th x-show="visibleColumns.batch_number" @@click="sort('batch_number')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                                     <div class="flex items-center">
                                         BATCH #
                                         <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'batch_number' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -209,16 +270,16 @@
                                         </svg>
                                     </div>
                                 </th>
-                                <th class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                <th x-show="visibleColumns.warehouse" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                                     WAREHOUSE
                                 </th>
-                                <th class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                <th x-show="visibleColumns.mode" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                                     MODE
                                 </th>
-                                <th class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                <th x-show="visibleColumns.items" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                                     ITEMS
                                 </th>
-                                <th @@click="sort('status')" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                <th x-show="visibleColumns.status" @@click="sort('status')" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                                     <div class="flex items-center justify-center">
                                         STATUS
                                         <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'status' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,7 +288,7 @@
                                         </svg>
                                     </div>
                                 </th>
-                                <th @@click="sort('sealed_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                <th x-show="visibleColumns.sealed_at" @@click="sort('sealed_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                                     <div class="flex items-center">
                                         SEALED AT
                                         <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'sealed_at' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -236,10 +297,10 @@
                                         </svg>
                                     </div>
                                 </th>
-                                <th class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                <th x-show="visibleColumns.linked" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                                     LINKED
                                 </th>
-                                <th @@click="sort('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                <th x-show="visibleColumns.created_at" @@click="sort('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                                     <div class="flex items-center">
                                         CREATED AT
                                         <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'created_at' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -248,7 +309,7 @@
                                         </svg>
                                     </div>
                                 </th>
-                                <th class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                <th x-show="visibleColumns.actions" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                                     ACTIONS
                                 </th>
                             </tr>
@@ -270,12 +331,12 @@
                             <template x-for="batch in batches" :key="batch.id">
                                 <tr class="hover:bg-slate-50/70">
                                     <!-- Batch Number -->
-                                    <td class="px-4 py-2.5 whitespace-nowrap">
+                                    <td x-show="visibleColumns.batch_number" class="px-4 py-2.5 whitespace-nowrap">
                                         <span class="text-xs font-semibold text-slate-900" x-text="batch.batch_number"></span>
                                     </td>
 
                                     <!-- Warehouse: origin → destination -->
-                                    <td class="px-4 py-2.5 whitespace-nowrap">
+                                    <td x-show="visibleColumns.warehouse" class="px-4 py-2.5 whitespace-nowrap">
                                         <div class="flex items-center gap-1 text-xs">
                                             <span class="font-medium text-slate-900" x-text="batch.origin_warehouse ? batch.origin_warehouse.name : '—'"></span>
                                             <template x-if="batch.destination_warehouse">
@@ -298,7 +359,7 @@
                                     </td>
 
                                     <!-- Dispatch Mode Badge -->
-                                    <td class="px-4 py-2.5 whitespace-nowrap">
+                                    <td x-show="visibleColumns.mode" class="px-4 py-2.5 whitespace-nowrap">
                                         <span
                                             class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
                                             :class="{
@@ -310,12 +371,12 @@
                                     </td>
 
                                     <!-- Items Count -->
-                                    <td class="px-4 py-2.5 whitespace-nowrap text-center">
+                                    <td x-show="visibleColumns.items" class="px-4 py-2.5 whitespace-nowrap text-center">
                                         <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-[10px] font-semibold text-slate-700" x-text="batch.items_count"></span>
                                     </td>
 
                                     <!-- Status Badge -->
-                                    <td class="px-4 py-2.5 whitespace-nowrap text-center">
+                                    <td x-show="visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap text-center">
                                         <span
                                             class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
                                             :class="{
@@ -327,10 +388,10 @@
                                     </td>
 
                                     <!-- Sealed At -->
-                                    <td class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="batch.sealed_at ? formatDateTime(batch.sealed_at) : '—'"></td>
+                                    <td x-show="visibleColumns.sealed_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="batch.sealed_at ? formatDateTime(batch.sealed_at) : '—'"></td>
 
                                     <!-- Linked: manifest or run -->
-                                    <td class="px-4 py-2.5 whitespace-nowrap">
+                                    <td x-show="visibleColumns.linked" class="px-4 py-2.5 whitespace-nowrap">
                                         <template x-if="batch.has_manifest">
                                             <a
                                                 :href="'{{ route('admin.transport-manifests.show', ['manifest' => '__ID__']) }}'.replace('__ID__', batch.manifest_id)"
@@ -359,10 +420,10 @@
                                     </td>
 
                                     <!-- Created At -->
-                                    <td class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(batch.created_at)"></td>
+                                    <td x-show="visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(batch.created_at)"></td>
 
                                     <!-- Actions -->
-                                    <td class="px-4 py-2.5 whitespace-nowrap text-center text-xs font-medium">
+                                    <td x-show="visibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center text-xs font-medium">
                                         <a
                                             :href="'{{ route('admin.sort-batches.show', ['batch' => '__ID__']) }}'.replace('__ID__', batch.id)"
                                             class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors inline-flex"
@@ -497,6 +558,28 @@ document.addEventListener('alpine:init', () => {
         sortBy: 'created_at',
         sortDirection: 'desc',
         perPage: 50,
+        columns: [
+            { key: 'batch_number', label: 'Batch #' },
+            { key: 'warehouse',    label: 'Warehouse' },
+            { key: 'mode',         label: 'Mode' },
+            { key: 'items',        label: 'Items' },
+            { key: 'status',       label: 'Status' },
+            { key: 'sealed_at',    label: 'Sealed At' },
+            { key: 'linked',       label: 'Linked' },
+            { key: 'created_at',   label: 'Created At' },
+            { key: 'actions',      label: 'Actions' },
+        ],
+        visibleColumns: {
+            batch_number: true,
+            warehouse:    true,
+            mode:         true,
+            items:        true,
+            status:       true,
+            sealed_at:    true,
+            linked:       true,
+            created_at:   true,
+            actions:      true,
+        },
         meta: {
             current_page: 1,
             from: 0,
@@ -547,6 +630,99 @@ document.addEventListener('alpine:init', () => {
         previousPage() { if (this.meta.current_page > 1) this.loadData(this.meta.current_page - 1); },
         nextPage()     { if (this.meta.current_page < this.meta.last_page) this.loadData(this.meta.current_page + 1); },
         lastPage()     { if (this.meta.current_page < this.meta.last_page) this.loadData(this.meta.last_page); },
+
+        toggleColumn(key) {
+            this.visibleColumns[key] = !this.visibleColumns[key];
+        },
+
+        async exportData(format) {
+            try {
+                const params = new URLSearchParams();
+                if (this.search)             params.append('search', this.search);
+                if (this.statusFilter)       params.append('status', this.statusFilter);
+                if (this.dispatchModeFilter) params.append('dispatch_mode', this.dispatchModeFilter);
+                if (this.warehouseFilter)    params.append('origin_warehouse_id', this.warehouseFilter);
+                params.append('format', format);
+
+                if (format === 'excel' || format === 'pdf') {
+                    window.location.href = `{{ route('admin.sort-batches.export') }}?${params}`;
+                    return;
+                }
+
+                const response = await fetch(`{{ route('admin.sort-batches.export') }}?${params}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!response.ok) throw new Error('Export failed');
+                const result = await response.json();
+                if (format === 'csv') this.downloadCSV(result.data);
+            } catch (err) {
+                console.error('Export failed:', err);
+                alert('Export failed. Please try again.');
+            }
+        },
+
+        async printData() {
+            try {
+                const params = new URLSearchParams();
+                if (this.search)             params.append('search', this.search);
+                if (this.statusFilter)       params.append('status', this.statusFilter);
+                if (this.dispatchModeFilter) params.append('dispatch_mode', this.dispatchModeFilter);
+                if (this.warehouseFilter)    params.append('origin_warehouse_id', this.warehouseFilter);
+
+                const response = await fetch(`{{ route('admin.sort-batches.export') }}?${params}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!response.ok) throw new Error('Failed to fetch data');
+                const result = await response.json();
+                this.openPrintWindow(result.data);
+            } catch (err) {
+                console.error('Print failed:', err);
+                alert('Print failed. Please try again.');
+            }
+        },
+
+        openPrintWindow(data) {
+            if (!data.length) { alert('No data to print'); return; }
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) { alert('Pop-up blocked. Please allow pop-ups to print.'); return; }
+            const doc = printWindow.document;
+            const headers = Object.keys(data[0]);
+            doc.title = 'Sort Batches Export';
+            doc.body.innerHTML = '';
+            const style = doc.createElement('style');
+            style.textContent = 'body{font-family:sans-serif;padding:20px}h1{font-size:22px;margin-bottom:16px;color:#1e293b}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #e2e8f0;padding:7px 10px;text-align:left;font-size:11px}th{background:#f1f5f9;font-weight:600;color:#475569}tr:nth-child(even){background:#f8fafc}';
+            doc.head.appendChild(style);
+            const title = doc.createElement('h1');
+            title.textContent = 'Sort Batches';
+            doc.body.appendChild(title);
+            const table = doc.createElement('table');
+            const thead = doc.createElement('thead');
+            const headRow = doc.createElement('tr');
+            headers.forEach(h => { const th = doc.createElement('th'); th.textContent = h; headRow.appendChild(th); });
+            thead.appendChild(headRow);
+            table.appendChild(thead);
+            const tbody = doc.createElement('tbody');
+            data.forEach(row => {
+                const tr = doc.createElement('tr');
+                headers.forEach(h => { const td = doc.createElement('td'); td.textContent = row[h] ?? '-'; tr.appendChild(td); });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            doc.body.appendChild(table);
+            setTimeout(() => printWindow.print(), 250);
+        },
+
+        downloadCSV(data) {
+            if (!data.length) return;
+            const headers = Object.keys(data[0]);
+            const csv = [headers.join(','), ...data.map(row => headers.map(h => `"${String(row[h] ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'sort_batches.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        },
 
         formatDateTime(value) {
             if (!value) return '—';

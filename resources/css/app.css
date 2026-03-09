@@ -95,9 +95,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
+    width: 27px;
+    height: 27px;
+    border-radius: 7px;
     transition: all 0.2s ease;
     flex-shrink: 0;
 }

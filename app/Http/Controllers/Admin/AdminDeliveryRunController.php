@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\DriversExport;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryRun;
 use App\Models\Driver;
 use App\Models\Warehouse;
+use App\Support\GenericPdfExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
 
 class AdminDeliveryRunController extends Controller
 {
@@ -141,6 +145,66 @@ class AdminDeliveryRunController extends Controller
         $statusLabel = $this->formatStatusLabel($run->status);
 
         return view('admin.delivery-runs.show', compact('run', 'statusLabel'));
+    }
+
+    /**
+     * Export delivery runs data (JSON / Excel / PDF).
+     */
+    public function export(Request $request)
+    {
+        $query = DeliveryRun::with(['warehouse', 'assignedDriver'])
+            ->withCount(['stops', 'items']);
+
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('run_number', 'like', "%{$search}%")
+                    ->orWhereHas('warehouse', fn($wq) => $wq->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('assignedDriver', fn($dq) => $dq->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        if ($status = $request->get('status')) {
+            $query->where('status', $status);
+        }
+
+        if ($warehouseId = $request->get('warehouse_id')) {
+            $query->where('warehouse_id', $warehouseId);
+        }
+
+        if ($dateFrom = $request->get('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo = $request->get('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        $runs = $query->orderBy('created_at', 'desc')->get();
+
+        $rows = $runs->map(fn(DeliveryRun $run) => [
+            'Run #'          => $run->run_number,
+            'Warehouse'      => $run->warehouse?->name ?? '—',
+            'Driver'         => $run->assignedDriver?->name ?? '—',
+            'Driver Phone'   => $run->assignedDriver?->phone ?? '—',
+            'Stops'          => $run->stops_count,
+            'Items'          => $run->items_count,
+            'Status'         => $this->formatStatusLabel($run->status),
+            'Dispatched At'  => $run->dispatched_at?->format('Y-m-d H:i:s') ?? '—',
+            'Completed At'   => $run->completed_at?->format('Y-m-d H:i:s') ?? '—',
+            'Created At'     => $run->created_at->format('Y-m-d H:i:s'),
+        ])->values()->toArray();
+
+        $format = $request->input('format', 'json');
+
+        if ($format === 'excel') {
+            return Excel::download(new DriversExport($rows), 'delivery_runs_' . date('Y-m-d_His') . '.xlsx');
+        }
+
+        if ($format === 'pdf') {
+            return GenericPdfExporter::download($rows, 'delivery_runs_' . date('Y-m-d_His') . '.pdf', 'Delivery Runs');
+        }
+
+        return response()->json(['data' => $rows]);
     }
 
     /**

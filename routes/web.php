@@ -23,7 +23,9 @@ use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
 use App\Http\Controllers\Warehouse\DeliveryRunController as WarehouseDeliveryRunController;
+use App\Http\Controllers\Warehouse\InvoiceController as WarehouseInvoiceController;
 use App\Http\Controllers\Warehouse\ReceiptController as WarehouseReceiptController;
+use App\Http\Controllers\Warehouse\ShipmentPaymentController as WarehouseShipmentPaymentController;
 use App\Http\Controllers\Warehouse\SortingController as WarehouseSortingController;
 use App\Http\Controllers\Warehouse\TransportManifestController as WarehouseTransportManifestController;
 use App\Http\Controllers\Warehouse\UserController as WarehouseUserController;
@@ -204,6 +206,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
         Route::post('invoices/{invoice}/admin-accept', [InvoiceController::class, 'adminAccept'])->name('invoices.admin-accept');
         Route::get('invoices/{invoice}/download', [InvoiceController::class, 'download'])->name('invoices.download');
+        Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
         Route::get('invoices/{invoice}/payments-data', [InvoiceController::class, 'paymentsData'])->name('invoices.payments.data');
         Route::post('invoices/{invoice}/payments', [InvoiceController::class, 'recordPayment'])->name('invoices.payments.store');
 
@@ -211,6 +214,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('shipments/{shipment}/payments-data', [ShipmentPaymentController::class, 'data'])->name('shipments.payments.data');
         Route::post('shipments/{shipment}/payments', [ShipmentPaymentController::class, 'store'])->name('shipments.payments.store');
         Route::delete('payments/{payment}', [ShipmentPaymentController::class, 'destroy'])->name('payments.destroy');
+        Route::get('payments/{payment}/download', [ShipmentPaymentController::class, 'download'])->name('payments.download');
+        Route::get('payments/{payment}/print', [ShipmentPaymentController::class, 'print'])->name('payments.print');
 
         // Pickup Assignments Page
         Route::get('pickups', [PickupAssignmentController::class, 'index'])->name('pickups.index');
@@ -275,16 +280,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Delivery Runs (admin read visibility)
         Route::get('delivery-runs', [AdminDeliveryRunController::class, 'index'])->name('delivery-runs.index');
         Route::get('delivery-runs-data', [AdminDeliveryRunController::class, 'data'])->name('delivery-runs.data');
+        Route::get('delivery-runs-export', [AdminDeliveryRunController::class, 'export'])->name('delivery-runs.export');
         Route::get('delivery-runs/{run}', [AdminDeliveryRunController::class, 'show'])->name('delivery-runs.show');
 
         // Transport Manifests (admin read visibility)
         Route::get('transport-manifests', [AdminTransportManifestController::class, 'index'])->name('transport-manifests.index');
         Route::get('transport-manifests-data', [AdminTransportManifestController::class, 'data'])->name('transport-manifests.data');
+        Route::get('transport-manifests-export', [AdminTransportManifestController::class, 'export'])->name('transport-manifests.export');
         Route::get('transport-manifests/{manifest}', [AdminTransportManifestController::class, 'show'])->name('transport-manifests.show');
 
         // Sort Batches (admin read visibility)
         Route::get('sort-batches', [AdminSortBatchController::class, 'index'])->name('sort-batches.index');
         Route::get('sort-batches-data', [AdminSortBatchController::class, 'data'])->name('sort-batches.data');
+        Route::get('sort-batches-export', [AdminSortBatchController::class, 'export'])->name('sort-batches.export');
         Route::get('sort-batches/{batch}', [AdminSortBatchController::class, 'show'])->name('sort-batches.show');
 
         // Invoice List (all invoices across all shipments)
@@ -359,8 +367,10 @@ Route::prefix('warehouse')
         Route::post('receipts/pending/{pickupAssignment}/finalize', [WarehouseReceiptController::class, 'finalizePendingReceipt'])->name('receipts.pending.finalize');
         Route::get('pickups/received', [WarehouseReceiptController::class, 'receivedPickupsIndex'])->name('pickups.received.index');
         Route::get('pickups/received-data', [WarehouseReceiptController::class, 'receivedPickupsData'])->name('pickups.received.data');
+        Route::get('pickups/received/{pickupAssignment}', [WarehouseReceiptController::class, 'receivedPickupShow'])->name('pickups.received.show');
         Route::get('items/received', [WarehouseReceiptController::class, 'receivedItemsIndex'])->name('items.received.index');
         Route::get('items/received-data', [WarehouseReceiptController::class, 'receivedItemsData'])->name('items.received.data');
+        Route::get('items/received/{warehouseReceiptItem}', [WarehouseReceiptController::class, 'receivedItemShow'])->name('items.received.show');
 
         // Sorting
         Route::get('sorting', [WarehouseSortingController::class, 'index'])->name('sorting.index');
@@ -395,6 +405,24 @@ Route::prefix('warehouse')
         Route::post('deliveries/runs/{run}/assign-driver', [WarehouseDeliveryRunController::class, 'assignDriver'])->name('deliveries.runs.assign-driver');
         Route::post('deliveries/runs/{run}/dispatch', [WarehouseDeliveryRunController::class, 'dispatch'])->name('deliveries.runs.dispatch');
         Route::post('deliveries/runs/{run}/stops/{stop}/resend-code', [WarehouseDeliveryRunController::class, 'resendCode'])->name('deliveries.runs.stops.resend-code');
+
+        // Invoice Management
+        Route::post('receipts/pending/{pickupAssignment}/invoices', [WarehouseInvoiceController::class, 'store'])->name('invoices.store');
+        Route::put('invoices/{invoice}', [WarehouseInvoiceController::class, 'update'])->name('invoices.update');
+        Route::post('invoices/{invoice}/send', [WarehouseInvoiceController::class, 'send'])->name('invoices.send');
+        Route::post('invoices/{invoice}/cancel', [WarehouseInvoiceController::class, 'cancel'])->name('invoices.cancel');
+        Route::post('invoices/{invoice}/admin-accept', [WarehouseInvoiceController::class, 'adminAccept'])->name('invoices.admin-accept');
+        Route::get('invoices/{invoice}/download', [WarehouseInvoiceController::class, 'download'])->name('invoices.download');
+        Route::get('invoices/{invoice}/print', [WarehouseInvoiceController::class, 'print'])->name('invoices.print');
+        Route::get('invoices/{invoice}/payments-data', [WarehouseInvoiceController::class, 'paymentsData'])->name('invoices.payments.data');
+        Route::post('invoices/{invoice}/payments', [WarehouseInvoiceController::class, 'recordPayment'])->name('invoices.payments.store');
+
+        // Shipment Payments
+        Route::get('receipts/pending/{pickupAssignment}/payments-data', [WarehouseShipmentPaymentController::class, 'data'])->name('receipts.payments.data');
+        Route::post('receipts/pending/{pickupAssignment}/payments', [WarehouseShipmentPaymentController::class, 'store'])->name('receipts.payments.store');
+        Route::delete('payments/{payment}', [WarehouseShipmentPaymentController::class, 'destroy'])->name('payments.destroy');
+        Route::get('payments/{payment}/download', [WarehouseShipmentPaymentController::class, 'download'])->name('payments.download');
+        Route::get('payments/{payment}/print', [WarehouseShipmentPaymentController::class, 'print'])->name('payments.print');
     });
 
 /*

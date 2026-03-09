@@ -63,7 +63,22 @@
         .status-cancelled { background: #fef2f2; color: #dc2626; }
 
         .footer { padding: 20px 40px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 10px; color: #9ca3af; }
+
+        @media print {
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            body { margin: 0; }
+            .header { background: #f97316 !important; }
+            .meta-bar { background: #fff7ed !important; }
+            .total-row { background: #fff7ed !important; }
+        }
     </style>
+    @if(!empty($autoPrint))
+    <script>
+        window.addEventListener('load', function () {
+            setTimeout(function () { window.print(); }, 400);
+        });
+    </script>
+    @endif
 </head>
 <body>
     {{-- Header --}}

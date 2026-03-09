@@ -430,7 +430,6 @@
 
         </div>
     </div>
-</div>
 
 <!-- Edit Assignment Modal -->
 <div x-show="showEditModal" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="showEditModal = false">
@@ -540,5 +539,7 @@
         </div>
     </div>
 </div>
+
+</div>{{-- end x-data="pickupsTable" --}}
 
 @endsection

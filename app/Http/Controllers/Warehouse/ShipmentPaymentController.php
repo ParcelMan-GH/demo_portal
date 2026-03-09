@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Warehouse;
 
 use App\Http\Controllers\Controller;
-use App\Models\Shipment;
+use App\Models\PickupAssignment;
 use App\Models\ShipmentPayment;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
@@ -13,10 +13,17 @@ use Illuminate\Support\Facades\Auth;
 class ShipmentPaymentController extends Controller
 {
     /**
-     * List all payments for a shipment (JSON, for the Payments tab).
+     * List all payments for the shipment linked to a pickup assignment.
      */
-    public function data(Shipment $shipment): JsonResponse
+    public function data(PickupAssignment $pickupAssignment): JsonResponse
     {
+        $this->authorizeAny(['invoices.view', 'warehouse.receiving.manage']);
+
+        $shipment = $pickupAssignment->shipment;
+        if (!$shipment) {
+            return response()->json(['payments' => [], 'summary' => ['total_invoiced' => 0, 'total_paid' => 0, 'balance_due' => 0]]);
+        }
+
         $payments = $shipment->payments()
             ->with(['recordedBy:id,name', 'invoice:id,invoice_number'])
             ->latest()
@@ -51,11 +58,14 @@ class ShipmentPaymentController extends Controller
     }
 
     /**
-     * Record a new payment for a shipment.
+     * Record a new payment for the shipment.
      */
-    public function store(Request $request, Shipment $shipment): JsonResponse
+    public function store(Request $request, PickupAssignment $pickupAssignment): JsonResponse
     {
-        $activeInvoice = $shipment->invoice;
+        $this->authorizePermission('invoices.edit');
+
+        $shipment     = $pickupAssignment->shipment;
+        $activeInvoice = $shipment?->invoice;
 
         if (!$activeInvoice) {
             return response()->json([
@@ -72,17 +82,16 @@ class ShipmentPaymentController extends Controller
             'payment_date'     => ['required', 'date'],
         ]);
 
-        $admin = Auth::guard('admin')->user();
-
+        $admin   = Auth::guard('admin')->user();
         $payment = ShipmentPayment::create([
-            'shipment_id'        => $shipment->id,
-            'invoice_id'         => $activeInvoice->id,
-            'amount'             => $validated['amount'],
-            'payment_method'     => $validated['payment_method'],
-            'reference_number'   => $validated['reference_number'] ?? null,
-            'notes'              => $validated['notes'] ?? null,
+            'shipment_id'          => $shipment->id,
+            'invoice_id'           => $activeInvoice->id,
+            'amount'               => $validated['amount'],
+            'payment_method'       => $validated['payment_method'],
+            'reference_number'     => $validated['reference_number'] ?? null,
+            'notes'                => $validated['notes'] ?? null,
             'recorded_by_admin_id' => $admin->id,
-            'payment_date'       => $validated['payment_date'],
+            'payment_date'         => $validated['payment_date'],
         ]);
 
         return response()->json([
@@ -97,9 +106,11 @@ class ShipmentPaymentController extends Controller
      */
     public function download(ShipmentPayment $payment)
     {
+        $this->authorizeAny(['invoices.view', 'warehouse.receiving.manage']);
+
         $payment->load(['shipment.vendor', 'invoice', 'recordedBy']);
 
-        $logoPath = public_path('logo.png');
+        $logoPath   = public_path('logo.png');
         $logoBase64 = '';
         if (file_exists($logoPath)) {
             $logoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
@@ -109,7 +120,7 @@ class ShipmentPaymentController extends Controller
             'payment'    => $payment,
             'logoBase64' => $logoBase64,
         ]);
-        $pdf->setPaper([0, 0, 226.77, 800], 'portrait'); // 80mm wide × auto height
+        $pdf->setPaper([0, 0, 226.77, 800], 'portrait');
         $pdf->setOption('isRemoteEnabled', true);
 
         return $pdf->download('receipt-PMR-' . str_pad($payment->id, 6, '0', STR_PAD_LEFT) . '.pdf');
@@ -120,9 +131,11 @@ class ShipmentPaymentController extends Controller
      */
     public function print(ShipmentPayment $payment)
     {
+        $this->authorizeAny(['invoices.view', 'warehouse.receiving.manage']);
+
         $payment->load(['shipment.vendor', 'invoice', 'recordedBy']);
 
-        $logoPath = public_path('logo.png');
+        $logoPath   = public_path('logo.png');
         $logoBase64 = '';
         if (file_exists($logoPath)) {
             $logoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
@@ -136,7 +149,7 @@ class ShipmentPaymentController extends Controller
     }
 
     /**
-     * Void (delete) a payment. Superadmin only.
+     * Void a payment. Super admin only.
      */
     public function destroy(ShipmentPayment $payment): JsonResponse
     {
@@ -155,5 +168,23 @@ class ShipmentPaymentController extends Controller
             'success' => true,
             'message' => 'Payment voided successfully.',
         ]);
+    }
+
+    protected function authorizePermission(string $permission): void
+    {
+        if (!Auth::guard('admin')->user()->hasPermission($permission)) {
+            abort(403, 'Unauthorized action.');
+        }
+    }
+
+    protected function authorizeAny(array $permissions): void
+    {
+        $user = Auth::guard('admin')->user();
+        foreach ($permissions as $permission) {
+            if ($user->hasPermission($permission)) {
+                return;
+            }
+        }
+        abort(403, 'Unauthorized action.');
     }
 }

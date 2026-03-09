@@ -228,9 +228,9 @@ class InvoiceService
         });
     }
 
-    public function cancel(Invoice $invoice, ?string $cancelReason = null): array
+    public function cancel(Invoice $invoice, ?string $cancelReason = null, ?int $cancelledByAdminId = null): array
     {
-        return DB::transaction(function () use ($invoice, $cancelReason) {
+        return DB::transaction(function () use ($invoice, $cancelReason, $cancelledByAdminId) {
             $lockedInvoice = Invoice::query()
                 ->with('shipment')
                 ->lockForUpdate()
@@ -265,6 +265,7 @@ class InvoiceService
                 'status' => InvoiceStatus::CANCELLED,
                 'cancel_reason' => $cancelReason,
                 'cancelled_at' => now(),
+                'cancelled_by_admin_id' => $cancelledByAdminId,
             ]);
 
             $shipmentUpdates = ['status' => ShipmentStatus::SUBMITTED];

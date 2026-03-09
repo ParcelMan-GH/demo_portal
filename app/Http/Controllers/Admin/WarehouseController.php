@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Exports\WarehousesExport;
 use App\Exports\UsersExport;
 use App\Http\Controllers\Controller;
+use App\Models\DeliveryRun;
 use App\Models\PickupAssignment;
 use App\Models\PickupItemConfirmation;
 use App\Models\Region;
 use App\Models\Role;
+use App\Models\SortBatch;
+use App\Models\TransportManifest;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Support\GenericPdfExporter;
@@ -210,16 +213,59 @@ class WarehouseController extends Controller
             'users_count' => $warehouse->users()->count(),
         ];
 
+        // Sort Batches (origin + destination)
+        $sortBatchesOrigin = $warehouse->originSortBatches()
+            ->with(['destinationWarehouse:id,name,code'])
+            ->withCount('activeItems')
+            ->latest()
+            ->limit(200)
+            ->get(['id', 'batch_number', 'destination_warehouse_id', 'dispatch_mode', 'status', 'sealed_at', 'created_at']);
+
+        $sortBatchesDest = $warehouse->destinationSortBatches()
+            ->with(['originWarehouse:id,name,code'])
+            ->withCount('activeItems')
+            ->latest()
+            ->limit(200)
+            ->get(['id', 'batch_number', 'origin_warehouse_id', 'dispatch_mode', 'status', 'sealed_at', 'created_at']);
+
+        // Transport Manifests (outgoing + incoming)
+        $manifestsOutgoing = $warehouse->originTransportManifests()
+            ->with(['destinationWarehouse:id,name,code', 'assignedDriver:id,name'])
+            ->withCount('items')
+            ->latest()
+            ->limit(200)
+            ->get(['id', 'manifest_number', 'destination_warehouse_id', 'assigned_driver_id', 'status', 'dispatched_at', 'arrived_at', 'created_at']);
+
+        $manifestsIncoming = $warehouse->destinationTransportManifests()
+            ->with(['originWarehouse:id,name,code', 'assignedDriver:id,name'])
+            ->withCount('items')
+            ->latest()
+            ->limit(200)
+            ->get(['id', 'manifest_number', 'origin_warehouse_id', 'assigned_driver_id', 'status', 'dispatched_at', 'arrived_at', 'created_at']);
+
+        // Delivery Runs
+        $deliveryRuns = $warehouse->deliveryRuns()
+            ->with(['assignedDriver:id,name'])
+            ->withCount('stops')
+            ->latest()
+            ->limit(200)
+            ->get(['id', 'run_number', 'assigned_driver_id', 'status', 'dispatched_at', 'completed_at', 'created_at']);
+
         return view('admin.warehouses.show', [
-            'warehouse' => $warehouse,
-            'canManage' => $canManage,
-            'warehouseStats' => $warehouseStats,
-            'warehouseUsers' => $warehouseUsers,
-            'userRoles' => $userRoles,
-            'receivedPickups' => $receivedPickups,
-            'pendingReceipts' => $pendingReceipts,
-            'receivedItems' => $receivedItems,
-            'canCreateUsers' => $currentAdmin->hasPermission('users.create'),
+            'warehouse'         => $warehouse,
+            'canManage'         => $canManage,
+            'warehouseStats'    => $warehouseStats,
+            'warehouseUsers'    => $warehouseUsers,
+            'userRoles'         => $userRoles,
+            'receivedPickups'   => $receivedPickups,
+            'pendingReceipts'   => $pendingReceipts,
+            'receivedItems'     => $receivedItems,
+            'sortBatchesOrigin' => $sortBatchesOrigin,
+            'sortBatchesDest'   => $sortBatchesDest,
+            'manifestsOutgoing' => $manifestsOutgoing,
+            'manifestsIncoming' => $manifestsIncoming,
+            'deliveryRuns'      => $deliveryRuns,
+            'canCreateUsers'    => $currentAdmin->hasPermission('users.create'),
         ]);
     }
 

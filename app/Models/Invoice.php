@@ -31,6 +31,7 @@ class Invoice extends Model
         'accepted_at',
         'rejected_at',
         'cancelled_at',
+        'cancelled_by_admin_id',
     ];
 
     protected $casts = [

@@ -41,6 +41,102 @@ function registerPendingReceiptsPage() {
 
         return {
             ...page,
+            dateFrom: '',
+            dateTo: '',
+            dateRangePicker: null,
+
+            init() {
+                this.loadData();
+                this.initDateRange();
+            },
+
+            buildParams(overrides = {}) {
+                const params = page.buildParams.call(this, overrides);
+
+                const dateFrom = overrides.date_from ?? this.dateFrom;
+                const dateTo = overrides.date_to ?? this.dateTo;
+
+                if (dateFrom) params.append('date_from', dateFrom);
+                if (dateTo) params.append('date_to', dateTo);
+
+                return params;
+            },
+
+            initDateRange() {
+                if (!this.$refs.dateRange) return;
+
+                const setupPicker = () => {
+                    if (!window.$ || !window.moment || !window.$.fn.daterangepicker) return;
+
+                    const $input = window.$(this.$refs.dateRange);
+
+                    $input.daterangepicker({
+                        autoUpdateInput: false,
+                        alwaysShowCalendars: true,
+                        opens: 'left',
+                        locale: { format: 'YYYY-MM-DD', cancelLabel: 'Clear' },
+                        ranges: {
+                            'Today': [window.moment(), window.moment()],
+                            'Yesterday': [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
+                            'Last 7 Days': [window.moment().subtract(6, 'days'), window.moment()],
+                            'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
+                            'This Month': [window.moment().startOf('month'), window.moment().endOf('month')],
+                            'Last Month': [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
+                        },
+                    });
+
+                    $input.on('apply.daterangepicker', (ev, picker) => {
+                        this.dateFrom = picker.startDate.format('YYYY-MM-DD');
+                        this.dateTo = picker.endDate.format('YYYY-MM-DD');
+                        $input.val(`${this.dateFrom} - ${this.dateTo}`);
+                        this.meta.current_page = 1;
+                        this.loadData();
+                    });
+
+                    $input.on('cancel.daterangepicker', () => {
+                        this.dateFrom = '';
+                        this.dateTo = '';
+                        $input.val('');
+                        this.meta.current_page = 1;
+                        this.loadData();
+                    });
+
+                    this.dateRangePicker = $input.data('daterangepicker');
+                };
+
+                if (window.$ && window.moment && window.$.fn.daterangepicker) {
+                    setupPicker();
+                    return;
+                }
+
+                const cssId = 'daterangepicker-css';
+                if (!document.getElementById(cssId)) {
+                    const link = document.createElement('link');
+                    link.id = cssId;
+                    link.rel = 'stylesheet';
+                    link.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
+                    document.head.appendChild(link);
+                }
+
+                const loadScript = (id, src) => new Promise((resolve) => {
+                    if (document.getElementById(id)) return resolve();
+                    const script = document.createElement('script');
+                    script.id = id;
+                    script.src = src;
+                    script.onload = () => resolve();
+                    document.body.appendChild(script);
+                });
+
+                loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
+                    .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
+                    .then(() => {
+                        window.$ = window.jQuery = window.jQuery || window.$;
+                        window.moment = window.moment || moment;
+                        return loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js');
+                    })
+                    .then(setupPicker);
+            },
+
             statusBadgeClass(status) {
                 switch ((status || '').toLowerCase()) {
                     case 'assigned':

@@ -94,6 +94,16 @@
                             <div id="group-invoices">
                                 <!-- Endpoints will be populated by JS -->
                             </div>
+
+                            <!-- Notifications Group -->
+                            <div class="group-header nested" onclick="toggleGroup('vendor-notifications')">
+                                <span class="folder-chevron open" id="chevron-vendor-notifications">▶</span>
+                                <span>Notifications</span>
+                            </div>
+
+                            <div id="group-vendor-notifications">
+                                <!-- Endpoints will be populated by JS -->
+                            </div>
                         </div>
 
                         <!-- Driver Folder -->
@@ -150,6 +160,16 @@
                             </div>
 
                             <div id="group-driver-deliveries">
+                                <!-- Endpoints will be populated by JS -->
+                            </div>
+
+                            <!-- Driver Notifications Group -->
+                            <div class="group-header nested" onclick="toggleGroup('driver-notifications')">
+                                <span class="folder-chevron open" id="chevron-driver-notifications">▶</span>
+                                <span>Notifications</span>
+                            </div>
+
+                            <div id="group-driver-notifications">
                                 <!-- Endpoints will be populated by JS -->
                             </div>
                         </div>
@@ -2214,6 +2234,125 @@
                     }
                 }
             },
+            // ============ VENDOR NOTIFICATION ENDPOINTS ============
+            {
+                method: 'GET',
+                url: '/api/v1/vendor/notifications',
+                name: 'List Notifications',
+                description: 'Get vendor notifications with filtering and pagination. Returns push notification history sent to this vendor.',
+                auth: true,
+                group: 'vendor-notifications',
+                userType: 'vendor',
+                useFormInputs: true,
+                fields: [
+                    { name: 'status', type: 'enum', required: false, description: 'Filter by send status', options: ['sent', 'failed'], labels: { 'sent': 'sent — Successfully delivered', 'failed': 'failed — Delivery failed' } },
+                    { name: 'type', type: 'string', required: false, description: 'Filter by notification type (e.g. shipment_status, invoice_sent, general)', example: 'shipment_status' },
+                    { name: 'is_read', type: 'enum', required: false, description: 'Filter by read status (boolean)', options: ['true', 'false'], labels: { 'true': 'true — Read', 'false': 'false — Unread' } },
+                    { name: 'from_date', type: 'date', required: false, description: 'Start date filter (YYYY-MM-DD)', example: '2026-01-01' },
+                    { name: 'to_date', type: 'date', required: false, description: 'End date filter (YYYY-MM-DD)', example: '2026-12-31' },
+                    { name: 'limit', type: 'number', required: false, description: 'Results per page (1-100, default 20)', example: '20' },
+                    { name: 'offset', type: 'number', required: false, description: 'Number of results to skip (default 0)', example: '0' },
+                    { name: 'sort_by', type: 'enum', required: false, description: 'Sort field', options: ['id', 'type', 'status', 'created_at', 'read_at'], labels: { 'id': 'id', 'type': 'type', 'status': 'status', 'created_at': 'created_at', 'read_at': 'read_at' } },
+                    { name: 'sort_order', type: 'enum', required: false, description: 'Sort direction', options: ['asc', 'desc'], labels: { 'asc': 'asc — Ascending', 'desc': 'desc — Descending' } }
+                ],
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Notifications retrieved successfully.',
+                        data: {
+                            notifications: [
+                                {
+                                    id: 1,
+                                    type: 'shipment_status',
+                                    channel: 'push',
+                                    title: 'Shipment Status Updated',
+                                    body: 'Your shipment PCM-2026-00001 is now picked up.',
+                                    data: { shipment_id: '1', status: 'picked_up' },
+                                    status: 'sent',
+                                    is_read: false,
+                                    read_at: null,
+                                    created_at: '2026-02-18T10:00:00.000000Z'
+                                },
+                                {
+                                    id: 2,
+                                    type: 'invoice_sent',
+                                    channel: 'push',
+                                    title: 'New Invoice',
+                                    body: 'Invoice INV-2026-0001 has been sent for shipment PCM-2026-00001.',
+                                    data: { invoice_id: '1', shipment_id: '1' },
+                                    status: 'sent',
+                                    is_read: true,
+                                    read_at: '2026-02-18T11:00:00.000000Z',
+                                    created_at: '2026-02-18T10:30:00.000000Z'
+                                }
+                            ],
+                            unread_count: 3,
+                            pagination: {
+                                offset: 0, limit: 20, total: 2, has_more: false,
+                                next_offset: null, current_page: 1, last_page: 1, per_page: 20
+                            }
+                        }
+                    },
+                    '401': { success: false, message: 'Unauthenticated.' }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/vendor/notifications/{id}/read',
+                name: 'Mark as Read',
+                description: 'Mark a single notification as read.',
+                auth: true,
+                group: 'vendor-notifications',
+                userType: 'vendor',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'id', type: 'number', required: true, description: 'Notification ID', example: '1' }
+                ],
+                fields: [],
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Notification marked as read.',
+                        data: {
+                            notification: {
+                                id: 1,
+                                type: 'shipment_status',
+                                channel: 'push',
+                                title: 'Shipment Status Updated',
+                                body: 'Your shipment PCM-2026-00001 is now picked up.',
+                                data: { shipment_id: '1', status: 'picked_up' },
+                                status: 'sent',
+                                is_read: true,
+                                read_at: '2026-02-18T11:00:00.000000Z',
+                                created_at: '2026-02-18T10:00:00.000000Z'
+                            }
+                        }
+                    },
+                    '401': { success: false, message: 'Unauthenticated.' },
+                    '404': { success: false, message: 'Notification not found.' }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/vendor/notifications/read-all',
+                name: 'Mark All as Read',
+                description: 'Mark all unread notifications as read for the authenticated vendor.',
+                auth: true,
+                group: 'vendor-notifications',
+                userType: 'vendor',
+                useFormInputs: false,
+                fields: [],
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: '5 notification(s) marked as read.',
+                        data: {
+                            updated_count: 5
+                        }
+                    },
+                    '401': { success: false, message: 'Unauthenticated.' }
+                }
+            },
             // ============ DRIVER PICKUP ENDPOINTS ============
             {
                 method: 'GET',
@@ -3609,6 +3748,125 @@ Each object in <code>items[]</code> corresponds to one package at this stop. The
                     },
                     '400': { success: false, message: 'Delivery run is not active.' }
                 }
+            },
+            // ============ DRIVER NOTIFICATION ENDPOINTS ============
+            {
+                method: 'GET',
+                url: '/api/v1/driver/notifications',
+                name: 'List Notifications',
+                description: 'Get driver notifications with filtering and pagination. Returns push notification history sent to this driver.',
+                auth: true,
+                group: 'driver-notifications',
+                userType: 'driver',
+                useFormInputs: true,
+                fields: [
+                    { name: 'status', type: 'enum', required: false, description: 'Filter by send status', options: ['sent', 'failed'], labels: { 'sent': 'sent — Successfully delivered', 'failed': 'failed — Delivery failed' } },
+                    { name: 'type', type: 'string', required: false, description: 'Filter by notification type (e.g. driver_assigned, driver_unassigned, general)', example: 'driver_assigned' },
+                    { name: 'is_read', type: 'enum', required: false, description: 'Filter by read status (boolean)', options: ['true', 'false'], labels: { 'true': 'true — Read', 'false': 'false — Unread' } },
+                    { name: 'from_date', type: 'date', required: false, description: 'Start date filter (YYYY-MM-DD)', example: '2026-01-01' },
+                    { name: 'to_date', type: 'date', required: false, description: 'End date filter (YYYY-MM-DD)', example: '2026-12-31' },
+                    { name: 'limit', type: 'number', required: false, description: 'Results per page (1-100, default 20)', example: '20' },
+                    { name: 'offset', type: 'number', required: false, description: 'Number of results to skip (default 0)', example: '0' },
+                    { name: 'sort_by', type: 'enum', required: false, description: 'Sort field', options: ['id', 'type', 'status', 'created_at', 'read_at'], labels: { 'id': 'id', 'type': 'type', 'status': 'status', 'created_at': 'created_at', 'read_at': 'read_at' } },
+                    { name: 'sort_order', type: 'enum', required: false, description: 'Sort direction', options: ['asc', 'desc'], labels: { 'asc': 'asc — Ascending', 'desc': 'desc — Descending' } }
+                ],
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Notifications retrieved successfully.',
+                        data: {
+                            notifications: [
+                                {
+                                    id: 5,
+                                    type: 'driver_assigned',
+                                    channel: 'push',
+                                    title: 'New Pickup Assignment',
+                                    body: 'You have been assigned to pick up shipment PCM-2026-00010.',
+                                    data: { assignment_id: '3', shipment_id: '10' },
+                                    status: 'sent',
+                                    is_read: false,
+                                    read_at: null,
+                                    created_at: '2026-02-18T08:00:00.000000Z'
+                                },
+                                {
+                                    id: 6,
+                                    type: 'transport_assigned',
+                                    channel: 'push',
+                                    title: 'Transport Assignment',
+                                    body: 'You have been assigned to transport manifest TM-2026-AC01-0001.',
+                                    data: { manifest_id: '1' },
+                                    status: 'sent',
+                                    is_read: true,
+                                    read_at: '2026-02-18T09:00:00.000000Z',
+                                    created_at: '2026-02-18T08:30:00.000000Z'
+                                }
+                            ],
+                            unread_count: 2,
+                            pagination: {
+                                offset: 0, limit: 20, total: 2, has_more: false,
+                                next_offset: null, current_page: 1, last_page: 1, per_page: 20
+                            }
+                        }
+                    },
+                    '401': { success: false, message: 'Unauthenticated.' }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/notifications/{id}/read',
+                name: 'Mark as Read',
+                description: 'Mark a single notification as read.',
+                auth: true,
+                group: 'driver-notifications',
+                userType: 'driver',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'id', type: 'number', required: true, description: 'Notification ID', example: '1' }
+                ],
+                fields: [],
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Notification marked as read.',
+                        data: {
+                            notification: {
+                                id: 5,
+                                type: 'driver_assigned',
+                                channel: 'push',
+                                title: 'New Pickup Assignment',
+                                body: 'You have been assigned to pick up shipment PCM-2026-00010.',
+                                data: { assignment_id: '3', shipment_id: '10' },
+                                status: 'sent',
+                                is_read: true,
+                                read_at: '2026-02-18T11:00:00.000000Z',
+                                created_at: '2026-02-18T08:00:00.000000Z'
+                            }
+                        }
+                    },
+                    '401': { success: false, message: 'Unauthenticated.' },
+                    '404': { success: false, message: 'Notification not found.' }
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/notifications/read-all',
+                name: 'Mark All as Read',
+                description: 'Mark all unread notifications as read for the authenticated driver.',
+                auth: true,
+                group: 'driver-notifications',
+                userType: 'driver',
+                useFormInputs: false,
+                fields: [],
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: '3 notification(s) marked as read.',
+                        data: {
+                            updated_count: 3
+                        }
+                    },
+                    '401': { success: false, message: 'Unauthenticated.' }
+                }
             }
         ];
 
@@ -3638,6 +3896,8 @@ Each object in <code>items[]</code> corresponds to one package at this stop. The
             const driverAssignmentsContainer = document.getElementById('group-driver-assignments');
             const driverTransportsContainer = document.getElementById('group-driver-transports');
             const driverDeliveriesContainer = document.getElementById('group-driver-deliveries');
+            const vendorNotificationsContainer = document.getElementById('group-vendor-notifications');
+            const driverNotificationsContainer = document.getElementById('group-driver-notifications');
             authContainer.innerHTML = '';
             profileContainer.innerHTML = '';
             locationContainer.innerHTML = '';
@@ -3649,6 +3909,8 @@ Each object in <code>items[]</code> corresponds to one package at this stop. The
             driverAssignmentsContainer.innerHTML = '';
             driverTransportsContainer.innerHTML = '';
             driverDeliveriesContainer.innerHTML = '';
+            vendorNotificationsContainer.innerHTML = '';
+            driverNotificationsContainer.innerHTML = '';
 
             endpoints.forEach((ep, index) => {
                 const div = document.createElement('div');
@@ -3683,6 +3945,10 @@ Each object in <code>items[]</code> corresponds to one package at this stop. The
                     driverTransportsContainer.appendChild(div);
                 } else if (ep.group === 'driver-deliveries') {
                     driverDeliveriesContainer.appendChild(div);
+                } else if (ep.group === 'vendor-notifications') {
+                    vendorNotificationsContainer.appendChild(div);
+                } else if (ep.group === 'driver-notifications') {
+                    driverNotificationsContainer.appendChild(div);
                 } else {
                     authContainer.appendChild(div);
                 }

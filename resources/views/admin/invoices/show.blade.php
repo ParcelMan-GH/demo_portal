@@ -11,6 +11,8 @@ $invoiceConfig = [
     'paymentsDataEndpoint' => route('admin.invoices.payments.data', $invoice),
     'storePaymentEndpoint' => route('admin.invoices.payments.store', $invoice),
     'destroyPaymentEndpointTemplate' => route('admin.payments.destroy', ['payment' => '__PAYMENT__']),
+    'downloadReceiptUrlTemplate' => route('admin.payments.download', ['payment' => '__PAYMENT__']),
+    'printReceiptUrlTemplate' => route('admin.payments.print', ['payment' => '__PAYMENT__']),
     'sendEndpoint' => route('admin.invoices.send', $invoice),
     'cancelEndpoint' => route('admin.invoices.cancel', $invoice),
     'adminAcceptEndpoint' => route('admin.invoices.admin-accept', $invoice),
@@ -56,7 +58,7 @@ $invoiceConfig = [
                             Download PDF
                         </a>
                         <!-- Print -->
-                        <a href="{{ route('admin.invoices.download', $invoice) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl border border-white/20 transition-all backdrop-blur-sm">
+                        <a href="{{ route('admin.invoices.print', $invoice) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl border border-white/20 transition-all backdrop-blur-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
                             </svg>
@@ -196,60 +198,54 @@ $invoiceConfig = [
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex min-h-[680px]">
 
         <!-- Sidebar Nav -->
-        <aside class="w-60 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col py-5 px-3">
+        <aside class="w-52 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col py-4 px-2.5">
 
-            <p class="px-2 mb-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Invoice</p>
+            <p class="px-1.5 mb-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Invoice</p>
 
             <!-- Details -->
             <button @@click="activeTab = 'details'"
-                class="group flex items-center gap-3 w-full px-2.5 py-2 rounded-xl mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'details'
-                    ? 'bg-orange-50 ring-1 ring-orange-100 shadow-sm'
-                    : 'hover:bg-slate-50'">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'details' ? 'bg-orange-500 shadow-md shadow-orange-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3.5 h-3.5 transition-colors" :class="activeTab === 'details' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-0.5 transition-all duration-150 text-left"
+                :class="activeTab === 'details' ? 'bg-orange-50 ring-1 ring-orange-100 shadow-sm' : 'hover:bg-slate-50'">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'details' ? 'bg-orange-500 shadow-sm shadow-orange-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'details' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 7h18M3 12h18M3 17h18"/>
                     </svg>
                 </div>
-                <span class="text-sm transition-colors" :class="activeTab === 'details' ? 'font-bold text-orange-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Details</span>
+                <span class="text-xs transition-colors" :class="activeTab === 'details' ? 'font-bold text-orange-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Details</span>
             </button>
 
             <!-- Fee Breakdown -->
             <button @@click="activeTab = 'fees'"
-                class="group flex items-center gap-3 w-full px-2.5 py-2 rounded-xl mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'fees'
-                    ? 'bg-sky-50 ring-1 ring-sky-100 shadow-sm'
-                    : 'hover:bg-slate-50'">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'fees' ? 'bg-sky-500 shadow-md shadow-sky-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3.5 h-3.5 transition-colors" :class="activeTab === 'fees' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-0.5 transition-all duration-150 text-left"
+                :class="activeTab === 'fees' ? 'bg-sky-50 ring-1 ring-sky-100 shadow-sm' : 'hover:bg-slate-50'">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'fees' ? 'bg-sky-500 shadow-sm shadow-sky-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'fees' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                     </svg>
                 </div>
-                <span class="text-sm transition-colors" :class="activeTab === 'fees' ? 'font-bold text-sky-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Fee Breakdown</span>
+                <span class="text-xs transition-colors" :class="activeTab === 'fees' ? 'font-bold text-sky-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Fee Breakdown</span>
             </button>
 
             <!-- Divider -->
-            <div class="flex items-center gap-2 mt-4 mb-2 px-1">
+            <div class="flex items-center gap-2 mt-3 mb-1.5 px-1">
                 <div class="flex-1 h-px bg-slate-100"></div>
-                <p class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Finance</p>
+                <p class="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Finance</p>
                 <div class="flex-1 h-px bg-slate-100"></div>
             </div>
 
             <!-- Payments -->
             <button @@click="activeTab = 'payments'; if (!paymentsLoaded) loadPayments()"
-                class="group flex items-center gap-3 w-full px-2.5 py-2 rounded-xl mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'payments'
-                    ? 'bg-teal-50 ring-1 ring-teal-100 shadow-sm'
-                    : 'hover:bg-slate-50'">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'payments' ? 'bg-teal-500 shadow-md shadow-teal-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3.5 h-3.5 transition-colors" :class="activeTab === 'payments' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-0.5 transition-all duration-150 text-left"
+                :class="activeTab === 'payments' ? 'bg-teal-50 ring-1 ring-teal-100 shadow-sm' : 'hover:bg-slate-50'">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'payments' ? 'bg-teal-500 shadow-sm shadow-teal-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'payments' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
                     </svg>
                 </div>
-                <span class="text-sm transition-colors" :class="activeTab === 'payments' ? 'font-bold text-teal-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Payments</span>
+                <span class="text-xs transition-colors" :class="activeTab === 'payments' ? 'font-bold text-teal-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Payments</span>
             </button>
 
         </aside>
@@ -735,13 +731,21 @@ $invoiceConfig = [
                                                 <td x-show="paymentVisibleColumns.reference" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-500 font-mono" x-text="payment.reference_number || '—'"></td>
                                                 <td x-show="paymentVisibleColumns.recorded_by" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="payment.recorded_by || '—'"></td>
                                                 <td x-show="paymentVisibleColumns.notes" class="px-4 py-2.5 text-xs text-slate-500 max-w-[150px] truncate" x-text="payment.notes || '—'"></td>
-                                                <td x-show="paymentVisibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center">
-                                                    <button x-show="isSuperAdmin" @@click="voidPayment(payment.id)"
-                                                        class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors inline-flex" title="Void payment">
-                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                                        </svg>
-                                                    </button>
+                                                <td x-show="paymentVisibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap">
+                                                    <div class="flex items-center justify-end gap-1">
+                                                        <a :href="config.downloadReceiptUrlTemplate.replace('__PAYMENT__', payment.id)" target="_blank"
+                                                            class="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors inline-flex" title="Download receipt PDF">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                                        </a>
+                                                        <a :href="config.printReceiptUrlTemplate.replace('__PAYMENT__', payment.id)" target="_blank"
+                                                            class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors inline-flex" title="Print receipt">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                                        </a>
+                                                        <button x-show="isSuperAdmin" @@click="voidPayment(payment.id)"
+                                                            class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors inline-flex" title="Void payment">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         </template>
@@ -921,6 +925,39 @@ $invoiceConfig = [
         </div>
     </div>
 
+    <!-- Custom Confirm Modal -->
+    <div x-show="confirmModal.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="confirmModalCancel()"></div>
+        <div class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div class="flex items-start gap-4">
+                <div class="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900" x-text="confirmModal.title"></h3>
+                    <p class="text-xs text-slate-500 mt-1 leading-relaxed" x-text="confirmModal.message"></p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button type="button" @@click="confirmModalCancel()" :disabled="confirmModal.loading"
+                    class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors disabled:opacity-50">
+                    Cancel
+                </button>
+                <button type="button" @@click="confirmModalOk()" :disabled="confirmModal.loading"
+                    :class="confirmModal.confirmClass"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg x-show="confirmModal.loading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span x-text="confirmModal.loading ? 'Please wait...' : confirmModal.confirmLabel"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
 
@@ -968,6 +1005,15 @@ function invoiceShow() {
             reference_number: '',
             notes: '',
             payment_date: '',
+        },
+        confirmModal: {
+            open: false,
+            title: '',
+            message: '',
+            confirmLabel: 'Confirm',
+            confirmClass: 'bg-rose-600 hover:bg-rose-700 text-white',
+            loading: false,
+            _resolve: null,
         },
 
         init() {
@@ -1180,8 +1226,24 @@ function invoiceShow() {
             }
         },
 
+        showConfirm(title, message, confirmLabel = 'Confirm', confirmClass = 'bg-rose-600 hover:bg-rose-700 text-white') {
+            return new Promise(resolve => {
+                this.confirmModal = { open: true, title, message, confirmLabel, confirmClass, loading: false, _resolve: resolve };
+            });
+        },
+
+        async confirmModalOk() {
+            this.confirmModal.loading = true;
+            this.confirmModal._resolve(true);
+        },
+
+        confirmModalCancel() {
+            this.confirmModal.open = false;
+            this.confirmModal._resolve(false);
+        },
+
         async voidPayment(paymentId) {
-            if (!confirm('Void this payment? This cannot be undone.')) return;
+            if (!await this.showConfirm('Void this payment?', 'This action is permanent and cannot be undone. The payment record will be removed.', 'Yes, Void Payment')) return;
             try {
                 const endpoint = (this.config.destroyPaymentEndpointTemplate || '').replace('__PAYMENT__', paymentId);
                 const response = await fetch(endpoint, {
@@ -1193,16 +1255,19 @@ function invoiceShow() {
                 });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.message || 'Failed to void payment');
+                this.confirmModal.open = false;
                 if (window.showToast) window.showToast(data.message || 'Payment voided', 'success');
                 await this.loadPayments();
             } catch (e) {
                 console.error('Failed to void payment:', e);
                 if (window.showToast) window.showToast(e.message || 'Failed to void payment', 'error');
+            } finally {
+                this.confirmModal.loading = false;
             }
         },
 
         async sendInvoice() {
-            if (!confirm('Send this invoice to the vendor?')) return;
+            if (!await this.showConfirm('Send this invoice?', 'The invoice will be sent to the vendor for review and acceptance.', 'Send Invoice', 'bg-blue-600 hover:bg-blue-700 text-white')) return;
             this.actionLoading = true;
             try {
                 const response = await fetch(this.config.sendEndpoint, {
@@ -1226,7 +1291,7 @@ function invoiceShow() {
         },
 
         async acceptInvoice() {
-            if (!confirm('Accept this invoice on behalf of the vendor?')) return;
+            if (!await this.showConfirm('Accept on behalf of vendor?', 'This will mark the invoice as accepted. You are acting on behalf of the vendor.', 'Yes, Accept', 'bg-emerald-600 hover:bg-emerald-700 text-white')) return;
             this.actionLoading = true;
             try {
                 const response = await fetch(this.config.adminAcceptEndpoint, {

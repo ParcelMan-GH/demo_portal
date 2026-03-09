@@ -14,6 +14,8 @@ use App\Events\PickupAssignmentStatusChanged;
 use App\Events\ShipmentStatusChanged;
 use App\Events\TransportManifestStatusChanged;
 use App\Events\VendorRegistered;
+use App\Events\WarehouseInvoiceCancelled;
+use App\Events\WarehouseInvoiceCreated;
 use App\Listeners\SendAdminDeliveryNotification;
 use App\Listeners\SendAdminInvoiceResponseNotification;
 use App\Listeners\SendAdminPickupNotification;
@@ -23,6 +25,7 @@ use App\Listeners\SendAdminVendorRegisteredNotification;
 use App\Listeners\SendDriverAssignmentNotification;
 use App\Listeners\SendDriverTransportNotification;
 use App\Listeners\SendDriverUnassignedNotification;
+use App\Listeners\SendAdminWarehouseInvoiceNotification;
 use App\Listeners\SendVendorInvoiceNotification;
 use App\Listeners\SendVendorShipmentNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
@@ -72,6 +75,14 @@ class EventServiceProvider extends ServiceProvider
         ],
         InvoiceRejectedByVendor::class => [
             SendAdminInvoiceResponseNotification::class,
+        ],
+
+        // Warehouse invoice events (notify super admins)
+        WarehouseInvoiceCreated::class => [
+            SendAdminWarehouseInvoiceNotification::class,
+        ],
+        WarehouseInvoiceCancelled::class => [
+            SendAdminWarehouseInvoiceNotification::class,
         ],
 
         // Vendor registration

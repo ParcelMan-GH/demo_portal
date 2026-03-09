@@ -205,8 +205,41 @@
                     </div>
                 </div>
 
-                <!-- Right Controls: View -->
+                <!-- Right Controls: Export + View -->
                 <div class="flex flex-wrap items-center justify-end gap-3">
+                    <!-- Export -->
+                    <div x-data="{ open: false }" class="relative">
+                        <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            Export
+                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50" style="display: none;">
+                            <button type="button" @@click="exportData('excel'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                Excel
+                            </button>
+                            <button type="button" @@click="exportData('pdf'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                PDF
+                            </button>
+                            <button type="button" @@click="exportData('csv'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                CSV
+                            </button>
+                            <div class="border-t border-slate-200/50 my-1"></div>
+                            <button type="button" @@click="printData(); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                Print
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- View (column toggle) -->
                     <div x-data="{ open: false }" class="relative">
                         <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
                             <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,7 +250,6 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                             </svg>
                         </button>
-
                         <div x-show="open" @@click.away="open = false" x-transition
                              class="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50"
                              style="display: none;">
@@ -526,27 +558,71 @@ document.addEventListener('alpine:init', () => {
 
         init() {
             this.loadData();
-            this.$nextTick(() => {
-                if (typeof flatpickr !== 'undefined' && this.$refs.createdRange) {
-                    flatpickr(this.$refs.createdRange, {
-                        mode: 'range',
-                        dateFormat: 'Y-m-d',
-                        onChange: (selectedDates) => {
-                            if (selectedDates.length === 2) {
-                                this.dateFrom = selectedDates[0].toISOString().split('T')[0];
-                                this.dateTo   = selectedDates[1].toISOString().split('T')[0];
-                                this.meta.current_page = 1;
-                                this.loadData();
-                            } else if (selectedDates.length === 0) {
-                                this.dateFrom = '';
-                                this.dateTo   = '';
-                                this.meta.current_page = 1;
-                                this.loadData();
-                            }
-                        },
-                    });
-                }
+            this.initDateRange();
+        },
+
+        initDateRange() {
+            if (!this.$refs.createdRange) return;
+
+            const setupPicker = () => {
+                if (!window.$ || !window.moment || !window.$.fn.daterangepicker) return;
+                const $input = window.$(this.$refs.createdRange);
+                $input.daterangepicker({
+                    autoUpdateInput: false,
+                    alwaysShowCalendars: true,
+                    opens: 'left',
+                    locale: { format: 'YYYY-MM-DD', cancelLabel: 'Clear' },
+                    ranges: {
+                        'Today':        [window.moment(), window.moment()],
+                        'Yesterday':    [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
+                        'Last 7 Days':  [window.moment().subtract(6, 'days'), window.moment()],
+                        'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
+                        'This Month':   [window.moment().startOf('month'), window.moment().endOf('month')],
+                        'Last Month':   [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
+                    },
+                });
+                $input.on('apply.daterangepicker', (ev, picker) => {
+                    this.dateFrom = picker.startDate.format('YYYY-MM-DD');
+                    this.dateTo   = picker.endDate.format('YYYY-MM-DD');
+                    $input.val(`${this.dateFrom} - ${this.dateTo}`);
+                    this.meta.current_page = 1;
+                    this.loadData();
+                });
+                $input.on('cancel.daterangepicker', () => {
+                    this.dateFrom = '';
+                    this.dateTo   = '';
+                    $input.val('');
+                    this.meta.current_page = 1;
+                    this.loadData();
+                });
+            };
+
+            if (window.$ && window.moment && window.$.fn.daterangepicker) {
+                setupPicker();
+                return;
+            }
+
+            const cssId = 'daterangepicker-css';
+            if (!document.getElementById(cssId)) {
+                const link = document.createElement('link');
+                link.id = cssId; link.rel = 'stylesheet';
+                link.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
+                document.head.appendChild(link);
+            }
+            const loadScript = (id, src) => new Promise(resolve => {
+                if (document.getElementById(id)) return resolve();
+                const s = document.createElement('script');
+                s.id = id; s.src = src; s.onload = resolve;
+                document.body.appendChild(s);
             });
+            loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
+                .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
+                .then(() => {
+                    window.$ = window.jQuery = window.jQuery || window.$;
+                    window.moment = window.moment || moment;
+                    return loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js');
+                })
+                .then(setupPicker);
         },
 
         async loadData() {
@@ -631,6 +707,99 @@ document.addEventListener('alpine:init', () => {
             if (isNaN(d.getTime())) return '—';
             return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
                 + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        },
+
+        async exportData(format) {
+            try {
+                const params = new URLSearchParams();
+                if (this.search)               params.append('search', this.search);
+                if (this.statusFilter)         params.append('status', this.statusFilter);
+                if (this.originWarehouseFilter) params.append('origin_warehouse_id', this.originWarehouseFilter);
+                if (this.destWarehouseFilter)  params.append('destination_warehouse_id', this.destWarehouseFilter);
+                if (this.dateFrom)             params.append('date_from', this.dateFrom);
+                if (this.dateTo)               params.append('date_to', this.dateTo);
+                params.append('format', format);
+
+                if (format === 'excel' || format === 'pdf') {
+                    window.location.href = `{{ route('admin.transport-manifests.export') }}?${params}`;
+                    return;
+                }
+
+                const response = await fetch(`{{ route('admin.transport-manifests.export') }}?${params}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!response.ok) throw new Error('Export failed');
+                const result = await response.json();
+                if (format === 'csv') this.downloadCSV(result.data);
+            } catch (err) {
+                console.error('Export failed:', err);
+                alert('Export failed. Please try again.');
+            }
+        },
+
+        async printData() {
+            try {
+                const params = new URLSearchParams();
+                if (this.search)               params.append('search', this.search);
+                if (this.statusFilter)         params.append('status', this.statusFilter);
+                if (this.originWarehouseFilter) params.append('origin_warehouse_id', this.originWarehouseFilter);
+                if (this.destWarehouseFilter)  params.append('destination_warehouse_id', this.destWarehouseFilter);
+                if (this.dateFrom)             params.append('date_from', this.dateFrom);
+                if (this.dateTo)               params.append('date_to', this.dateTo);
+
+                const response = await fetch(`{{ route('admin.transport-manifests.export') }}?${params}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!response.ok) throw new Error('Failed to fetch data');
+                const result = await response.json();
+                this.openPrintWindow(result.data);
+            } catch (err) {
+                console.error('Print failed:', err);
+                alert('Print failed. Please try again.');
+            }
+        },
+
+        openPrintWindow(data) {
+            if (!data.length) { alert('No data to print'); return; }
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) { alert('Pop-up blocked. Please allow pop-ups to print.'); return; }
+            const doc = printWindow.document;
+            const headers = Object.keys(data[0]);
+            doc.title = 'Transport Manifests Export';
+            doc.body.innerHTML = '';
+            const style = doc.createElement('style');
+            style.textContent = 'body{font-family:sans-serif;padding:20px}h1{font-size:22px;margin-bottom:16px;color:#1e293b}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #e2e8f0;padding:7px 10px;text-align:left;font-size:11px}th{background:#f1f5f9;font-weight:600;color:#475569}tr:nth-child(even){background:#f8fafc}';
+            doc.head.appendChild(style);
+            const title = doc.createElement('h1');
+            title.textContent = 'Transport Manifests';
+            doc.body.appendChild(title);
+            const table = doc.createElement('table');
+            const thead = doc.createElement('thead');
+            const headRow = doc.createElement('tr');
+            headers.forEach(h => { const th = doc.createElement('th'); th.textContent = h; headRow.appendChild(th); });
+            thead.appendChild(headRow);
+            table.appendChild(thead);
+            const tbody = doc.createElement('tbody');
+            data.forEach(row => {
+                const tr = doc.createElement('tr');
+                headers.forEach(h => { const td = doc.createElement('td'); td.textContent = row[h] ?? '-'; tr.appendChild(td); });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            doc.body.appendChild(table);
+            setTimeout(() => printWindow.print(), 250);
+        },
+
+        downloadCSV(data) {
+            if (!data.length) return;
+            const headers = Object.keys(data[0]);
+            const csv = [headers.join(','), ...data.map(row => headers.map(h => `"${String(row[h] ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'transport_manifests.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
         },
     }));
 });

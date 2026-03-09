@@ -90,6 +90,30 @@ class InvoiceController extends Controller
     }
 
     /**
+     * Render invoice as printable HTML page.
+     */
+    public function print(Invoice $invoice)
+    {
+        $this->authorizePermission('invoices.view');
+
+        $invoice->load('shipment.vendor');
+
+        $logoPath = public_path('logo.png');
+        $logoBase64 = '';
+        if (file_exists($logoPath)) {
+            $logoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+        }
+
+        return view('pdf.vendor-invoice', [
+            'invoice'    => $invoice,
+            'shipment'   => $invoice->shipment,
+            'vendor'     => $invoice->shipment->vendor,
+            'logoBase64' => $logoBase64,
+            'autoPrint'  => true,
+        ]);
+    }
+
+    /**
      * Get payments linked to this invoice.
      */
     public function paymentsData(Invoice $invoice): JsonResponse
