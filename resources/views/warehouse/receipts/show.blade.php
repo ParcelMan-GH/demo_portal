@@ -52,6 +52,18 @@
 
 @section('content')
 <div class="space-y-6" x-data="warehouseReceiptShowPage" data-warehouse-receipt-show-config="{{ e(json_encode($receiptConfig, JSON_INVALID_UTF8_SUBSTITUTE)) }}">
+    <div x-show="!canReceive" x-cloak class="flex items-center gap-3 px-5 py-4 rounded-2xl border border-amber-200/70 bg-amber-50/80 backdrop-blur-sm">
+        <div class="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-100">
+            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+            </svg>
+        </div>
+        <div>
+            <p class="text-sm font-semibold text-amber-800">Awaiting Pickup</p>
+            <p class="text-xs text-amber-700 mt-0.5">The driver has not picked up this shipment yet. Receiving and finalization are disabled until pickup is confirmed.</p>
+        </div>
+    </div>
+
     <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30">
         <div class="relative">
             <div class="absolute inset-0 opacity-10">
@@ -649,10 +661,10 @@
                                                     Accept
                                                 </button>
                                             </template>
-                                            <a :href="activeInvoice().print_url" target="_blank"
-                                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold transition-colors">
+                                            <a :href="invoiceShowUrl.replace('__INVOICE__', activeInvoice().id)"
+                                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white text-xs font-bold shadow-sm hover:opacity-90 transition-opacity">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                                View
+                                                View Details
                                             </a>
                                             <template x-if="canEditInvoice && ['pending','sent','accepted'].includes(activeInvoice().status)">
                                                 <button @@click="openCancelInvoiceModal(activeInvoice())"
@@ -967,6 +979,9 @@
                                             <td class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="historyInvoice.created_at || '—'"></td>
                                             <td class="px-4 py-2.5 whitespace-nowrap text-center text-xs font-medium">
                                                 <div class="inline-flex items-center gap-1">
+                                                    <a :href="invoiceShowUrl.replace('__INVOICE__', historyInvoice.id)" class="p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors" title="View details">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                    </a>
                                                     <a :href="historyInvoice.download_url" target="_blank" class="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors" title="Download PDF">
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                                     </a>
@@ -1414,6 +1429,8 @@
                         </span>
                         <button
                             type="button"
+                            x-show="canReceive"
+                            x-cloak
                             @@click="openFinalizeModal()"
                             class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
                             :disabled="isFinalized() || items.length === 0 || saving"
@@ -1560,7 +1577,7 @@
                                 </div>
 
                                 {{-- Receive button --}}
-                                <div class="px-4 py-3 mt-auto">
+                                <div class="px-4 py-3 mt-auto" x-show="canReceive" x-cloak>
                                     <button
                                         type="button"
                                         @@click="openReceiveModal(item.shipment_item_id)"
@@ -1839,49 +1856,98 @@
     </div>
 
     <!-- ═══ CREATE INVOICE MODAL ═══ -->
-    <div x-show="invoiceModalOpen" x-cloak class="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-        <div class="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-xl">
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h4 class="text-base font-semibold text-slate-900">Create Invoice</h4>
-                <button type="button" @@click="closeCreateInvoiceModal()" class="text-slate-400 hover:text-slate-600">&times;</button>
-            </div>
-            <div class="px-5 py-4 space-y-3">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Pickup Fee *</label>
-                        <input type="number" step="0.01" min="0" x-model="invoiceForm.pickup_fee" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="0.00">
+    <div x-show="invoiceModalOpen" x-cloak class="fixed inset-0 z-[120] overflow-y-auto" @@keydown.escape.window="invoiceModalOpen = false">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="closeCreateInvoiceModal()"></div>
+        <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="relative z-10 bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl max-h-[95vh] overflow-y-auto">
+            <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Transport Fee</label>
-                        <input type="number" step="0.01" min="0" x-model="invoiceForm.transport_fee" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="0.00">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Handling Fee</label>
-                        <input type="number" step="0.01" min="0" x-model="invoiceForm.handling_fee" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="0.00">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Other Fee</label>
-                        <input type="number" step="0.01" min="0" x-model="invoiceForm.other_fee" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="0.00">
+                        <h3 class="text-base font-bold text-slate-900">Create Invoice</h3>
+                        <p class="text-xs text-slate-500">Set fees for this shipment</p>
                     </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Notes</label>
-                    <textarea rows="2" x-model="invoiceForm.notes" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Optional invoice notes"></textarea>
-                </div>
-                <label class="flex items-center gap-2 text-xs font-medium text-slate-700">
-                    <input type="checkbox" x-model="invoiceForm.send_now" class="rounded border-slate-300 text-violet-600">
-                    Send to vendor immediately
-                </label>
-                <template x-if="invoiceUiError">
-                    <p class="text-xs text-rose-600 bg-rose-50 rounded-lg px-3 py-2" x-text="invoiceUiError"></p>
-                </template>
-            </div>
-            <div class="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2">
-                <button type="button" @@click="closeCreateInvoiceModal()" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
-                <button type="button" @@click="createInvoice()" :disabled="invoiceForm.submitting" class="px-3 py-1.5 rounded-lg bg-violet-600 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50">
-                    <span x-text="invoiceForm.submitting ? 'Creating…' : 'Create Invoice'"></span>
+                <button @@click="closeCreateInvoiceModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
+            <div class="px-6 py-5">
+                <template x-if="invoiceUiError">
+                    <div class="mb-4 flex items-start gap-2.5 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">
+                        <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                        <span x-text="invoiceUiError"></span>
+                    </div>
+                </template>
+                <form @@submit.prevent="createInvoice()">
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Pickup Fee</label>
+                            <input type="number" step="0.01" min="0" x-model="invoiceForm.pickup_fee"
+                                class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Transport Fee</label>
+                            <input type="number" step="0.01" min="0" x-model="invoiceForm.transport_fee"
+                                class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Handling Fee</label>
+                            <input type="number" step="0.01" min="0" x-model="invoiceForm.handling_fee"
+                                class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Other Fee</label>
+                            <input type="number" step="0.01" min="0" x-model="invoiceForm.other_fee"
+                                class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="mb-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 p-[1px] shadow-lg shadow-emerald-500/15">
+                        <div class="rounded-[11px] bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3.5">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-semibold text-emerald-200 uppercase tracking-wider">Invoice Total</span>
+                                <div class="flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                    <span class="text-[10px] text-emerald-300 font-medium" x-text="[invoiceForm.pickup_fee, invoiceForm.transport_fee, invoiceForm.handling_fee, invoiceForm.other_fee].filter(f => parseFloat(f || 0) > 0).length + ' fee(s)'"></span>
+                                </div>
+                            </div>
+                            <div class="flex items-baseline justify-end gap-1.5">
+                                <span class="text-sm font-semibold text-emerald-200">GHS</span>
+                                <span class="text-2xl font-extrabold text-white tracking-tight" x-text="(parseFloat(invoiceForm.pickup_fee || 0) + parseFloat(invoiceForm.transport_fee || 0) + parseFloat(invoiceForm.handling_fee || 0) + parseFloat(invoiceForm.other_fee || 0)).toFixed(2)"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Notes <span class="text-slate-400 font-normal">(optional)</span></label>
+                        <textarea x-model="invoiceForm.notes" rows="2"
+                            class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 resize-none transition-all" placeholder="Optional notes..."></textarea>
+                    </div>
+                    <label class="flex items-center gap-3 mb-6 cursor-pointer select-none">
+                        <input type="checkbox" x-model="invoiceForm.send_now"
+                            class="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400">
+                        <span class="text-sm text-slate-700">Send invoice to vendor immediately</span>
+                    </label>
+                    <div class="flex justify-end gap-3">
+                        <button type="button" @@click="closeCreateInvoiceModal()"
+                            class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" :disabled="invoiceForm.submitting"
+                            class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                            <svg x-show="invoiceForm.submitting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span x-text="invoiceForm.submitting ? 'Creating...' : (invoiceForm.send_now ? 'Create & Send' : 'Create Invoice')"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
         </div>
     </div>
 

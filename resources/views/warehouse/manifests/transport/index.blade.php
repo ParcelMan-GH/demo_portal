@@ -7,9 +7,6 @@
     $config = [
         'data_endpoint' => route('warehouse.manifests.transport.data'),
         'create_endpoint' => route('warehouse.manifests.transport.store'),
-        'assign_endpoint' => route('warehouse.manifests.transport.assign-driver', ['manifest' => '__MANIFEST__']),
-        'dispatch_endpoint' => route('warehouse.manifests.transport.dispatch', ['manifest' => '__MANIFEST__']),
-        'transport_drivers' => $transportDrivers->values(),
         'transfer_batches' => $transferBatches->values(),
     ];
 @endphp
@@ -262,43 +259,15 @@
                                         </div>
                                     </template>
                                     <template x-if="!row.driver_name">
-                                        <div class="flex items-center gap-2">
-                                            <select
-                                                class="rounded-lg border border-slate-200/70 bg-white/70 backdrop-blur-sm px-2 py-1 text-[11px] text-slate-700"
-                                                x-model="selectedDriverByManifest[row.id]"
-                                            >
-                                                <option value="">Select driver</option>
-                                                <template x-for="driver in transportDrivers" :key="driver.id">
-                                                    <option :value="driver.id" x-text="`${driver.name} (${driver.vehicle_type || '-'})`"></option>
-                                                </template>
-                                            </select>
-                                            <button
-                                                type="button"
-                                                class="rounded-lg border border-slate-200/70 bg-white/70 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                @@click="assignDriver(row.id)"
-                                                :disabled="!selectedDriverByManifest[row.id] || loading"
-                                            >
-                                                Assign
-                                            </button>
-                                        </div>
+                                        <span class="text-xs text-slate-400 italic">Not assigned</span>
                                     </template>
                                 </td>
                                 <td x-show="visibleColumns.items_count" class="px-4 py-2.5 text-center text-xs font-semibold text-slate-800" x-text="row.items_count"></td>
                                 <td x-show="visibleColumns.actions" class="px-4 py-2.5 text-center">
-                                    <div class="flex items-center justify-center gap-1.5">
-                                        <a :href="row.view_url"
-                                           class="inline-flex items-center rounded-lg border border-slate-200/70 bg-white/70 px-2.5 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50">
-                                            View
-                                        </a>
-                                        <button
-                                            type="button"
-                                            class="inline-flex items-center rounded-lg bg-slate-900 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            @@click="dispatchManifest(row.id)"
-                                            :disabled="!canDispatch(row)"
-                                        >
-                                            Dispatch
-                                        </button>
-                                    </div>
+                                    <a :href="row.view_url"
+                                       class="inline-flex items-center rounded-lg border border-slate-200/70 bg-white/70 px-2.5 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50">
+                                        View
+                                    </a>
                                 </td>
                             </tr>
                         </template>

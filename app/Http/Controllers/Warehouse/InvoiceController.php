@@ -13,10 +13,26 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class InvoiceController extends Controller
 {
     public function __construct(private InvoiceService $invoiceService) {}
+
+    /**
+     * Show invoice detail page.
+     */
+    public function show(Invoice $invoice): View
+    {
+        $this->authorizeAny(['invoices.view', 'warehouse.receiving.manage']);
+
+        $invoice->load(['shipment.vendor', 'creator']);
+
+        $admin    = Auth::guard('admin')->user();
+        $canManage = $admin->hasPermission('invoices.edit');
+
+        return view('warehouse.invoices.show', compact('invoice', 'canManage'));
+    }
 
     /**
      * Create an invoice for the shipment linked to a pickup assignment.

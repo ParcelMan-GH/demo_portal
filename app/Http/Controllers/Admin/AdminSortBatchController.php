@@ -163,11 +163,63 @@ class AdminSortBatchController extends Controller
             'destinationWarehouse',
             'createdBy',
             'sealedBy',
-            'activeItems.shipmentItem.shipment',
-            'transportManifest',
-            'deliveryRun',
+            'transportManifest.assignedDriver',
+            'deliveryRun.assignedDriver',
         ]);
 
+        $batch->loadCount('activeItems');
+
         return view('admin.sort-batches.show', compact('batch'));
+    }
+
+    public function itemsData(Request $request, SortBatch $batch): JsonResponse
+    {
+        $query = $batch->activeItems()
+            ->with(['shipmentItem.shipment.vendor', 'addedBy']);
+
+        if ($search = $request->get('search')) {
+            $query->whereHas('shipmentItem', function ($q) use ($search) {
+                $q->where('tracking_code', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                  ->orWhereHas('shipment', function ($sq) use ($search) {
+                      $sq->where('shipment_number', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $perPage = min((int) $request->get('per_page', 20), 100);
+        $page    = max((int) $request->get('page', 1), 1);
+        $total   = $query->count();
+        $items   = $query->latest('id')->skip(($page - 1) * $perPage)->take($perPage)->get();
+
+        return response()->json([
+            'data' => $items->map(function ($item, $index) use ($page, $perPage) {
+                $si = $item->shipmentItem;
+                return [
+                    'row_number'               => (($page - 1) * $perPage) + $index + 1,
+                    'id'                       => $item->id,
+                    'shipment_id'              => $si?->shipment?->id,
+                    'shipment_number'          => $si?->shipment?->shipment_number,
+                    'vendor_name'              => $si?->shipment?->vendor?->name,
+                    'tracking_code'            => $si?->tracking_code,
+                    'description'              => $si?->description,
+                    'quantity'                 => $item->quantity_allocated ?? $si?->quantity,
+                    'delivery_recipient_name'  => $si?->delivery_recipient_name,
+                    'delivery_recipient_phone' => $si?->delivery_recipient_phone,
+                    'delivery_town'            => $si?->delivery_town,
+                    'added_by'                 => $item->addedBy?->name,
+                    'added_at'                 => $item->added_at?->format('d M Y, H:i'),
+                ];
+            }),
+            'meta' => [
+                'total'        => $total,
+                'per_page'     => $perPage,
+                'current_page' => $page,
+                'last_page'    => max((int) ceil($total / $perPage), 1),
+                'from'         => $total ? (($page - 1) * $perPage) + 1 : 0,
+                'to'           => min($page * $perPage, $total),
+            ],
+        ]);
     }
 }

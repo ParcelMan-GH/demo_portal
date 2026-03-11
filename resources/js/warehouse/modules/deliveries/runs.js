@@ -1,3 +1,4 @@
+import { createRemoteTablePage } from '../shared/table-page.js';
 import { parseJsonAttribute } from '../../core/config.js';
 
 function getConfig() {
@@ -30,362 +31,311 @@ function registerWarehouseDeliveryRunsPage() {
     const config = getConfig();
     if (!config || !config.data_endpoint) return;
 
-    window.Alpine.data('warehouseDeliveryRunsPage', () => ({
-        loading: false,
-        rows: [],
-        search: '',
-        statusFilter: '',
-        perPage: 10,
-        meta: {
-            current_page: 1,
-            from: 0,
-            to: 0,
-            total: 0,
-            last_page: 1,
-        },
-        deliveryDrivers: Array.isArray(config.delivery_drivers) ? config.delivery_drivers : [],
-        localDeliveryBatches: Array.isArray(config.local_delivery_batches) ? config.local_delivery_batches : [],
-        selectedDriverByRun: {},
-        newRunBatchId: '',
-        canResetCodes: Boolean(config.can_reset_codes),
-        showItemSelector: false,
-        eligibleItems: [],
-        eligibleSearch: '',
-        eligibleLoading: false,
-        selectedReceiptItemIds: [],
+    const statuses = [
+        { value: 'draft', label: 'Draft' },
+        { value: 'assigned', label: 'Assigned' },
+        { value: 'out_for_delivery', label: 'Out For Delivery' },
+        { value: 'partially_delivered', label: 'Partially Delivered' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'cancelled', label: 'Cancelled' },
+    ];
 
-        async init() {
-            await this.loadData();
-        },
+    const pageConfig = {
+        endpoint: config.data_endpoint,
+        defaultSort: 'created_at',
+        exportFileName: 'warehouse-delivery-runs',
+        printTitle: 'Warehouse Delivery Runs',
+        statuses,
+        columns: [
+            { key: 'run_number', label: 'Run #', exportLabel: 'Run Number' },
+            { key: 'status', label: 'Status' },
+            { key: 'driver_name', label: 'Driver', exportLabel: 'Driver Name' },
+            { key: 'stops_count', label: 'Stops', sortable: false },
+            { key: 'items_count', label: 'Items', sortable: false },
+            { key: 'assigned_at', label: 'Assigned At' },
+            { key: 'dispatched_at', label: 'Dispatched At' },
+            { key: 'completed_at', label: 'Completed At' },
+            { key: 'actions', label: 'Actions', sortable: false },
+        ],
+    };
 
-        statusClass(status) {
-            switch ((status || '').toLowerCase()) {
-                case 'draft':
-                    return 'border-slate-200 bg-slate-50 text-slate-700';
-                case 'assigned':
-                    return 'border-blue-200 bg-blue-50 text-blue-700';
-                case 'out_for_delivery':
-                    return 'border-violet-200 bg-violet-50 text-violet-700';
-                case 'partially_delivered':
-                    return 'border-amber-200 bg-amber-50 text-amber-700';
-                case 'completed':
-                    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-                case 'cancelled':
-                    return 'border-rose-200 bg-rose-50 text-rose-700';
-                default:
-                    return 'border-slate-200 bg-slate-50 text-slate-700';
-            }
-        },
+    Alpine.data('warehouseDeliveryRunsPage', () => {
+        const page = createRemoteTablePage(pageConfig);
 
-        stopStatusClass(status) {
-            switch ((status || '').toLowerCase()) {
-                case 'delivered':
-                    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-                case 'arrived':
-                    return 'border-indigo-200 bg-indigo-50 text-indigo-700';
-                case 'failed':
-                    return 'border-rose-200 bg-rose-50 text-rose-700';
-                default:
-                    return 'border-slate-200 bg-slate-50 text-slate-700';
-            }
-        },
+        return {
+            ...page,
+            deliveryDrivers: Array.isArray(config.delivery_drivers) ? config.delivery_drivers : [],
+            localDeliveryBatches: Array.isArray(config.local_delivery_batches) ? config.local_delivery_batches : [],
+            selectedDriverByRun: {},
+            newRunBatchId: '',
+            canResetCodes: Boolean(config.can_reset_codes),
+            showCreateModal: false,
+            createMode: 'batch',
+            eligibleItems: [],
+            eligibleSearch: '',
+            eligibleLoading: false,
+            selectedReceiptItemIds: [],
+            expandedRunId: null,
 
-        canDispatch(row) {
-            return (row?.status || '').toLowerCase() === 'assigned' && Boolean(row?.driver_name) && !this.loading;
-        },
-
-        canResendCode(row, stop) {
-            if (!this.canResetCodes || this.loading) return false;
-            const runStatus = (row?.status || '').toLowerCase();
-            if (!['assigned', 'out_for_delivery', 'partially_delivered'].includes(runStatus)) return false;
-            return ['pending', 'arrived', 'failed'].includes((stop?.status || '').toLowerCase());
-        },
-
-        buildParams() {
-            const params = new URLSearchParams();
-            params.set('page', String(this.meta.current_page || 1));
-            params.set('per_page', String(this.perPage || 10));
-            if (this.search) params.set('search', this.search);
-            if (this.statusFilter) params.set('status', this.statusFilter);
-            return params;
-        },
-
-        async loadData() {
-            this.loading = true;
-            try {
-                const response = await fetch(`${config.data_endpoint}?${this.buildParams().toString()}`, {
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-
-                const result = await response.json();
-                if (!response.ok) {
-                    throw new Error(result.message || 'Failed to load delivery runs.');
-                }
-
-                this.rows = Array.isArray(result.data) ? result.data : [];
-                this.meta = result.meta || this.meta;
-            } catch (error) {
-                console.error(error);
-                window.showToast?.(error.message || 'Unable to load delivery runs.', 'error');
-            } finally {
-                this.loading = false;
-            }
-        },
-
-        async createRun() {
-            if (!this.newRunBatchId) {
-                window.showToast?.('Select a sealed local delivery batch first.', 'warning');
-                return;
-            }
-
-            this.loading = true;
-            try {
-                const response = await fetch(config.create_endpoint, {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': csrfToken(),
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        sort_batch_id: Number(this.newRunBatchId),
-                    }),
-                });
-
-                const result = await response.json();
-                if (!response.ok || !result.success) {
-                    throw new Error(result.message || 'Failed to create delivery run.');
-                }
-
-                window.showToast?.(result.message || 'Delivery run created successfully.', 'success');
-                this.newRunBatchId = '';
-                await this.loadData();
-            } catch (error) {
-                console.error(error);
-                window.showToast?.(error.message || 'Unable to create delivery run.', 'error');
-            } finally {
-                this.loading = false;
-            }
-        },
-
-        async loadEligibleItems() {
-            this.eligibleLoading = true;
-            try {
-                const params = new URLSearchParams();
-                params.set('per_page', '200');
-                if (this.eligibleSearch) params.set('search', this.eligibleSearch);
-
-                const response = await fetch(`${config.eligible_items_endpoint}?${params.toString()}`, {
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.message || 'Failed to load eligible items.');
-
-                this.eligibleItems = Array.isArray(result.data) ? result.data : [];
-            } catch (error) {
-                console.error(error);
-                window.showToast?.(error.message || 'Unable to load eligible items.', 'error');
-            } finally {
-                this.eligibleLoading = false;
-            }
-        },
-
-        toggleAllEligible(event) {
-            if (event.target.checked) {
-                this.selectedReceiptItemIds = this.eligibleItems.map(item => item.warehouse_receipt_item_id);
-            } else {
-                this.selectedReceiptItemIds = [];
-            }
-        },
-
-        toggleItem(id) {
-            const index = this.selectedReceiptItemIds.indexOf(id);
-            if (index === -1) {
-                this.selectedReceiptItemIds.push(id);
-            } else {
-                this.selectedReceiptItemIds.splice(index, 1);
-            }
-        },
-
-        async createRunFromItems() {
-            if (this.selectedReceiptItemIds.length === 0) {
-                window.showToast?.('Select at least one item.', 'warning');
-                return;
-            }
-
-            this.loading = true;
-            try {
-                const response = await fetch(config.create_from_items_endpoint, {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': csrfToken(),
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        warehouse_receipt_item_ids: this.selectedReceiptItemIds.map(id => Number(id)),
-                    }),
-                });
-
-                const result = await response.json();
-                if (!response.ok || !result.success) {
-                    throw new Error(result.message || 'Failed to create delivery run.');
-                }
-
-                window.showToast?.(result.message || 'Delivery run created successfully.', 'success');
-                this.selectedReceiptItemIds = [];
-                this.showItemSelector = false;
-                this.eligibleItems = [];
-                this.eligibleSearch = '';
-                await this.loadData();
-            } catch (error) {
-                console.error(error);
-                window.showToast?.(error.message || 'Unable to create delivery run.', 'error');
-            } finally {
-                this.loading = false;
-            }
-        },
-
-        async assignDriver(runId) {
-            const driverId = this.selectedDriverByRun[runId];
-            if (!driverId) {
-                window.showToast?.('Select a delivery driver first.', 'warning');
-                return;
-            }
-
-            this.loading = true;
-            try {
-                const response = await fetch(withRun(config.assign_endpoint, runId), {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': csrfToken(),
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ driver_id: Number(driverId) }),
-                });
-
-                const result = await response.json();
-                if (!response.ok || !result.success) {
-                    throw new Error(result.message || 'Failed to assign driver.');
-                }
-
-                window.showToast?.(result.message || 'Driver assigned successfully.', 'success');
-                delete this.selectedDriverByRun[runId];
-                await this.loadData();
-            } catch (error) {
-                console.error(error);
-                window.showToast?.(error.message || 'Unable to assign delivery driver.', 'error');
-            } finally {
-                this.loading = false;
-            }
-        },
-
-        async dispatchRun(runId) {
-            this.loading = true;
-            try {
-                const response = await fetch(withRun(config.dispatch_endpoint, runId), {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': csrfToken(),
-                    },
-                });
-
-                const result = await response.json();
-                if (!response.ok || !result.success) {
-                    throw new Error(result.message || 'Failed to dispatch delivery run.');
-                }
-
-                window.showToast?.(result.message || 'Delivery run dispatched successfully.', 'success');
-                await this.loadData();
-            } catch (error) {
-                console.error(error);
-                window.showToast?.(error.message || 'Unable to dispatch delivery run.', 'error');
-            } finally {
-                this.loading = false;
-            }
-        },
-
-        async resendCode(runId, stopId) {
-            this.loading = true;
-            try {
-                const response = await fetch(withRunAndStop(config.resend_code_endpoint, runId, stopId), {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': csrfToken(),
-                    },
-                });
-
-                const result = await response.json();
-                if (!response.ok || !result.success) {
-                    throw new Error(result.message || 'Failed to resend verification code.');
-                }
-
-                window.showToast?.(result.message || 'Verification code resent successfully.', 'success');
-                await this.loadData();
-            } catch (error) {
-                console.error(error);
-                window.showToast?.(error.message || 'Unable to resend verification code.', 'error');
-            } finally {
-                this.loading = false;
-            }
-        },
-
-        setStatusFilter(value) {
-            this.statusFilter = value || '';
-            this.meta.current_page = 1;
-            this.loadData();
-        },
-
-        setPerPage(value) {
-            this.perPage = Number(value) || 10;
-            this.meta.current_page = 1;
-            this.loadData();
-        },
-
-        firstPage() {
-            if ((this.meta.current_page || 1) > 1) {
-                this.meta.current_page = 1;
+            init() {
                 this.loadData();
-            }
-        },
+            },
 
-        previousPage() {
-            if ((this.meta.current_page || 1) > 1) {
-                this.meta.current_page -= 1;
-                this.loadData();
-            }
-        },
+            statusBadgeClass(status) {
+                switch ((status || '').toLowerCase()) {
+                    case 'draft':
+                        return 'border-slate-200/60 bg-slate-50 text-slate-700';
+                    case 'assigned':
+                        return 'border-blue-200/60 bg-blue-50 text-blue-700';
+                    case 'out_for_delivery':
+                        return 'border-violet-200/60 bg-violet-50 text-violet-700';
+                    case 'partially_delivered':
+                        return 'border-amber-200/60 bg-amber-50 text-amber-700';
+                    case 'completed':
+                        return 'border-emerald-200/60 bg-emerald-50 text-emerald-700';
+                    case 'cancelled':
+                        return 'border-rose-200/60 bg-rose-50 text-rose-700';
+                    default:
+                        return 'border-slate-200/50 bg-white/60 text-slate-700';
+                }
+            },
 
-        nextPage() {
-            if ((this.meta.current_page || 1) < (this.meta.last_page || 1)) {
-                this.meta.current_page += 1;
-                this.loadData();
-            }
-        },
+            stopStatusClass(status) {
+                switch ((status || '').toLowerCase()) {
+                    case 'delivered':
+                        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+                    case 'arrived':
+                        return 'border-indigo-200 bg-indigo-50 text-indigo-700';
+                    case 'failed':
+                        return 'border-rose-200 bg-rose-50 text-rose-700';
+                    default:
+                        return 'border-slate-200 bg-slate-50 text-slate-700';
+                }
+            },
 
-        lastPage() {
-            const lastPage = this.meta.last_page || 1;
-            if ((this.meta.current_page || 1) < lastPage) {
-                this.meta.current_page = lastPage;
-                this.loadData();
-            }
-        },
-    }));
+            canDispatch(row) {
+                return (row?.status || '').toLowerCase() === 'assigned' && Boolean(row?.driver_name) && !this.loading;
+            },
+
+            canResendCode(row, stop) {
+                if (!this.canResetCodes || this.loading) return false;
+                const runStatus = (row?.status || '').toLowerCase();
+                if (!['assigned', 'out_for_delivery', 'partially_delivered'].includes(runStatus)) return false;
+                return ['pending', 'arrived', 'failed'].includes((stop?.status || '').toLowerCase());
+            },
+
+            async createRun() {
+                if (!this.newRunBatchId) {
+                    window.showToast?.('Select a sealed local delivery batch first.', 'warning');
+                    return;
+                }
+
+                this.loading = true;
+                try {
+                    const response = await fetch(config.create_endpoint, {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            sort_batch_id: Number(this.newRunBatchId),
+                        }),
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to create delivery run.');
+                    }
+
+                    window.showToast?.(result.message || 'Delivery run created successfully.', 'success');
+                    this.newRunBatchId = '';
+                    this.showCreateModal = false;
+                    await this.loadData();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to create delivery run.', 'error');
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async loadEligibleItems() {
+                this.eligibleLoading = true;
+                try {
+                    const params = new URLSearchParams();
+                    params.set('per_page', '200');
+                    if (this.eligibleSearch) params.set('search', this.eligibleSearch);
+
+                    const response = await fetch(`${config.eligible_items_endpoint}?${params.toString()}`, {
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.message || 'Failed to load eligible items.');
+
+                    this.eligibleItems = Array.isArray(result.data) ? result.data : [];
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to load eligible items.', 'error');
+                } finally {
+                    this.eligibleLoading = false;
+                }
+            },
+
+            toggleAllEligible(event) {
+                if (event.target.checked) {
+                    this.selectedReceiptItemIds = this.eligibleItems.map(item => item.warehouse_receipt_item_id);
+                } else {
+                    this.selectedReceiptItemIds = [];
+                }
+            },
+
+            toggleItem(id) {
+                const index = this.selectedReceiptItemIds.indexOf(id);
+                if (index === -1) {
+                    this.selectedReceiptItemIds.push(id);
+                } else {
+                    this.selectedReceiptItemIds.splice(index, 1);
+                }
+            },
+
+            async createRunFromItems() {
+                if (this.selectedReceiptItemIds.length === 0) {
+                    window.showToast?.('Select at least one item.', 'warning');
+                    return;
+                }
+
+                this.loading = true;
+                try {
+                    const response = await fetch(config.create_from_items_endpoint, {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            warehouse_receipt_item_ids: this.selectedReceiptItemIds.map(id => Number(id)),
+                        }),
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to create delivery run.');
+                    }
+
+                    window.showToast?.(result.message || 'Delivery run created successfully.', 'success');
+                    this.selectedReceiptItemIds = [];
+                    this.showCreateModal = false;
+                    this.eligibleItems = [];
+                    this.eligibleSearch = '';
+                    await this.loadData();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to create delivery run.', 'error');
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async assignDriver(runId) {
+                const driverId = this.selectedDriverByRun[runId];
+                if (!driverId) {
+                    window.showToast?.('Select a delivery driver first.', 'warning');
+                    return;
+                }
+
+                this.loading = true;
+                try {
+                    const response = await fetch(withRun(config.assign_endpoint, runId), {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ driver_id: Number(driverId) }),
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to assign driver.');
+                    }
+
+                    window.showToast?.(result.message || 'Driver assigned successfully.', 'success');
+                    delete this.selectedDriverByRun[runId];
+                    await this.loadData();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to assign delivery driver.', 'error');
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async dispatchRun(runId) {
+                this.loading = true;
+                try {
+                    const response = await fetch(withRun(config.dispatch_endpoint, runId), {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                        },
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to dispatch delivery run.');
+                    }
+
+                    window.showToast?.(result.message || 'Delivery run dispatched successfully.', 'success');
+                    await this.loadData();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to dispatch delivery run.', 'error');
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async resendCode(runId, stopId) {
+                this.loading = true;
+                try {
+                    const response = await fetch(withRunAndStop(config.resend_code_endpoint, runId, stopId), {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                        },
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to resend verification code.');
+                    }
+
+                    window.showToast?.(result.message || 'Verification code resent successfully.', 'success');
+                    await this.loadData();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to resend verification code.', 'error');
+                } finally {
+                    this.loading = false;
+                }
+            },
+        };
+    });
 }
 
 if (window.Alpine) {
@@ -393,4 +343,3 @@ if (window.Alpine) {
 } else {
     document.addEventListener('alpine:init', registerWarehouseDeliveryRunsPage);
 }
-

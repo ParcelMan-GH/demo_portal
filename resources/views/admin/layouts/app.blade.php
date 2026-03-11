@@ -333,22 +333,6 @@
                 @endhasPermission
 
                 @hasPermission('settings.view')
-                <a href="{{ route('admin.notifications.index') }}"
-                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.notifications.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                        </svg>
-                    </div>
-                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Notification Logs</span>
-                    <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Notification Logs</span>
-                    </template>
-                </a>
-                @endhasPermission
-
-                @hasPermission('settings.view')
                 <a href="{{ route('admin.marketing.index') }}"
                    class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.marketing.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">

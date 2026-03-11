@@ -57,9 +57,7 @@ function registerWarehouseTransportManifestsPage() {
         return {
             ...page,
             newManifestBatchId: '',
-            transportDrivers: Array.isArray(config.transport_drivers) ? config.transport_drivers : [],
             transferBatches: Array.isArray(config.transfer_batches) ? config.transfer_batches : [],
-            selectedDriverByManifest: {},
             dateFrom: '',
             dateTo: '',
             dateRangePicker: null,
@@ -177,10 +175,6 @@ function registerWarehouseTransportManifestsPage() {
                 }
             },
 
-            canDispatch(row) {
-                return ['assigned'].includes((row?.status || '').toLowerCase()) && Boolean(row?.driver_name) && !this.loading;
-            },
-
             async createManifest() {
                 if (!this.newManifestBatchId) {
                     window.showToast?.('Select a transfer batch first.', 'warning');
@@ -218,68 +212,6 @@ function registerWarehouseTransportManifestsPage() {
                 }
             },
 
-            async assignDriver(manifestId) {
-                const driverId = this.selectedDriverByManifest[manifestId];
-                if (!driverId) {
-                    window.showToast?.('Select a driver first.', 'warning');
-                    return;
-                }
-
-                this.loading = true;
-                try {
-                    const response = await fetch(withManifest(config.assign_endpoint, manifestId), {
-                        method: 'POST',
-                        headers: {
-                            Accept: 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'X-CSRF-TOKEN': csrfToken(),
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ driver_id: Number(driverId) }),
-                    });
-
-                    const result = await response.json();
-                    if (!response.ok || !result.success) {
-                        throw new Error(result.message || 'Failed to assign driver.');
-                    }
-
-                    window.showToast?.(result.message || 'Driver assigned successfully.', 'success');
-                    delete this.selectedDriverByManifest[manifestId];
-                    await this.loadData();
-                } catch (error) {
-                    console.error(error);
-                    window.showToast?.(error.message || 'Unable to assign driver.', 'error');
-                } finally {
-                    this.loading = false;
-                }
-            },
-
-            async dispatchManifest(manifestId) {
-                this.loading = true;
-                try {
-                    const response = await fetch(withManifest(config.dispatch_endpoint, manifestId), {
-                        method: 'POST',
-                        headers: {
-                            Accept: 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'X-CSRF-TOKEN': csrfToken(),
-                        },
-                    });
-
-                    const result = await response.json();
-                    if (!response.ok || !result.success) {
-                        throw new Error(result.message || 'Failed to dispatch manifest.');
-                    }
-
-                    window.showToast?.(result.message || 'Manifest dispatched successfully.', 'success');
-                    await this.loadData();
-                } catch (error) {
-                    console.error(error);
-                    window.showToast?.(error.message || 'Unable to dispatch manifest.', 'error');
-                } finally {
-                    this.loading = false;
-                }
-            },
         };
     });
 }

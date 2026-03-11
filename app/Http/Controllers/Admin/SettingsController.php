@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
+use App\Models\NotificationLog;
 use App\Models\OtpCode;
 use App\Models\PlatformSetting;
 use Illuminate\Http\JsonResponse;
@@ -22,7 +23,6 @@ class SettingsController extends Controller
      */
     protected array $tabs = [
         'platform' => ['label' => 'Platform Info', 'icon' => 'building'],
-        'locations' => ['label' => 'Locations', 'icon' => 'map'],
         'invoice' => ['label' => 'Invoice Settings', 'icon' => 'document'],
         'sms' => ['label' => 'SMS Config', 'icon' => 'chat'],
         'mail' => ['label' => 'Mail Config', 'icon' => 'envelope'],
@@ -31,6 +31,7 @@ class SettingsController extends Controller
         'sms-logs' => ['label' => 'SMS Logs', 'icon' => 'phone'],
         'otp-logs' => ['label' => 'OTP Logs', 'icon' => 'chat'],
         'admin-audit-logs' => ['label' => 'Admin Audit Logs', 'icon' => 'shield'],
+        'notification-logs' => ['label' => 'Notification Logs', 'icon' => 'bell'],
         'push' => ['label' => 'Push Notifications', 'icon' => 'bell'],
         'health' => ['label' => 'System Health', 'icon' => 'heart'],
         'logs' => ['label' => 'System Logs', 'icon' => 'terminal'],
@@ -69,10 +70,6 @@ class SettingsController extends Controller
                 'platform_timezone' => ['label' => 'Timezone', 'type' => 'select', 'options' => $this->getTimezones(), 'default' => 'UTC'],
                 'platform_currency' => ['label' => 'Default Currency', 'type' => 'select', 'options' => $this->getCurrencies(), 'default' => 'GHS'],
                 'platform_date_format' => ['label' => 'Date Format', 'type' => 'select', 'options' => ['Y-m-d' => 'YYYY-MM-DD', 'd/m/Y' => 'DD/MM/YYYY', 'm/d/Y' => 'MM/DD/YYYY'], 'default' => 'd/m/Y'],
-            ],
-            'locations' => [
-                'locations_country' => ['label' => 'Default Country', 'type' => 'text', 'default' => 'Ghana'],
-                'locations_regions' => ['label' => 'Supported Regions', 'type' => 'tags', 'default' => ''],
             ],
             'invoice' => [
                 'invoice_prefix' => ['label' => 'Invoice Prefix', 'type' => 'text', 'default' => 'INV-'],
@@ -132,6 +129,7 @@ class SettingsController extends Controller
         return match ($tab) {
             'health' => $this->getSystemHealth(),
             'email-templates' => $this->getEmailTemplates(),
+            'notification-logs' => $this->getNotificationLogsMeta(),
             default => [],
         };
     }
@@ -248,6 +246,18 @@ class SettingsController extends Controller
     /**
      * Get email templates.
      */
+    protected function getNotificationLogsMeta(): array
+    {
+        return [
+            'types' => [
+                'shipment_status', 'invoice_sent', 'invoice_accepted', 'invoice_rejected',
+                'driver_assigned', 'payment_recorded', 'general',
+            ],
+            'channels' => ['push', 'email', 'sms'],
+            'statuses' => ['pending', 'sent', 'failed'],
+        ];
+    }
+
     protected function getEmailTemplates(): array
     {
         $templates = [];

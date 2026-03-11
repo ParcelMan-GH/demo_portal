@@ -36,10 +36,6 @@ class DeliveryRunController extends Controller
             'canResetCodes' => (bool) $user?->hasPermission('warehouse.delivery.code.reset'),
             'deliveryDrivers' => Driver::query()
                 ->where('is_active', true)
-                ->where(function ($query) {
-                    $query->whereNull('status')
-                        ->orWhereIn('status', ['available', 'offline']);
-                })
                 ->whereJsonContains('task_capabilities', Driver::CAPABILITY_DELIVERY)
                 ->orderBy('name')
                 ->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']),
@@ -95,6 +91,7 @@ class DeliveryRunController extends Controller
                 'assigned_at' => optional($run->assigned_at)?->format('Y-m-d H:i:s'),
                 'dispatched_at' => optional($run->dispatched_at)?->format('Y-m-d H:i:s'),
                 'completed_at' => optional($run->completed_at)?->format('Y-m-d H:i:s'),
+                'view_url' => route('warehouse.deliveries.runs.show', $run->id),
                 'stops' => $run->stops->map(function ($stop) {
                     return [
                         'id' => $stop->id,
@@ -208,6 +205,97 @@ class DeliveryRunController extends Controller
         $result = $this->deliveryService->dispatch($run, $warehouse, Auth::guard('admin')->user());
 
         return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function show(DeliveryRun $run): View
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+
+        if ((int) $run->warehouse_id !== (int) $warehouse->id) {
+            abort(404);
+        }
+
+        $run->load([
+            'warehouse',
+            'assignedDriver',
+            'sortBatch',
+            'createdBy',
+            'stops.region',
+            'stops.district',
+            'stops.items.shipmentItem.shipment',
+            'items.shipmentItem.shipment',
+            'items.stop',
+        ]);
+
+        $deliveryDrivers = Driver::query()
+            ->where('is_active', true)
+            ->whereJsonContains('task_capabilities', Driver::CAPABILITY_DELIVERY)
+            ->orderBy('name')
+            ->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']);
+
+        $stopsData = $run->stops->map(function ($stop) {
+            return [
+                'id' => $stop->id,
+                'recipient_name' => $stop->recipient_name,
+                'recipient_phone' => $stop->recipient_phone,
+                'status' => $stop->status,
+                'region_name' => $stop->region?->name ?? '',
+                'district_name' => $stop->district?->name ?? '',
+                'town' => $stop->town ?? '',
+                'gh_post_address' => $stop->gh_post_address ?? '',
+                'landmark' => $stop->landmark ?? '',
+                'code_sent_at' => $stop->verification_code_sent_at?->format('M d, H:i'),
+                'attempts' => (int) $stop->verification_attempts,
+                'max_attempts' => (int) $stop->max_attempts,
+                'arrived_at' => $stop->arrived_at?->format('M d, Y H:i'),
+                'delivered_at' => $stop->delivered_at?->format('M d, Y H:i'),
+                'failure_reason' => $stop->failure_reason,
+                'failure_notes' => $stop->failure_notes,
+                'has_proof_photo' => !empty($stop->proof_photo_path),
+                'items_count' => $stop->items->count(),
+                'items' => $stop->items->map(fn($item) => [
+                    'id' => $item->id,
+                    'description' => $item->shipmentItem?->description ?? '-',
+                    'shipment_number' => $item->shipmentItem?->shipment?->shipment_number ?? '-',
+                    'expected_quantity' => (int) $item->expected_quantity,
+                    'delivered_quantity' => (int) $item->delivered_quantity,
+                    'status' => $item->status,
+                    'notes' => $item->notes ?? '',
+                ])->values()->toArray(),
+            ];
+        })->values()->toArray();
+
+        $itemsData = $run->items->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'description' => $item->shipmentItem?->description ?? '-',
+                'tracking_code' => $item->shipmentItem?->tracking_code ?? '',
+                'shipment_number' => $item->shipmentItem?->shipment?->shipment_number ?? '-',
+                'stop_recipient' => $item->stop?->recipient_name ?? '-',
+                'expected_quantity' => (int) $item->expected_quantity,
+                'delivered_quantity' => (int) $item->delivered_quantity,
+                'status' => $item->status,
+                'notes' => $item->notes ?? '',
+                'delivered_at' => $item->delivered_at?->format('M d, H:i'),
+            ];
+        })->values()->toArray();
+
+        $user = Auth::guard('admin')->user();
+        $runConfig = [
+            'assign_driver_endpoint' => route('warehouse.deliveries.runs.assign-driver', ['run' => $run]),
+            'dispatch_endpoint' => route('warehouse.deliveries.runs.dispatch', ['run' => $run]),
+            'resend_code_endpoint' => route('warehouse.deliveries.runs.stops.resend-code', ['run' => $run, 'stop' => '__STOP__']),
+            'can_reset_codes' => (bool) $user?->hasPermission('warehouse.delivery.code.reset'),
+        ];
+
+        return view('warehouse.deliveries.runs.show', [
+            'run' => $run,
+            'deliveryDrivers' => $deliveryDrivers,
+            'stopsData' => $stopsData,
+            'itemsData' => $itemsData,
+            'runConfig' => $runConfig,
+        ]);
     }
 
     public function resendCode(DeliveryRun $run, DeliveryRunStop $stop): JsonResponse

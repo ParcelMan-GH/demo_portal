@@ -225,10 +225,6 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Driver is inactive.'];
         }
 
-        if ($driver->status === 'busy' && (int) $run->assigned_driver_id !== (int) $driver->id) {
-            return ['success' => false, 'message' => 'Driver is currently busy.'];
-        }
-
         if (!$driver->hasCapability(Driver::CAPABILITY_DELIVERY)) {
             return ['success' => false, 'message' => 'Driver is not configured for delivery assignments.'];
         }

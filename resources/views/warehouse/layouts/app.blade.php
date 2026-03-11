@@ -30,137 +30,124 @@
     <div class="min-h-screen flex">
         {{-- ==================== SIDEBAR ==================== --}}
         <aside
-            class="fixed inset-y-0 left-0 z-50 w-[260px] bg-gradient-to-b from-[#0b1220] via-[#111a2d] to-[#0b1220] transition-transform duration-200 flex flex-col wh-sidebar-shadow"
+            class="fixed inset-y-0 left-0 z-50 w-[260px] wh-sidebar transition-transform duration-200 flex flex-col"
             :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
         >
-            {{-- Logo --}}
-            <div class="flex items-center h-[60px] px-5">
-                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/25 ring-1 ring-white/10">
+            {{-- Logo Area --}}
+            <div class="flex items-center h-[70px] px-5">
+                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center ring-1 ring-white/[0.08]">
                     <img src="{{ asset('logo.png') }}" alt="Parcelman" class="h-6 w-6 object-contain">
                 </div>
                 <div class="ml-3 min-w-0">
-                    <span class="text-white text-[15px] font-bold tracking-tight block truncate">Warehouse</span>
-                    <span class="block text-teal-400/70 text-[10px] font-semibold uppercase tracking-[0.15em] truncate">Parcelman Express</span>
+                    <span class="text-white text-[15px] font-extrabold tracking-tight block truncate">Parcelman</span>
+                    <span class="block text-orange-300/60 text-[10px] font-semibold uppercase tracking-[0.15em] truncate">Warehouse Portal</span>
                 </div>
             </div>
-            <div class="mx-4 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent"></div>
 
             {{-- Navigation --}}
-            <nav class="flex-1 overflow-y-auto warehouse-sidebar-scroll py-4 px-3">
+            <nav class="flex-1 overflow-y-auto warehouse-sidebar-scroll pt-2 pb-4 px-4">
+
+                {{-- MAIN section --}}
+                <div class="wh-nav-section-label">Main</div>
+
                 @if($canDashboard)
                     <a href="{{ route('warehouse.dashboard') }}"
-                       class="warehouse-nav-link {{ request()->routeIs('warehouse.dashboard') ? 'active' : '' }} flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-300">
-                        <div class="wh-nav-icon">
-                            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>
-                            </svg>
-                        </div>
-                        <span class="text-[13px] font-medium">Dashboard</span>
+                       class="wh-nav-item {{ request()->routeIs('warehouse.dashboard') ? 'active' : '' }}">
+                        <span class="wh-nav-bullet"></span>
+                        <span class="wh-nav-text">Dashboard</span>
                     </a>
                 @endif
 
                 @if($canUsers)
                     <a href="{{ route('warehouse.users.index') }}"
-                       class="warehouse-nav-link {{ request()->routeIs('warehouse.users.*') ? 'active' : '' }} flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-300">
-                        <div class="wh-nav-icon">
-                            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
-                            </svg>
-                        </div>
-                        <span class="text-[13px] font-medium">Users</span>
+                       class="wh-nav-item {{ request()->routeIs('warehouse.users.*') ? 'active' : '' }}">
+                        <span class="wh-nav-bullet"></span>
+                        <span class="wh-nav-text">Users</span>
                     </a>
                 @endif
 
                 @if($canReceiving || $canItems || $canSorting || $canManifest || $canTransportAssign || $canDeliveryAssign)
-                    <div class="pt-4 mt-3">
-                        <div class="flex items-center gap-2 px-3 mb-2">
-                            <span class="text-[10px] uppercase tracking-[0.14em] text-slate-500 font-semibold">Shipments</span>
-                            <div class="flex-1 h-px bg-gradient-to-r from-white/[0.06] to-transparent"></div>
-                        </div>
 
-                        @if($canReceiving)
-                            <a href="{{ route('warehouse.receipts.pending.index') }}"
-                               class="warehouse-nav-link {{ request()->routeIs('warehouse.receipts.pending.*') ? 'active' : '' }} flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-300">
-                                <div class="wh-nav-icon">
-                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-                                    </svg>
-                                </div>
-                                <span class="text-[13px] font-medium">Pending Receipts</span>
-                            </a>
+                    {{-- RECEIVING section --}}
+                    <div class="wh-nav-section-label mt-6">Receiving</div>
 
-                            <a href="{{ route('warehouse.pickups.received.index') }}"
-                               class="warehouse-nav-link {{ request()->routeIs('warehouse.pickups.received.*') ? 'active' : '' }} flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-300">
-                                <div class="wh-nav-icon">
-                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                    </svg>
-                                </div>
-                                <span class="text-[13px] font-medium">Received Pickups</span>
-                            </a>
-                        @endif
+                    @if($canReceiving)
+                        <a href="{{ route('warehouse.receipts.pending.index') }}"
+                           class="wh-nav-item {{ request()->routeIs('warehouse.receipts.pending.*') ? 'active' : '' }}">
+                            <span class="wh-nav-bullet"></span>
+                            <span class="wh-nav-text">Pending Receipts</span>
+                        </a>
 
-                        @if($canItems)
-                            <a href="{{ route('warehouse.items.received.index') }}"
-                               class="warehouse-nav-link {{ request()->routeIs('warehouse.items.received.*') ? 'active' : '' }} flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-300">
-                                <div class="wh-nav-icon">
-                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                    </svg>
-                                </div>
-                                <span class="text-[13px] font-medium">Received Items</span>
-                            </a>
-                        @endif
+                        <a href="{{ route('warehouse.pickups.received.index') }}"
+                           class="wh-nav-item {{ request()->routeIs('warehouse.pickups.received.*') ? 'active' : '' }}">
+                            <span class="wh-nav-bullet"></span>
+                            <span class="wh-nav-text">Received Pickups</span>
+                        </a>
+                    @endif
 
-                        @if($canSorting)
-                            <a href="{{ route('warehouse.sorting.index') }}"
-                               class="warehouse-nav-link {{ request()->routeIs('warehouse.sorting.*') ? 'active' : '' }} flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-300">
-                                <div class="wh-nav-icon">
-                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 7h16M4 12h10M4 17h7m9 0h-3m6-5h-3m3-5h-6"/>
-                                    </svg>
-                                </div>
-                                <span class="text-[13px] font-medium">Sorting</span>
-                            </a>
-                        @endif
+                    @if($canItems)
+                        <a href="{{ route('warehouse.items.received.index') }}"
+                           class="wh-nav-item {{ request()->routeIs('warehouse.items.received.*') ? 'active' : '' }}">
+                            <span class="wh-nav-bullet"></span>
+                            <span class="wh-nav-text">Received Items</span>
+                        </a>
+                    @endif
 
-                        @if($canManifest || $canTransportAssign)
-                            <a href="{{ route('warehouse.manifests.transport.index') }}"
-                               class="warehouse-nav-link {{ request()->routeIs('warehouse.manifests.transport.*') ? 'active' : '' }} flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-300">
-                                <div class="wh-nav-icon">
-                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 17H7a2 2 0 01-2-2V9a2 2 0 012-2h2m0 10h6m-6 0V7m6 10h2a2 2 0 002-2V9a2 2 0 00-2-2h-2m0 10V7m-6 3h6"/>
-                                    </svg>
-                                </div>
-                                <span class="text-[13px] font-medium">Transport Manifests</span>
-                            </a>
+                    {{-- OPERATIONS section --}}
+                    <div class="wh-nav-section-label mt-6">Operations</div>
 
-                            <a href="{{ route('warehouse.manifests.incoming.index') }}"
-                               class="warehouse-nav-link {{ request()->routeIs('warehouse.manifests.incoming.*') ? 'active' : '' }} flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-300">
-                                <div class="wh-nav-icon">
-                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 7h16M4 12h16M4 17h16"/>
-                                    </svg>
-                                </div>
-                                <span class="text-[13px] font-medium">Incoming Manifests</span>
-                            </a>
-                        @endif
+                    @if($canSorting)
+                        <a href="{{ route('warehouse.sorting.index') }}"
+                           class="wh-nav-item {{ request()->routeIs('warehouse.sorting.*') ? 'active' : '' }}">
+                            <span class="wh-nav-bullet"></span>
+                            <span class="wh-nav-text">Sorting</span>
+                        </a>
+                    @endif
 
-                        @if($canDeliveryAssign)
-                            <a href="{{ route('warehouse.deliveries.runs.index') }}"
-                               class="warehouse-nav-link {{ request()->routeIs('warehouse.deliveries.runs.*') ? 'active' : '' }} flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-300">
-                                <div class="wh-nav-icon">
-                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 19V6l12-2v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-2c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-2"/>
-                                    </svg>
-                                </div>
-                                <span class="text-[13px] font-medium">Delivery Runs</span>
-                            </a>
-                        @endif
-                    </div>
+                    @if($canManifest || $canTransportAssign)
+                        {{-- TRANSPORT section --}}
+                        <div class="wh-nav-section-label mt-6">Transport</div>
+
+                        <a href="{{ route('warehouse.manifests.transport.index') }}"
+                           class="wh-nav-item {{ request()->routeIs('warehouse.manifests.transport.*') ? 'active' : '' }}">
+                            <span class="wh-nav-bullet"></span>
+                            <span class="wh-nav-text">Transport Manifests</span>
+                        </a>
+
+                        <a href="{{ route('warehouse.manifests.incoming.index') }}"
+                           class="wh-nav-item {{ request()->routeIs('warehouse.manifests.incoming.*') ? 'active' : '' }}">
+                            <span class="wh-nav-bullet"></span>
+                            <span class="wh-nav-text">Incoming Manifests</span>
+                        </a>
+                    @endif
+
+                    @if($canDeliveryAssign)
+                        {{-- DELIVERY section --}}
+                        <div class="wh-nav-section-label mt-6">Delivery</div>
+
+                        <a href="{{ route('warehouse.deliveries.runs.index') }}"
+                           class="wh-nav-item {{ request()->routeIs('warehouse.deliveries.runs.*') ? 'active' : '' }}">
+                            <span class="wh-nav-bullet"></span>
+                            <span class="wh-nav-text">Delivery Runs</span>
+                        </a>
+                    @endif
                 @endif
             </nav>
 
+            {{-- Sidebar Footer — User card --}}
+            <div class="px-4 pb-4">
+                <div class="wh-user-card">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0">
+                            {{ substr($authUser?->name ?? 'W', 0, 1) }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[12px] font-semibold text-white/90 leading-tight truncate">{{ $authUser?->name }}</p>
+                            <p class="text-[10px] text-white/40 leading-tight truncate">{{ $warehouse?->name ?? 'Warehouse' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </aside>
 
         {{-- Mobile overlay --}}
@@ -214,7 +201,7 @@
                         </div>
                         <input type="text"
                                placeholder="Search shipments, receipts..."
-                               class="w-full h-9 pl-10 pr-16 text-[13px] bg-slate-50/80 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-300 focus:bg-white transition-all placeholder-slate-400">
+                               class="w-full h-9 pl-10 pr-16 text-[13px] bg-slate-50/80 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 focus:bg-white transition-all placeholder-slate-400">
                         <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
                             <span class="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded-md border border-slate-200/60 font-medium tracking-wide">⌘K</span>
                         </div>
@@ -238,23 +225,23 @@
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                         </svg>
-                        <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-teal-500 rounded-full ring-2 ring-white/80"></span>
+                        <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full ring-2 ring-white/80"></span>
                     </button>
 
                     {{-- Separator --}}
                     <div class="w-px h-6 bg-slate-200/60 mx-1"></div>
 
                     {{-- Warehouse badge --}}
-                    <div class="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-teal-50/60 border border-teal-100/80">
-                        <div class="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></div>
-                        <span class="text-[11px] font-semibold text-teal-700">{{ $warehouse?->name ?? 'Warehouse' }}</span>
+                    <div class="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-orange-50/60 border border-orange-100/80">
+                        <div class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
+                        <span class="text-[11px] font-semibold text-orange-700">{{ $warehouse?->name ?? 'Warehouse' }}</span>
                     </div>
 
                     {{-- User Avatar Dropdown --}}
                     <div class="relative">
                         <button @click="userMenuOpen = !userMenuOpen"
                                 class="flex items-center gap-2 py-1 px-1.5 rounded-xl hover:bg-slate-50/80 transition-all">
-                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-[12px] font-bold shadow-sm ring-1 ring-slate-200/50">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center text-white text-[12px] font-bold shadow-sm ring-1 ring-slate-200/50">
                                 {{ substr($authUser?->name ?? 'W', 0, 1) }}
                             </div>
                             <div class="hidden lg:block text-left mr-1">
@@ -288,7 +275,7 @@
                             {{-- Warehouse info --}}
                             <div class="px-4 py-2 border-b border-slate-100/80">
                                 <div class="flex items-center gap-2">
-                                    <div class="w-2 h-2 rounded-full bg-teal-500"></div>
+                                    <div class="w-2 h-2 rounded-full bg-orange-500"></div>
                                     <span class="text-[11px] font-medium text-slate-500">{{ $warehouse?->name ?? 'Warehouse' }}</span>
                                 </div>
                             </div>

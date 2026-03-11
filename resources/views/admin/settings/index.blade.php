@@ -34,7 +34,7 @@
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">General</span>
                     </div>
                     <div class="space-y-1">
-                        @foreach(['platform' => $tabs['platform'], 'locations' => $tabs['locations'], 'invoice' => $tabs['invoice']] as $key => $tab)
+                        @foreach(['platform' => $tabs['platform'], 'invoice' => $tabs['invoice']] as $key => $tab)
                         <a href="{{ route('admin.settings.index', ['tab' => $key]) }}"
                            class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 {{ $activeTab === $key ? 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg shadow-slate-900/25' : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900' }}">
                             <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 {{ $activeTab === $key ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-slate-200' }}">
@@ -76,7 +76,7 @@
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Activity Logs</span>
                     </div>
                     <div class="space-y-1">
-                        @foreach(['email-logs' => $tabs['email-logs'], 'sms-logs' => $tabs['sms-logs'], 'otp-logs' => $tabs['otp-logs'], 'admin-audit-logs' => $tabs['admin-audit-logs']] as $key => $tab)
+                        @foreach(['email-logs' => $tabs['email-logs'], 'sms-logs' => $tabs['sms-logs'], 'otp-logs' => $tabs['otp-logs'], 'admin-audit-logs' => $tabs['admin-audit-logs'], 'notification-logs' => $tabs['notification-logs']] as $key => $tab)
                         <a href="{{ route('admin.settings.index', ['tab' => $key]) }}"
                            class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 {{ $activeTab === $key ? 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg shadow-slate-900/25' : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900' }}">
                             <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 {{ $activeTab === $key ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-slate-200' }}">
@@ -139,10 +139,78 @@
                         </div>
                         <div>
                             <h2 class="text-xl font-bold text-slate-800">{{ $tabs[$activeTab]['label'] }}</h2>
-                            <p class="text-sm text-slate-500 font-medium mt-0.5">Configure your {{ strtolower($tabs[$activeTab]['label']) }} settings</p>
+                            <p class="text-sm text-slate-500 font-medium mt-0.5">
+                                @if(in_array($activeTab, ['email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'notification-logs']))
+                                    View and search {{ strtolower($tabs[$activeTab]['label']) }}
+                                @else
+                                    Configure your {{ strtolower($tabs[$activeTab]['label']) }} settings
+                                @endif
+                            </p>
                         </div>
                     </div>
-                    @if(!in_array($activeTab, ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates']))
+                    @if($activeTab === 'notification-logs')
+                    {{-- Notification Logs header controls (View, Export, Total) --}}
+                    <div x-data class="flex flex-wrap items-center gap-3">
+                        {{-- View (column visibility) --}}
+                        <div x-data="{ open: false }" class="relative">
+                            <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/>
+                                </svg>
+                                View
+                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                            <div x-show="open" @@click.away="open = false" x-transition
+                                 class="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50"
+                                 style="display: none;">
+                                <template x-for="col in $store.notifLogs?.columns || []" :key="col.key">
+                                    <button type="button" @@click="$dispatch('notif-toggle-column', col.key)"
+                                            class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70">
+                                        <span x-text="col.label"></span>
+                                        <svg x-show="$store.notifLogs?.visibleColumns?.[col.key]" class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+
+                        {{-- Export --}}
+                        <div x-data="{ open: false }" class="relative">
+                            <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                Export
+                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                            <div x-show="open" @@click.away="open = false" x-transition
+                                 class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50"
+                                 style="display: none;">
+                                <button type="button" @@click="$dispatch('notif-export-csv'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    CSV
+                                </button>
+                                <div class="border-t border-slate-200/50 my-1"></div>
+                                <button type="button" @@click="$dispatch('notif-print'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
+                                    <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                    </svg>
+                                    Print
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- Total count badge --}}
+                        <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="($store.notifLogs?.total || 0) + ' Total Logs'"></span>
+                    </div>
+                    @elseif(!in_array($activeTab, ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates']))
                     <button type="button"
                             @@click="saveSettings()"
                             :disabled="saving"
@@ -215,6 +283,7 @@ window.settingsConfig = {
     otpLogsDataEndpoint: @json(route('admin.settings.otp-logs.data')),
     adminAuditLogsDataEndpoint: @json(route('admin.settings.admin-audit-logs.data')),
     adminAuditLogsExportEndpoint: @json(route('admin.settings.admin-audit-logs.export')),
+    notificationLogsDataEndpoint: @json(route('admin.notifications.data')),
     testEmailEndpoint: @json(route('admin.settings.test-email')),
     testSmsEndpoint: @json(route('admin.settings.test-sms')),
     clearCacheEndpoint: @json(route('admin.settings.clear-cache')),

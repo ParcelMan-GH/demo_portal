@@ -53,7 +53,7 @@ class ReceiptController extends Controller
             abort(404);
         }
 
-        if (is_null($pickupAssignment->picked_up_at) || (string) ($pickupAssignment->status?->value ?? $pickupAssignment->status) === 'cancelled') {
+        if ((string) ($pickupAssignment->status?->value ?? $pickupAssignment->status) === 'cancelled') {
             abort(404);
         }
 
@@ -81,6 +81,7 @@ class ReceiptController extends Controller
             'save_item_url' => route('warehouse.receipts.pending.items.save', ['pickupAssignment' => $pickupAssignment, 'shipmentItem' => '__ITEM__']),
             'print_label_url' => route('warehouse.receipts.pending.items.print-label', ['pickupAssignment' => $pickupAssignment, 'shipmentItem' => '__ITEM__']),
             'finalize_url' => route('warehouse.receipts.pending.finalize', ['pickupAssignment' => $pickupAssignment]),
+            'can_receive' => !is_null($pickupAssignment->picked_up_at),
             'receipt' => $receipt ? [
                 'id' => $receipt->id,
                 'status' => $receipt->status,
@@ -149,6 +150,7 @@ class ReceiptController extends Controller
         $receiptConfig['payment_destroy_url']     = route('warehouse.payments.destroy', ['payment' => '__ID__']);
         $receiptConfig['payment_download_url']    = route('warehouse.payments.download', ['payment' => '__ID__']);
         $receiptConfig['payment_print_url']       = route('warehouse.payments.print', ['payment' => '__ID__']);
+        $receiptConfig['invoice_show_url']        = route('warehouse.invoices.show', ['invoice' => '__INVOICE__']);
         $receiptConfig['can_create_invoice']      = $admin->hasPermission('invoices.create');
         $receiptConfig['can_edit_invoice']        = $admin->hasPermission('invoices.edit');
         $receiptConfig['can_view_invoice']        = $admin->hasPermission('invoices.view');
@@ -280,6 +282,13 @@ class ReceiptController extends Controller
             abort(404);
         }
 
+        if (is_null($pickupAssignment->picked_up_at)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot receive items — the driver has not picked up this shipment yet.',
+            ], 422);
+        }
+
         $validated = $request->validate([
             'received_quantity' => ['required', 'integer', 'min:0'],
             'damaged_quantity' => ['nullable', 'integer', 'min:0'],
@@ -333,6 +342,13 @@ class ReceiptController extends Controller
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
         if ((int) $pickupAssignment->target_warehouse_id !== (int) $warehouse->id) {
             abort(404);
+        }
+
+        if (is_null($pickupAssignment->picked_up_at)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot finalize receipt — the driver has not picked up this shipment yet.',
+            ], 422);
         }
 
         $validated = $request->validate([
@@ -451,6 +467,7 @@ class ReceiptController extends Controller
         $receiptConfig['payment_destroy_url'] = route('warehouse.payments.destroy', ['payment' => '__ID__']);
         $receiptConfig['payment_download_url'] = route('warehouse.payments.download', ['payment' => '__ID__']);
         $receiptConfig['payment_print_url']   = route('warehouse.payments.print', ['payment' => '__ID__']);
+        $receiptConfig['invoice_show_url']    = route('warehouse.invoices.show', ['invoice' => '__INVOICE__']);
         $receiptConfig['can_create_invoice']  = $admin->hasPermission('invoices.create');
         $receiptConfig['can_edit_invoice']    = $admin->hasPermission('invoices.edit');
         $receiptConfig['can_view_invoice']    = $admin->hasPermission('invoices.view');

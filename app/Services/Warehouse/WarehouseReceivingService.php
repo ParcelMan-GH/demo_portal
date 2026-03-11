@@ -211,11 +211,20 @@ class WarehouseReceivingService
 
         return DB::transaction(function () use ($assignment, $shipmentItem, $warehouse, $user) {
             $lockedAssignment = PickupAssignment::query()->lockForUpdate()->findOrFail($assignment->id);
-            if ($error = $this->validateReceivingPreconditions($lockedAssignment, $warehouse)) {
-                return $error;
-            }
 
-            $receipt = $this->getOrCreateReceipt($lockedAssignment, $warehouse, $user);
+            // Find existing receipt — label reprinting is allowed even after finalization
+            $receipt = WarehouseReceipt::query()
+                ->where('pickup_assignment_id', $lockedAssignment->id)
+                ->where('warehouse_id', $warehouse->id)
+                ->first();
+
+            if (!$receipt) {
+                // Only validate preconditions when creating a new receipt (first-time label)
+                if ($error = $this->validateReceivingPreconditions($lockedAssignment, $warehouse)) {
+                    return $error;
+                }
+                $receipt = $this->getOrCreateReceipt($lockedAssignment, $warehouse, $user);
+            }
 
             $receiptItem = WarehouseReceiptItem::query()
                 ->where('warehouse_receipt_id', $receipt->id)

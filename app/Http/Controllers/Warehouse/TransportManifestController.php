@@ -34,10 +34,6 @@ class TransportManifestController extends Controller
             'warehouse' => $warehouse,
             'transportDrivers' => Driver::query()
                 ->where('is_active', true)
-                ->where(function ($query) {
-                    $query->whereNull('status')
-                        ->orWhereIn('status', ['available', 'offline']);
-                })
                 ->whereJsonContains('task_capabilities', Driver::CAPABILITY_TRANSPORT)
                 ->orderBy('name')
                 ->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']),
@@ -65,12 +61,53 @@ class TransportManifestController extends Controller
             'assignedDriver',
             'sortBatch',
             'createdBy',
-            'items.shipmentItem.shipment',
+            'items.shipmentItem.shipment.vendor',
         ]);
+
+        $transportDrivers = Driver::query()
+            ->where('is_active', true)
+            ->whereJsonContains('task_capabilities', Driver::CAPABILITY_TRANSPORT)
+            ->orderBy('name')
+            ->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']);
+
+        $itemsData = $manifest->items->map(function ($line) {
+            $shipmentItem = $line->shipmentItem;
+            $shipment = $shipmentItem?->shipment;
+            return [
+                'id' => $line->id,
+                'description' => $shipmentItem?->description ?? '-',
+                'tracking_code' => $shipmentItem?->tracking_code ?? '',
+                'shipment_item_id' => $line->shipment_item_id,
+                'shipment_number' => $shipment?->shipment_number ?? '-',
+                'vendor_name' => $shipment?->vendor?->name ?? '',
+                'expected_quantity' => (int) $line->expected_quantity,
+                'loaded_quantity' => (int) $line->loaded_quantity,
+                'received_quantity' => (int) $line->received_quantity,
+                'line_status' => $line->line_status ?? 'pending',
+                'notes' => $line->notes ?: '',
+                'loaded_at' => $line->loaded_at?->format('M d, H:i'),
+                'received_at' => $line->received_at?->format('M d, H:i'),
+            ];
+        })->values()->toArray();
+
+        $manifestConfig = [
+            'assign_driver_endpoint' => route('warehouse.manifests.transport.assign-driver', ['manifest' => $manifest]),
+            'dispatch_endpoint' => route('warehouse.manifests.transport.dispatch', ['manifest' => $manifest]),
+            'unassign_driver_endpoint' => route('warehouse.manifests.transport.unassign-driver', ['manifest' => $manifest]),
+        ];
+
+        $assignmentHistory = $manifest->assignments()
+            ->with(['driver:id,name,phone,vehicle_type,vehicle_number', 'assignedBy:id,name', 'unassignedBy:id,name'])
+            ->orderByDesc('id')
+            ->get();
 
         return view('warehouse.manifests.transport.show', [
             'warehouse' => $warehouse,
             'manifest' => $manifest,
+            'transportDrivers' => $transportDrivers,
+            'manifestConfig' => $manifestConfig,
+            'itemsData' => $itemsData,
+            'assignmentHistory' => $assignmentHistory,
         ]);
     }
 
@@ -145,7 +182,26 @@ class TransportManifestController extends Controller
         ]);
 
         $driver = Driver::query()->findOrFail((int) $validated['driver_id']);
-        $result = $this->transportService->assignDriver($manifest, $driver, $warehouse);
+        $result = $this->transportService->assignDriver($manifest, $driver, $warehouse, Auth::guard('admin')->user());
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function unassignDriver(Request $request, TransportManifest $manifest): JsonResponse
+    {
+        $this->authorizePermission('warehouse.transport.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $result = $this->transportService->unassignDriver(
+            $manifest,
+            $warehouse,
+            Auth::guard('admin')->user(),
+            $validated['reason'] ?? null
+        );
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }
@@ -223,7 +279,9 @@ class TransportManifestController extends Controller
             'originWarehouse',
             'destinationWarehouse',
             'assignedDriver',
-            'items.shipmentItem.shipment',
+            'sortBatch',
+            'createdBy',
+            'items.shipmentItem.shipment.vendor',
         ]);
 
         $config = [

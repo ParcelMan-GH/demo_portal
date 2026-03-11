@@ -36,6 +36,7 @@ function registerWarehouseReceiptShowPage() {
         showFinalizeModal: false,
         finalizeNotes: '',
         approvalReason: '',
+        canReceive: config.can_receive !== false,
         canApproveDiscrepancy: Boolean(config.can_approve_discrepancy),
         receipt: config.receipt || null,
         items: Array.isArray(config.items) ? config.items : [],
@@ -72,6 +73,7 @@ function registerWarehouseReceiptShowPage() {
         canCreateInvoice: Boolean(config.can_create_invoice),
         canEditInvoice: Boolean(config.can_edit_invoice),
         canViewInvoice: Boolean(config.can_view_invoice),
+        invoiceShowUrl: config.invoice_show_url || '',
 
         // Payments state
         paymentsLoaded: false,
@@ -151,12 +153,20 @@ function registerWarehouseReceiptShowPage() {
 
         openFinalizeModal() {
             if (this.isFinalized()) return;
+            if (!this.canReceive) {
+                window.showToast?.('Cannot finalize — the driver has not picked up this shipment yet.', 'warning');
+                return;
+            }
             this.showFinalizeModal = true;
         },
 
         async saveItem(itemId) {
             if (this.isFinalized()) {
                 window.showToast?.('Receipt is finalized and cannot be edited.', 'warning');
+                return;
+            }
+            if (!this.canReceive) {
+                window.showToast?.('Cannot receive items — the driver has not picked up this shipment yet.', 'warning');
                 return;
             }
 
@@ -216,10 +226,6 @@ function registerWarehouseReceiptShowPage() {
         },
 
         async printLabel(itemId) {
-            if (this.isFinalized()) {
-                window.showToast?.('Receipt is finalized and label state is locked.', 'warning');
-            }
-
             this.saving = true;
             try {
                 const response = await fetch(endpointWithItem(config.print_label_url, itemId), {
@@ -673,6 +679,10 @@ function registerWarehouseReceiptShowPage() {
         },
 
         openReceiveModal(itemId) {
+            if (!this.canReceive) {
+                window.showToast?.('Cannot receive items — the driver has not picked up this shipment yet.', 'warning');
+                return;
+            }
             const idx = this.items.findIndex((i) => Number(i.shipment_item_id) === Number(itemId));
             this.receiveModal = { open: true, itemId: Number(itemId), itemIndex: idx };
         },

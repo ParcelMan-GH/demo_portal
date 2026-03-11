@@ -83,5 +83,10 @@ class TransportManifest extends Model
     {
         return $this->hasOne(WarehouseReceipt::class);
     }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(TransportManifestAssignment::class);
+    }
 }
 

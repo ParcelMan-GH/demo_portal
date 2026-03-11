@@ -45,13 +45,6 @@ class PickupAssignmentService
             ];
         }
 
-        if ($driver->status === 'busy') {
-            return [
-                'success' => false,
-                'message' => 'Driver is currently busy.',
-            ];
-        }
-
         if (!$driver->hasCapability(Driver::CAPABILITY_PICKUP)) {
             return [
                 'success' => false,
@@ -120,9 +113,6 @@ class PickupAssignmentService
             }
             if (!$newDriver->is_active) {
                 return ['success' => false, 'message' => 'Selected driver is inactive.'];
-            }
-            if ($newDriver->status === 'busy') {
-                return ['success' => false, 'message' => 'Selected driver is currently busy.'];
             }
             if (!$newDriver->hasCapability(Driver::CAPABILITY_PICKUP)) {
                 return ['success' => false, 'message' => 'Selected driver is not configured for pickup assignments.'];
@@ -291,10 +281,6 @@ class PickupAssignmentService
         }
 
         $query = Driver::where('is_active', true)
-            ->where(function ($q) {
-                $q->whereNull('status')
-                    ->orWhereIn('status', ['available', 'offline']);
-            })
             ->where(function ($q) use ($assignmentType) {
                 // Backward compatibility: null capabilities are treated as pickup-capable.
                 if ($assignmentType === Driver::CAPABILITY_PICKUP) {

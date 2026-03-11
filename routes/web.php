@@ -294,6 +294,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('sort-batches-data', [AdminSortBatchController::class, 'data'])->name('sort-batches.data');
         Route::get('sort-batches-export', [AdminSortBatchController::class, 'export'])->name('sort-batches.export');
         Route::get('sort-batches/{batch}', [AdminSortBatchController::class, 'show'])->name('sort-batches.show');
+        Route::get('sort-batches/{batch}/items-data', [AdminSortBatchController::class, 'itemsData'])->name('sort-batches.items-data');
 
         // Invoice List (all invoices across all shipments)
         Route::get('invoices', [AdminInvoiceListController::class, 'index'])->name('invoices.index');
@@ -307,6 +308,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Marketing Broadcasts
         Route::get('marketing', [AdminMarketingController::class, 'index'])->name('marketing.index');
+        Route::get('marketing/data', [AdminMarketingController::class, 'data'])->name('marketing.data');
+        Route::get('marketing/email-templates', [AdminMarketingController::class, 'emailTemplates'])->name('marketing.email-templates');
         Route::post('marketing/send', [AdminMarketingController::class, 'send'])->name('marketing.send');
 
         // Settings Management
@@ -388,6 +391,7 @@ Route::prefix('warehouse')
         Route::post('manifests/transport', [WarehouseTransportManifestController::class, 'create'])->name('manifests.transport.store');
         Route::post('manifests/transport/{manifest}/assign-driver', [WarehouseTransportManifestController::class, 'assignDriver'])->name('manifests.transport.assign-driver');
         Route::post('manifests/transport/{manifest}/dispatch', [WarehouseTransportManifestController::class, 'dispatch'])->name('manifests.transport.dispatch');
+        Route::post('manifests/transport/{manifest}/unassign-driver', [WarehouseTransportManifestController::class, 'unassignDriver'])->name('manifests.transport.unassign-driver');
         Route::get('manifests/transport/{manifest}', [WarehouseTransportManifestController::class, 'outboundShow'])->name('manifests.transport.show');
 
         Route::get('manifests/incoming', [WarehouseTransportManifestController::class, 'incomingIndex'])->name('manifests.incoming.index');
@@ -405,9 +409,11 @@ Route::prefix('warehouse')
         Route::post('deliveries/runs/{run}/assign-driver', [WarehouseDeliveryRunController::class, 'assignDriver'])->name('deliveries.runs.assign-driver');
         Route::post('deliveries/runs/{run}/dispatch', [WarehouseDeliveryRunController::class, 'dispatch'])->name('deliveries.runs.dispatch');
         Route::post('deliveries/runs/{run}/stops/{stop}/resend-code', [WarehouseDeliveryRunController::class, 'resendCode'])->name('deliveries.runs.stops.resend-code');
+        Route::get('deliveries/runs/{run}', [WarehouseDeliveryRunController::class, 'show'])->name('deliveries.runs.show');
 
         // Invoice Management
         Route::post('receipts/pending/{pickupAssignment}/invoices', [WarehouseInvoiceController::class, 'store'])->name('invoices.store');
+        Route::get('invoices/{invoice}', [WarehouseInvoiceController::class, 'show'])->name('invoices.show');
         Route::put('invoices/{invoice}', [WarehouseInvoiceController::class, 'update'])->name('invoices.update');
         Route::post('invoices/{invoice}/send', [WarehouseInvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/cancel', [WarehouseInvoiceController::class, 'cancel'])->name('invoices.cancel');

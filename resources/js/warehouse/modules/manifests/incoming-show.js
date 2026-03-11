@@ -1,17 +1,3 @@
-import { parseJsonAttribute } from '../../core/config.js';
-
-function getConfig() {
-    const container = document.querySelector('[data-warehouse-incoming-show-config]');
-    if (!container) return null;
-
-    const config = parseJsonAttribute(container, 'data-warehouse-incoming-show-config', null);
-    if (!config) {
-        console.error('Invalid warehouse incoming manifest config JSON');
-    }
-
-    return config;
-}
-
 function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 }
@@ -23,18 +9,32 @@ function withItem(urlTemplate, itemId) {
 function registerWarehouseIncomingManifestShowPage() {
     if (!window.Alpine) return;
 
-    const config = getConfig();
-    if (!config || !config.finalize_endpoint) return;
+    const config = window.__incomingManifestConfig || {};
+    if (!config.finalize_endpoint) return;
 
     window.Alpine.data('warehouseIncomingManifestShowPage', () => ({
+        activeTab: 'overview',
         loading: false,
         showFinalizeModal: false,
         finalizeNotes: '',
         manifestStatus: config.manifest_status || 'draft',
         items: Array.isArray(config.items) ? config.items : [],
 
+        // Receive modal state
+        receiveModal: { open: false, itemId: null, itemIndex: -1 },
+
         isFinalized() {
             return (this.manifestStatus || '').toLowerCase() === 'received';
+        },
+
+        receivedCount() {
+            return this.items.filter((i) => i.received_at).length;
+        },
+
+        discrepancyCount() {
+            return this.items.filter(
+                (i) => i.line_status && !['pending', 'loaded', 'received'].includes(i.line_status),
+            ).length;
         },
 
         statusClass(status) {
@@ -54,7 +54,35 @@ function registerWarehouseIncomingManifestShowPage() {
             }
         },
 
-        async saveLine(itemId) {
+        statusLabel(status) {
+            switch ((status || '').toLowerCase()) {
+                case 'received':
+                    return 'Received';
+                case 'short':
+                    return 'Short';
+                case 'excess':
+                    return 'Excess';
+                case 'damaged':
+                    return 'Damaged';
+                case 'loaded':
+                    return 'Loaded';
+                default:
+                    return 'Pending';
+            }
+        },
+
+        openReceiveModal(itemId) {
+            if (this.isFinalized()) return;
+            const idx = this.items.findIndex((i) => Number(i.shipment_item_id) === Number(itemId));
+            if (idx < 0) return;
+            this.receiveModal = { open: true, itemId, itemIndex: idx };
+        },
+
+        closeReceiveModal() {
+            this.receiveModal = { open: false, itemId: null, itemIndex: -1 };
+        },
+
+        async saveItem(itemId) {
             if (this.isFinalized()) {
                 window.showToast?.('Manifest receipt is finalized and cannot be changed.', 'warning');
                 return;
@@ -93,6 +121,7 @@ function registerWarehouseIncomingManifestShowPage() {
                     row.received_at = updatedLine.received_at || row.received_at;
                 }
 
+                this.closeReceiveModal();
                 window.showToast?.(result.message || 'Line saved successfully.', 'success');
             } catch (error) {
                 console.error(error);
@@ -146,4 +175,3 @@ if (window.Alpine) {
 } else {
     document.addEventListener('alpine:init', registerWarehouseIncomingManifestShowPage);
 }
-

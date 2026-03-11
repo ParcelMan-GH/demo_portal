@@ -10,6 +10,7 @@ use App\Models\ShipmentItem;
 use App\Models\ShipmentItemTracking;
 use App\Models\SortBatch;
 use App\Models\TransportManifest;
+use App\Models\TransportManifestAssignment;
 use App\Models\TransportManifestItem;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -112,7 +113,7 @@ class WarehouseTransportService
         });
     }
 
-    public function assignDriver(TransportManifest $manifest, Driver $driver, Warehouse $warehouse): array
+    public function assignDriver(TransportManifest $manifest, Driver $driver, Warehouse $warehouse, ?User $user = null): array
     {
         if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
             return ['success' => false, 'message' => 'Cannot assign driver for another warehouse manifest.'];
@@ -131,27 +132,43 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Driver is inactive.'];
         }
 
-        if ($driver->status === 'busy' && (int) $manifest->assigned_driver_id !== (int) $driver->id) {
-            return ['success' => false, 'message' => 'Driver is currently busy.'];
-        }
-
         if (!$driver->hasCapability(Driver::CAPABILITY_TRANSPORT)) {
             return ['success' => false, 'message' => 'Driver is not configured for transport assignments.'];
         }
 
-        return DB::transaction(function () use ($manifest, $driver) {
+        return DB::transaction(function () use ($manifest, $driver, $user) {
             $lockedManifest = TransportManifest::query()->lockForUpdate()->findOrFail($manifest->id);
             $previousDriverId = $lockedManifest->assigned_driver_id;
+            $now = now();
+
+            // Close previous assignment log if driver is changing
+            if ($previousDriverId && (int) $previousDriverId !== (int) $driver->id) {
+                TransportManifestAssignment::query()
+                    ->where('transport_manifest_id', $lockedManifest->id)
+                    ->where('driver_id', $previousDriverId)
+                    ->whereNull('unassigned_at')
+                    ->update([
+                        'unassigned_at' => $now,
+                        'unassigned_by_user_id' => $user?->id,
+                        'unassign_reason' => 'Reassigned to another driver',
+                    ]);
+
+                Driver::query()->whereKey($previousDriverId)->update(['status' => 'available']);
+            }
 
             $lockedManifest->update([
                 'assigned_driver_id' => $driver->id,
-                'assigned_at' => now(),
+                'assigned_at' => $now,
                 'status' => TransportManifest::STATUS_ASSIGNED,
             ]);
 
-            if ($previousDriverId && (int) $previousDriverId !== (int) $driver->id) {
-                Driver::query()->whereKey($previousDriverId)->update(['status' => 'available']);
-            }
+            // Create assignment log entry
+            TransportManifestAssignment::query()->create([
+                'transport_manifest_id' => $lockedManifest->id,
+                'driver_id' => $driver->id,
+                'assigned_by_user_id' => $user?->id,
+                'assigned_at' => $now,
+            ]);
 
             $driver->update(['status' => 'busy']);
 
@@ -165,6 +182,53 @@ class WarehouseTransportService
                         'destinationWarehouse',
                     ]),
                 ],
+            ];
+        });
+    }
+
+    public function unassignDriver(TransportManifest $manifest, Warehouse $warehouse, User $user, ?string $reason = null): array
+    {
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            return ['success' => false, 'message' => 'Cannot modify another warehouse manifest.'];
+        }
+
+        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_DRAFT], true)) {
+            return ['success' => false, 'message' => 'Driver can only be unassigned from draft or assigned manifests.'];
+        }
+
+        if (!$manifest->assigned_driver_id) {
+            return ['success' => false, 'message' => 'No driver is currently assigned.'];
+        }
+
+        return DB::transaction(function () use ($manifest, $user, $reason) {
+            $lockedManifest = TransportManifest::query()->lockForUpdate()->findOrFail($manifest->id);
+            $previousDriverId = $lockedManifest->assigned_driver_id;
+            $now = now();
+
+            // Close assignment log
+            TransportManifestAssignment::query()
+                ->where('transport_manifest_id', $lockedManifest->id)
+                ->where('driver_id', $previousDriverId)
+                ->whereNull('unassigned_at')
+                ->update([
+                    'unassigned_at' => $now,
+                    'unassigned_by_user_id' => $user->id,
+                    'unassign_reason' => $reason ?: 'Driver unassigned',
+                ]);
+
+            $lockedManifest->update([
+                'assigned_driver_id' => null,
+                'assigned_at' => null,
+                'status' => TransportManifest::STATUS_DRAFT,
+            ]);
+
+            if ($previousDriverId) {
+                Driver::query()->whereKey($previousDriverId)->update(['status' => 'available']);
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Driver unassigned successfully.',
             ];
         });
     }

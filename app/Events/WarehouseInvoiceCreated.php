@@ -2,8 +2,8 @@
 
 namespace App\Events;
 
-use App\Models\Admin;
 use App\Models\Invoice;
+use App\Models\User;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -14,6 +14,6 @@ class WarehouseInvoiceCreated
 
     public function __construct(
         public readonly Invoice $invoice,
-        public readonly Admin $createdBy,
+        public readonly User $createdBy,
     ) {}
 }
