@@ -13,6 +13,7 @@ $vendorConfig = [
     'updateEndpoint' => route('admin.vendors.update', $vendor),
     'toggleActiveEndpoint' => route('admin.vendors.toggle-active', $vendor),
     'restoreEndpoint' => route('admin.vendors.restore', $vendor),
+    'deleteEndpoint' => route('admin.vendors.destroy', $vendor),
     'isDeleted' => $vendor->trashed(),
     'canManage' => $canManage,
     'statuses' => $statuses,
@@ -39,7 +40,7 @@ $vendorConfig = [
             </div>
             @if($canManage)
             <button
-                @@click="restoreVendor()"
+                @@click="showRestoreModal = true"
                 class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -97,6 +98,15 @@ $vendorConfig = [
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
                             </svg>
                             <span x-text="vendor.is_active ? 'Deactivate' : 'Activate'"></span>
+                        </button>
+                        <button
+                            @@click="showDeleteModal = true"
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl border border-rose-500/30 transition-all backdrop-blur-sm shadow-sm hover:shadow-md"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            Delete
                         </button>
                     </div>
                     @endif
@@ -1007,6 +1017,70 @@ $vendorConfig = [
                         <span x-text="toggling ? 'Processing...' : (vendor.is_active ? 'Yes, Deactivate' : 'Yes, Activate')"></span>
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restore Vendor Modal -->
+    <div x-show="showRestoreModal" x-cloak class="fixed inset-0 z-[9999] flex items-center justify-center p-4" style="display:none">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="showRestoreModal = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" @@click.stop>
+            <div class="px-6 py-8 text-center">
+                <div class="mx-auto mb-4 flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100">
+                    <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-slate-900">Restore Vendor?</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    Are you sure you want to restore <strong x-text="vendor.name"></strong>? Their account will be recovered in an inactive state and will need to be manually activated.
+                </p>
+            </div>
+            <div class="flex items-center gap-3 border-t border-slate-200/50 bg-slate-50/50 px-6 py-4">
+                <button type="button" @@click="showRestoreModal = false"
+                        class="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-700 bg-white border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all">
+                    Cancel
+                </button>
+                <button type="button" @@click="restoreVendor()" :disabled="restoring"
+                        class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white transition-all disabled:opacity-50">
+                    <svg x-show="restoring" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span x-text="restoring ? 'Restoring...' : 'Yes, Restore'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Vendor Modal -->
+    <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-[9999] flex items-center justify-center p-4" style="display:none">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="showDeleteModal = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" @@click.stop>
+            <div class="px-6 py-8 text-center">
+                <div class="mx-auto mb-4 flex items-center justify-center w-16 h-16 rounded-full bg-rose-100">
+                    <svg class="w-8 h-8 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-slate-900">Delete Vendor?</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    Are you sure you want to delete <strong x-text="vendor.name"></strong>? Their API access will be revoked and phone number freed for re-registration. Shipment and invoice records will be preserved.
+                </p>
+            </div>
+            <div class="flex items-center gap-3 border-t border-slate-200/50 bg-slate-50/50 px-6 py-4">
+                <button type="button" @@click="showDeleteModal = false"
+                        class="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-700 bg-white border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all">
+                    Cancel
+                </button>
+                <button type="button" @@click="deleteVendor()" :disabled="deleting"
+                        class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold rounded-xl bg-rose-500 hover:bg-rose-600 text-white transition-all disabled:opacity-50">
+                    <svg x-show="deleting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span x-text="deleting ? 'Deleting...' : 'Yes, Delete'"></span>
+                </button>
             </div>
         </div>
     </div>

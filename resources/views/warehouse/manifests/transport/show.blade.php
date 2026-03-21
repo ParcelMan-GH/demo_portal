@@ -43,7 +43,7 @@
 @section('content')
 <div class="space-y-6"
      x-data="transportManifestShowPage"
-     data-transport-manifest-show-config="{{ e(json_encode($manifestConfig, JSON_INVALID_UTF8_SUBSTITUTE)) }}">
+     data-transport-manifest-show-config="{{ json_encode($manifestConfig, JSON_INVALID_UTF8_SUBSTITUTE) }}">
 
     {{-- ── Hero ────────────────────────────────────────────────────────── --}}
     <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30">

@@ -391,11 +391,22 @@ function buildVendorsTable(config) {
             }
         },
 
-        async restoreVendor(vendor) {
-            if (!confirm(`Restore vendor "${vendor.name}"?`)) return;
+        openRestoreModal(vendor) {
+            if (this.$store?.vendorsRestore) {
+                this.$store.vendorsRestore.vendor = vendor;
+                this.$store.vendorsRestore.onConfirm = () => this.confirmRestore();
+                this.$store.vendorsRestore.show = true;
+            }
+        },
+
+        async confirmRestore() {
+            const store = this.$store?.vendorsRestore;
+            if (!store?.vendor) return;
+
+            store.restoring = true;
 
             try {
-                const response = await fetch(`${window.location.origin}/admin/vendors/${vendor.id}/restore`, {
+                const response = await fetch(`${window.location.origin}/admin/vendors/${store.vendor.id}/restore`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -411,6 +422,9 @@ function buildVendorsTable(config) {
                     throw new Error(data.message || 'Failed to restore vendor');
                 }
 
+                store.show = false;
+                store.vendor = null;
+
                 if (window.showToast) {
                     window.showToast(data.message || 'Vendor restored successfully.', 'success');
                 }
@@ -419,9 +433,9 @@ function buildVendorsTable(config) {
                 console.error('Error restoring vendor:', error);
                 if (window.showToast) {
                     window.showToast(error.message || 'Failed to restore vendor.', 'error');
-                } else {
-                    alert(error.message || 'Failed to restore vendor. Please try again.');
                 }
+            } finally {
+                store.restoring = false;
             }
         },
 
@@ -644,6 +658,13 @@ function registerVendorsTable() {
         show: false,
         vendor: null,
         deleting: false,
+        onConfirm: null,
+    });
+
+    Alpine.store('vendorsRestore', {
+        show: false,
+        vendor: null,
+        restoring: false,
         onConfirm: null,
     });
 

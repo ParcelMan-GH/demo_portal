@@ -322,7 +322,7 @@
                                     <!-- Restore Button (for deleted vendors) -->
                                     <template x-if="vendor.is_deleted && vendor.can_manage">
                                         <button
-                                            @@click="restoreVendor(vendor)"
+                                            @@click="openRestoreModal(vendor)"
                                             class="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
                                             title="Restore vendor">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -738,6 +738,75 @@
                             </div>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restore Confirmation Modal -->
+    <div
+        x-show="$store.vendorsRestore.show"
+        x-cloak
+        class="fixed inset-0 z-[110] overflow-y-auto"
+        @keydown.escape.window="$store.vendorsRestore.show = false"
+    >
+        <div x-show="$store.vendorsRestore.show"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-slate-600/60 backdrop-blur-[2px]"
+             @click="$store.vendorsRestore.show = false"></div>
+
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div
+                x-show="$store.vendorsRestore.show"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-95"
+                @click.stop
+                class="relative w-full max-w-sm bg-white rounded-2xl shadow-[0_18px_45px_rgba(15,23,42,0.28)] border border-slate-200/80 overflow-hidden"
+            >
+                <div class="px-6 py-5">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-slate-900">Restore Vendor</h3>
+                            <p class="mt-1.5 text-sm text-slate-500 leading-relaxed">
+                                Are you sure you want to restore
+                                <span class="font-semibold text-slate-800" x-text="$store.vendorsRestore.vendor?.name"></span>?
+                                Their account will be recovered in an inactive state.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-5">
+                    <button
+                        type="button"
+                        @click="$store.vendorsRestore.show = false"
+                        class="text-sm font-medium text-slate-600 hover:text-slate-800"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        @click="$store.vendorsRestore.onConfirm && $store.vendorsRestore.onConfirm()"
+                        :disabled="$store.vendorsRestore.restoring"
+                        class="inline-flex items-center justify-center px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-full shadow-lg shadow-emerald-600/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <span x-show="$store.vendorsRestore.restoring">Restoring...</span>
+                        <span x-show="!$store.vendorsRestore.restoring">Restore</span>
+                    </button>
                 </div>
             </div>
         </div>

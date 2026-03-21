@@ -12,6 +12,10 @@ function vendorShow() {
 
         activeTab: 'shipments',
         showToggleModal: false,
+        showDeleteModal: false,
+        deleting: false,
+        showRestoreModal: false,
+        restoring: false,
 
         // Shipments state
         shipments: {
@@ -433,8 +437,7 @@ function vendorShow() {
         },
 
         async restoreVendor() {
-            if (!confirm('Restore this vendor?')) return;
-
+            this.restoring = true;
             try {
                 const response = await fetch(this.config.restoreEndpoint, {
                     method: 'PATCH',
@@ -455,15 +458,52 @@ function vendorShow() {
                     window.showToast(data.message || 'Vendor restored successfully.', 'success');
                 }
 
-                // Reload page to reflect restored state
                 window.location.reload();
             } catch (error) {
                 console.error('Restore error:', error);
                 if (window.showToast) {
                     window.showToast(error.message || 'Failed to restore vendor.', 'error');
-                } else {
-                    alert(error.message || 'Failed to restore vendor.');
                 }
+            } finally {
+                this.restoring = false;
+                this.showRestoreModal = false;
+            }
+        },
+
+        async deleteVendor() {
+            this.deleting = true;
+            try {
+                const response = await fetch(this.config.deleteEndpoint, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to delete vendor');
+                }
+
+                if (window.showToast) {
+                    window.showToast(data.message || 'Vendor deleted successfully.', 'success');
+                }
+
+                // Redirect to vendors list
+                setTimeout(() => {
+                    window.location.href = '/admin/vendors';
+                }, 1000);
+            } catch (error) {
+                console.error('Delete error:', error);
+                if (window.showToast) {
+                    window.showToast(error.message || 'Failed to delete vendor.', 'error');
+                }
+            } finally {
+                this.deleting = false;
+                this.showDeleteModal = false;
             }
         },
 

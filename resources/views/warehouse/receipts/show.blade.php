@@ -1532,7 +1532,7 @@
                                     </div>
                                     <div class="flex items-center gap-1">
                                         <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                        <span class="text-[11px] text-slate-500" x-text="(item.photos || []).length + ' photo(s)'"></span>
+                                        <span class="text-[11px] text-slate-500" x-text="((item.vendor_photos||[]).length + (item.driver_photos||[]).length + (item.photos||[]).length) + ' photo(s)'"></span>
                                     </div>
                                     <template x-if="item.notes">
                                         <div class="flex items-center gap-1">
@@ -1541,6 +1541,65 @@
                                         </div>
                                     </template>
                                 </div>
+
+                                {{-- Photos gallery --}}
+                                <template x-if="(item.vendor_photos||[]).length > 0 || (item.driver_photos||[]).length > 0">
+                                    <div class="px-4 py-3 border-b border-slate-100" x-data="{ expanded: false, lbOpen: false, lbPhotos: [], lbIndex: 0, openLightbox(photos, idx) { this.lbPhotos = photos; this.lbIndex = idx; this.lbOpen = true; }, lbPrev() { this.lbIndex = (this.lbIndex - 1 + this.lbPhotos.length) % this.lbPhotos.length; }, lbNext() { this.lbIndex = (this.lbIndex + 1) % this.lbPhotos.length; } }">
+                                        <button type="button" @click="expanded = !expanded" class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 hover:text-slate-700 transition-colors w-full">
+                                            <svg class="w-3 h-3 transition-transform" :class="expanded ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                            <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                            <span x-text="'View Photos (' + ((item.vendor_photos||[]).length + (item.driver_photos||[]).length) + ')'"></span>
+                                        </button>
+                                        <div x-show="expanded" x-collapse class="mt-3 space-y-3">
+                                            <template x-if="(item.vendor_photos||[]).length > 0">
+                                                <div>
+                                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Vendor Photos</p>
+                                                    <div class="flex flex-wrap gap-1.5">
+                                                        <template x-for="(url, pi) in (item.vendor_photos||[])" :key="'vp-'+pi">
+                                                            <button type="button" @click="openLightbox(item.vendor_photos, pi)" class="block w-14 h-14 rounded-lg overflow-hidden border border-slate-200 hover:border-slate-400 transition-colors cursor-zoom-in">
+                                                                <img :src="url" class="w-full h-full object-cover" />
+                                                            </button>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                            <template x-if="(item.driver_photos||[]).length > 0">
+                                                <div>
+                                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Driver Photos</p>
+                                                    <div class="flex flex-wrap gap-1.5">
+                                                        <template x-for="(photo, pi) in (item.driver_photos||[])" :key="'dp-'+pi">
+                                                            <button type="button" @click="openLightbox((item.driver_photos||[]).map(p => p.url), pi)" class="block w-14 h-14 rounded-lg overflow-hidden border border-slate-200 hover:border-slate-400 transition-colors cursor-zoom-in">
+                                                                <img :src="photo.url" class="w-full h-full object-cover" />
+                                                            </button>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+
+                                        {{-- Lightbox overlay --}}
+                                        <div x-show="lbOpen" x-cloak @keydown.escape.window="lbOpen = false" @keydown.left.window="lbPrev()" @keydown.right.window="lbNext()"
+                                             class="fixed inset-0 z-[99999] flex items-center justify-center" style="display:none">
+                                            <div class="absolute inset-0 bg-black/90" @click="lbOpen = false"></div>
+                                            {{-- Close --}}
+                                            <button type="button" @click="lbOpen = false" class="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            </button>
+                                            {{-- Counter --}}
+                                            <div class="absolute top-4 left-4 z-10 text-white/70 text-sm font-medium" x-text="(lbIndex + 1) + ' / ' + lbPhotos.length"></div>
+                                            {{-- Prev --}}
+                                            <button type="button" x-show="lbPhotos.length > 1" @click.stop="lbPrev()" class="absolute left-3 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                            </button>
+                                            {{-- Image --}}
+                                            <img :src="lbPhotos[lbIndex]" class="relative z-[1] max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl" @click.stop />
+                                            {{-- Next --}}
+                                            <button type="button" x-show="lbPhotos.length > 1" @click.stop="lbNext()" class="absolute right-3 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
 
                                 {{-- Barcode row --}}
                                 <div class="px-4 py-3 flex items-center justify-between border-b border-slate-100">

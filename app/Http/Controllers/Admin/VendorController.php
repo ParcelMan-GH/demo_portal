@@ -462,9 +462,12 @@ class VendorController extends Controller
         // Revoke all API tokens
         $vendor->tokens()->delete();
 
-        // Mangle phone to free it for re-registration
-        $vendor->phone = $vendor->phone . '_deleted_' . time();
-        $vendor->save();
+        // Mangle phone to free it for re-registration, clear FCM, deactivate
+        $vendor->update([
+            'phone'     => $vendor->phone . '_deleted_' . time(),
+            'fcm_token' => null,
+            'is_active' => false,
+        ]);
 
         $vendor->delete();
 
