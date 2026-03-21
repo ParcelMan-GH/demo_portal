@@ -58,11 +58,14 @@ class VendorProfileController extends Controller
         // Revoke all API tokens
         $vendor->tokens()->delete();
 
-        // Clear FCM token
-        $vendor->update(['fcm_token' => null]);
+        // Mangle phone to free the unique constraint for re-registration
+        $vendor->update([
+            'phone'     => $vendor->phone . '_deleted_' . time(),
+            'fcm_token' => null,
+            'is_active' => false,
+        ]);
 
         // Soft-delete the vendor
-        $vendor->update(['is_active' => false]);
         $vendor->delete();
 
         return response()->json([
