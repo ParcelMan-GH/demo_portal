@@ -2234,6 +2234,30 @@
                     }
                 }
             },
+            {
+                method: 'GET',
+                url: '/api/v1/vendor/invoices/{id}/pdf',
+                name: 'Download Invoice PDF',
+                description: 'Download invoice as a PDF file. Only available for invoices that are not in pending status.',
+                auth: true,
+                group: 'invoices',
+                userType: 'vendor',
+                urlParams: [
+                    { name: 'id', type: 'dropdown', required: true, description: 'Invoice ID', source: 'invoices?limit=100', labelField: 'invoice_number', valueField: 'id' }
+                ],
+                fields: [],
+                sampleResponses: {
+                    '200': 'PDF file download (Content-Type: application/pdf)',
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    },
+                    '404': {
+                        success: false,
+                        message: 'Invoice not found.'
+                    }
+                }
+            },
             // ============ VENDOR NOTIFICATION ENDPOINTS ============
             {
                 method: 'GET',
