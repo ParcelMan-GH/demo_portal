@@ -20,7 +20,7 @@ class VendorNotificationController extends Controller
         $validated = $request->validate([
             'status'     => ['nullable', 'string', Rule::in(['sent', 'failed'])],
             'type'       => ['nullable', 'string', 'max:100'],
-            'is_read'    => ['nullable', 'boolean'],
+            'is_read'    => ['nullable', 'in:true,false,1,0'],
             'from_date'  => ['nullable', 'date'],
             'to_date'    => ['nullable', 'date', 'after_or_equal:from_date'],
             'limit'      => ['nullable', 'integer', 'min:1', 'max:100'],
@@ -41,7 +41,7 @@ class VendorNotificationController extends Controller
         }
 
         if (array_key_exists('is_read', $validated) && !is_null($validated['is_read'])) {
-            if ((bool) $validated['is_read']) {
+            if (filter_var($validated['is_read'], FILTER_VALIDATE_BOOLEAN)) {
                 $query->whereNotNull('read_at');
             } else {
                 $query->whereNull('read_at');
