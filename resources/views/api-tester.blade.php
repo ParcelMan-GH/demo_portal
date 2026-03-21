@@ -578,6 +578,26 @@
                     }
                 }
             },
+            {
+                method: 'DELETE',
+                url: '/api/v1/vendor/account',
+                name: 'Delete Account',
+                description: 'Permanently delete the vendor\'s account. This will revoke all API tokens, deactivate the account, and soft-delete it. This action cannot be undone from the app.',
+                auth: true,
+                group: 'profile',
+                fields: [],
+                sampleBody: {},
+                exampleResponses: {
+                    '200': {
+                        success: true,
+                        message: 'Your account has been deleted successfully.'
+                    },
+                    '401': {
+                        success: false,
+                        message: 'Unauthenticated.'
+                    }
+                }
+            },
             // ==================== DRIVER ENDPOINTS ====================
             // Driver Auth Endpoints
             {

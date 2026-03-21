@@ -43,6 +43,7 @@ Route::prefix('v1/vendor')->middleware(['auth:sanctum', 'vendor.active'])->group
     Route::get('profile', [VendorProfileController::class, 'show']);
     Route::put('profile', [VendorProfileController::class, 'update']);
     Route::post('fcm-token', [VendorProfileController::class, 'updateFcmToken']);
+    Route::delete('account', [VendorProfileController::class, 'deleteAccount']);
 
     // Location endpoints
     Route::get('regions', [VendorLocationController::class, 'regions']);

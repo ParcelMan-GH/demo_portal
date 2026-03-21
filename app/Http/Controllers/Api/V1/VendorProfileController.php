@@ -48,6 +48,30 @@ class VendorProfileController extends Controller
     }
 
     /**
+     * Delete vendor account.
+     * DELETE /api/v1/vendor/account
+     */
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        $vendor = $request->user();
+
+        // Revoke all API tokens
+        $vendor->tokens()->delete();
+
+        // Clear FCM token
+        $vendor->update(['fcm_token' => null]);
+
+        // Soft-delete the vendor
+        $vendor->update(['is_active' => false]);
+        $vendor->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Your account has been deleted successfully.',
+        ]);
+    }
+
+    /**
      * Update vendor FCM device token.
      * POST /api/v1/vendor/fcm-token
      */
