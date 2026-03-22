@@ -203,33 +203,58 @@ $walkinConfig = [
         </div>
     </div>
 
-    <!-- ═══════════ STEP 2: ITEMS & DELIVERY ═══════════ -->
+    <!-- ═══════════ STEP 2: FULFILLMENT METHOD ═══════════ -->
     <div x-show="step === 2" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
-        <div class="space-y-6">
-
-            <!-- Fulfillment Type -->
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50 p-6">
-                <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5 mb-4">
-                    <span class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    </span>
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50">
+            <div class="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
+                <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">2</span>
                     Fulfillment Method
                 </h2>
-                <div class="grid grid-cols-3 gap-3">
-                    <template x-for="ft in [{v:'warehouse',label:'Warehouse Delivery',desc:'Normal: warehouse → delivery run',icon:'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',color:'blue'},{v:'self_pickup',label:'Self Pickup',desc:'Recipient collects from warehouse',icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',color:'emerald'},{v:'direct',label:'Direct Delivery',desc:'Driver delivers directly after pickup',icon:'M13 10V3L4 14h7v7l9-11h-7z',color:'amber'}]" :key="ft.v">
+                <p class="text-xs text-slate-500 mt-1 ml-[42px]">How should this shipment be fulfilled?</p>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 gap-3">
+                    <template x-for="ft in [
+                        {v:'warehouse', label:'Warehouse Delivery', desc:'Items go to warehouse, get sorted, then dispatched via delivery run to the recipient. This is the standard flow.', icon:'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4', color:'blue'},
+                        {v:'self_pickup', label:'Self Pickup', desc:'Items go to warehouse, then the recipient comes to the warehouse and collects them. No delivery run needed.', icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', color:'emerald'},
+                        {v:'direct', label:'Direct Delivery', desc:'Driver picks up from vendor and delivers directly to the recipient. No warehouse stop — pipeline records are auto-created.', icon:'M13 10V3L4 14h7v7l9-11h-7z', color:'amber'}
+                    ]" :key="ft.v">
                         <label class="cursor-pointer">
                             <input type="radio" x-model="fulfillmentType" :value="ft.v" class="sr-only peer">
-                            <div class="relative p-3.5 rounded-xl border-2 transition-all duration-200 border-slate-200 hover:border-slate-300 hover:bg-slate-50 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:shadow-sm">
-                                <p class="text-xs font-bold text-slate-900" x-text="ft.label"></p>
-                                <p class="text-[10px] text-slate-500 mt-1" x-text="ft.desc"></p>
-                                <div class="absolute top-3 right-3 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all" :class="fulfillmentType === ft.v ? 'border-blue-500 bg-blue-500' : 'border-slate-300'">
-                                    <svg x-show="fulfillmentType === ft.v" class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                            <div class="relative flex items-start gap-4 p-4 rounded-2xl border-2 transition-all duration-200 border-slate-200 hover:border-slate-300 hover:bg-slate-50 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:shadow-md peer-checked:shadow-blue-500/10">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                                     :class="ft.color === 'blue' ? 'bg-blue-100' : (ft.color === 'emerald' ? 'bg-emerald-100' : 'bg-amber-100')">
+                                    <svg class="w-5 h-5" :class="ft.color === 'blue' ? 'text-blue-600' : (ft.color === 'emerald' ? 'text-emerald-600' : 'text-amber-600')" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" :d="ft.icon"/></svg>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-bold text-slate-900" x-text="ft.label"></p>
+                                    <p class="text-xs text-slate-500 mt-1 leading-relaxed" x-text="ft.desc"></p>
+                                </div>
+                                <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 transition-all" :class="fulfillmentType === ft.v ? 'border-blue-500 bg-blue-500' : 'border-slate-300'">
+                                    <svg x-show="fulfillmentType === ft.v" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                                 </div>
                             </div>
                         </label>
                     </template>
                 </div>
             </div>
+        </div>
+        <div class="flex items-center justify-between mt-6">
+            <button @@click="step = 1" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
+                Back
+            </button>
+            <button @@click="step = 3" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-600/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
+                Continue
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- ═══════════ STEP 3: ITEMS & DELIVERY ═══════════ -->
+    <div x-show="step === 3" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+        <div class="space-y-6">
 
             <!-- Destination Mode Toggle -->
             <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50 p-6">
@@ -414,7 +439,7 @@ $walkinConfig = [
 
             <!-- Nav -->
             <div class="flex items-center justify-between pt-2">
-                <button @@click="step = 1" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
+                <button @@click="step = 2" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
                     Back
                 </button>
@@ -427,8 +452,8 @@ $walkinConfig = [
         </div>
     </div>
 
-    <!-- ═══════════ STEP 3: REVIEW ═══════════ -->
-    <div x-show="step === 3" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+    <!-- ═══════════ STEP 4: REVIEW ═══════════ -->
+    <div x-show="step === 4" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
         <div class="space-y-5">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <!-- Vendor -->
@@ -476,7 +501,7 @@ $walkinConfig = [
 
             <!-- Submit -->
             <div class="flex items-center justify-between pt-3">
-                <button @@click="step = 2" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
+                <button @@click="step = 3" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
                     Edit
                 </button>
@@ -508,7 +533,7 @@ $walkinConfig = [
 function walkinShipment() {
     return {
         config: {},
-        steps: ['Vendor', 'Items & Delivery', 'Review'],
+        steps: ['Vendor', 'Fulfillment', 'Items & Delivery', 'Review'],
         step: 1,
         vendorPhone: '', vendorLoading: false, vendorFound: null, vendorData: null, vendorId: null, vendorError: '',
         newVendor: { name: '', business_name: '', phone: '', email: '' },
@@ -617,7 +642,7 @@ function walkinShipment() {
             return true;
         },
 
-        goToReview() { if (this.canProceedToReview()) this.step = 3; },
+        goToReview() { if (this.canProceedToReview()) this.step = 4; },
 
         async submitShipment() {
             this.submitting = true; this.submitError = '';

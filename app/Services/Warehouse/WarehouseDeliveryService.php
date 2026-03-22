@@ -889,7 +889,7 @@ class WarehouseDeliveryService
         $deliveredStops = $run->stops->where('status', DeliveryRunStop::STATUS_DELIVERED)->count();
         $failedStops = $run->stops->where('status', DeliveryRunStop::STATUS_FAILED)->count();
 
-        if ($totalStops > 0 && $deliveredStops === $totalStops) {
+        if ($totalStops > 0 && ($deliveredStops + $failedStops) === $totalStops) {
             $run->update([
                 'status' => DeliveryRun::STATUS_COMPLETED,
                 'completed_at' => now(),
