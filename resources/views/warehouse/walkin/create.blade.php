@@ -50,24 +50,24 @@ $walkinConfig = [
     <!-- Stepper -->
     <div class="mb-6">
         <div class="flex items-center">
-            <template x-for="(s, idx) in steps" :key="idx">
-                <div class="flex items-center" :class="idx < steps.length - 1 ? 'flex-1' : ''">
-                    <button @@click="idx + 1 < step && (step = idx + 1)" class="flex items-center gap-2 group" :class="idx + 1 < step ? 'cursor-pointer' : 'cursor-default'">
+            <template x-for="(s, idx) in stepLabels()" :key="idx">
+                <div class="flex items-center" :class="idx < stepLabels().length - 1 ? 'flex-1' : ''">
+                    <button @@click="stepMap()[idx] < step && (step = stepMap()[idx])" class="flex items-center gap-2 group" :class="stepMap()[idx] < step ? 'cursor-pointer' : 'cursor-default'">
                         <div class="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all duration-300 border-2"
-                             :class="step > idx + 1 ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/30' : (step === idx + 1 ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/30' : 'bg-white border-slate-200 text-slate-400')">
-                            <template x-if="step > idx + 1">
+                             :class="step > stepMap()[idx] ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/30' : (step === stepMap()[idx] ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/30' : 'bg-white border-slate-200 text-slate-400')">
+                            <template x-if="step > stepMap()[idx]">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                             </template>
-                            <template x-if="step <= idx + 1">
+                            <template x-if="step <= stepMap()[idx]">
                                 <span x-text="idx + 1"></span>
                             </template>
                         </div>
                         <span class="text-xs font-semibold hidden sm:inline transition-colors"
-                              :class="step === idx + 1 ? 'text-slate-900' : (step > idx + 1 ? 'text-emerald-600' : 'text-slate-400')"
+                              :class="step === stepMap()[idx] ? 'text-slate-900' : (step > stepMap()[idx] ? 'text-emerald-600' : 'text-slate-400')"
                               x-text="s"></span>
                     </button>
-                    <template x-if="idx < steps.length - 1">
-                        <div class="flex-1 h-[2px] mx-4 rounded-full transition-all duration-500" :class="step > idx + 1 ? 'bg-emerald-400' : 'bg-slate-200'"></div>
+                    <template x-if="idx < stepLabels().length - 1">
+                        <div class="flex-1 h-[2px] mx-4 rounded-full transition-all duration-500" :class="step > stepMap()[idx] ? 'bg-emerald-400' : 'bg-slate-200'"></div>
                     </template>
                 </div>
             </template>
@@ -203,12 +203,62 @@ $walkinConfig = [
         </div>
     </div>
 
-    <!-- ═══════════ STEP 2: FULFILLMENT METHOD ═══════════ -->
+    <!-- ═══════════ STEP 2: DESTINATION MODE ═══════════ -->
     <div x-show="step === 2" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50 p-6">
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5 mb-4">
+                <span class="w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-bold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                </span>
+                Delivery Mode
+            </h2>
+            <div class="grid grid-cols-2 gap-4">
+                <label class="cursor-pointer">
+                    <input type="radio" x-model="destinationMode" value="single" class="sr-only peer">
+                    <div class="relative p-4 rounded-2xl border-2 transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:shadow-md peer-checked:shadow-blue-500/15 border-slate-200 hover:border-slate-300 hover:bg-slate-50">
+                        <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        </div>
+                        <p class="text-sm font-bold text-slate-900">Single Destination</p>
+                        <p class="text-[11px] text-slate-500 mt-1">All items go to one address</p>
+                        <div class="absolute top-3.5 right-3.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all" :class="destinationMode === 'single' ? 'border-blue-500 bg-blue-500' : 'border-slate-300'">
+                            <svg x-show="destinationMode === 'single'" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                        </div>
+                    </div>
+                </label>
+                <label class="cursor-pointer">
+                    <input type="radio" x-model="destinationMode" value="per_item" class="sr-only peer">
+                    <div class="relative p-4 rounded-2xl border-2 transition-all duration-200 peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:shadow-md peer-checked:shadow-amber-500/15 border-slate-200 hover:border-slate-300 hover:bg-slate-50">
+                        <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center mb-3">
+                            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+                        </div>
+                        <p class="text-sm font-bold text-slate-900">Per-item Destinations</p>
+                        <p class="text-[11px] text-slate-500 mt-1">Each item has its own recipient</p>
+                        <div class="absolute top-3.5 right-3.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all" :class="destinationMode === 'per_item' ? 'border-amber-500 bg-amber-500' : 'border-slate-300'">
+                            <svg x-show="destinationMode === 'per_item'" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                        </div>
+                    </div>
+                </label>
+            </div>
+        </div>
+        <div class="flex items-center justify-between mt-6">
+            <button @@click="step = 1" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
+                Back
+            </button>
+            <button @@click="step = nextStepFrom(2)" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-600/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
+                Continue
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- ═══════════ STEP 3: FULFILLMENT METHOD (single only) ═══════════ -->
+    <div x-show="step === 3 && destinationMode === 'single'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
         <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50">
             <div class="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
                 <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5">
-                    <span class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">2</span>
+                    <span class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">3</span>
                     Fulfillment Method
                 </h2>
                 <p class="text-xs text-slate-500 mt-1 ml-[42px]">How should this shipment be fulfilled?</p>
@@ -241,58 +291,20 @@ $walkinConfig = [
             </div>
         </div>
         <div class="flex items-center justify-between mt-6">
-            <button @@click="step = 1" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
+            <button @@click="step = 2" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
                 Back
             </button>
-            <button @@click="step = 3" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-600/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
+            <button @@click="step = 4" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-600/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
                 Continue
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
             </button>
         </div>
     </div>
 
-    <!-- ═══════════ STEP 3: ITEMS & DELIVERY ═══════════ -->
-    <div x-show="step === 3" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+    <!-- ═══════════ STEP 4 (or 3 for per_item): ITEMS & DELIVERY ═══════════ -->
+    <div x-show="step === itemsStep()" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
         <div class="space-y-6">
-
-            <!-- Destination Mode Toggle -->
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50 p-6">
-                <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5 mb-4">
-                    <span class="w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-bold">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-                    </span>
-                    Delivery Mode
-                </h2>
-                <div class="grid grid-cols-2 gap-4">
-                    <label class="cursor-pointer">
-                        <input type="radio" x-model="destinationMode" value="single" class="sr-only peer">
-                        <div class="relative p-4 rounded-2xl border-2 transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:shadow-md peer-checked:shadow-blue-500/15 border-slate-200 hover:border-slate-300 hover:bg-slate-50">
-                            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3">
-                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            </div>
-                            <p class="text-sm font-bold text-slate-900">Single Destination</p>
-                            <p class="text-[11px] text-slate-500 mt-1">All items delivered to one address</p>
-                            <div class="absolute top-3.5 right-3.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all peer-checked:border-blue-500 peer-checked:bg-blue-500" :class="destinationMode === 'single' ? 'border-blue-500 bg-blue-500' : 'border-slate-300'">
-                                <svg x-show="destinationMode === 'single'" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                            </div>
-                        </div>
-                    </label>
-                    <label class="cursor-pointer">
-                        <input type="radio" x-model="destinationMode" value="per_item" class="sr-only peer">
-                        <div class="relative p-4 rounded-2xl border-2 transition-all duration-200 peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:shadow-md peer-checked:shadow-amber-500/15 border-slate-200 hover:border-slate-300 hover:bg-slate-50">
-                            <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center mb-3">
-                                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                            </div>
-                            <p class="text-sm font-bold text-slate-900">Per-Item Destination</p>
-                            <p class="text-[11px] text-slate-500 mt-1">Each item has its own delivery address</p>
-                            <div class="absolute top-3.5 right-3.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all" :class="destinationMode === 'per_item' ? 'border-amber-500 bg-amber-500' : 'border-slate-300'">
-                                <svg x-show="destinationMode === 'per_item'" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                            </div>
-                        </div>
-                    </label>
-                </div>
-            </div>
 
             <!-- Items List -->
             <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50">
@@ -335,6 +347,14 @@ $walkinConfig = [
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
                                                 Delivery for this item
                                             </p>
+                                            <div>
+                                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Fulfillment Type</label>
+                                                <select x-model="item.fulfillment_type" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white">
+                                                    <option value="warehouse">Warehouse Delivery</option>
+                                                    <option value="direct">Direct Delivery</option>
+                                                    <option value="self_pickup">Self Pickup</option>
+                                                </select>
+                                            </div>
                                             <div class="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient <span class="text-red-400">*</span></label>
@@ -439,7 +459,7 @@ $walkinConfig = [
 
             <!-- Nav -->
             <div class="flex items-center justify-between pt-2">
-                <button @@click="step = 2" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
+                <button @@click="step = prevStepFrom(itemsStep())" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
                     Back
                 </button>
@@ -453,7 +473,7 @@ $walkinConfig = [
     </div>
 
     <!-- ═══════════ STEP 4: REVIEW ═══════════ -->
-    <div x-show="step === 4" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+    <div x-show="step === reviewStep()" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
         <div class="space-y-5">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <!-- Vendor -->
@@ -501,7 +521,7 @@ $walkinConfig = [
 
             <!-- Submit -->
             <div class="flex items-center justify-between pt-3">
-                <button @@click="step = 3" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
+                <button @@click="step = itemsStep()" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
                     Edit
                 </button>
@@ -533,7 +553,7 @@ $walkinConfig = [
 function walkinShipment() {
     return {
         config: {},
-        steps: ['Vendor', 'Fulfillment', 'Items & Delivery', 'Review'],
+        steps: [], // dynamic — use stepLabels() and stepMap() instead
         step: 1,
         vendorPhone: '', vendorLoading: false, vendorFound: null, vendorData: null, vendorId: null, vendorError: '',
         newVendor: { name: '', business_name: '', phone: '', email: '' },
@@ -566,6 +586,7 @@ function walkinShipment() {
         makeItem() {
             return {
                 description: '', quantity: 1,
+                fulfillment_type: 'warehouse',
                 delivery: this.makeDelivery ? this.makeDelivery() : {
                     recipient_name: '', recipient_phone: '',
                     locationQuery: '', locationResults: [], locationSearching: false,
@@ -642,14 +663,33 @@ function walkinShipment() {
             return true;
         },
 
-        goToReview() { if (this.canProceedToReview()) this.step = 4; },
+        // Step navigation helpers
+        stepLabels() {
+            return this.destinationMode === 'single'
+                ? ['Vendor', 'Delivery Mode', 'Fulfillment', 'Items & Delivery', 'Review']
+                : ['Vendor', 'Delivery Mode', 'Items & Delivery', 'Review'];
+        },
+        stepMap() {
+            return this.destinationMode === 'single'
+                ? [1, 2, 3, 4, 5]
+                : [1, 2, 3, 4];
+        },
+        itemsStep()  { return this.destinationMode === 'single' ? 4 : 3; },
+        reviewStep() { return this.destinationMode === 'single' ? 5 : 4; },
+        nextStepFrom(current) { return current === 2 && this.destinationMode === 'per_item' ? 3 : current + 1; },
+        prevStepFrom(current) { return current === 3 && this.destinationMode === 'per_item' ? 2 : current - 1; },
+
+        goToReview() { if (this.canProceedToReview()) this.step = this.reviewStep(); },
 
         async submitShipment() {
             this.submitting = true; this.submitError = '';
             const payload = {
-                vendor_id: this.vendorId, fulfillment_type: this.fulfillmentType, destination_mode: this.destinationMode,
+                vendor_id: this.vendorId,
+                fulfillment_type: this.destinationMode === 'single' ? this.fulfillmentType : null,
+                destination_mode: this.destinationMode,
                 items: this.items.map(i => ({
                     description: i.description, quantity: i.quantity,
+                    fulfillment_type: this.destinationMode === 'per_item' ? i.fulfillment_type : undefined,
                     delivery: this.destinationMode === 'per_item' ? {
                         recipient_name: i.delivery.recipient_name, recipient_phone: i.delivery.recipient_phone,
                         region_id: i.delivery.region_id, district_id: i.delivery.district_id, town: i.delivery.town,

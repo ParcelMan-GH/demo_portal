@@ -23,8 +23,13 @@
                         <p class="mt-0.5 text-sm text-slate-500">View and manage all vendor shipments</p>
                     </div>
                 </div>
-                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="meta.total + ' Total Shipments'">
-                </span>
+                <div class="flex items-center gap-2.5">
+                    <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="meta.total + ' Total Shipments'"></span>
+                    <a href="{{ route('admin.shipments.create') }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm hover:shadow-md hover:shadow-blue-600/20 active:scale-[0.98]">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                        Create Shipment
+                    </a>
+                </div>
             </div>
         </div>
 

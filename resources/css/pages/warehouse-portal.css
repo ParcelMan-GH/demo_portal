@@ -33,12 +33,44 @@ body {
 
 /* ===================== Sidebar ===================== */
 
-/* Sidebar base — warm dark background with subtle orange tint */
+/* Sidebar base — warm brown-to-burnt-orange gradient matching driver portal */
 .wh-sidebar {
-    background: linear-gradient(180deg, #1e1a15 0%, #1a1611 50%, #151210 100%);
+    background: linear-gradient(180deg, #7c2d12 0%, #9a3412 40%, #7c2d12 100%);
     box-shadow:
-        4px 0 32px -4px rgba(0, 0, 0, 0.4),
-        1px 0 0 rgba(255, 255, 255, 0.03) inset;
+        4px 0 32px -4px rgba(124, 45, 18, 0.5),
+        1px 0 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+/* Dot-grid texture overlay on sidebar */
+.wh-sidebar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.04;
+    background-image: radial-gradient(circle, #fff 1px, transparent 1px);
+    background-size: 22px 22px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Decorative circles */
+.wh-sidebar::after {
+    content: '';
+    position: absolute;
+    top: -5rem;
+    right: -5rem;
+    width: 18rem;
+    height: 18rem;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Ensure sidebar children are above pseudo-elements */
+.wh-sidebar > * {
+    position: relative;
+    z-index: 1;
 }
 
 /* Scrollbar */
@@ -49,14 +81,14 @@ body {
     background: transparent;
 }
 .warehouse-sidebar-scroll::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 999px;
 }
 .warehouse-sidebar-scroll::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.28);
 }
 
-/* Section labels — Metronic style uppercase muted headings */
+/* Section labels — uppercase muted headings */
 .wh-nav-section-label {
     display: block;
     padding: 0 0.75rem;
@@ -65,10 +97,10 @@ body {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: rgba(255, 255, 255, 0.28);
+    color: rgba(253, 186, 116, 0.45);
 }
 
-/* Nav items — Metronic bullet style */
+/* Nav items */
 .wh-nav-item {
     display: flex;
     align-items: center;
@@ -76,7 +108,7 @@ body {
     padding: 0.5rem 0.75rem;
     border-radius: 8px;
     margin-bottom: 1px;
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.65);
     font-size: 0.8125rem;
     font-weight: 500;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -84,12 +116,12 @@ body {
     position: relative;
 }
 .wh-nav-item:hover {
-    color: rgba(255, 255, 255, 0.9);
-    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.08);
 }
 .wh-nav-item.active {
-    color: #fb923c;
-    background: rgba(251, 146, 60, 0.08);
+    color: #fdba74;
+    background: rgba(253, 186, 116, 0.12);
 }
 
 /* Bullet dot */
@@ -98,16 +130,16 @@ body {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.22);
     flex-shrink: 0;
     transition: all 0.2s ease;
 }
 .wh-nav-item:hover .wh-nav-bullet {
-    background: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.55);
 }
 .wh-nav-item.active .wh-nav-bullet {
-    background: #fb923c;
-    box-shadow: 0 0 8px rgba(251, 146, 60, 0.5);
+    background: #fdba74;
+    box-shadow: 0 0 10px rgba(253, 186, 116, 0.6);
 }
 
 /* Nav text */
@@ -120,22 +152,22 @@ body {
 
 /* Sidebar user card */
 .wh-user-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
     padding: 0.625rem;
     transition: all 0.2s;
 }
 .wh-user-card:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.14);
 }
 
 /* ===================== Header ===================== */
 
 /* Frosted glass header */
 .wh-header {
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.88);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border-bottom: 1px solid rgba(226, 232, 240, 0.5);
@@ -185,4 +217,62 @@ body {
 }
 .wh-dropdown-item.danger svg {
     color: #e11d48;
+}
+
+/* ===================== Buttons ===================== */
+
+/* Primary action buttons — warm orange matching sidebar */
+.wh-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #c2410c 0%, #ea580c 100%);
+    border-radius: 10px;
+    border: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(194, 65, 12, 0.25), 0 1px 2px rgba(0, 0, 0, 0.06);
+    cursor: pointer;
+}
+.wh-btn-primary:hover {
+    background: linear-gradient(135deg, #9a3412 0%, #c2410c 100%);
+    box-shadow: 0 4px 16px rgba(194, 65, 12, 0.35), 0 2px 4px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+.wh-btn-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(194, 65, 12, 0.2);
+}
+
+/* Secondary / outline button */
+.wh-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #9a3412;
+    background: rgba(254, 215, 170, 0.15);
+    border: 1px solid rgba(194, 65, 12, 0.2);
+    border-radius: 10px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+.wh-btn-secondary:hover {
+    background: rgba(254, 215, 170, 0.3);
+    border-color: rgba(194, 65, 12, 0.35);
+    color: #7c2d12;
+}
+
+/* Small variant */
+.wh-btn-sm {
+    padding: 0.375rem 0.875rem;
+    font-size: 0.75rem;
+    border-radius: 8px;
 }

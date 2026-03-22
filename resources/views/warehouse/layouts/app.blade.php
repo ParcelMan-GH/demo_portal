@@ -35,12 +35,12 @@
         >
             {{-- Logo Area --}}
             <div class="flex items-center h-[70px] px-5">
-                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center ring-1 ring-white/[0.08]">
-                    <img src="{{ asset('logo.png') }}" alt="Parcelman" class="h-6 w-6 object-contain">
+                <div class="flex-shrink-0 rounded-xl bg-white shadow-sm overflow-hidden flex items-center justify-center" style="width:44px;height:44px;">
+                    <img src="{{ asset('logo.png') }}" alt="Parcelman" style="transform:scale(1.8);transform-origin:center 40%;">
                 </div>
                 <div class="ml-3 min-w-0">
-                    <span class="text-white text-[15px] font-extrabold tracking-tight block truncate">Parcelman</span>
-                    <span class="block text-orange-300/60 text-[10px] font-semibold uppercase tracking-[0.15em] truncate">Warehouse Portal</span>
+                    <span class="text-white text-[15px] font-extrabold tracking-tight block truncate">Parcelman Express</span>
+                    <span class="block text-[10px] font-semibold uppercase tracking-[0.15em] truncate" style="color:rgba(253,186,116,0.55);">Warehouse Portal</span>
                 </div>
             </div>
 
@@ -152,7 +152,7 @@
             <div class="px-4 pb-4">
                 <div class="wh-user-card">
                     <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0" style="background:linear-gradient(135deg,#fdba74 0%,#fb923c 100%)">
                             {{ substr($authUser?->name ?? 'W', 0, 1) }}
                         </div>
                         <div class="min-w-0 flex-1">
@@ -215,7 +215,7 @@
                         </div>
                         <input type="text"
                                placeholder="Search shipments, receipts..."
-                               class="w-full h-9 pl-10 pr-16 text-[13px] bg-slate-50/80 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 focus:bg-white transition-all placeholder-slate-400">
+                               class="w-full h-9 pl-10 pr-16 text-[13px] bg-slate-50/80 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 focus:bg-white transition-all placeholder-slate-400">
                         <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
                             <span class="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded-md border border-slate-200/60 font-medium tracking-wide">⌘K</span>
                         </div>
@@ -239,23 +239,23 @@
                         <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                         </svg>
-                        <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full ring-2 ring-white/80"></span>
+                        <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-600 rounded-full ring-2 ring-white/80"></span>
                     </button>
 
                     {{-- Separator --}}
                     <div class="w-px h-6 bg-slate-200/60 mx-1"></div>
 
                     {{-- Warehouse badge --}}
-                    <div class="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-orange-50/60 border border-orange-100/80">
-                        <div class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
-                        <span class="text-[11px] font-semibold text-orange-700">{{ $warehouse?->name ?? 'Warehouse' }}</span>
+                    <div class="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl border" style="background:rgba(254,215,170,0.12);border-color:rgba(194,65,12,0.15);">
+                        <div class="w-2 h-2 rounded-full animate-pulse" style="background:#c2410c;"></div>
+                        <span class="text-[11px] font-semibold" style="color:#9a3412;">{{ $warehouse?->name ?? 'Warehouse' }}</span>
                     </div>
 
                     {{-- User Avatar Dropdown --}}
                     <div class="relative">
                         <button @click="userMenuOpen = !userMenuOpen"
                                 class="flex items-center gap-2 py-1 px-1.5 rounded-xl hover:bg-slate-50/80 transition-all">
-                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center text-white text-[12px] font-bold shadow-sm ring-1 ring-slate-200/50">
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[12px] font-bold shadow-sm ring-1 ring-slate-200/50" style="background:linear-gradient(135deg,#c2410c 0%,#9a3412 100%);">
                                 {{ substr($authUser?->name ?? 'W', 0, 1) }}
                             </div>
                             <div class="hidden lg:block text-left mr-1">
@@ -289,7 +289,7 @@
                             {{-- Warehouse info --}}
                             <div class="px-4 py-2 border-b border-slate-100/80">
                                 <div class="flex items-center gap-2">
-                                    <div class="w-2 h-2 rounded-full bg-orange-500"></div>
+                                    <div class="w-2 h-2 rounded-full" style="background:#c2410c;"></div>
                                     <span class="text-[11px] font-medium text-slate-500">{{ $warehouse?->name ?? 'Warehouse' }}</span>
                                 </div>
                             </div>
