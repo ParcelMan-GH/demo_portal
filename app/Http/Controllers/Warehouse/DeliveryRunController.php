@@ -254,6 +254,7 @@ class DeliveryRunController extends Controller
                 'delivered_at' => $stop->delivered_at?->format('M d, Y H:i'),
                 'failure_reason' => $stop->failure_reason,
                 'failure_notes' => $stop->failure_notes,
+                'delivery_notes' => $stop->delivery_notes,
                 'has_proof_photo' => !empty($stop->proof_photo_path),
                 'total_packages' => (int) $stop->total_packages,
                 'verification_skipped' => (bool) $stop->verification_skipped,

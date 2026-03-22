@@ -644,6 +644,19 @@
                                 </div>
                             </template>
 
+                            {{-- Delivery Notes --}}
+                            <template x-if="stop.delivery_notes">
+                                <div class="border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+                                    <div class="flex items-start gap-2 text-xs text-slate-600">
+                                        <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+                                        <div>
+                                            <p class="font-semibold text-slate-500">Delivery Notes</p>
+                                            <p class="mt-0.5" x-text="stop.delivery_notes"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
                             {{-- Resend Code button --}}
                             <template x-if="stop.can_resend_code">
                                 <div class="border-t border-slate-100 px-5 py-3 flex justify-end">

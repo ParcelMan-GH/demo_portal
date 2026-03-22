@@ -58,6 +58,7 @@ class DriverDeliveryController extends Controller
             'items.*.shipment_item_id' => ['required', 'integer', 'exists:shipment_items,id'],
             'items.*.delivered_quantity' => ['required', 'integer', 'min:0'],
             'items.*.notes' => ['nullable', 'string', 'max:1000'],
+            'delivery_notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $result = $this->warehouseDeliveryService->driverConfirmStop(
@@ -71,7 +72,8 @@ class DriverDeliveryController extends Controller
             linePayloads: $validated['items'],
             ipAddress: (string) $request->ip(),
             skipVerification: $skipVerification,
-            skipReason: $validated['skip_reason'] ?? null
+            skipReason: $validated['skip_reason'] ?? null,
+            deliveryNotes: $validated['delivery_notes'] ?? null
         );
 
         return $this->deliveryActionResponse($driver, $run, $result, 400);
@@ -90,6 +92,7 @@ class DriverDeliveryController extends Controller
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'proof_photo' => ['required', 'file', 'image', 'max:12288'],
+            'delivery_notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $result = $this->warehouseDeliveryService->driverConfirmStopByPackage(
@@ -103,7 +106,8 @@ class DriverDeliveryController extends Controller
             proofPhoto: $request->file('proof_photo'),
             ipAddress: (string) $request->ip(),
             skipVerification: $skipVerification,
-            skipReason: $validated['skip_reason'] ?? null
+            skipReason: $validated['skip_reason'] ?? null,
+            deliveryNotes: $validated['delivery_notes'] ?? null
         );
 
         return $this->deliveryActionResponse($driver, $run, $result, 400);

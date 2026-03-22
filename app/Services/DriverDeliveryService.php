@@ -167,6 +167,7 @@ class DriverDeliveryService
                     ],
                     'failure_reason' => $stop->failure_reason,
                     'failure_notes' => $stop->failure_notes,
+                    'delivery_notes' => $stop->delivery_notes,
                     'items' => $items->map(function ($item) {
                         return [
                             'shipment_item_id' => $item->shipment_item_id,

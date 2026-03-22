@@ -393,7 +393,8 @@ class WarehouseDeliveryService
         array $linePayloads,
         ?string $ipAddress = null,
         bool $skipVerification = false,
-        ?string $skipReason = null
+        ?string $skipReason = null,
+        ?string $deliveryNotes = null
     ): array {
         if ((int) $run->assigned_driver_id !== (int) $driver->id || (int) $stop->delivery_run_id !== (int) $run->id) {
             return ['success' => false, 'message' => 'Delivery stop not found.'];
@@ -533,6 +534,7 @@ class WarehouseDeliveryService
                 'proof_photo_size' => $upload['size'],
                 'failure_reason' => $allDelivered ? null : ($stop->failure_reason ?: 'partial_quantity'),
                 'failure_notes' => $allDelivered ? null : ($stop->failure_notes ?: 'One or more line items were not fully delivered.'),
+                'delivery_notes' => $deliveryNotes,
             ]);
 
             $this->refreshRunStatus($run);
@@ -566,7 +568,8 @@ class WarehouseDeliveryService
         UploadedFile $proofPhoto,
         ?string $ipAddress = null,
         bool $skipVerification = false,
-        ?string $skipReason = null
+        ?string $skipReason = null,
+        ?string $deliveryNotes = null
     ): array {
         if ((int) $run->assigned_driver_id !== (int) $driver->id || (int) $stop->delivery_run_id !== (int) $run->id) {
             return ['success' => false, 'message' => 'Delivery stop not found.'];
@@ -708,6 +711,7 @@ class WarehouseDeliveryService
                 'proof_photo_size' => $upload['size'],
                 'failure_reason' => $allDelivered ? null : ($noneDelivered ? 'no_packages_delivered' : 'partial_packages'),
                 'failure_notes' => $allDelivered ? null : "{$packagesDelivered} of {$totalPackages} packages delivered. Requires warehouse review.",
+                'delivery_notes' => $deliveryNotes,
             ]);
 
             $this->refreshRunStatus($run);

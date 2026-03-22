@@ -3789,6 +3789,7 @@ If the recipient did not receive the SMS code, send <code>skip_verification=true
                     { name: 'latitude', type: 'string', required: true, description: 'Delivery GPS latitude', example: '5.6037' },
                     { name: 'longitude', type: 'string', required: true, description: 'Delivery GPS longitude', example: '-0.1870' },
                     { name: 'proof_photo', type: 'file', required: true, description: 'Delivery proof image', accept: 'image/jpeg,image/png,image/webp' },
+                    { name: 'delivery_notes', type: 'textarea', required: false, description: 'General notes or remarks about the delivery (max 1000 chars)', example: 'Recipient was not home, left packages with security guard.' },
                 ],
                 sampleBody: {
                     verification_code: '483219',
