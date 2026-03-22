@@ -39,14 +39,14 @@
             <div class="relative flex-1 max-w-xs">
                 <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 <input type="text" x-model="search" @@input="onSearch()" placeholder="Search shipment, vendor, recipient..."
-                       class="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                       class="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none">
             </div>
         </div>
     </div>
 
     <!-- Loading -->
     <div x-show="loading" class="flex items-center justify-center py-16">
-        <svg class="w-6 h-6 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        <svg class="w-6 h-6 text-orange-600 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
     </div>
 
     <!-- Empty -->
@@ -76,7 +76,7 @@
                     <template x-for="row in rows" :key="row.id">
                         <tr class="hover:bg-slate-50/70">
                             <td class="px-4 py-3 whitespace-nowrap">
-                                <span class="text-xs font-bold text-blue-600" x-text="row.shipment_number"></span>
+                                <span class="text-xs font-bold text-orange-700" x-text="row.shipment_number"></span>
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-700" x-text="row.vendor_name || '—'"></td>
                             <td class="px-4 py-3 whitespace-nowrap">
@@ -123,24 +123,24 @@
                     </button>
                 </div>
 
-                <div class="bg-blue-50 rounded-xl p-3 border border-blue-200">
-                    <p class="text-xs text-blue-900 font-bold" x-text="handoverRow?.shipment_number"></p>
-                    <p class="text-[11px] text-blue-700 mt-0.5">Recipient: <span x-text="handoverRow?.recipient_name"></span> &middot; <span x-text="handoverRow?.recipient_phone"></span></p>
+                <div class="bg-orange-50 rounded-xl p-3 border border-orange-200">
+                    <p class="text-xs text-orange-900 font-bold" x-text="handoverRow?.shipment_number"></p>
+                    <p class="text-[11px] text-orange-800 mt-0.5">Recipient: <span x-text="handoverRow?.recipient_name"></span> &middot; <span x-text="handoverRow?.recipient_phone"></span></p>
                 </div>
 
                 <div class="space-y-3">
                     <div>
                         <label class="block text-[11px] font-bold text-slate-600 mb-1">Collector Name <span class="text-red-400">*</span></label>
-                        <input type="text" x-model="handoverForm.collected_by_name" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <input type="text" x-model="handoverForm.collected_by_name" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none">
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold text-slate-600 mb-1">Collector Phone <span class="text-red-400">*</span></label>
-                        <input type="text" x-model="handoverForm.collected_by_phone" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none font-mono">
+                        <input type="text" x-model="handoverForm.collected_by_phone" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none font-mono">
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-[11px] font-bold text-slate-600 mb-1">ID Type</label>
-                            <select x-model="handoverForm.collected_by_id_type" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                            <select x-model="handoverForm.collected_by_id_type" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none">
                                 <option value="">None</option>
                                 <option value="national_id">National ID (Ghana Card)</option>
                                 <option value="passport">Passport</option>
@@ -150,12 +150,12 @@
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-600 mb-1">ID Number</label>
-                            <input type="text" x-model="handoverForm.collected_by_id_number" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                            <input type="text" x-model="handoverForm.collected_by_id_number" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none">
                         </div>
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold text-slate-600 mb-1">Notes</label>
-                        <textarea x-model="handoverForm.notes" rows="2" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
+                        <textarea x-model="handoverForm.notes" rows="2" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none resize-none"></textarea>
                     </div>
                 </div>
 

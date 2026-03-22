@@ -11,7 +11,7 @@
 
     $statusClass = match ($manifest->status) {
         'draft' => 'bg-slate-100 text-slate-700 border-slate-200',
-        'assigned' => 'bg-blue-50 text-blue-700 border-blue-200',
+        'assigned' => 'bg-orange-50 text-orange-800 border-orange-200',
         'loading' => 'bg-indigo-50 text-indigo-700 border-indigo-200',
         'in_transit' => 'bg-violet-50 text-violet-700 border-violet-200',
         'arrived' => 'bg-amber-50 text-amber-700 border-amber-200',
@@ -22,7 +22,7 @@
 
     $statusDotClass = match ($manifest->status) {
         'draft' => 'bg-slate-400',
-        'assigned' => 'bg-blue-500',
+        'assigned' => 'bg-orange-600',
         'loading' => 'bg-indigo-500',
         'in_transit' => 'bg-violet-500',
         'arrived' => 'bg-amber-500',
@@ -33,7 +33,7 @@
 
     $timeline = [
         ['label' => 'Created', 'value' => $manifest->created_at, 'dot' => 'bg-slate-500'],
-        ['label' => 'Driver Assigned', 'value' => $manifest->assigned_at, 'dot' => 'bg-blue-500'],
+        ['label' => 'Driver Assigned', 'value' => $manifest->assigned_at, 'dot' => 'bg-orange-600'],
         ['label' => 'Dispatched', 'value' => $manifest->dispatched_at, 'dot' => 'bg-violet-500'],
         ['label' => 'Arrived', 'value' => $manifest->arrived_at, 'dot' => 'bg-amber-500'],
         ['label' => 'Received', 'value' => $manifest->received_at, 'dot' => 'bg-emerald-500'],
@@ -124,8 +124,8 @@
 
                     <div class="flex items-center gap-2 flex-wrap lg:flex-nowrap lg:ml-auto lg:self-start">
                         <div class="w-20 h-20 lg:w-24 lg:h-24 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 p-2 flex flex-col items-center justify-center text-center gap-1.5 transition-colors shrink-0">
-                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/30 to-blue-600/20 flex items-center justify-center flex-shrink-0">
-                                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-600/30 to-orange-700/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                 </svg>
                             </div>
@@ -200,16 +200,16 @@
             {{-- Receiving --}}
             <button @@click="activeTab = 'receiving'"
                 class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'receiving' ? 'bg-blue-50 ring-1 ring-blue-100 shadow-sm' : 'hover:bg-slate-50'">
+                :class="activeTab === 'receiving' ? 'bg-orange-50 ring-1 ring-orange-100 shadow-sm' : 'hover:bg-slate-50'">
                 <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'receiving' ? 'bg-blue-500 shadow-sm shadow-blue-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    :class="activeTab === 'receiving' ? 'bg-orange-500 shadow-sm shadow-orange-200' : 'bg-slate-100 group-hover:bg-slate-200'">
                     <svg class="w-3 h-3 transition-colors" :class="activeTab === 'receiving' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                     </svg>
                 </div>
-                <span class="text-xs transition-colors" :class="activeTab === 'receiving' ? 'font-bold text-blue-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Receiving</span>
+                <span class="text-xs transition-colors" :class="activeTab === 'receiving' ? 'font-bold text-orange-800' : 'font-medium text-slate-500 group-hover:text-slate-700'">Receiving</span>
                 <span class="ml-auto inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold"
-                    :class="activeTab === 'receiving' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'">{{ $items->count() }}</span>
+                    :class="activeTab === 'receiving' ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-500'">{{ $items->count() }}</span>
             </button>
 
             {{-- Divider --}}
@@ -384,8 +384,8 @@
                             <h3 class="text-sm font-bold text-slate-900 mb-3">Quantity Summary</h3>
                             <div class="space-y-2.5">
                                 <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
-                                    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-600/10 flex items-center justify-center flex-shrink-0">
-                                        <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-orange-600/20 to-orange-700/10 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total Items</p>
@@ -534,8 +534,8 @@
                 {{-- Summary Cards --}}
                 <div class="grid grid-cols-3 gap-3 mb-5">
                     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-600/10 flex items-center justify-center flex-shrink-0">
-                            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-orange-600/20 to-orange-700/10 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                         </div>
                         <div>
                             <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total Items</p>
@@ -822,7 +822,7 @@
                     ];
                     $timelineIconColor = [
                         'bg-slate-500'   => ['badge' => 'bg-slate-100 text-slate-600'],
-                        'bg-blue-500'    => ['badge' => 'bg-blue-50 text-blue-700'],
+                        'bg-orange-500'    => ['badge' => 'bg-orange-50 text-orange-800'],
                         'bg-violet-500'  => ['badge' => 'bg-violet-50 text-violet-700'],
                         'bg-amber-500'   => ['badge' => 'bg-amber-50 text-amber-700'],
                         'bg-emerald-500' => ['badge' => 'bg-emerald-50 text-emerald-700'],

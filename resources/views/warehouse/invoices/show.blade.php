@@ -67,7 +67,7 @@ $invoiceConfig = [
 
                         @if($canManage)
                         @if($invoice->status === \App\Enums\InvoiceStatus::PENDING)
-                        <button @@click="sendInvoice()" :disabled="actionLoading" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs font-semibold rounded-xl border border-blue-500/30 transition-all backdrop-blur-sm disabled:opacity-50">
+                        <button @@click="sendInvoice()" :disabled="actionLoading" class="inline-flex items-center gap-2 px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-300 text-xs font-semibold rounded-xl border border-orange-600/30 transition-all backdrop-blur-sm disabled:opacity-50">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
                             </svg>
@@ -110,7 +110,7 @@ $invoiceConfig = [
                                 <h1 class="text-xl lg:text-2xl font-bold text-white truncate">{{ $invoice->invoice_number }}</h1>
                                 @if($invoice->shipment)
                                 <p class="text-slate-400 text-sm mt-0.5">
-                                    Shipment: <span class="text-blue-400">{{ $invoice->shipment->shipment_number }}</span>
+                                    Shipment: <span class="text-orange-400">{{ $invoice->shipment->shipment_number }}</span>
                                 </p>
                                 @endif
                                 @if($invoice->shipment?->vendor)
@@ -126,7 +126,7 @@ $invoiceConfig = [
                                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold
                                     @switch($invoice->status->value)
                                         @case('pending') bg-amber-400/20 text-amber-300 @break
-                                        @case('sent') bg-blue-400/20 text-blue-300 @break
+                                        @case('sent') bg-orange-400/20 text-orange-300 @break
                                         @case('accepted') bg-emerald-400/20 text-emerald-300 @break
                                         @case('rejected') bg-rose-400/20 text-rose-300 @break
                                         @case('cancelled') bg-gray-400/20 text-gray-300 @break
@@ -158,7 +158,7 @@ $invoiceConfig = [
                             </div>
                             <div class="flex items-center gap-2 flex-wrap">
                                 @if($invoice->sent_at)
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-400/15 text-blue-300 border border-blue-400/20">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-orange-400/15 text-orange-300 border border-orange-400/20">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                                     Sent {{ $invoice->sent_at->format('M d, Y') }}
                                 </span>
@@ -250,10 +250,10 @@ $invoiceConfig = [
 
             <!-- Send to Vendor Banner (Pending invoices) -->
             @if($canManage && $invoice->status === \App\Enums\InvoiceStatus::PENDING)
-            <div class="mb-5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+            <div class="mb-5 bg-gradient-to-r from-orange-50 to-indigo-50 border border-orange-200/80 rounded-2xl p-5 flex items-center justify-between shadow-sm">
                 <div class="flex items-center gap-4">
-                    <div class="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-                        <svg class="w-5.5 h-5.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-11 h-11 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-5.5 h-5.5 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                         </svg>
                     </div>
@@ -263,7 +263,7 @@ $invoiceConfig = [
                     </div>
                 </div>
                 <button @@click="sendInvoice()" :disabled="actionLoading"
-                    class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0">
+                    class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-700 to-indigo-600 hover:from-orange-800 hover:to-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-orange-600/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
                     </svg>
@@ -294,7 +294,7 @@ $invoiceConfig = [
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold
                                     @switch($invoice->status->value)
                                         @case('pending') bg-amber-100 text-amber-700 @break
-                                        @case('sent') bg-blue-100 text-blue-700 @break
+                                        @case('sent') bg-orange-100 text-orange-800 @break
                                         @case('accepted') bg-emerald-100 text-emerald-700 @break
                                         @case('rejected') bg-rose-100 text-rose-700 @break
                                         @case('cancelled') bg-gray-100 text-gray-500 @break
@@ -410,8 +410,8 @@ $invoiceConfig = [
                                 </div>
                                 @endif
                                 @if($invoice->vendor_notes)
-                                <div class="p-3 bg-blue-50 rounded-xl border-l-4 border-blue-300">
-                                    <p class="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">Vendor Notes</p>
+                                <div class="p-3 bg-orange-50 rounded-xl border-l-4 border-orange-300">
+                                    <p class="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Vendor Notes</p>
                                     <p class="text-xs text-slate-700">{{ $invoice->vendor_notes }}</p>
                                 </div>
                                 @endif
@@ -472,8 +472,8 @@ $invoiceConfig = [
                             </div>
 
                             <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow p-4 flex items-center gap-4">
-                                <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/>
                                     </svg>
                                 </div>
@@ -585,7 +585,7 @@ $invoiceConfig = [
                                     </button>
                                     <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50" style="display: none;">
                                         <button type="button" @@click="exportPayments('csv'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                            <svg class="w-4 h-4 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                             CSV
                                         </button>
                                         <div class="border-t border-slate-200/50 my-1"></div>
@@ -669,7 +669,7 @@ $invoiceConfig = [
                                                     <span class="text-xs font-semibold text-emerald-700" x-text="'{{ $invoice->currency ?: 'GHS' }} ' + payment.formatted_amount"></span>
                                                 </td>
                                                 <td x-show="paymentVisibleColumns.method" class="px-4 py-2.5 whitespace-nowrap">
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700" x-text="payment.method_label"></span>
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-800" x-text="payment.method_label"></span>
                                                 </td>
                                                 <td x-show="paymentVisibleColumns.reference" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-500 font-mono" x-text="payment.reference_number || '\u2014'"></td>
                                                 <td x-show="paymentVisibleColumns.recorded_by" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="payment.recorded_by || '\u2014'"></td>
@@ -1100,7 +1100,7 @@ function invoiceShow() {
         },
 
         async sendInvoice() {
-            if (!await this.showConfirm('Send this invoice?', 'The invoice will be sent to the vendor for review and acceptance.', 'Send Invoice', 'bg-blue-600 hover:bg-blue-700 text-white')) return;
+            if (!await this.showConfirm('Send this invoice?', 'The invoice will be sent to the vendor for review and acceptance.', 'Send Invoice', 'bg-slate-900 hover:bg-slate-800 text-white')) return;
             this.actionLoading = true;
             try {
                 const response = await fetch(this.config.sendEndpoint, {

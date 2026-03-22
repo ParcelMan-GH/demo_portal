@@ -240,7 +240,7 @@
                         <template x-for="row in rows" :key="row.id">
                             <tr class="hover:bg-slate-50/70 align-top">
                                 <td x-show="visibleColumns.manifest_number" class="px-4 py-2.5">
-                                    <a :href="row.view_url" class="text-xs font-semibold text-slate-900 hover:text-blue-600 hover:underline" x-text="row.manifest_number"></a>
+                                    <a :href="row.view_url" class="text-xs font-semibold text-slate-900 hover:text-orange-700 hover:underline" x-text="row.manifest_number"></a>
                                     <p class="text-[11px] text-slate-500 mt-0.5" x-text="row.dispatched_at ? 'Dispatched: ' + row.dispatched_at : 'Not dispatched'"></p>
                                 </td>
                                 <td x-show="visibleColumns.destination_warehouse" class="px-4 py-2.5 text-xs text-slate-600" x-text="row.destination_warehouse || '-'"></td>

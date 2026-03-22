@@ -222,8 +222,8 @@
                     {{-- Stat tiles --}}
                     <div class="flex items-center gap-2 flex-wrap lg:flex-nowrap lg:ml-auto lg:self-start">
                         <div class="w-20 h-20 lg:w-24 lg:h-24 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 p-2 flex flex-col items-center justify-center text-center gap-1.5 transition-colors shrink-0">
-                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/30 to-blue-600/20 flex items-center justify-center">
-                                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500/30 to-orange-600/20 flex items-center justify-center">
+                                <svg class="w-4 h-4 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>
                             </div>
                             <div>
                                 <p class="text-base lg:text-lg font-bold text-white leading-none">{{ $receiptItem->expected_quantity ?? 0 }}</p>
@@ -323,9 +323,9 @@
 
                             {{-- Qty tiles --}}
                             <div class="grid grid-cols-3 gap-3 mb-4">
-                                <div class="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-center">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-blue-400 mb-1">Expected</p>
-                                    <p class="text-2xl font-bold text-blue-700">{{ $receiptItem->expected_quantity ?? 0 }}</p>
+                                <div class="rounded-xl bg-orange-50 border border-orange-100 px-4 py-3 text-center">
+                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-orange-400 mb-1">Expected</p>
+                                    <p class="text-2xl font-bold text-orange-800">{{ $receiptItem->expected_quantity ?? 0 }}</p>
                                 </div>
                                 <div class="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-center">
                                     <p class="text-[10px] font-semibold uppercase tracking-wider text-emerald-400 mb-1">Received</p>
@@ -339,8 +339,8 @@
 
                             @php $diff = ($receiptItem->received_quantity ?? 0) - ($receiptItem->expected_quantity ?? 0); @endphp
                             @if ($diff !== 0)
-                            <div class="mb-4 rounded-xl px-4 py-2.5 {{ $diff < 0 ? 'bg-amber-50 border border-amber-200' : 'bg-blue-50 border border-blue-200' }}">
-                                <p class="text-xs font-semibold {{ $diff < 0 ? 'text-amber-700' : 'text-blue-700' }}">
+                            <div class="mb-4 rounded-xl px-4 py-2.5 {{ $diff < 0 ? 'bg-amber-50 border border-amber-200' : 'bg-orange-50 border border-orange-200' }}">
+                                <p class="text-xs font-semibold {{ $diff < 0 ? 'text-amber-700' : 'text-orange-800' }}">
                                     {{ $diff > 0 ? '+' : '' }}{{ $diff }} unit{{ abs($diff) !== 1 ? 's' : '' }} {{ $diff < 0 ? 'short' : 'extra' }} vs expected
                                 </p>
                             </div>
@@ -492,7 +492,7 @@
                             @if ($pickupAssignmentId)
                             <div class="pt-3 border-t border-slate-100 mt-3">
                                 <a href="{{ route('warehouse.receipts.pending.show', $pickupAssignmentId) }}"
-                                   class="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors">
+                                   class="inline-flex items-center gap-1.5 text-xs font-medium text-orange-700 hover:text-orange-900 transition-colors">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
                                     </svg>
@@ -513,7 +513,7 @@
                                 <div class="min-w-0">
                                     <p class="text-sm font-semibold text-slate-900 truncate">{{ $driver->name }}</p>
                                     @if ($driver->phone)
-                                    <a href="tel:{{ $driver->phone }}" class="text-xs text-blue-600 hover:text-blue-800 transition-colors">{{ $driver->phone }}</a>
+                                    <a href="tel:{{ $driver->phone }}" class="text-xs text-orange-700 hover:text-orange-900 transition-colors">{{ $driver->phone }}</a>
                                     @endif
                                 </div>
                             </div>

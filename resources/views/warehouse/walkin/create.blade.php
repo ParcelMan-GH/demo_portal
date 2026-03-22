@@ -54,7 +54,7 @@ $walkinConfig = [
                 <div class="flex items-center" :class="idx < stepLabels().length - 1 ? 'flex-1' : ''">
                     <button @@click="stepMap()[idx] < step && (step = stepMap()[idx])" class="flex items-center gap-2 group" :class="stepMap()[idx] < step ? 'cursor-pointer' : 'cursor-default'">
                         <div class="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all duration-300 border-2"
-                             :class="step > stepMap()[idx] ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/30' : (step === stepMap()[idx] ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/30' : 'bg-white border-slate-200 text-slate-400')">
+                             :class="step > stepMap()[idx] ? 'bg-slate-800 border-slate-800 text-white shadow-md shadow-slate-800/30' : (step === stepMap()[idx] ? 'bg-orange-600 border-orange-600 text-white shadow-md shadow-orange-600/30' : 'bg-white border-slate-200 text-slate-400')">
                             <template x-if="step > stepMap()[idx]">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                             </template>
@@ -63,11 +63,11 @@ $walkinConfig = [
                             </template>
                         </div>
                         <span class="text-xs font-semibold hidden sm:inline transition-colors"
-                              :class="step === stepMap()[idx] ? 'text-slate-900' : (step > stepMap()[idx] ? 'text-emerald-600' : 'text-slate-400')"
+                              :class="step === stepMap()[idx] ? 'text-orange-700' : (step > stepMap()[idx] ? 'text-slate-600' : 'text-slate-400')"
                               x-text="s"></span>
                     </button>
                     <template x-if="idx < stepLabels().length - 1">
-                        <div class="flex-1 h-[2px] mx-4 rounded-full transition-all duration-500" :class="step > stepMap()[idx] ? 'bg-emerald-400' : 'bg-slate-200'"></div>
+                        <div class="flex-1 h-[2px] mx-4 rounded-full transition-all duration-500" :class="step > stepMap()[idx] ? 'bg-slate-400' : 'bg-slate-200'"></div>
                     </template>
                 </div>
             </template>
@@ -80,7 +80,7 @@ $walkinConfig = [
             <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50">
                 <div class="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
                     <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5">
-                        <span class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-bold">1</span>
+                        <span class="w-8 h-8 rounded-lg bg-orange-700 text-white flex items-center justify-center text-xs font-bold">1</span>
                         Vendor Identification
                     </h2>
                     <p class="text-xs text-slate-500 mt-1 ml-[42px]">Enter the vendor's phone number to look up or create their account</p>
@@ -96,10 +96,10 @@ $walkinConfig = [
                                 </div>
                                 <input type="text" x-model="vendorPhone" placeholder="e.g. 0241234567"
                                        @@keydown.enter.prevent="lookupVendor()"
-                                       class="w-full pl-14 pr-4 py-3 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none placeholder:text-slate-400 font-mono">
+                                       class="w-full pl-14 pr-4 py-3 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none placeholder:text-slate-400 font-mono">
                             </div>
                             <button @@click="lookupVendor()" :disabled="vendorLoading || vendorPhone.length < 9"
-                                    class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-lg hover:shadow-blue-600/25 active:scale-[0.98]">
+                                    class="px-6 py-3 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-lg hover:shadow-orange-700/25 active:scale-[0.98]">
                                 <span x-show="!vendorLoading">Search</span>
                                 <span x-show="vendorLoading" class="flex items-center gap-2">
                                     <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
@@ -124,7 +124,7 @@ $walkinConfig = [
                             </div>
                         </div>
                         <div class="flex gap-2.5">
-                            <button @@click="selectVendor(vendorData)" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-all shadow-sm active:scale-[0.98]">
+                            <button @@click="selectVendor(vendorData)" class="flex-1 py-2.5 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl transition-all shadow-sm active:scale-[0.98]">
                                 Use This Vendor
                             </button>
                             <button @@click="resetVendor()" class="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors">
@@ -148,11 +148,11 @@ $walkinConfig = [
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
                                     <label class="block text-[11px] font-bold text-slate-600 mb-1">Full Name <span class="text-red-400">*</span></label>
-                                    <input type="text" x-model="newVendor.name" placeholder="John Doe" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white">
+                                    <input type="text" x-model="newVendor.name" placeholder="John Doe" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white">
                                 </div>
                                 <div>
                                     <label class="block text-[11px] font-bold text-slate-600 mb-1">Business Name</label>
-                                    <input type="text" x-model="newVendor.business_name" placeholder="Optional" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white">
+                                    <input type="text" x-model="newVendor.business_name" placeholder="Optional" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white">
                                 </div>
                             </div>
                             <div class="grid grid-cols-2 gap-3">
@@ -162,13 +162,13 @@ $walkinConfig = [
                                 </div>
                                 <div>
                                     <label class="block text-[11px] font-bold text-slate-600 mb-1">Email</label>
-                                    <input type="email" x-model="newVendor.email" placeholder="Optional" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white">
+                                    <input type="email" x-model="newVendor.email" placeholder="Optional" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white">
                                 </div>
                             </div>
                         </div>
                         <div class="mt-4 flex gap-2.5">
                             <button @@click="createVendor()" :disabled="creatingVendor || !newVendor.name"
-                                    class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm active:scale-[0.98]">
+                                    class="flex-1 py-2.5 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm active:scale-[0.98]">
                                 <span x-show="!creatingVendor">Create Vendor & Continue</span>
                                 <span x-show="creatingVendor" class="flex items-center justify-center gap-2">
                                     <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
@@ -183,16 +183,16 @@ $walkinConfig = [
                     </div>
 
                     <!-- Vendor Selected — Proceed -->
-                    <div x-show="vendorId && step === 1" x-transition class="rounded-2xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-5">
+                    <div x-show="vendorId && step === 1" x-transition class="rounded-2xl border-2 border-orange-200 bg-gradient-to-r from-orange-50 to-indigo-50 p-5">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3.5">
-                                <div class="w-11 h-11 rounded-full bg-blue-200 flex items-center justify-center text-blue-700 text-lg font-bold" x-text="vendorData?.name?.charAt(0)?.toUpperCase()"></div>
+                                <div class="w-11 h-11 rounded-full bg-orange-200 flex items-center justify-center text-orange-800 text-lg font-bold" x-text="vendorData?.name?.charAt(0)?.toUpperCase()"></div>
                                 <div>
                                     <p class="text-sm font-bold text-slate-900" x-text="vendorData?.name"></p>
                                     <p class="text-xs text-slate-500 font-mono" x-text="vendorData?.phone"></p>
                                 </div>
                             </div>
-                            <button @@click="step = 2" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-600/25 hover:shadow-lg hover:shadow-blue-600/30 active:scale-[0.98] flex items-center gap-2">
+                            <button @@click="step = 2" class="px-6 py-2.5 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-orange-700/25 hover:shadow-lg hover:shadow-orange-700/30 active:scale-[0.98] flex items-center gap-2">
                                 Continue
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
                             </button>
@@ -215,13 +215,13 @@ $walkinConfig = [
             <div class="grid grid-cols-2 gap-4">
                 <label class="cursor-pointer">
                     <input type="radio" x-model="destinationMode" value="single" class="sr-only peer">
-                    <div class="relative p-4 rounded-2xl border-2 transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:shadow-md peer-checked:shadow-blue-500/15 border-slate-200 hover:border-slate-300 hover:bg-slate-50">
-                        <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3">
-                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <div class="relative p-4 rounded-2xl border-2 transition-all duration-200 peer-checked:border-orange-600 peer-checked:bg-orange-50 peer-checked:shadow-md peer-checked:shadow-orange-600/15 border-slate-200 hover:border-slate-300 hover:bg-slate-50">
+                        <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3">
+                            <svg class="w-5 h-5 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                         </div>
                         <p class="text-sm font-bold text-slate-900">Single Destination</p>
                         <p class="text-[11px] text-slate-500 mt-1">All items go to one address</p>
-                        <div class="absolute top-3.5 right-3.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all" :class="destinationMode === 'single' ? 'border-blue-500 bg-blue-500' : 'border-slate-300'">
+                        <div class="absolute top-3.5 right-3.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all" :class="destinationMode === 'single' ? 'border-orange-600 bg-orange-600' : 'border-slate-300'">
                             <svg x-show="destinationMode === 'single'" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                         </div>
                     </div>
@@ -246,7 +246,7 @@ $walkinConfig = [
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
                 Back
             </button>
-            <button @@click="step = nextStepFrom(2)" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-600/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
+            <button @@click="step = nextStepFrom(2)" class="px-6 py-2.5 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-orange-700/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
                 Continue
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
             </button>
@@ -267,21 +267,21 @@ $walkinConfig = [
                 <div class="grid grid-cols-1 gap-3">
                     <template x-for="ft in [
                         {v:'warehouse', label:'Warehouse Delivery', desc:'Items go to warehouse, get sorted, then dispatched via delivery run to the recipient. This is the standard flow.', icon:'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4', color:'blue'},
-                        {v:'self_pickup', label:'Self Pickup', desc:'Items go to warehouse, then the recipient comes to the warehouse and collects them. No delivery run needed.', icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', color:'emerald'},
+                        {v:'self_pickup', label:'Self Pickup', desc:'Items go to warehouse, then the recipient comes to the warehouse and collects them. No delivery run needed.', icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', color:'slate'},
                         {v:'direct', label:'Direct Delivery', desc:'Driver picks up from vendor and delivers directly to the recipient. No warehouse stop — pipeline records are auto-created.', icon:'M13 10V3L4 14h7v7l9-11h-7z', color:'amber'}
                     ]" :key="ft.v">
                         <label class="cursor-pointer">
                             <input type="radio" x-model="fulfillmentType" :value="ft.v" class="sr-only peer">
-                            <div class="relative flex items-start gap-4 p-4 rounded-2xl border-2 transition-all duration-200 border-slate-200 hover:border-slate-300 hover:bg-slate-50 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:shadow-md peer-checked:shadow-blue-500/10">
+                            <div class="relative flex items-start gap-4 p-4 rounded-2xl border-2 transition-all duration-200 border-slate-200 hover:border-slate-300 hover:bg-slate-50 peer-checked:border-orange-600 peer-checked:bg-orange-50 peer-checked:shadow-md peer-checked:shadow-orange-600/10">
                                 <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-                                     :class="ft.color === 'blue' ? 'bg-blue-100' : (ft.color === 'emerald' ? 'bg-emerald-100' : 'bg-amber-100')">
-                                    <svg class="w-5 h-5" :class="ft.color === 'blue' ? 'text-blue-600' : (ft.color === 'emerald' ? 'text-emerald-600' : 'text-amber-600')" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" :d="ft.icon"/></svg>
+                                     :class="ft.color === 'blue' ? 'bg-orange-100' : (ft.color === 'slate' ? 'bg-slate-100' : 'bg-amber-100')">
+                                    <svg class="w-5 h-5" :class="ft.color === 'blue' ? 'text-orange-700' : (ft.color === 'slate' ? 'text-slate-600' : 'text-amber-600')" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" :d="ft.icon"/></svg>
                                 </div>
                                 <div class="flex-1">
                                     <p class="text-sm font-bold text-slate-900" x-text="ft.label"></p>
                                     <p class="text-xs text-slate-500 mt-1 leading-relaxed" x-text="ft.desc"></p>
                                 </div>
-                                <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 transition-all" :class="fulfillmentType === ft.v ? 'border-blue-500 bg-blue-500' : 'border-slate-300'">
+                                <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 transition-all" :class="fulfillmentType === ft.v ? 'border-orange-600 bg-orange-600' : 'border-slate-300'">
                                     <svg x-show="fulfillmentType === ft.v" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                                 </div>
                             </div>
@@ -295,7 +295,7 @@ $walkinConfig = [
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
                 Back
             </button>
-            <button @@click="step = 4" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-600/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
+            <button @@click="step = 4" class="px-6 py-2.5 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-orange-700/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
                 Continue
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
             </button>
@@ -325,18 +325,18 @@ $walkinConfig = [
                     <template x-for="(item, idx) in items" :key="idx">
                         <div class="p-5">
                             <div class="flex items-start gap-3.5">
-                                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-800 to-slate-700 flex items-center justify-center text-white text-[11px] font-bold shrink-0 mt-0.5 shadow-sm" x-text="idx + 1"></div>
+                                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#7c2d12] to-[#9a3412] flex items-center justify-center text-white text-[11px] font-bold shrink-0 mt-0.5 shadow-sm" x-text="idx + 1"></div>
                                 <div class="flex-1 space-y-3.5">
                                     <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
                                         <div class="sm:col-span-4">
                                             <label class="block text-[11px] font-bold text-slate-600 mb-1">Item Description <span class="text-red-400">*</span></label>
                                             <input type="text" x-model="item.description" placeholder="What is being shipped?"
-                                                   class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
+                                                   class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
                                         </div>
                                         <div>
                                             <label class="block text-[11px] font-bold text-slate-600 mb-1">Qty <span class="text-red-400">*</span></label>
                                             <input type="number" x-model.number="item.quantity" min="1"
-                                                   class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-slate-50/50 text-center font-mono font-bold">
+                                                   class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 text-center font-mono font-bold">
                                         </div>
                                     </div>
 
@@ -349,7 +349,7 @@ $walkinConfig = [
                                             </p>
                                             <div>
                                                 <label class="block text-[10px] font-semibold text-slate-500 mb-1">Fulfillment Type</label>
-                                                <select x-model="item.fulfillment_type" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white">
+                                                <select x-model="item.fulfillment_type" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white">
                                                     <option value="warehouse">Warehouse Delivery</option>
                                                     <option value="direct">Direct Delivery</option>
                                                     <option value="self_pickup">Self Pickup</option>
@@ -358,22 +358,22 @@ $walkinConfig = [
                                             <div class="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient <span class="text-red-400">*</span></label>
-                                                    <input type="text" x-model="item.delivery.recipient_name" placeholder="Name" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white">
+                                                    <input type="text" x-model="item.delivery.recipient_name" placeholder="Name" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white">
                                                 </div>
                                                 <div>
                                                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Phone <span class="text-red-400">*</span></label>
-                                                    <input type="text" x-model="item.delivery.recipient_phone" placeholder="Phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white">
+                                                    <input type="text" x-model="item.delivery.recipient_phone" placeholder="Phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white">
                                                 </div>
                                             </div>
                                             <div class="relative">
                                                 <label class="block text-[10px] font-semibold text-slate-500 mb-1">Location <span class="text-red-400">*</span></label>
                                                 <div class="relative">
                                                     <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                                    <input type="text" x-model="item.delivery.locationQuery" @@input="searchLocation(item.delivery)" @@focus="item.delivery.locationResults.length && (item.delivery._showDropdown = true)" @@click.outside="item.delivery._showDropdown = false" placeholder="Search location..." class="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white placeholder:text-slate-400">
+                                                    <input type="text" x-model="item.delivery.locationQuery" @@input="searchLocation(item.delivery)" @@focus="item.delivery.locationResults.length && (item.delivery._showDropdown = true)" @@click.outside="item.delivery._showDropdown = false" placeholder="Search location..." class="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white placeholder:text-slate-400">
                                                 </div>
                                                 <div x-show="item.delivery._showDropdown && item.delivery.locationResults.length" class="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-2xl max-h-52 overflow-y-auto">
                                                     <template x-for="loc in item.delivery.locationResults" :key="loc.id">
-                                                        <button @@click="selectLocation(item.delivery, loc)" class="w-full text-left px-4 py-2.5 hover:bg-blue-50 text-xs text-slate-700 border-b border-slate-50 last:border-0 flex items-center gap-2 transition-colors">
+                                                        <button @@click="selectLocation(item.delivery, loc)" class="w-full text-left px-4 py-2.5 hover:bg-orange-50 text-xs text-slate-700 border-b border-slate-50 last:border-0 flex items-center gap-2 transition-colors">
                                                             <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
                                                             <span x-text="loc.display"></span>
                                                         </button>
@@ -387,11 +387,11 @@ $walkinConfig = [
                                             <div class="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Landmark</label>
-                                                    <input type="text" x-model="item.delivery.landmark" placeholder="Near..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white placeholder:text-slate-400">
+                                                    <input type="text" x-model="item.delivery.landmark" placeholder="Near..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white placeholder:text-slate-400">
                                                 </div>
                                                 <div>
                                                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Instructions</label>
-                                                    <input type="text" x-model="item.delivery.instructions" placeholder="Notes..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white placeholder:text-slate-400">
+                                                    <input type="text" x-model="item.delivery.instructions" placeholder="Notes..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white placeholder:text-slate-400">
                                                 </div>
                                             </div>
                                         </div>
@@ -409,7 +409,7 @@ $walkinConfig = [
             <!-- Single Mode Delivery -->
             <div x-show="destinationMode === 'single'" class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50 p-6">
                 <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5 mb-4">
-                    <span class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">
+                    <span class="w-8 h-8 rounded-lg bg-orange-700 text-white flex items-center justify-center text-xs font-bold">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
                     </span>
                     Delivery Address
@@ -418,22 +418,22 @@ $walkinConfig = [
                     <div class="grid grid-cols-2 gap-3.5">
                         <div>
                             <label class="block text-[11px] font-bold text-slate-600 mb-1">Recipient Name <span class="text-red-400">*</span></label>
-                            <input type="text" x-model="delivery.recipient_name" placeholder="Who receives the items?" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
+                            <input type="text" x-model="delivery.recipient_name" placeholder="Who receives the items?" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-600 mb-1">Phone <span class="text-red-400">*</span></label>
-                            <input type="text" x-model="delivery.recipient_phone" placeholder="0241234567" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-slate-50/50 placeholder:text-slate-400 font-mono">
+                            <input type="text" x-model="delivery.recipient_phone" placeholder="0241234567" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 placeholder:text-slate-400 font-mono">
                         </div>
                     </div>
                     <div class="relative">
                         <label class="block text-[11px] font-bold text-slate-600 mb-1">Location <span class="text-red-400">*</span></label>
                         <div class="relative">
                             <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                            <input type="text" x-model="delivery.locationQuery" @@input="searchLocation(delivery)" @@focus="delivery.locationResults.length && (delivery._showDropdown = true)" @@click.outside="delivery._showDropdown = false" placeholder="Search for a town or area..." class="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
+                            <input type="text" x-model="delivery.locationQuery" @@input="searchLocation(delivery)" @@focus="delivery.locationResults.length && (delivery._showDropdown = true)" @@click.outside="delivery._showDropdown = false" placeholder="Search for a town or area..." class="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
                         </div>
                         <div x-show="delivery._showDropdown && delivery.locationResults.length" class="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-2xl max-h-52 overflow-y-auto">
                             <template x-for="loc in delivery.locationResults" :key="loc.id">
-                                <button @@click="selectLocation(delivery, loc)" class="w-full text-left px-4 py-3 hover:bg-blue-50 text-sm text-slate-700 border-b border-slate-100 last:border-0 flex items-center gap-2.5 transition-colors">
+                                <button @@click="selectLocation(delivery, loc)" class="w-full text-left px-4 py-3 hover:bg-orange-50 text-sm text-slate-700 border-b border-slate-100 last:border-0 flex items-center gap-2.5 transition-colors">
                                     <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
                                     <span x-text="loc.display"></span>
                                 </button>
@@ -447,11 +447,11 @@ $walkinConfig = [
                     <div class="grid grid-cols-2 gap-3.5">
                         <div>
                             <label class="block text-[11px] font-bold text-slate-600 mb-1">Landmark</label>
-                            <input type="text" x-model="delivery.landmark" placeholder="Near a known place" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
+                            <input type="text" x-model="delivery.landmark" placeholder="Near a known place" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-600 mb-1">Delivery Instructions</label>
-                            <input type="text" x-model="delivery.instructions" placeholder="Special notes" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
+                            <input type="text" x-model="delivery.instructions" placeholder="Special notes" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
                         </div>
                     </div>
                 </div>
@@ -464,7 +464,7 @@ $walkinConfig = [
                     Back
                 </button>
                 <button @@click="goToReview()" :disabled="!canProceedToReview()"
-                        class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-blue-600/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
+                        class="px-6 py-2.5 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-orange-700/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
                     Review
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
                 </button>
@@ -480,7 +480,7 @@ $walkinConfig = [
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50 p-5">
                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Vendor</p>
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-sm font-bold" x-text="vendorData?.name?.charAt(0)?.toUpperCase()"></div>
+                        <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-800 text-sm font-bold" x-text="vendorData?.name?.charAt(0)?.toUpperCase()"></div>
                         <div>
                             <p class="text-sm font-bold text-slate-900" x-text="vendorData?.name"></p>
                             <p class="text-xs text-slate-500 font-mono" x-text="vendorData?.phone"></p>
@@ -526,7 +526,7 @@ $walkinConfig = [
                     Edit
                 </button>
                 <button @@click="submitShipment()" :disabled="submitting"
-                        class="px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white text-base font-bold rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xl shadow-emerald-600/30 hover:shadow-2xl hover:shadow-emerald-600/40 active:scale-[0.98] flex items-center gap-2.5">
+                        class="px-8 py-3.5 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-white text-base font-bold rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xl shadow-slate-900/30 hover:shadow-2xl hover:shadow-slate-900/40 active:scale-[0.98] flex items-center gap-2.5">
                     <span x-show="!submitting" class="flex items-center gap-2.5">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                         Submit Shipment

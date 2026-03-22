@@ -15,7 +15,7 @@
 
     $statusValue = $assignment->status?->value ?? (string) $assignment->status;
     $statusClasses = match ($statusValue) {
-        'assigned' => 'bg-blue-100 text-blue-700 ring-1 ring-blue-200',
+        'assigned' => 'bg-orange-100 text-orange-800 ring-1 ring-orange-200',
         'en_route' => 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200',
         'arrived' => 'bg-amber-100 text-amber-700 ring-1 ring-amber-200',
         'picking_up' => 'bg-violet-100 text-violet-700 ring-1 ring-violet-200',
@@ -24,7 +24,7 @@
         default => 'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
     };
     $statusDotClasses = match ($statusValue) {
-        'assigned' => 'bg-blue-500',
+        'assigned' => 'bg-orange-600',
         'en_route' => 'bg-indigo-500',
         'arrived' => 'bg-amber-500',
         'picking_up' => 'bg-violet-500',
@@ -34,7 +34,7 @@
     };
 
     $timeline = [
-        ['label' => 'Assigned', 'value' => $assignment->assigned_at, 'dot' => 'bg-blue-500'],
+        ['label' => 'Assigned', 'value' => $assignment->assigned_at, 'dot' => 'bg-orange-600'],
         ['label' => 'En Route', 'value' => $assignment->en_route_at, 'dot' => 'bg-indigo-500'],
         ['label' => 'Arrived Pickup', 'value' => $assignment->arrived_at, 'dot' => 'bg-amber-500'],
         ['label' => 'Picked Up', 'value' => $assignment->picked_up_at, 'dot' => 'bg-violet-500'],
@@ -90,7 +90,7 @@
                 <div class="flex flex-col lg:flex-row lg:items-start gap-6">
                     <div class="flex items-start gap-5 lg:flex-shrink-0">
                         <div class="relative flex-shrink-0">
-                            <div class="w-20 h-20 lg:w-24 lg:h-24 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white text-2xl lg:text-3xl font-bold shadow-xl shadow-blue-500/30 ring-4 ring-white/10">
+                            <div class="w-20 h-20 lg:w-24 lg:h-24 rounded-2xl bg-gradient-to-br from-orange-600 via-orange-700 to-orange-800 flex items-center justify-center text-white text-2xl lg:text-3xl font-bold shadow-xl shadow-orange-600/30 ring-4 ring-white/10">
                                 {{ strtoupper(substr($shipment?->shipment_number ?? 'S', 0, 1)) }}
                             </div>
                         </div>
@@ -155,8 +155,8 @@
 
                     <div class="flex items-center gap-2 flex-wrap lg:flex-nowrap lg:ml-auto lg:self-start">
                         <div class="w-20 h-20 lg:w-24 lg:h-24 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 p-2 flex flex-col items-center justify-center text-center gap-1.5 transition-colors shrink-0">
-                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/30 to-blue-600/20 flex items-center justify-center flex-shrink-0">
-                                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-600/30 to-orange-700/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                 </svg>
                             </div>
@@ -649,7 +649,7 @@
                                             </a>
                                             <template x-if="canEditInvoice && activeInvoice().status === 'pending'">
                                                 <button @@click="sendInvoice(activeInvoice())"
-                                                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-bold shadow-sm hover:opacity-90 transition-opacity">
+                                                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-700 text-white text-xs font-bold shadow-sm hover:opacity-90 transition-opacity">
                                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                                                     Send
                                                 </button>
@@ -680,7 +680,7 @@
 
                         <!-- Widget: Warehouse Receiving -->
                         <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200/80">
-                            <div class="bg-gradient-to-br from-sky-500 to-blue-600 px-5 py-4">
+                            <div class="bg-gradient-to-br from-orange-600 to-orange-700 px-5 py-4">
                                 <div class="flex items-center gap-3">
                                     <div class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
                                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -771,7 +771,7 @@
                         'Completed'         => 'Pickup assignment completed',
                     ];
                     $timelineIconColor = [
-                        'bg-blue-500'    => ['badge' => 'bg-blue-50 text-blue-700',    'icon' => 'text-white'],
+                        'bg-orange-600'    => ['badge' => 'bg-orange-50 text-orange-800',    'icon' => 'text-white'],
                         'bg-indigo-500'  => ['badge' => 'bg-indigo-50 text-indigo-700', 'icon' => 'text-white'],
                         'bg-amber-500'   => ['badge' => 'bg-amber-50 text-amber-700',   'icon' => 'text-white'],
                         'bg-violet-500'  => ['badge' => 'bg-violet-50 text-violet-700', 'icon' => 'text-white'],
@@ -985,7 +985,7 @@
                                                     <a :href="historyInvoice.download_url" target="_blank" class="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors" title="Download PDF">
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                                     </a>
-                                                    <button x-show="canEditInvoice && historyInvoice.status === 'pending'" @@click="sendInvoice(historyInvoice)" class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Send invoice">
+                                                    <button x-show="canEditInvoice && historyInvoice.status === 'pending'" @@click="sendInvoice(historyInvoice)" class="p-1.5 rounded-lg text-slate-400 hover:text-orange-700 hover:bg-orange-50 transition-colors" title="Send invoice">
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.868v4.264a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12a7 7 0 1114 0A7 7 0 015 12z"/>
@@ -1142,7 +1142,7 @@
                                     </button>
                                     <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50" style="display: none;">
                                         <button type="button" @@click="open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                            <svg class="w-4 h-4 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                             CSV
                                         </button>
                                         <div class="border-t border-slate-200/50 my-1"></div>
@@ -1210,7 +1210,7 @@
                                                     <span class="text-xs font-semibold text-emerald-700" x-text="'GHS ' + (payment.formatted_amount || formatCurrency(payment.amount))"></span>
                                                 </td>
                                                 <td class="px-4 py-2.5 whitespace-nowrap">
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700" x-text="payment.method_label"></span>
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-800" x-text="payment.method_label"></span>
                                                 </td>
                                                 <td class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-500 font-mono" x-text="payment.reference_number || '—'"></td>
                                                 <td class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-500" x-text="payment.invoice_number || '—'"></td>
@@ -1880,7 +1880,7 @@
                     <div class="w-full max-w-lg rounded-3xl bg-white border border-slate-200 shadow-2xl">
                         <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
                             <div class="flex items-center gap-3">
-                                <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center flex-shrink-0">
+                                <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center flex-shrink-0">
                                     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                 </div>
                                 <h4 class="text-base font-bold text-slate-900">Finalize Receipt</h4>
