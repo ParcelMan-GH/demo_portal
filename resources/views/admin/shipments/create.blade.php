@@ -245,42 +245,57 @@ $walkinConfig = [
         </div>
     </div>
 
-    <!-- ═══════════ STEP 3: FULFILLMENT METHOD (single only) ═══════════ -->
+    <!-- ═══════════ STEP 3: DELIVERY PREFERENCE (single only) ═══════════ -->
     <div x-show="step === 3 && destinationMode === 'single'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+        <div class="space-y-6">
+        <!-- Delivery Preference (vendor-facing choice) -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50">
             <div class="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
                 <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5">
                     <span class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">3</span>
-                    Fulfillment Method
+                    Delivery Preference
                 </h2>
-                <p class="text-xs text-slate-500 mt-1 ml-[42px]">How should this shipment be fulfilled?</p>
+                <p class="text-xs text-slate-500 mt-1 ml-[42px]">How does the recipient want to receive their parcel?</p>
             </div>
             <div class="p-6">
                 <div class="grid grid-cols-1 gap-3">
-                    <template x-for="ft in [
-                        {v:'warehouse', label:'Warehouse Delivery', desc:'Items go to warehouse, get sorted, then dispatched via delivery run to the recipient. This is the standard flow.', icon:'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4', color:'blue'},
-                        {v:'self_pickup', label:'Self Pickup', desc:'Items go to warehouse, then the recipient comes to the warehouse and collects them. No delivery run needed.', icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', color:'emerald'},
-                        {v:'direct', label:'Direct Delivery', desc:'Driver picks up from vendor and delivers directly to the recipient. No warehouse stop — pipeline records are auto-created.', icon:'M13 10V3L4 14h7v7l9-11h-7z', color:'amber'}
-                    ]" :key="ft.v">
+                    <template x-for="dp in [
+                        {v:'deliver', label:'Deliver to Recipient', desc:'We deliver the parcel to the recipient\'s address.', icon:'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z', color:'blue'},
+                        {v:'self_pickup', label:'Collect from Warehouse', desc:'The recipient will come to the warehouse to collect their parcel.', icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', color:'emerald'}
+                    ]" :key="dp.v">
                         <label class="cursor-pointer">
-                            <input type="radio" x-model="fulfillmentType" :value="ft.v" class="sr-only peer">
+                            <input type="radio" x-model="deliveryPreference" :value="dp.v" class="sr-only peer">
                             <div class="relative flex items-start gap-4 p-4 rounded-2xl border-2 transition-all duration-200 border-slate-200 hover:border-slate-300 hover:bg-slate-50 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:shadow-md peer-checked:shadow-blue-500/10">
                                 <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-                                     :class="ft.color === 'blue' ? 'bg-blue-100' : (ft.color === 'emerald' ? 'bg-emerald-100' : 'bg-amber-100')">
-                                    <svg class="w-5 h-5" :class="ft.color === 'blue' ? 'text-blue-600' : (ft.color === 'emerald' ? 'text-emerald-600' : 'text-amber-600')" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" :d="ft.icon"/></svg>
+                                     :class="dp.color === 'blue' ? 'bg-blue-100' : 'bg-emerald-100'">
+                                    <svg class="w-5 h-5" :class="dp.color === 'blue' ? 'text-blue-600' : 'text-emerald-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" :d="dp.icon"/></svg>
                                 </div>
                                 <div class="flex-1">
-                                    <p class="text-sm font-bold text-slate-900" x-text="ft.label"></p>
-                                    <p class="text-xs text-slate-500 mt-1 leading-relaxed" x-text="ft.desc"></p>
+                                    <p class="text-sm font-bold text-slate-900" x-text="dp.label"></p>
+                                    <p class="text-xs text-slate-500 mt-1 leading-relaxed" x-text="dp.desc"></p>
                                 </div>
-                                <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 transition-all" :class="fulfillmentType === ft.v ? 'border-blue-500 bg-blue-500' : 'border-slate-300'">
-                                    <svg x-show="fulfillmentType === ft.v" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 transition-all" :class="deliveryPreference === dp.v ? 'border-blue-500 bg-blue-500' : 'border-slate-300'">
+                                    <svg x-show="deliveryPreference === dp.v" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                                 </div>
                             </div>
                         </label>
                     </template>
                 </div>
             </div>
+        </div>
+
+        <!-- Fulfillment Type (admin-only routing override) -->
+        <div x-show="deliveryPreference === 'deliver'" x-transition class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50 p-6">
+            <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2 mb-3">
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Routing <span class="text-[10px] font-medium text-slate-400 ml-1">(Admin only — optional)</span>
+            </h2>
+            <p class="text-xs text-slate-500 mb-3">How should this delivery be routed? Leave as Warehouse unless you want to override.</p>
+            <select x-model="fulfillmentType" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-slate-50/50">
+                <option value="warehouse">Warehouse Delivery (standard)</option>
+                <option value="direct">Direct Delivery (no warehouse stop)</option>
+            </select>
+        </div>
         </div>
         <div class="flex items-center justify-between mt-6">
             <button @@click="step = 2" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
@@ -335,13 +350,21 @@ $walkinConfig = [
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
                                                 Delivery for this item
                                             </p>
-                                            <div>
-                                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Fulfillment Type</label>
-                                                <select x-model="item.fulfillment_type" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white">
-                                                    <option value="warehouse">Warehouse Delivery</option>
-                                                    <option value="direct">Direct Delivery</option>
-                                                    <option value="self_pickup">Self Pickup</option>
-                                                </select>
+                                            <div class="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Delivery Preference</label>
+                                                    <select x-model="item.delivery_preference" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white">
+                                                        <option value="deliver">Deliver to Recipient</option>
+                                                        <option value="self_pickup">Collect from Warehouse</option>
+                                                    </select>
+                                                </div>
+                                                <div x-show="item.delivery_preference === 'deliver'">
+                                                    <label class="block text-[10px] font-semibold text-slate-400 mb-1">Routing <span class="text-[9px]">(Admin)</span></label>
+                                                    <select x-model="item.fulfillment_type" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none bg-white">
+                                                        <option value="warehouse">Warehouse</option>
+                                                        <option value="direct">Direct</option>
+                                                    </select>
+                                                </div>
                                             </div>
                                             <div class="grid grid-cols-2 gap-3">
                                                 <div>
@@ -566,6 +589,7 @@ function walkinShipment() {
         vendorPhone: '', vendorLoading: false, vendorFound: null, vendorData: null, vendorId: null, vendorError: '',
         newVendor: { name: '', business_name: '', phone: '', email: '' },
         creatingVendor: false,
+        deliveryPreference: 'deliver',
         fulfillmentType: 'warehouse',
         destinationMode: 'single',
         items: [],
@@ -593,6 +617,7 @@ function walkinShipment() {
         makeItem() {
             return {
                 description: '', quantity: 1,
+                delivery_preference: 'deliver',
                 fulfillment_type: 'warehouse',
                 delivery: this.makeDelivery ? this.makeDelivery() : {
                     recipient_name: '', recipient_phone: '',
@@ -696,11 +721,13 @@ function walkinShipment() {
             this.submitting = true; this.submitError = '';
             const payload = {
                 vendor_id: this.vendorId, warehouse_id: this.warehouseId,
-                fulfillment_type: this.destinationMode === 'single' ? this.fulfillmentType : null,
+                delivery_preference: this.destinationMode === 'single' ? this.deliveryPreference : null,
+                fulfillment_type: this.destinationMode === 'single' && this.deliveryPreference === 'deliver' ? this.fulfillmentType : null,
                 destination_mode: this.destinationMode,
                 items: this.items.map(i => ({
                     description: i.description, quantity: i.quantity,
-                    fulfillment_type: this.destinationMode === 'per_item' ? i.fulfillment_type : undefined,
+                    delivery_preference: this.destinationMode === 'per_item' ? i.delivery_preference : undefined,
+                    fulfillment_type: this.destinationMode === 'per_item' && i.delivery_preference === 'deliver' ? i.fulfillment_type : undefined,
                     delivery: this.destinationMode === 'per_item' ? {
                         recipient_name: i.delivery.recipient_name, recipient_phone: i.delivery.recipient_phone,
                         region_id: i.delivery.region_id, district_id: i.delivery.district_id, town: i.delivery.town,

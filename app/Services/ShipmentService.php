@@ -363,7 +363,10 @@ class ShipmentService
             'destination_mode' => $mode,
             'fulfillment_type' => $mode === ShipmentDestinationMode::PER_ITEM->value
                 ? null
-                : ($data['fulfillment_type'] ?? $shipment?->fulfillment_type?->value ?? 'warehouse'),
+                : ($data['fulfillment_type'] ?? $shipment?->fulfillment_type?->value ?? null),
+            'delivery_preference' => $mode === ShipmentDestinationMode::PER_ITEM->value
+                ? null
+                : ($data['delivery_preference'] ?? $shipment?->delivery_preference ?? 'deliver'),
             'pickup_contact_name' => $data['pickup_contact_name'] ?? $shipment?->pickup_contact_name,
             'pickup_contact_phone' => $data['pickup_contact_phone'] ?? $shipment?->pickup_contact_phone,
             'pickup_region_id' => $data['pickup_region_id'] ?? $shipment?->pickup_region_id,
@@ -527,7 +530,8 @@ class ShipmentService
             'id' => $shipment->id,
             'shipment_number' => $shipment->shipment_number,
             'status' => $shipment->status->value,
-            'fulfillment_type' => $shipment->fulfillment_type?->value ?? 'warehouse',
+            'delivery_preference' => $shipment->delivery_preference ?? 'deliver',
+            'fulfillment_type' => $shipment->fulfillment_type?->value ?? null,
             'destination_mode' => $shipment->destination_mode->value,
         ];
 

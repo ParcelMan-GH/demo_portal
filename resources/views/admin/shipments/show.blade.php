@@ -78,7 +78,6 @@ $shipmentConfig = [
                                  class="absolute right-0 mt-1 w-56 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 py-1">
                                 <template x-for="ft in [
                                     {v:'warehouse', label:'Warehouse Delivery', desc:'Standard flow'},
-                                    {v:'self_pickup', label:'Self Pickup', desc:'Recipient collects'},
                                     {v:'direct', label:'Direct Delivery', desc:'Driver delivers directly'}
                                 ]" :key="ft.v">
                                     <button @@click="changeFulfillmentType(ft.v); ftOpen = false"
@@ -216,13 +215,21 @@ $shipmentConfig = [
                                     {{ $shipment->status->label() }}
                                 </span>
                                 @php
-                                    $ftColors = match($shipment->fulfillment_type?->value ?? 'warehouse') {
-                                        'self_pickup' => 'bg-emerald-500/20 text-emerald-300',
+                                    $dpColors = ($shipment->delivery_preference ?? 'deliver') === 'self_pickup'
+                                        ? 'bg-emerald-500/20 text-emerald-300'
+                                        : 'bg-blue-500/20 text-blue-300';
+                                    $ftColors = match($shipment->fulfillment_type?->value ?? null) {
                                         'direct' => 'bg-amber-500/20 text-amber-300',
-                                        default => 'bg-slate-500/20 text-slate-300',
+                                        'warehouse' => 'bg-slate-500/20 text-slate-300',
+                                        default => '',
                                     };
                                 @endphp
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $dpColors }}">
+                                    {{ ($shipment->delivery_preference ?? 'deliver') === 'self_pickup' ? 'Self Pickup' : 'Deliver to Recipient' }}
+                                </span>
+                                @if($shipment->fulfillment_type)
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $ftColors }}" x-text="fulfillmentTypeLabel()"></span>
+                                @endif
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-500/20 text-slate-300">
                                     {{ $shipment->created_at->format('M d, Y') }}
                                 </span>

@@ -47,7 +47,8 @@ class ShipmentItemService
                 'delivery_gh_post_address' => $data['delivery_gh_post_address'] ?? null,
                 'delivery_landmark' => $data['delivery_landmark'] ?? null,
                 'delivery_instructions' => $data['delivery_instructions'] ?? null,
-                'fulfillment_type' => $data['fulfillment_type'] ?? 'warehouse',
+                'delivery_preference' => $data['delivery_preference'] ?? 'deliver',
+                'fulfillment_type' => $data['fulfillment_type'] ?? null,
             ]);
         }
 
@@ -158,6 +159,9 @@ class ShipmentItemService
                     : null;
             }
 
+            if (array_key_exists('delivery_preference', $data)) {
+                $updates['delivery_preference'] = $data['delivery_preference'];
+            }
             if (array_key_exists('fulfillment_type', $data)) {
                 $updates['fulfillment_type'] = $data['fulfillment_type'];
             }
@@ -173,6 +177,7 @@ class ShipmentItemService
                 'delivery_gh_post_address' => null,
                 'delivery_landmark' => null,
                 'delivery_instructions' => null,
+                'delivery_preference' => null,
                 'fulfillment_type' => null,
             ]);
         }
@@ -422,6 +427,7 @@ class ShipmentItemService
             'quantity' => $item->quantity,
             'status' => $item->status?->value ?? 'pending',
             'tracking_code' => $item->tracking_code,
+            'delivery_preference' => $item->delivery_preference ?? 'deliver',
             'fulfillment_type' => $item->fulfillment_type?->value,
             'delivery' => $item->shipment && $item->shipment->destination_mode === ShipmentDestinationMode::PER_ITEM ? [
                 'recipient_name' => $item->delivery_recipient_name,

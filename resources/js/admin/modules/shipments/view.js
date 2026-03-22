@@ -259,7 +259,7 @@ function shipmentShow() {
 
         fulfillmentTypeLabel() {
             const ft = this.shipment?.fulfillment_type || 'warehouse';
-            return { warehouse: 'Warehouse Delivery', self_pickup: 'Self Pickup', direct: 'Direct Delivery' }[ft] || 'Warehouse Delivery';
+            return { warehouse: 'Warehouse Delivery', direct: 'Direct Delivery' }[ft] || 'Warehouse Delivery';
         },
 
         canChangeFulfillmentType() {

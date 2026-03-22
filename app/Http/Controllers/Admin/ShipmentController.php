@@ -92,8 +92,9 @@ class ShipmentController extends Controller
                     'vendor_business' => $shipment->vendor?->business_name,
                     'destination_mode' => $shipment->destination_mode?->value,
                     'destination_mode_label' => $shipment->destination_mode?->label() ?? 'Single Destination',
-                    'fulfillment_type' => $shipment->fulfillment_type?->value ?? 'warehouse',
-                    'fulfillment_type_label' => $shipment->fulfillment_type?->label() ?? 'Warehouse Delivery',
+                    'delivery_preference' => $shipment->delivery_preference ?? 'deliver',
+                    'fulfillment_type' => $shipment->fulfillment_type?->value ?? null,
+                    'fulfillment_type_label' => $shipment->fulfillment_type?->label() ?? null,
                     'destination_summary_title' => $summary['title'],
                     'destination_summary_subtitle' => $summary['subtitle'],
                     'delivery_location_title' => $location['title'],
@@ -263,6 +264,7 @@ class ShipmentController extends Controller
                     'status' => $item->status->value ?? $item->status,
                     'status_label' => method_exists($item->status, 'label') ? $item->status->label() : $item->status,
                     'tracking_code' => $item->tracking_code,
+                    'delivery_preference' => $item->delivery_preference ?? 'deliver',
                     'fulfillment_type' => $item->fulfillment_type?->value,
                     'delivery_recipient_name' => $item->delivery_recipient_name,
                     'delivery_recipient_phone' => $item->delivery_recipient_phone,
@@ -766,7 +768,7 @@ class ShipmentController extends Controller
         $this->authorizePermission('shipments.edit');
 
         $validated = $request->validate([
-            'fulfillment_type' => 'required|in:warehouse,self_pickup,direct',
+            'fulfillment_type' => 'required|in:warehouse,direct',
         ]);
 
         // Only allow change before pickup is completed

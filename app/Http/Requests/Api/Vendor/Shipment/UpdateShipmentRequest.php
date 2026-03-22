@@ -25,6 +25,7 @@ class UpdateShipmentRequest extends FormRequest
 
         return [
             'destination_mode' => ['sometimes', 'string', Rule::in($modes)],
+            'delivery_preference' => ['sometimes', 'string', Rule::in(['deliver', 'self_pickup'])],
             'fulfillment_type' => ['sometimes', 'string', Rule::in(['warehouse', 'self_pickup', 'direct'])],
 
             'pickup_contact_name' => ['sometimes', 'string', 'max:255'],
