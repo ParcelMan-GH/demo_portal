@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\FulfillmentType;
 use App\Enums\InvoiceStatus;
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentSource;
@@ -28,6 +29,7 @@ class Shipment extends Model
         'shipment_number',
         'status',
         'source',
+        'fulfillment_type',
         'created_by_user_id',
         'destination_mode',
         'current_invoice_id',
@@ -64,6 +66,7 @@ class Shipment extends Model
     protected $casts = [
         'status' => ShipmentStatus::class,
         'source' => ShipmentSource::class,
+        'fulfillment_type' => FulfillmentType::class,
         'destination_mode' => ShipmentDestinationMode::class,
         'pickup_latitude' => 'decimal:8',
         'pickup_longitude' => 'decimal:8',
@@ -243,6 +246,11 @@ class Shipment extends Model
     public function pickupAssignments(): HasMany
     {
         return $this->hasMany(PickupAssignment::class);
+    }
+
+    public function collection(): HasOne
+    {
+        return $this->hasOne(ShipmentCollection::class);
     }
 
     /**

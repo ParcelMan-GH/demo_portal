@@ -99,6 +99,14 @@
                         </a>
                     @endif
 
+                    @if($canReceiving)
+                        <a href="{{ route('warehouse.collections.index') }}"
+                           class="wh-nav-item {{ request()->routeIs('warehouse.collections.*') ? 'active' : '' }}">
+                            <span class="wh-nav-bullet"></span>
+                            <span class="wh-nav-text">Collections</span>
+                        </a>
+                    @endif
+
                     {{-- OPERATIONS section --}}
                     <div class="wh-nav-section-label mt-6">Operations</div>
 

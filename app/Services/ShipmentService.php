@@ -349,6 +349,7 @@ class ShipmentService
 
         $payload = [
             'destination_mode' => $mode,
+            'fulfillment_type' => $data['fulfillment_type'] ?? $shipment?->fulfillment_type?->value ?? 'warehouse',
             'pickup_contact_name' => $data['pickup_contact_name'] ?? $shipment?->pickup_contact_name,
             'pickup_contact_phone' => $data['pickup_contact_phone'] ?? $shipment?->pickup_contact_phone,
             'pickup_region_id' => $data['pickup_region_id'] ?? $shipment?->pickup_region_id,
@@ -489,10 +490,29 @@ class ShipmentService
             $invoiceHistory = [$this->transformInvoiceForApi($shipment->invoice, $shipment)];
         }
 
+        // Build collection info for self-pickup shipments
+        $collectionData = null;
+        if ($shipment->fulfillment_type?->isSelfPickup()) {
+            $collection = $shipment->relationLoaded('collection') ? $shipment->collection : $shipment->collection;
+            if ($collection) {
+                $warehouse = $collection->relationLoaded('warehouse') ? $collection->warehouse : $collection->warehouse;
+                $collectionData = [
+                    'status' => $collection->status,
+                    'warehouse_name' => $warehouse?->name,
+                    'warehouse_address' => $warehouse?->address,
+                    'warehouse_phone' => $warehouse?->contact_phone,
+                    'ready_at' => $collection->ready_at?->toIso8601String(),
+                    'collected_at' => $collection->collected_at?->toIso8601String(),
+                    'collected_by_name' => $collection->collected_by_name,
+                ];
+            }
+        }
+
         $payload = [
             'id' => $shipment->id,
             'shipment_number' => $shipment->shipment_number,
             'status' => $shipment->status->value,
+            'fulfillment_type' => $shipment->fulfillment_type?->value ?? 'warehouse',
             'destination_mode' => $shipment->destination_mode->value,
         ];
 
@@ -535,6 +555,7 @@ class ShipmentService
                 ? $this->transformInvoiceForApi($shipment->invoice, $shipment)
                 : null,
             'invoice_history' => $invoiceHistory,
+            'collection' => $collectionData,
             'pickup_assignment' => $pickupAssignment ? array_merge([
                 'id' => $pickupAssignment->id,
                 'status' => $pickupAssignment->status->value,

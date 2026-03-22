@@ -29,6 +29,7 @@ use App\Http\Controllers\Warehouse\ShipmentPaymentController as WarehouseShipmen
 use App\Http\Controllers\Warehouse\SortingController as WarehouseSortingController;
 use App\Http\Controllers\Warehouse\TransportManifestController as WarehouseTransportManifestController;
 use App\Http\Controllers\Warehouse\UserController as WarehouseUserController;
+use App\Http\Controllers\Warehouse\CollectionController as WarehouseCollectionController;
 use App\Http\Controllers\Warehouse\WalkinController as WarehouseWalkinController;
 use Illuminate\Support\Facades\Route;
 
@@ -363,6 +364,11 @@ Route::prefix('warehouse')
         Route::get('walkin/vendor-lookup', [WarehouseWalkinController::class, 'vendorLookup'])->name('walkin.vendor-lookup');
         Route::post('walkin/vendor-create', [WarehouseWalkinController::class, 'vendorCreate'])->name('walkin.vendor-create');
         Route::get('locations/search', [WarehouseWalkinController::class, 'locationSearch'])->name('locations.search');
+
+        // Collections (self-pickup)
+        Route::get('collections', [WarehouseCollectionController::class, 'index'])->name('collections.index');
+        Route::get('collections-data', [WarehouseCollectionController::class, 'data'])->name('collections.data');
+        Route::post('collections/{shipment}/handover', [WarehouseCollectionController::class, 'handover'])->name('collections.handover');
 
         // Warehouse Users
         Route::get('users', [WarehouseUserController::class, 'index'])->name('users.index');

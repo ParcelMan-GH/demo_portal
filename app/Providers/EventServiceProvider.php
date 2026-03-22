@@ -11,6 +11,8 @@ use App\Events\InvoiceAcceptedByVendor;
 use App\Events\InvoiceRejectedByVendor;
 use App\Events\InvoiceSent;
 use App\Events\PickupAssignmentStatusChanged;
+use App\Events\ShipmentCollected;
+use App\Events\ShipmentReadyForCollection;
 use App\Events\ShipmentStatusChanged;
 use App\Events\TransportManifestStatusChanged;
 use App\Events\VendorRegistered;
@@ -27,6 +29,7 @@ use App\Listeners\SendDriverAssignmentNotification;
 use App\Listeners\SendDriverTransportNotification;
 use App\Listeners\SendDriverUnassignedNotification;
 use App\Listeners\SendAdminWarehouseInvoiceNotification;
+use App\Listeners\SendCollectionNotifications;
 use App\Listeners\SendVendorInvoiceNotification;
 use App\Listeners\SendVendorShipmentNotification;
 use App\Listeners\SendWalkinShipmentNotifications;
@@ -90,6 +93,14 @@ class EventServiceProvider extends ServiceProvider
         // Walk-in shipment
         WalkinShipmentReceived::class => [
             SendWalkinShipmentNotifications::class,
+        ],
+
+        // Collection (self-pickup)
+        ShipmentReadyForCollection::class => [
+            SendCollectionNotifications::class,
+        ],
+        ShipmentCollected::class => [
+            SendCollectionNotifications::class,
         ],
 
         // Vendor registration

@@ -24,6 +24,7 @@ class CreateShipmentRequest extends FormRequest
 
         return [
             'destination_mode' => ['required', 'string', Rule::in($modes)],
+            'fulfillment_type' => ['nullable', 'string', Rule::in(['warehouse', 'self_pickup', 'direct'])],
 
             'pickup_contact_name' => ['required', 'string', 'max:255'],
             'pickup_contact_phone' => ['required', 'string', 'max:20'],

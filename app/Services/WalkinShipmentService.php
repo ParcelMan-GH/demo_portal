@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\FulfillmentType;
 use App\Enums\ItemStatus;
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentSource;
@@ -51,11 +52,14 @@ class WalkinShipmentService
                 ? ShipmentDestinationMode::PER_ITEM
                 : ShipmentDestinationMode::SINGLE;
 
+            $fulfillmentType = FulfillmentType::tryFrom($data['fulfillment_type'] ?? 'warehouse') ?? FulfillmentType::WAREHOUSE;
+
             // Build shipment attributes
             $shipmentData = [
                 'vendor_id'           => $vendor->id,
                 'status'              => ShipmentStatus::AT_WAREHOUSE,
                 'source'              => $source,
+                'fulfillment_type'    => $fulfillmentType,
                 'created_by_user_id'  => $data['created_by_user_id'],
                 'destination_mode'    => $destMode,
                 'submitted_at'        => now(),
@@ -145,6 +149,11 @@ class WalkinShipmentService
             // Fire event
             $user = \App\Models\User::find($data['created_by_user_id']);
             event(new WalkinShipmentReceived($shipment, $warehouse, $user));
+
+            // For self-pickup walk-ins: auto-mark ready for collection
+            if ($fulfillmentType->isSelfPickup()) {
+                app(ShipmentCollectionService::class)->markReadyForCollection($shipment, $warehouse);
+            }
 
             return [
                 'shipment' => $shipment->fresh(['vendor', 'items']),

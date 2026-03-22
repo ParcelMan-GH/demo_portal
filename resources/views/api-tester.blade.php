@@ -1001,6 +1001,7 @@
                                     id: 2,
                                     shipment_number: 'PCM-2026-00002',
                                     status: 'invoice_accepted',
+                                    fulfillment_type: 'warehouse',
                                     destination_mode: 'single',
                                     pickup: {
                                         contact_name: 'Kwame Mensah',
@@ -1051,6 +1052,7 @@
                                             updated_at: '2026-02-10T11:20:00+00:00'
                                         }
                                     ],
+                                    collection: null,
                                     can_edit: false,
                                     can_delete: false,
                                     can_submit: false,
@@ -1160,6 +1162,7 @@
                                     id: 3,
                                     shipment_number: 'PCM-2026-00003',
                                     status: 'draft',
+                                    fulfillment_type: 'warehouse',
                                     destination_mode: 'per_item',
                                     pickup: {
                                         contact_name: 'Yaw Asante',
@@ -1208,6 +1211,7 @@
                                             updated_at: '2026-02-10T18:12:00+00:00'
                                         }
                                     ],
+                                    collection: null,
                                     can_edit: true,
                                     can_delete: true,
                                     can_submit: true,
@@ -1245,6 +1249,7 @@
                 useFormInputs: true,
                 fields: [
                     { name: 'destination_mode', type: 'enum', required: true, description: 'Destination mode. Pass exact value: `single` or `per_item`. `single` = use shipment-level delivery fields. `per_item` = do not send shipment-level delivery fields; provide delivery on each item.', options: ['single', 'per_item'], labels: { single: 'Single destination for all items', per_item: 'Each item has its own destination' } },
+                    { name: 'fulfillment_type', type: 'enum', required: false, description: 'Fulfillment method. `warehouse` = standard warehouse delivery (default). `self_pickup` = recipient collects from warehouse. `direct` = driver delivers directly after pickup, no warehouse stop.', options: ['warehouse', 'self_pickup', 'direct'], labels: { warehouse: 'Warehouse Delivery (default)', self_pickup: 'Self Pickup by Recipient', direct: 'Direct Delivery' } },
 
                     { name: 'pickup_contact_name', type: 'string', required: true, description: 'Pickup contact full name', example: 'Kwame Mensah' },
                     { name: 'pickup_contact_phone', type: 'string', required: true, description: 'Pickup contact phone number', example: '+233244123456' },
@@ -1284,6 +1289,7 @@
                                 id: 1,
                                 shipment_number: 'PCM-2026-00001',
                                 status: 'draft',
+                                fulfillment_type: 'warehouse',
                                 destination_mode: 'single',
                                 pickup: {
                                     contact_name: 'Kwame Mensah',
@@ -1320,6 +1326,7 @@
                                     instructions: 'Call before delivery'
                                 },
                                 items: [],
+                                collection: null,
                                 can_edit: true,
                                 can_delete: true,
                                 can_submit: false,
@@ -1340,6 +1347,7 @@
                                 id: 2,
                                 shipment_number: 'PCM-2026-00002',
                                 status: 'draft',
+                                fulfillment_type: 'warehouse',
                                 destination_mode: 'per_item',
                                 pickup: {
                                     contact_name: 'Yaw Asante',
@@ -1360,6 +1368,7 @@
                                 },
                                 delivery: null,
                                 items: [],
+                                collection: null,
                                 can_edit: true,
                                 can_delete: true,
                                 can_submit: false,
@@ -1451,6 +1460,7 @@
                                         updated_at: '2026-02-10T11:20:00+00:00'
                                     }
                                 ],
+                                collection: null,
                                 can_edit: false,
                                 can_delete: false,
                                 can_submit: false,
@@ -2429,6 +2439,8 @@
                                     shipment_id: 5,
                                     shipment_number: 'PCM-2026-00005',
                                     status: 'assigned',
+                                    is_direct_delivery: false,
+                                    direct_delivery: null,
                                     cancellation_reason: null,
                                     notes: 'Handle with care',
                                     timeline: {
@@ -2486,6 +2498,8 @@
                                     shipment_id: 8,
                                     shipment_number: 'PCM-2026-00008',
                                     status: 'en_route',
+                                    is_direct_delivery: false,
+                                    direct_delivery: null,
                                     cancellation_reason: null,
                                     notes: null,
                                     timeline: {
@@ -2578,6 +2592,8 @@
                                 shipment_id: 5,
                                 shipment_number: 'PCM-2026-00005',
                                 status: 'assigned',
+                                is_direct_delivery: false,
+                                direct_delivery: null,
                                 cancellation_reason: null,
                                 notes: 'Handle with care',
                                 pickup_latitude: null,
@@ -2674,6 +2690,8 @@
                                 shipment_id: 5,
                                 shipment_number: 'PCM-2026-00005',
                                 status: 'en_route',
+                                is_direct_delivery: false,
+                                direct_delivery: null,
                                 cancellation_reason: null,
                                 notes: 'Handle with care',
                                 pickup_latitude: null,
@@ -2775,6 +2793,8 @@
                                 shipment_id: 5,
                                 shipment_number: 'PCM-2026-00005',
                                 status: 'arrived',
+                                is_direct_delivery: false,
+                                direct_delivery: null,
                                 cancellation_reason: null,
                                 notes: 'Handle with care',
                                 pickup_latitude: 5.6037,
@@ -2881,6 +2901,8 @@
                                 shipment_id: 5,
                                 shipment_number: 'PCM-2026-00005',
                                 status: 'picking_up',
+                                is_direct_delivery: false,
+                                direct_delivery: null,
                                 cancellation_reason: null,
                                 notes: 'Handle with care',
                                 pickup_latitude: 5.6037,
@@ -3013,6 +3035,9 @@
                                 shipment_id: 5,
                                 shipment_number: 'PCM-2026-00005',
                                 status: 'completed',
+                                is_direct_delivery: false,
+                                direct_delivery: null,
+                                auto_delivery: null,
                                 cancellation_reason: null,
                                 notes: 'All items confirmed and loaded.',
                                 pickup_latitude: 5.6037,
@@ -3496,6 +3521,7 @@
                                     id: 3,
                                     run_number: 'DR-2026-AC01-0001',
                                     status: 'out_for_delivery',
+                                    is_direct_delivery: false,
                                     warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
                                     timeline: {
                                         assigned: { at: '2026-02-18T10:00:00Z' },
@@ -3508,12 +3534,17 @@
                                             recipient_name: 'Ama Mensah',
                                             recipient_phone: '+233241234567',
                                             status: 'pending',
+                                            total_packages: 2,
                                             verification: {
                                                 code_sent_at: '2026-02-18T10:30:00Z',
                                                 code_expires_at: '2026-02-19T10:30:00Z',
                                                 attempts: 0,
-                                                max_attempts: 5
-                                            }
+                                                max_attempts: 5,
+                                                skipped: false,
+                                                skip_reason: null,
+                                                skipped_at: null
+                                            },
+                                            delivery_notes: null
                                         }
                                     ],
                                     notes: null,
@@ -3571,11 +3602,13 @@
                                         recipient_name: 'Ama Mensah',
                                         recipient_phone: '+233241234567',
                                         status: 'pending',
+                                        total_packages: 2,
                                         location: { region: 'Greater Accra', district: 'Accra Metropolitan', town: 'Osu', latitude: '5.5558', longitude: '-0.1845', gh_post_address: 'GA-144-2020', landmark: 'Near Oxford Street' },
-                                        verification: { code_sent_at: '2026-02-18T10:30:00.000000Z', code_expires_at: '2026-02-19T10:30:00.000000Z', attempts: 0, max_attempts: 5 },
+                                        verification: { code_sent_at: '2026-02-18T10:30:00.000000Z', code_expires_at: '2026-02-19T10:30:00.000000Z', attempts: 0, max_attempts: 5, skipped: false, skip_reason: null, skipped_at: null },
                                         timeline: { arrived: { at: null }, delivered: { at: null } },
                                         failure_reason: null,
                                         failure_notes: null,
+                                        delivery_notes: null,
                                         items: [
                                             { shipment_item_id: 14, shipment_number: 'PCM-2026-00014', description: 'LED TV 50-inch', tracking_code: 'TRK5PNQ13E', expected_quantity: 1, delivered_quantity: 0, status: 'pending', notes: null, delivered_at: null }
                                         ]
@@ -3611,17 +3644,18 @@
                         message: 'Arrival at recipient stop recorded.',
                         data: {
                             delivery: {
-                                id: 3, run_number: 'DR-2026-AC01-0001', status: 'out_for_delivery',
+                                id: 3, run_number: 'DR-2026-AC01-0001', status: 'out_for_delivery', is_direct_delivery: false,
                                 warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
                                 timeline: { assigned: { at: '2026-02-18T10:00:00.000000Z' }, out_for_delivery: { at: '2026-02-18T10:30:00.000000Z' }, completed: { at: null } },
                                 stops: [
                                     {
                                         id: 9,
                                         recipient_name: 'Ama Mensah', recipient_phone: '+233241234567', status: 'arrived',
+                                        total_packages: 2,
                                         location: { region: 'Greater Accra', district: 'Accra Metropolitan', town: 'Osu', latitude: '5.5558', longitude: '-0.1845', gh_post_address: 'GA-144-2020', landmark: 'Near Oxford Street' },
-                                        verification: { code_sent_at: '2026-02-18T10:30:00.000000Z', code_expires_at: '2026-02-19T10:30:00.000000Z', attempts: 0, max_attempts: 5 },
+                                        verification: { code_sent_at: '2026-02-18T11:05:00.000000Z', code_expires_at: '2026-02-19T11:05:00.000000Z', attempts: 0, max_attempts: 5, skipped: false, skip_reason: null, skipped_at: null },
                                         timeline: { arrived: { at: '2026-02-18T11:05:00.000000Z' }, delivered: { at: null } },
-                                        failure_reason: null, failure_notes: null,
+                                        failure_reason: null, failure_notes: null, delivery_notes: null,
                                         items: [
                                             { shipment_item_id: 14, shipment_number: 'PCM-2026-00014', description: 'LED TV 50-inch', tracking_code: 'TRK5PNQ13E', expected_quantity: 1, delivered_quantity: 0, status: 'pending', notes: null, delivered_at: null }
                                         ]
@@ -3725,17 +3759,18 @@ Each object in <code>items[]</code> corresponds to one package at this stop. The
                         message: 'Delivery stop confirmed successfully.',
                         data: {
                             delivery: {
-                                id: 3, run_number: 'DR-2026-AC01-0001', status: 'completed',
+                                id: 3, run_number: 'DR-2026-AC01-0001', status: 'completed', is_direct_delivery: false,
                                 warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
                                 timeline: { assigned: { at: '2026-02-18T10:00:00.000000Z' }, out_for_delivery: { at: '2026-02-18T10:30:00.000000Z' }, completed: { at: '2026-02-18T11:20:00.000000Z' } },
                                 stops: [
                                     {
                                         id: 9,
                                         recipient_name: 'Ama Mensah', recipient_phone: '+233241234567', status: 'delivered',
+                                        total_packages: 2,
                                         location: { region: 'Greater Accra', district: 'Accra Metropolitan', town: 'Osu', latitude: '5.5558', longitude: '-0.1845', gh_post_address: 'GA-144-2020', landmark: 'Near Oxford Street' },
-                                        verification: { code_sent_at: '2026-02-18T10:30:00.000000Z', code_expires_at: '2026-02-19T10:30:00.000000Z', attempts: 1, max_attempts: 5 },
+                                        verification: { code_sent_at: '2026-02-18T11:05:00.000000Z', code_expires_at: '2026-02-19T11:05:00.000000Z', attempts: 1, max_attempts: 5, skipped: false, skip_reason: null, skipped_at: null },
                                         timeline: { arrived: { at: '2026-02-18T11:05:00.000000Z' }, delivered: { at: '2026-02-18T11:20:00.000000Z' } },
-                                        failure_reason: null, failure_notes: null,
+                                        failure_reason: null, failure_notes: null, delivery_notes: 'Left with security guard at gate.',
                                         items: [
                                             { shipment_item_id: 14, shipment_number: 'PCM-2026-00014', description: 'LED TV 50-inch', tracking_code: 'TRK5PNQ13E', expected_quantity: 1, delivered_quantity: 1, status: 'delivered', notes: 'Handed to recipient', delivered_at: '2026-02-18T11:20:00.000000Z' }
                                         ]
@@ -3831,17 +3866,18 @@ If the recipient did not receive the SMS code, send <code>skip_verification=true
                         message: 'Delivery stop marked as failed.',
                         data: {
                             delivery: {
-                                id: 3, run_number: 'DR-2026-AC01-0001', status: 'partially_delivered',
+                                id: 3, run_number: 'DR-2026-AC01-0001', status: 'partially_delivered', is_direct_delivery: false,
                                 warehouse: { id: 1, name: 'Accra Main Hub', code: 'AC01', address: '123 Ring Road, Accra', latitude: '5.60391200', longitude: '-0.18690900', contact_phone: '+233201234567' },
                                 timeline: { assigned: { at: '2026-02-18T10:00:00.000000Z' }, out_for_delivery: { at: '2026-02-18T10:30:00.000000Z' }, completed: { at: null } },
                                 stops: [
                                     {
                                         id: 9,
                                         recipient_name: 'Ama Mensah', recipient_phone: '+233241234567', status: 'failed',
+                                        total_packages: 2,
                                         location: { region: 'Greater Accra', district: 'Accra Metropolitan', town: 'Osu', latitude: '5.5558', longitude: '-0.1845', gh_post_address: 'GA-144-2020', landmark: 'Near Oxford Street' },
-                                        verification: { code_sent_at: '2026-02-18T10:30:00.000000Z', code_expires_at: '2026-02-19T10:30:00.000000Z', attempts: 0, max_attempts: 5 },
+                                        verification: { code_sent_at: '2026-02-18T11:05:00.000000Z', code_expires_at: '2026-02-19T11:05:00.000000Z', attempts: 0, max_attempts: 5, skipped: false, skip_reason: null, skipped_at: null },
                                         timeline: { arrived: { at: '2026-02-18T11:05:00.000000Z' }, delivered: { at: null } },
-                                        failure_reason: 'recipient_unreachable', failure_notes: 'Phone switched off after 3 attempts',
+                                        failure_reason: 'recipient_unreachable', failure_notes: 'Phone switched off after 3 attempts', delivery_notes: null,
                                         items: [
                                             { shipment_item_id: 14, shipment_number: 'PCM-2026-00014', description: 'LED TV 50-inch', tracking_code: 'TRK5PNQ13E', expected_quantity: 1, delivered_quantity: 0, status: 'failed', notes: 'Phone switched off after 3 attempts', delivered_at: '2026-02-18T11:15:00.000000Z' }
                                         ]

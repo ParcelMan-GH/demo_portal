@@ -35,7 +35,7 @@ class DriverDeliveryService
             ->where('assigned_driver_id', $driver->id)
             ->with([
                 'warehouse:id,name,code,address,latitude,longitude,contact_phone',
-                'stops:id,delivery_run_id,recipient_name,recipient_phone,status,total_packages,town,landmark,gh_post_address,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,arrived_at,delivered_at,failure_reason',
+                'stops:id,delivery_run_id,recipient_name,recipient_phone,status,total_packages,town,landmark,gh_post_address,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,failure_reason,failure_notes,delivery_notes',
                 'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status',
                 'items.shipmentItem:id,shipment_id,description,tracking_code',
                 'items.shipmentItem.shipment:id,shipment_number',
@@ -102,7 +102,7 @@ class DriverDeliveryService
 
         $run->load([
             'warehouse:id,name,code,address,latitude,longitude,contact_phone',
-            'stops:id,delivery_run_id,recipient_name,recipient_phone,status,total_packages,region_id,district_id,town,latitude,longitude,gh_post_address,landmark,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,arrived_at,delivered_at,delivery_latitude,delivery_longitude,failure_reason,failure_notes',
+            'stops:id,delivery_run_id,recipient_name,recipient_phone,status,total_packages,region_id,district_id,town,latitude,longitude,gh_post_address,landmark,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,delivery_latitude,delivery_longitude,failure_reason,failure_notes,delivery_notes',
             'stops.region:id,name',
             'stops.district:id,name',
             'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status,notes,delivered_at',
@@ -120,10 +120,18 @@ class DriverDeliveryService
 
     private function transformRun(DeliveryRun $run): array
     {
+        // Check if this run's shipment is a direct delivery
+        $isDirectDelivery = false;
+        $firstItem = $run->items->first();
+        if ($firstItem?->shipmentItem?->shipment) {
+            $isDirectDelivery = $firstItem->shipmentItem->shipment->fulfillment_type?->isDirect() ?? false;
+        }
+
         return [
             'id' => $run->id,
             'run_number' => $run->run_number,
             'status' => $run->status,
+            'is_direct_delivery' => $isDirectDelivery,
             'warehouse' => $run->warehouse ? [
                 'id' => $run->warehouse->id,
                 'name' => $run->warehouse->name,
@@ -160,6 +168,9 @@ class DriverDeliveryService
                         'code_expires_at' => $stop->verification_code_expires_at,
                         'attempts' => (int) $stop->verification_attempts,
                         'max_attempts' => (int) $stop->max_attempts,
+                        'skipped' => (bool) $stop->verification_skipped,
+                        'skip_reason' => $stop->verification_skip_reason,
+                        'skipped_at' => $stop->verification_skipped_at,
                     ],
                     'timeline' => [
                         'arrived' => ['at' => $stop->arrived_at],

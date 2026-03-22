@@ -644,6 +644,7 @@ class ShipmentController extends Controller
         $validated = $request->validate([
             'vendor_id'                          => 'required|exists:vendors,id',
             'warehouse_id'                       => 'required|exists:warehouses,id',
+            'fulfillment_type'                   => 'nullable|in:warehouse,self_pickup,direct',
             'destination_mode'                   => 'required|in:single,per_item',
             'items'                              => 'required|array|min:1',
             'items.*.description'                => 'required|string|max:500',

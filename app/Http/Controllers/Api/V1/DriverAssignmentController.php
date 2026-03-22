@@ -8,6 +8,7 @@ use App\Models\PickupAssignment;
 use App\Models\PickupPhoto;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
+use App\Services\DirectDeliveryService;
 use App\Services\PickupAssignmentService;
 use App\Services\StorageService;
 use Illuminate\Http\JsonResponse;
@@ -358,7 +359,11 @@ class DriverAssignmentController extends Controller
                 'shipment.vendor',
                 'shipment.pickupRegion',
                 'shipment.pickupDistrict',
+                'shipment.deliveryRegion',
+                'shipment.deliveryDistrict',
                 'shipment.items.images',
+                'shipment.items.deliveryRegion',
+                'shipment.items.deliveryDistrict',
                 'targetWarehouse',
                 'receivedWarehouse',
                 'photos',
@@ -367,6 +372,18 @@ class DriverAssignmentController extends Controller
 
             if ($freshAssignment instanceof PickupAssignment) {
                 $result['data']['assignment'] = $this->transformAssignmentForDriver($freshAssignment);
+
+                // Direct delivery: auto-create virtual pipeline and return delivery info
+                $shipment = $freshAssignment->shipment;
+                if ($shipment?->fulfillment_type?->isDirect() && $freshAssignment->target_warehouse_id) {
+                    $autoDelivery = app(DirectDeliveryService::class)->createVirtualPipeline(
+                        $shipment,
+                        $freshAssignment->driver_id,
+                        $freshAssignment->target_warehouse_id
+                    );
+                    $result['data']['assignment']['auto_delivery'] = $autoDelivery;
+                    $result['message'] = 'Pickup confirmed. Proceed to delivery.';
+                }
             }
         }
 
@@ -401,11 +418,53 @@ class DriverAssignmentController extends Controller
 
     private function transformAssignmentForDriver(PickupAssignment $assignment): array
     {
+        $shipment = $assignment->shipment;
+        $isDirect = $shipment?->fulfillment_type?->isDirect() ?? false;
+
+        $directDelivery = null;
+        if ($isDirect && $shipment) {
+            $directDelivery = [
+                'recipient_name' => $shipment->delivery_recipient_name,
+                'recipient_phone' => $shipment->delivery_recipient_phone,
+                'location' => [
+                    'region' => $shipment->deliveryRegion?->name,
+                    'district' => $shipment->deliveryDistrict?->name,
+                    'town' => $shipment->delivery_town,
+                    'latitude' => $shipment->delivery_latitude,
+                    'longitude' => $shipment->delivery_longitude,
+                    'gh_post_address' => $shipment->delivery_gh_post_address,
+                    'landmark' => $shipment->delivery_landmark,
+                ],
+                'instructions' => $shipment->delivery_instructions,
+            ];
+
+            // For PER_ITEM mode, use first item's delivery if shipment-level is empty
+            if (!$directDelivery['recipient_name'] && $shipment->isPerItemDestination() && $shipment->items->isNotEmpty()) {
+                $firstItem = $shipment->items->first();
+                $directDelivery = [
+                    'recipient_name' => $firstItem->delivery_recipient_name,
+                    'recipient_phone' => $firstItem->delivery_recipient_phone,
+                    'location' => [
+                        'region' => $firstItem->deliveryRegion?->name,
+                        'district' => $firstItem->deliveryDistrict?->name,
+                        'town' => $firstItem->delivery_town,
+                        'latitude' => $firstItem->delivery_latitude,
+                        'longitude' => $firstItem->delivery_longitude,
+                        'gh_post_address' => $firstItem->delivery_gh_post_address,
+                        'landmark' => $firstItem->delivery_landmark,
+                    ],
+                    'instructions' => $firstItem->delivery_instructions,
+                ];
+            }
+        }
+
         return [
             'id' => $assignment->id,
             'shipment_id' => $assignment->shipment_id,
-            'shipment_number' => $assignment->shipment?->shipment_number,
+            'shipment_number' => $shipment?->shipment_number,
             'status' => $assignment->status->value,
+            'is_direct_delivery' => $isDirect,
+            'direct_delivery' => $directDelivery,
             'cancellation_reason' => $assignment->cancellation_reason,
             'notes' => $assignment->notes,
             'pickup_latitude' => $assignment->pickup_latitude,
@@ -416,8 +475,8 @@ class DriverAssignmentController extends Controller
                 'name' => $assignment->targetWarehouse->name,
                 'code' => $assignment->targetWarehouse->code,
             ] : null,
-            'shipment' => $assignment->shipment
-                ? $this->transformShipmentForDriver($assignment->shipment, $assignment)
+            'shipment' => $shipment
+                ? $this->transformShipmentForDriver($shipment, $assignment)
                 : null,
             'created_at' => $assignment->created_at,
             'updated_at' => $assignment->updated_at,
