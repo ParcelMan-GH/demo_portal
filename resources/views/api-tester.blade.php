@@ -3670,10 +3670,15 @@ For packaged/bagged items where the driver cannot open and count, send <code>exp
   <li>Run becomes <code>partially_delivered</code> while some stops are done and others remain</li>
 </ul>
 <br>
+<strong>Skipping verification</strong><br>
+If the recipient did not receive the SMS code, the driver can skip verification by sending <code>skip_verification=true</code> and <code>skip_reason</code> (e.g. "SMS not received"). The stop will be flagged as <strong>unverified</strong> for warehouse review. <code>proof_photo</code> is still required.
+<br><br>
 <strong>Request body structure (JSON equivalent)</strong><br>
 <small style="color:#64748b;">The actual request uses <code>multipart/form-data</code> (to support the proof photo file upload), but the structure maps directly to this JSON shape:</small>
 <pre class="docs-code-block">{
   "verification_code": "483219",
+  "skip_verification": false,
+  "skip_reason": null,
   "latitude": "5.6037",
   "longitude": "-0.1870",
   "proof_photo": "&lt;file&gt;",
@@ -3701,7 +3706,9 @@ Each object in <code>items[]</code> corresponds to one package at this stop. The
                     { name: 'stop', type: 'dropdown', required: true, description: 'Select stop under chosen run', dependsOn: 'run', onSelect: 'handleDeliveryStopSelection' }
                 ],
                 fields: [
-                    { name: 'verification_code', type: 'string', required: true, description: '6-digit code from recipient', example: '483219' },
+                    { name: 'verification_code', type: 'string', required: false, description: '6-digit code from recipient. Required unless skip_verification is true.', example: '483219' },
+                    { name: 'skip_verification', type: 'enum', required: false, description: 'Skip OTP verification (e.g. SMS not received). When true, skip_reason is required and stop is flagged for warehouse review.', options: ['false', 'true'], example: 'false' },
+                    { name: 'skip_reason', type: 'string', required: false, description: 'Reason for skipping verification. Required when skip_verification is true.', example: 'SMS not received by recipient' },
                     { name: 'latitude', type: 'string', required: true, description: 'Delivery GPS latitude', example: '5.6037' },
                     { name: 'longitude', type: 'string', required: true, description: 'Delivery GPS longitude', example: '-0.1870' },
                     { name: 'proof_photo', type: 'file', required: true, description: 'Delivery proof image', accept: 'image/jpeg,image/png,image/webp' },

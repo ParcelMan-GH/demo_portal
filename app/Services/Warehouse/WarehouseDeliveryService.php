@@ -15,6 +15,7 @@ use App\Models\ShipmentItemTracking;
 use App\Models\SortBatch;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\SmsService;
 use App\Services\StorageService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
@@ -25,7 +26,8 @@ class WarehouseDeliveryService
 {
     public function __construct(
         private DeliveryVerificationService $verificationService,
-        private StorageService $storageService
+        private StorageService $storageService,
+        private SmsService $smsService
     ) {
     }
 
@@ -281,7 +283,14 @@ class WarehouseDeliveryService
             ]);
 
             foreach ($run->stops as $stop) {
-                $this->verificationService->issueCode($stop, $run->run_number);
+                // Notify recipient their items are on the way (OTP sent on driver arrival)
+                $this->smsService->send(
+                    (string) $stop->recipient_phone,
+                    sprintf(
+                        'Parcelman: Your parcel (run %s) is on its way! A delivery person will contact you shortly. A verification code will be sent when they arrive.',
+                        $run->run_number
+                    )
+                );
             }
 
             $now = now();
@@ -361,9 +370,12 @@ class WarehouseDeliveryService
             'arrived_at' => now(),
         ]);
 
+        // Send OTP verification code to recipient now that driver has arrived
+        $this->verificationService->issueCode($stop, $run->run_number);
+
         return [
             'success' => true,
-            'message' => 'Arrival at recipient stop recorded.',
+            'message' => 'Arrival recorded. Verification code sent to recipient.',
         ];
     }
 
@@ -374,12 +386,14 @@ class WarehouseDeliveryService
         DeliveryRun $run,
         DeliveryRunStop $stop,
         Driver $driver,
-        string $verificationCode,
+        ?string $verificationCode,
         float $latitude,
         float $longitude,
         UploadedFile $proofPhoto,
         array $linePayloads,
-        ?string $ipAddress = null
+        ?string $ipAddress = null,
+        bool $skipVerification = false,
+        ?string $skipReason = null
     ): array {
         if ((int) $run->assigned_driver_id !== (int) $driver->id || (int) $stop->delivery_run_id !== (int) $run->id) {
             return ['success' => false, 'message' => 'Delivery stop not found.'];
@@ -393,14 +407,22 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Stop already delivered.'];
         }
 
-        $verifyResult = $this->verificationService->verifyCode(
-            stop: $stop,
-            code: $verificationCode,
-            driver: $driver,
-            ipAddress: $ipAddress
-        );
-        if (!$verifyResult['success']) {
-            return $verifyResult;
+        if ($skipVerification) {
+            $stop->update([
+                'verification_skipped' => true,
+                'verification_skip_reason' => $skipReason,
+                'verification_skipped_at' => now(),
+            ]);
+        } else {
+            $verifyResult = $this->verificationService->verifyCode(
+                stop: $stop,
+                code: (string) $verificationCode,
+                driver: $driver,
+                ipAddress: $ipAddress
+            );
+            if (!$verifyResult['success']) {
+                return $verifyResult;
+            }
         }
 
         return DB::transaction(function () use ($run, $stop, $driver, $latitude, $longitude, $proofPhoto, $linePayloads) {
