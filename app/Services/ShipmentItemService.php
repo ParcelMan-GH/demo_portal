@@ -47,6 +47,7 @@ class ShipmentItemService
                 'delivery_gh_post_address' => $data['delivery_gh_post_address'] ?? null,
                 'delivery_landmark' => $data['delivery_landmark'] ?? null,
                 'delivery_instructions' => $data['delivery_instructions'] ?? null,
+                'fulfillment_type' => $data['fulfillment_type'] ?? 'warehouse',
             ]);
         }
 
@@ -156,6 +157,10 @@ class ShipmentItemService
                     ? PhoneHelper::format($data['delivery_recipient_phone'])
                     : null;
             }
+
+            if (array_key_exists('fulfillment_type', $data)) {
+                $updates['fulfillment_type'] = $data['fulfillment_type'];
+            }
         } else {
             $updates = array_merge($updates, [
                 'delivery_recipient_name' => null,
@@ -168,6 +173,7 @@ class ShipmentItemService
                 'delivery_gh_post_address' => null,
                 'delivery_landmark' => null,
                 'delivery_instructions' => null,
+                'fulfillment_type' => null,
             ]);
         }
 
@@ -416,6 +422,7 @@ class ShipmentItemService
             'quantity' => $item->quantity,
             'status' => $item->status?->value ?? 'pending',
             'tracking_code' => $item->tracking_code,
+            'fulfillment_type' => $item->fulfillment_type?->value,
             'delivery' => $item->shipment && $item->shipment->destination_mode === ShipmentDestinationMode::PER_ITEM ? [
                 'recipient_name' => $item->delivery_recipient_name,
                 'recipient_phone' => $item->delivery_recipient_phone,

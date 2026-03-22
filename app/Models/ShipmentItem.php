@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\FulfillmentType;
 use App\Enums\ItemStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -32,6 +33,7 @@ class ShipmentItem extends Model
         'delivery_gh_post_address',
         'delivery_landmark',
         'delivery_instructions',
+        'fulfillment_type',
         'status',
         'tracking_code',
     ];
@@ -45,6 +47,7 @@ class ShipmentItem extends Model
         'quantity' => 'integer',
         'delivery_latitude' => 'decimal:8',
         'delivery_longitude' => 'decimal:8',
+        'fulfillment_type' => FulfillmentType::class,
         'status' => ItemStatus::class,
     ];
 

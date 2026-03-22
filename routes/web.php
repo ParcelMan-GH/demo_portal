@@ -203,6 +203,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('shipments/{shipment}', [ShipmentController::class, 'showPage'])->name('shipments.show');
         Route::get('shipments/{shipment}/items', [ShipmentController::class, 'items'])->name('shipments.items');
         Route::get('shipments/{shipment}/tracking', [ShipmentController::class, 'tracking'])->name('shipments.tracking');
+        Route::post('shipments/{shipment}/fulfillment-type', [ShipmentController::class, 'updateFulfillmentType'])->name('shipments.update-fulfillment-type');
         Route::get('shipments-export', [ShipmentController::class, 'export'])->name('shipments.export');
 
         // Invoice Management (on shipments)

@@ -92,6 +92,8 @@ class ShipmentController extends Controller
                     'vendor_business' => $shipment->vendor?->business_name,
                     'destination_mode' => $shipment->destination_mode?->value,
                     'destination_mode_label' => $shipment->destination_mode?->label() ?? 'Single Destination',
+                    'fulfillment_type' => $shipment->fulfillment_type?->value ?? 'warehouse',
+                    'fulfillment_type_label' => $shipment->fulfillment_type?->label() ?? 'Warehouse Delivery',
                     'destination_summary_title' => $summary['title'],
                     'destination_summary_subtitle' => $summary['subtitle'],
                     'delivery_location_title' => $location['title'],
@@ -261,6 +263,7 @@ class ShipmentController extends Controller
                     'status' => $item->status->value ?? $item->status,
                     'status_label' => method_exists($item->status, 'label') ? $item->status->label() : $item->status,
                     'tracking_code' => $item->tracking_code,
+                    'fulfillment_type' => $item->fulfillment_type?->value,
                     'delivery_recipient_name' => $item->delivery_recipient_name,
                     'delivery_recipient_phone' => $item->delivery_recipient_phone,
                     'delivery_location_title' => $deliveryLocationTitle,
@@ -755,6 +758,32 @@ class ShipmentController extends Controller
                 'region'   => ['id' => $l->region->id, 'name' => $l->region->name],
                 'display'  => "{$l->name}, {$l->district->name}, {$l->region->name}",
             ]),
+        ]);
+    }
+
+    public function updateFulfillmentType(Request $request, Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $validated = $request->validate([
+            'fulfillment_type' => 'required|in:warehouse,self_pickup,direct',
+        ]);
+
+        // Only allow change before pickup is completed
+        $blockStatuses = ['picked_up', 'at_warehouse', 'sorted', 'in_transit', 'at_destination', 'out_for_delivery', 'delivered', 'cancelled'];
+        if (in_array($shipment->status->value, $blockStatuses)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Fulfillment type cannot be changed after pickup is completed.',
+            ], 400);
+        }
+
+        $shipment->update(['fulfillment_type' => $validated['fulfillment_type']]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Fulfillment type updated.',
+            'fulfillment_type' => $shipment->fresh()->fulfillment_type->value,
         ]);
     }
 

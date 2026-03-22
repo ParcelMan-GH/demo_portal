@@ -1249,7 +1249,7 @@
                 useFormInputs: true,
                 fields: [
                     { name: 'destination_mode', type: 'enum', required: true, description: 'Destination mode. Pass exact value: `single` or `per_item`. `single` = use shipment-level delivery fields. `per_item` = do not send shipment-level delivery fields; provide delivery on each item.', options: ['single', 'per_item'], labels: { single: 'Single destination for all items', per_item: 'Each item has its own destination' } },
-                    { name: 'fulfillment_type', type: 'enum', required: false, description: 'Fulfillment method. `warehouse` = standard warehouse delivery (default). `self_pickup` = recipient collects from warehouse. `direct` = driver delivers directly after pickup, no warehouse stop.', options: ['warehouse', 'self_pickup', 'direct'], labels: { warehouse: 'Warehouse Delivery (default)', self_pickup: 'Self Pickup by Recipient', direct: 'Direct Delivery' } },
+                    { name: 'fulfillment_type', type: 'enum', required: false, description: 'Fulfillment method (single destination only). `warehouse` = standard warehouse delivery (default). `self_pickup` = recipient collects from warehouse. `direct` = driver delivers directly after pickup, no warehouse stop.', options: ['warehouse', 'self_pickup', 'direct'], labels: { warehouse: 'Warehouse Delivery (default)', self_pickup: 'Self Pickup by Recipient', direct: 'Direct Delivery' }, showWhen: { field: 'destination_mode', value: 'single' } },
 
                     { name: 'pickup_contact_name', type: 'string', required: true, description: 'Pickup contact full name', example: 'Kwame Mensah' },
                     { name: 'pickup_contact_phone', type: 'string', required: true, description: 'Pickup contact phone number', example: '+233244123456' },
@@ -1585,6 +1585,7 @@
                 ],
                 fields: [
                     { name: 'destination_mode', type: 'enum', required: false, description: 'Destination mode', options: ['single', 'per_item'], labels: { single: 'Single destination for all items', per_item: 'Each item has its own destination' } },
+                    { name: 'fulfillment_type', type: 'enum', required: false, description: 'Fulfillment method (single destination only)', options: ['warehouse', 'self_pickup', 'direct'], labels: { warehouse: 'Warehouse Delivery (default)', self_pickup: 'Self Pickup by Recipient', direct: 'Direct Delivery' }, showWhen: { field: 'destination_mode', value: 'single' } },
 
                     { name: 'pickup_contact_name', type: 'string', required: false, description: 'Pickup contact full name', example: 'Kwame Mensah' },
                     { name: 'pickup_contact_phone', type: 'string', required: false, description: 'Pickup contact phone number', example: '+233244123456' },
@@ -1749,7 +1750,8 @@
                     { name: 'delivery_longitude', type: 'number', required: false, description: 'Item delivery GPS longitude', example: '-0.1870', showWhen: { field: '_item_delivery_location_method', value: 'coordinates' } },
                     { name: 'delivery_gh_post_address', type: 'string', required: false, description: 'Item delivery Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_item_delivery_location_method', value: 'gh_post' } },
                     { name: 'delivery_landmark', type: 'string', required: false, description: 'Item delivery landmark', example: 'Near the market', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
-                    { name: 'delivery_instructions', type: 'string', required: false, description: 'Item delivery instructions', example: 'Leave with reception', showWhen: { field: '_item_delivery_mode', value: 'per_item' } }
+                    { name: 'delivery_instructions', type: 'string', required: false, description: 'Item delivery instructions', example: 'Leave with reception', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: 'fulfillment_type', type: 'enum', required: false, description: 'Fulfillment type for this item (per_item mode only)', options: ['warehouse', 'direct', 'self_pickup'], example: 'warehouse', showWhen: { field: '_item_delivery_mode', value: 'per_item' } }
                 ],
                 sampleBody: null,
                 exampleResponses: {
@@ -1763,6 +1765,7 @@
                                 quantity: 2,
                                 status: 'pending',
                                 tracking_code: 'TRK8A3F2K9X',
+                                fulfillment_type: 'warehouse',
                                 images: [
                                     {
                                         id: 1,
@@ -1816,7 +1819,8 @@
                     { name: 'delivery_longitude', type: 'number', required: false, description: 'Item delivery GPS longitude', example: '-0.1870', showWhen: { field: '_item_delivery_location_method', value: 'coordinates' } },
                     { name: 'delivery_gh_post_address', type: 'string', required: false, description: 'Item delivery Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_item_delivery_location_method', value: 'gh_post' } },
                     { name: 'delivery_landmark', type: 'string', required: false, description: 'Item delivery landmark', example: 'Near the market', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
-                    { name: 'delivery_instructions', type: 'string', required: false, description: 'Item delivery instructions', example: 'Leave with reception', showWhen: { field: '_item_delivery_mode', value: 'per_item' } }
+                    { name: 'delivery_instructions', type: 'string', required: false, description: 'Item delivery instructions', example: 'Leave with reception', showWhen: { field: '_item_delivery_mode', value: 'per_item' } },
+                    { name: 'fulfillment_type', type: 'enum', required: false, description: 'Fulfillment type for this item (per_item mode only)', options: ['warehouse', 'direct', 'self_pickup'], example: 'warehouse', showWhen: { field: '_item_delivery_mode', value: 'per_item' } }
                 ],
                 sampleBody: null,
                 exampleResponses: {
@@ -1830,6 +1834,7 @@
                                 quantity: 3,
                                 status: 'pending',
                                 tracking_code: 'TRK8A3F2K9X',
+                                fulfillment_type: 'warehouse',
                                 images: [
                                     {
                                         id: 3,

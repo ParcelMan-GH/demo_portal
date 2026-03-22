@@ -208,6 +208,9 @@
                         <th x-show="visibleColumns.destination_mode" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             DEST. MODE
                         </th>
+                        <th x-show="visibleColumns.fulfillment_type" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            FULFILLMENT
+                        </th>
                         <th x-show="visibleColumns.destination" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             DESTINATION
                         </th>
@@ -259,6 +262,12 @@
                                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
                                       :class="shipment.destination_mode === 'per_item' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'"
                                       x-text="shipment.destination_mode_label">
+                                </span>
+                            </td>
+                            <td x-show="visibleColumns.fulfillment_type" class="px-4 py-2.5 whitespace-nowrap">
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                      :class="shipment.fulfillment_type === 'direct' ? 'bg-amber-100 text-amber-700' : shipment.fulfillment_type === 'self_pickup' ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-600'"
+                                      x-text="shipment.fulfillment_type_label">
                                 </span>
                             </td>
                             <td x-show="visibleColumns.destination" class="px-4 py-2.5 whitespace-nowrap">

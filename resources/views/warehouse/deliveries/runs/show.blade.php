@@ -696,7 +696,12 @@
                                                     <tr class="hover:bg-slate-50/70">
                                                         <td class="px-4 py-2 text-xs text-slate-700">
                                                             <p class="font-semibold text-slate-900" x-text="si.description"></p>
-                                                            <p class="text-[11px] text-slate-500" x-text="'Shipment: ' + (si.shipment_number || '—')"></p>
+                                                            <div class="flex items-center gap-1.5 mt-0.5">
+                                                                <span class="text-[11px] text-slate-500" x-text="'Shipment: ' + (si.shipment_number || '—')"></span>
+                                                                <span x-show="si.fulfillment_type && si.fulfillment_type !== 'warehouse'" class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[8px] font-semibold"
+                                                                      :class="si.fulfillment_type === 'direct' ? 'bg-amber-100 text-amber-700' : 'bg-teal-100 text-teal-700'"
+                                                                      x-text="si.fulfillment_type === 'direct' ? 'Direct' : 'Self Pickup'"></span>
+                                                            </div>
                                                         </td>
                                                         <td class="px-4 py-2 text-center text-xs font-semibold text-slate-800" x-text="si.expected_quantity"></td>
                                                         <td class="px-4 py-2 text-center text-xs font-semibold text-slate-800" x-text="si.delivered_quantity"></td>
@@ -819,7 +824,12 @@
                                 <tr class="hover:bg-slate-50/70 align-top">
                                     <td class="px-4 py-2.5 text-xs text-slate-700 min-w-[200px]">
                                         <p class="font-semibold text-slate-900" x-text="item.description"></p>
-                                        <p class="text-[11px] text-slate-500 mt-0.5" x-text="'ID: ' + item.shipment_item_id"></p>
+                                        <div class="flex items-center gap-1.5 mt-0.5">
+                                            <span class="text-[11px] text-slate-500" x-text="'ID: ' + item.shipment_item_id"></span>
+                                            <span x-show="item.fulfillment_type && item.fulfillment_type !== 'warehouse'" class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[8px] font-semibold"
+                                                  :class="item.fulfillment_type === 'direct' ? 'bg-amber-100 text-amber-700' : 'bg-teal-100 text-teal-700'"
+                                                  x-text="item.fulfillment_type === 'direct' ? 'Direct' : 'Self Pickup'"></span>
+                                        </div>
                                     </td>
                                     <td class="px-4 py-2.5 text-xs text-slate-700 min-w-[140px]">
                                         <p class="font-semibold text-slate-900" x-text="item.shipment_number"></p>

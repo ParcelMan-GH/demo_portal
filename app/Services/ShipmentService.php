@@ -206,6 +206,18 @@ class ShipmentService
             ];
         }
 
+        if (
+            isset($data['destination_mode'])
+            && $data['destination_mode'] !== $shipment->destination_mode->value
+            && $shipment->items()->exists()
+        ) {
+            return [
+                'success' => false,
+                'message' => 'Cannot change destination mode when items have been added. Remove all items first.',
+                'data' => null,
+            ];
+        }
+
         $payload = $this->buildShipmentPayload($data, $shipment);
         $shipment->update($payload);
         $shipment->load(['deliveryRegion', 'deliveryDistrict', 'pickupRegion', 'pickupDistrict', 'items']);
@@ -349,7 +361,9 @@ class ShipmentService
 
         $payload = [
             'destination_mode' => $mode,
-            'fulfillment_type' => $data['fulfillment_type'] ?? $shipment?->fulfillment_type?->value ?? 'warehouse',
+            'fulfillment_type' => $mode === ShipmentDestinationMode::PER_ITEM->value
+                ? null
+                : ($data['fulfillment_type'] ?? $shipment?->fulfillment_type?->value ?? 'warehouse'),
             'pickup_contact_name' => $data['pickup_contact_name'] ?? $shipment?->pickup_contact_name,
             'pickup_contact_phone' => $data['pickup_contact_phone'] ?? $shipment?->pickup_contact_phone,
             'pickup_region_id' => $data['pickup_region_id'] ?? $shipment?->pickup_region_id,
@@ -455,6 +469,7 @@ class ShipmentService
                 'quantity' => $item->quantity,
                 'status' => $item->status->value,
                 'tracking_code' => $item->tracking_code,
+                'fulfillment_type' => $item->fulfillment_type?->value,
                 'delivery' => $itemDelivery,
                 'images' => $item->images->map(fn($img) => $img->getSignedUrl()),
                 'created_at' => $item->created_at->toIso8601String(),

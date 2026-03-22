@@ -15,6 +15,12 @@ function shipmentShow() {
         assignmentUiError: '',
         assignmentActionLoading: false,
 
+        // Fulfillment type
+        ftLoading: false,
+        ftToast: '',
+        ftToastType: 'success', // 'success' or 'error'
+        _ftToastTimeout: null,
+
         activeTab: 'overview',
 
         // Items state
@@ -249,6 +255,51 @@ function shipmentShow() {
             ].filter(Boolean).join(', ');
 
             return shared || '-';
+        },
+
+        fulfillmentTypeLabel() {
+            const ft = this.shipment?.fulfillment_type || 'warehouse';
+            return { warehouse: 'Warehouse Delivery', self_pickup: 'Self Pickup', direct: 'Direct Delivery' }[ft] || 'Warehouse Delivery';
+        },
+
+        canChangeFulfillmentType() {
+            if (!this.canManage) return false;
+            const blocked = ['picked_up', 'at_warehouse', 'sorted', 'in_transit', 'at_destination', 'out_for_delivery', 'delivered', 'cancelled'];
+            return !blocked.includes(this.shipment?.status);
+        },
+
+        showFtToast(message, type = 'success') {
+            this.ftToast = message;
+            this.ftToastType = type;
+            clearTimeout(this._ftToastTimeout);
+            this._ftToastTimeout = setTimeout(() => { this.ftToast = ''; }, 3500);
+        },
+
+        async changeFulfillmentType(newType) {
+            if (newType === this.shipment?.fulfillment_type) return;
+            this.ftLoading = true;
+            try {
+                const response = await fetch(this.config.updateFulfillmentTypeEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ fulfillment_type: newType }),
+                });
+                const result = await response.json();
+                if (result.success) {
+                    this.shipment.fulfillment_type = result.fulfillment_type;
+                    this.showFtToast('Fulfillment type changed to ' + this.fulfillmentTypeLabel());
+                } else {
+                    this.showFtToast(result.message || 'Failed to update.', 'error');
+                }
+            } catch (e) {
+                this.showFtToast('An error occurred. Please try again.', 'error');
+            }
+            this.ftLoading = false;
         },
 
         init() {

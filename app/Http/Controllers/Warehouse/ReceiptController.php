@@ -115,6 +115,7 @@ class ReceiptController extends Controller
                     'shipment_item_id' => $item->id,
                     'description' => $item->description,
                     'tracking_code' => $item->tracking_code,
+                    'fulfillment_type' => $item->fulfillment_type?->value ?? $item->shipment?->fulfillment_type?->value ?? 'warehouse',
                     'vendor_quantity' => $vendorQuantity,
                     'driver_confirmed_quantity' => $driverQuantity,
                     'driver_qty_matches_vendor' => $driverQuantity !== null
@@ -435,6 +436,7 @@ class ReceiptController extends Controller
                     'shipment_item_id'            => $item->id,
                     'description'                 => $item->description,
                     'tracking_code'               => $item->tracking_code,
+                    'fulfillment_type'            => $item->fulfillment_type?->value ?? $item->shipment?->fulfillment_type?->value ?? 'warehouse',
                     'vendor_quantity'             => $vendorQuantity,
                     'driver_confirmed_quantity'   => $driverQuantity,
                     'driver_qty_matches_vendor'   => $driverQuantity !== null ? $driverQuantity === $vendorQuantity : null,

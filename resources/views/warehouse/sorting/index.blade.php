@@ -378,7 +378,12 @@
                             <div class="group flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2.5 hover:border-slate-200 transition-colors">
                                 <div class="min-w-0 flex-1">
                                     <p class="text-[11px] font-semibold text-slate-800 truncate" x-text="item.description"></p>
-                                    <p class="text-[10px] text-slate-400 font-mono mt-0.5 truncate" x-text="item.tracking_code || '—'"></p>
+                                    <div class="flex items-center gap-1.5 mt-0.5">
+                                        <span class="text-[10px] text-slate-400 font-mono truncate" x-text="item.tracking_code || '—'"></span>
+                                        <span x-show="item.fulfillment_type && item.fulfillment_type !== 'warehouse'" class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[8px] font-semibold flex-shrink-0"
+                                              :class="item.fulfillment_type === 'direct' ? 'bg-amber-100 text-amber-700' : 'bg-teal-100 text-teal-700'"
+                                              x-text="item.fulfillment_type === 'direct' ? 'Direct' : 'Self Pickup'"></span>
+                                    </div>
                                 </div>
                                 <button type="button"
                                         x-show="activeBatch?.status === 'open'"
@@ -458,7 +463,12 @@
                                         <td class="px-3 py-2.5">
                                             <p class="font-bold text-slate-900" x-text="item.shipment_number"></p>
                                             <p class="text-slate-500 mt-0.5" x-text="item.item_description"></p>
-                                            <p class="text-[10px] text-slate-400 font-mono mt-0.5" x-text="item.tracking_code || '—'"></p>
+                                            <div class="flex items-center gap-1.5 mt-0.5">
+                                                <span class="text-[10px] text-slate-400 font-mono" x-text="item.tracking_code || '—'"></span>
+                                                <span x-show="item.fulfillment_type && item.fulfillment_type !== 'warehouse'" class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[8px] font-semibold"
+                                                      :class="item.fulfillment_type === 'direct' ? 'bg-amber-100 text-amber-700' : 'bg-teal-100 text-teal-700'"
+                                                      x-text="item.fulfillment_type === 'direct' ? 'Direct' : 'Self Pickup'"></span>
+                                            </div>
                                         </td>
                                         <td class="px-3 py-2.5">
                                             <p class="font-medium text-slate-700 truncate" x-text="item.destination?.recipient_name || '—'"></p>

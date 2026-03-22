@@ -504,6 +504,7 @@ class WarehouseSortingService
                 'shipment_number' => $shipment?->shipment_number,
                 'item_description' => $shipmentItem?->description,
                 'tracking_code' => $shipmentItem?->tracking_code,
+                'fulfillment_type' => $shipmentItem?->fulfillment_type?->value ?? $shipment?->fulfillment_type?->value ?? 'warehouse',
                 'received_quantity' => (int) $receiptItem->received_quantity,
                 'damaged_quantity' => (int) $receiptItem->damaged_quantity,
                 'discrepancy_type' => $receiptItem->discrepancy_type,

@@ -19,6 +19,7 @@ $shipmentConfig = [
     'availableDriversEndpoint' => route('admin.assignments.available-drivers'),
     'availableWarehousesEndpoint' => route('admin.assignments.available-warehouses'),
     'receiveAssignmentEndpointTemplate' => route('admin.assignments.receive', ['pickupAssignment' => '__ASSIGNMENT__']),
+    'updateFulfillmentTypeEndpoint' => route('admin.shipments.update-fulfillment-type', $shipment),
     'canManage' => $canManage,
     'isSuperAdmin' => auth('admin')->user()?->isSuperAdmin() ?? false,
     'paymentsDataEndpoint' => route('admin.shipments.payments.data', $shipment),
@@ -65,6 +66,33 @@ $shipmentConfig = [
                     </a>
                     @if($canManage)
                     <div class="flex items-center gap-2">
+                        <!-- Fulfillment Type Changer -->
+                        <div class="relative" x-data="{ ftOpen: false }" x-show="canChangeFulfillmentType()" x-cloak>
+                            <button @@click="ftOpen = !ftOpen" :disabled="ftLoading" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-xs font-semibold rounded-xl border border-indigo-500/30 transition-all backdrop-blur-sm disabled:opacity-50">
+                                <svg x-show="!ftLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                <svg x-show="ftLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                <span x-text="ftLoading ? 'Updating...' : fulfillmentTypeLabel()"></span>
+                                <svg x-show="!ftLoading" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div x-show="ftOpen && !ftLoading" @@click.outside="ftOpen = false" x-transition
+                                 class="absolute right-0 mt-1 w-56 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 py-1">
+                                <template x-for="ft in [
+                                    {v:'warehouse', label:'Warehouse Delivery', desc:'Standard flow'},
+                                    {v:'self_pickup', label:'Self Pickup', desc:'Recipient collects'},
+                                    {v:'direct', label:'Direct Delivery', desc:'Driver delivers directly'}
+                                ]" :key="ft.v">
+                                    <button @@click="changeFulfillmentType(ft.v); ftOpen = false"
+                                            class="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors flex items-center justify-between"
+                                            :class="shipment.fulfillment_type === ft.v ? 'bg-blue-50' : ''">
+                                        <div>
+                                            <p class="text-xs font-bold text-slate-900" x-text="ft.label"></p>
+                                            <p class="text-[10px] text-slate-500" x-text="ft.desc"></p>
+                                        </div>
+                                        <svg x-show="shipment.fulfillment_type === ft.v" class="w-4 h-4 text-blue-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
                         <button
                             x-show="['submitted', 'invoice_accepted'].includes(shipment.status)"
                             x-cloak
@@ -187,6 +215,14 @@ $shipmentConfig = [
                                     <span class="w-1.5 h-1.5 rounded-full {{ $dotColors }}"></span>
                                     {{ $shipment->status->label() }}
                                 </span>
+                                @php
+                                    $ftColors = match($shipment->fulfillment_type?->value ?? 'warehouse') {
+                                        'self_pickup' => 'bg-emerald-500/20 text-emerald-300',
+                                        'direct' => 'bg-amber-500/20 text-amber-300',
+                                        default => 'bg-slate-500/20 text-slate-300',
+                                    };
+                                @endphp
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $ftColors }}" x-text="fulfillmentTypeLabel()"></span>
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-500/20 text-slate-300">
                                     {{ $shipment->created_at->format('M d, Y') }}
                                 </span>
@@ -509,6 +545,9 @@ $shipmentConfig = [
                                             <p class="text-sm font-medium text-slate-900 truncate" x-text="item.description || '—'"></p>
                                             <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
                                                 <span x-show="item.tracking_code" class="text-[10px] text-slate-400 font-mono" x-text="item.tracking_code"></span>
+                                                <span x-show="item.fulfillment_type" class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
+                                                      :class="item.fulfillment_type === 'direct' ? 'bg-amber-100 text-amber-700' : item.fulfillment_type === 'self_pickup' ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-500'"
+                                                      x-text="item.fulfillment_type === 'direct' ? 'Direct' : item.fulfillment_type === 'self_pickup' ? 'Self Pickup' : 'Warehouse'"></span>
                                                 <span class="text-[10px] text-slate-400" x-text="itemDestinationTitle(item)"></span>
                                             </div>
                                         </div>
@@ -2883,6 +2922,22 @@ $shipmentConfig = [
             </div>
         </div>
     </div>
+
+    <!-- Fulfillment Type Toast -->
+    <template x-teleport="body">
+        <div x-show="ftToast" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-4"
+             class="fixed bottom-6 right-6 z-[9999] max-w-sm">
+            <div class="flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border"
+                 :class="ftToastType === 'success' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-red-600 border-red-500 text-white'">
+                <svg x-show="ftToastType === 'success'" class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <svg x-show="ftToastType === 'error'" class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <p class="text-sm font-semibold" x-text="ftToast"></p>
+                <button @@click="ftToast = ''" class="ml-auto shrink-0 hover:opacity-70">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
+    </template>
 
 </div>
 

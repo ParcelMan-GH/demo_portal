@@ -1485,7 +1485,12 @@
                                             </div>
                                             <div class="min-w-0">
                                                 <p class="text-sm font-bold text-slate-900 leading-snug" x-text="item.description"></p>
-                                                <p class="text-[11px] text-slate-400 mt-0.5">ID: <span x-text="item.shipment_item_id"></span><template x-if="item.tracking_code"><span> · <span x-text="item.tracking_code"></span></span></template></p>
+                                                <div class="flex items-center gap-1.5 mt-0.5">
+                                                    <span class="text-[11px] text-slate-400">ID: <span x-text="item.shipment_item_id"></span><template x-if="item.tracking_code"><span> · <span x-text="item.tracking_code"></span></span></template></span>
+                                                    <span x-show="item.fulfillment_type" class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
+                                                          :class="item.fulfillment_type === 'direct' ? 'bg-amber-100 text-amber-700' : item.fulfillment_type === 'self_pickup' ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-500'"
+                                                          x-text="item.fulfillment_type === 'direct' ? 'Direct' : item.fulfillment_type === 'self_pickup' ? 'Self Pickup' : 'Warehouse'"></span>
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="flex-shrink-0">
