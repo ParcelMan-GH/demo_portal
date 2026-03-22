@@ -3752,6 +3752,59 @@ Each object in <code>items[]</code> corresponds to one package at this stop. The
             },
             {
                 method: 'POST',
+                url: '/api/v1/driver/deliveries/{run}/stops/{stop}/confirm-packages',
+                name: 'Confirm Stop (Package Level)',
+                description: 'Confirm delivery at package level — driver reports how many sealed packages were handed over without opening them. Use this instead of the item-level confirm endpoint.',
+                notes: `
+<strong>Package-level confirmation</strong><br>
+The driver confirms how many sealed packages were handed over to the recipient without inspecting individual items inside. This is the recommended endpoint for the mobile app.
+<br><br>
+<strong>How it works</strong>
+<ul style="margin:6px 0 6px 16px;padding:0;">
+  <li><code>packages_delivered</code> >= <code>stop.total_packages</code> → all items marked <strong>delivered</strong></li>
+  <li><code>packages_delivered</code> = 0 → all items marked <strong>failed</strong></li>
+  <li><code>0 &lt; packages_delivered &lt; total_packages</code> → stop flagged as <strong>partial</strong> for warehouse review</li>
+</ul>
+The <code>total_packages</code> count is set by the warehouse team before dispatch (editable on the delivery run show page). It represents the number of physical sealed parcels at each stop, which may differ from the item count. It defaults to 1 if not set.
+<ul style="margin:6px 0 6px 16px;padding:0;">
+</ul>
+<br>
+<strong>Skipping verification</strong><br>
+If the recipient did not receive the SMS code, send <code>skip_verification=true</code> and <code>skip_reason</code>. The stop will be flagged as unverified for warehouse review. <code>proof_photo</code> is still required.
+`,
+                auth: true,
+                group: 'driver-deliveries',
+                userType: 'driver',
+                useFormInputs: true,
+                bodyType: 'formdata',
+                urlParams: [
+                    { name: 'run', type: 'dropdown', required: true, description: 'Select active delivery run', source: 'deliveries?status[]=out_for_delivery&status[]=partially_delivered&limit=100', labelField: 'run_number', valueField: 'id', onSelect: 'handleDeliveryRunSelection' },
+                    { name: 'stop', type: 'dropdown', required: true, description: 'Select stop under chosen run', dependsOn: 'run' }
+                ],
+                fields: [
+                    { name: 'verification_code', type: 'string', required: false, description: '6-digit code from recipient. Required unless skip_verification is true.', example: '483219' },
+                    { name: 'skip_verification', type: 'enum', required: false, description: 'Skip OTP verification when SMS was not received.', options: ['false', 'true'], example: 'false' },
+                    { name: 'skip_reason', type: 'string', required: false, description: 'Reason for skipping verification. Required when skip_verification is true.', example: 'SMS not received by recipient' },
+                    { name: 'packages_delivered', type: 'number', required: true, description: 'Number of sealed packages handed to recipient', example: '2' },
+                    { name: 'latitude', type: 'string', required: true, description: 'Delivery GPS latitude', example: '5.6037' },
+                    { name: 'longitude', type: 'string', required: true, description: 'Delivery GPS longitude', example: '-0.1870' },
+                    { name: 'proof_photo', type: 'file', required: true, description: 'Delivery proof image', accept: 'image/jpeg,image/png,image/webp' },
+                ],
+                sampleBody: {
+                    verification_code: '483219',
+                    packages_delivered: 2,
+                    latitude: '5.6037',
+                    longitude: '-0.1870',
+                },
+                exampleResponses: {
+                    '200_all': { success: true, message: 'All packages delivered successfully.' },
+                    '200_partial': { success: true, message: '1 of 3 packages delivered. Flagged for warehouse review.' },
+                    '400_invalid_code': { success: false, message: 'Invalid verification code. 4 attempt(s) remaining.' },
+                    '422': { success: false, message: 'The packages delivered field is required.' }
+                }
+            },
+            {
+                method: 'POST',
                 url: '/api/v1/driver/deliveries/{run}/stops/{stop}/fail',
                 name: 'Fail Stop Delivery',
                 description: 'Mark stop as failed with reason/notes so items return to destination warehouse queue.',

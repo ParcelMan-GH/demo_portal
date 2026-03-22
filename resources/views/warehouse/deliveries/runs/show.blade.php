@@ -522,6 +522,47 @@
                                     x-text="stop.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())"></span>
                             </div>
 
+                            {{-- Packages --}}
+                            <div class="border-t border-slate-100 px-5 py-2.5 flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                    <span class="text-xs font-semibold text-slate-700"><span x-text="stop.total_packages"></span> package<span x-show="stop.total_packages !== 1">s</span></span>
+                                    <span class="text-[10px] text-slate-400">(<span x-text="stop.items_count"></span> item<span x-show="stop.items_count !== 1">s</span>)</span>
+                                </div>
+                                <template x-if="stop.status !== 'delivered' && stop.status !== 'failed'">
+                                    <div x-data="{ editing: false, pkg: stop.total_packages, saving: false }" class="flex items-center gap-1.5">
+                                        <template x-if="!editing">
+                                            <button @@click="editing = true; pkg = stop.total_packages" class="text-[10px] font-medium text-indigo-600 hover:text-indigo-800 transition-colors">Edit</button>
+                                        </template>
+                                        <template x-if="editing">
+                                            <div class="flex items-center gap-1">
+                                                <input type="number" x-model.number="pkg" min="1" max="999" class="w-14 h-6 px-1.5 text-xs border border-slate-200 rounded-md text-center focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400">
+                                                <button @@click="
+                                                    if (pkg < 1) return;
+                                                    saving = true;
+                                                    fetch(`{{ route('warehouse.deliveries.runs.stops.update-packages', ['run' => '__RUN__', 'stop' => '__STOP__']) }}`.replace('__RUN__', {{ $run->id }}).replace('__STOP__', stop.id), {
+                                                        method: 'PATCH',
+                                                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                                                        body: JSON.stringify({ total_packages: pkg })
+                                                    })
+                                                    .then(r => r.json())
+                                                    .then(data => {
+                                                        if (data.success) { stop.total_packages = data.data.total_packages; window.showToast?.('Package count updated.', 'success'); }
+                                                        else { window.showToast?.(data.message || 'Failed.', 'error'); }
+                                                    })
+                                                    .catch(() => window.showToast?.('Failed to update.', 'error'))
+                                                    .finally(() => { saving = false; editing = false; });
+                                                " :disabled="saving" class="h-6 px-2 text-[10px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md disabled:opacity-50">
+                                                    <span x-show="!saving">Save</span>
+                                                    <span x-show="saving">...</span>
+                                                </button>
+                                                <button @@click="editing = false" class="h-6 px-1.5 text-[10px] text-slate-500 hover:text-slate-700">Cancel</button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+
                             {{-- Location row --}}
                             <div class="border-t border-slate-100 px-5 py-3 bg-slate-50/60">
                                 <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5">
@@ -575,6 +616,20 @@
                                     </span>
                                 </div>
                             </div>
+
+                            {{-- Verification skipped warning --}}
+                            <template x-if="stop.verification_skipped">
+                                <div class="border-t border-amber-200 px-5 py-3 bg-amber-50">
+                                    <div class="flex items-start gap-2 text-xs text-amber-700">
+                                        <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                                        <div>
+                                            <span class="font-semibold">OTP Verification Skipped</span>
+                                            <span x-show="stop.verification_skip_reason" class="ml-1">— <span x-text="stop.verification_skip_reason"></span></span>
+                                            <span x-show="stop.verification_skipped_at" class="block mt-0.5 text-amber-500" x-text="'Skipped at: ' + stop.verification_skipped_at"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
 
                             {{-- Failure info --}}
                             <template x-if="stop.status === 'failed' && (stop.failure_reason || stop.failure_notes)">

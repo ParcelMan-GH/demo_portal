@@ -77,6 +77,38 @@ class DriverDeliveryController extends Controller
         return $this->deliveryActionResponse($driver, $run, $result, 400);
     }
 
+    public function confirmStopPackages(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
+    {
+        $driver = $request->user();
+        $skipVerification = filter_var($request->input('skip_verification', false), FILTER_VALIDATE_BOOLEAN);
+
+        $validated = $request->validate([
+            'verification_code' => [$skipVerification ? 'nullable' : 'required', 'digits:6'],
+            'skip_verification' => ['nullable', 'in:true,false,1,0'],
+            'skip_reason' => [$skipVerification ? 'required' : 'nullable', 'string', 'max:500'],
+            'packages_delivered' => ['required', 'integer', 'min:0'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'proof_photo' => ['required', 'file', 'image', 'max:12288'],
+        ]);
+
+        $result = $this->warehouseDeliveryService->driverConfirmStopByPackage(
+            run: $run,
+            stop: $stop,
+            driver: $driver,
+            verificationCode: $validated['verification_code'] ?? null,
+            packagesDelivered: (int) $validated['packages_delivered'],
+            latitude: (float) $validated['latitude'],
+            longitude: (float) $validated['longitude'],
+            proofPhoto: $request->file('proof_photo'),
+            ipAddress: (string) $request->ip(),
+            skipVerification: $skipVerification,
+            skipReason: $validated['skip_reason'] ?? null
+        );
+
+        return $this->deliveryActionResponse($driver, $run, $result, 400);
+    }
+
     public function failStop(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
     {
         $driver = $request->user();

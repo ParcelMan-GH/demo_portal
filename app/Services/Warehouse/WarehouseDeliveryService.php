@@ -37,7 +37,7 @@ class WarehouseDeliveryService
             ->with([
                 'warehouse:id,name,code',
                 'assignedDriver:id,name,phone,vehicle_type,vehicle_number',
-                'stops:id,delivery_run_id,status,recipient_name,recipient_phone,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts',
+                'stops:id,delivery_run_id,status,total_packages,recipient_name,recipient_phone,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts',
                 'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status',
             ])
             ->where('warehouse_id', $warehouse->id);
@@ -551,6 +551,181 @@ class WarehouseDeliveryService
                 'message' => $allDelivered
                     ? 'Delivery stop confirmed successfully.'
                     : 'Delivery recorded with partial/failed line items.',
+            ];
+        });
+    }
+
+    public function driverConfirmStopByPackage(
+        DeliveryRun $run,
+        DeliveryRunStop $stop,
+        Driver $driver,
+        ?string $verificationCode,
+        int $packagesDelivered,
+        float $latitude,
+        float $longitude,
+        UploadedFile $proofPhoto,
+        ?string $ipAddress = null,
+        bool $skipVerification = false,
+        ?string $skipReason = null
+    ): array {
+        if ((int) $run->assigned_driver_id !== (int) $driver->id || (int) $stop->delivery_run_id !== (int) $run->id) {
+            return ['success' => false, 'message' => 'Delivery stop not found.'];
+        }
+
+        if (!in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED], true)) {
+            return ['success' => false, 'message' => 'Delivery run is not active.'];
+        }
+
+        if ($stop->status === DeliveryRunStop::STATUS_DELIVERED) {
+            return ['success' => false, 'message' => 'Stop already delivered.'];
+        }
+
+        if ($skipVerification) {
+            $stop->update([
+                'verification_skipped' => true,
+                'verification_skip_reason' => $skipReason,
+                'verification_skipped_at' => now(),
+            ]);
+        } else {
+            $verifyResult = $this->verificationService->verifyCode(
+                stop: $stop,
+                code: (string) $verificationCode,
+                driver: $driver,
+                ipAddress: $ipAddress
+            );
+            if (!$verifyResult['success']) {
+                return $verifyResult;
+            }
+        }
+
+        return DB::transaction(function () use ($run, $stop, $driver, $packagesDelivered, $latitude, $longitude, $proofPhoto) {
+            $run = DeliveryRun::query()
+                ->with(['items.shipmentItem.shipment', 'stops'])
+                ->lockForUpdate()
+                ->findOrFail($run->id);
+            $stop = DeliveryRunStop::query()
+                ->whereKey($stop->id)
+                ->where('delivery_run_id', $run->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $runItems = DeliveryRunItem::query()
+                ->where('delivery_run_id', $run->id)
+                ->where('delivery_run_stop_id', $stop->id)
+                ->with('shipmentItem.shipment')
+                ->lockForUpdate()
+                ->get();
+
+            if ($runItems->isEmpty()) {
+                return ['success' => false, 'message' => 'No delivery items found for this stop.'];
+            }
+
+            $totalPackages = (int) $stop->total_packages ?: $runItems->count();
+
+            $upload = $this->storageService->upload(
+                $proofPhoto,
+                "deliveries/runs/{$run->id}/stops/{$stop->id}"
+            );
+
+            $allDelivered = $packagesDelivered >= $totalPackages;
+            $noneDelivered = $packagesDelivered <= 0;
+            $now = now();
+            /** @var Collection<int, Shipment> $shipments */
+            $shipments = collect();
+
+            foreach ($runItems as $runItem) {
+                $expected = (int) $runItem->expected_quantity;
+
+                if ($allDelivered) {
+                    $lineStatus = DeliveryRunItem::STATUS_DELIVERED;
+                    $deliveredQuantity = $expected;
+                } elseif ($noneDelivered) {
+                    $lineStatus = DeliveryRunItem::STATUS_FAILED;
+                    $deliveredQuantity = 0;
+                } else {
+                    // Partial — we don't know which packages, flag all for warehouse review
+                    $lineStatus = DeliveryRunItem::STATUS_PARTIAL;
+                    $deliveredQuantity = $expected; // Assume delivered, warehouse reviews
+                }
+
+                $runItem->update([
+                    'delivered_quantity' => $deliveredQuantity,
+                    'status' => $lineStatus,
+                    'notes' => $noneDelivered ? 'Package not delivered.' : ($allDelivered ? null : "Partial delivery: {$packagesDelivered}/{$totalPackages} packages handed over. Flagged for warehouse review."),
+                    'delivered_at' => $now,
+                ]);
+
+                $shipmentItem = $runItem->shipmentItem;
+                if ($shipmentItem) {
+                    if ($lineStatus === DeliveryRunItem::STATUS_DELIVERED) {
+                        $shipmentItem->update(['status' => ItemStatus::DELIVERED]);
+                    } else {
+                        $shipmentItem->update(['status' => ItemStatus::AT_DESTINATION]);
+                    }
+
+                    $trackingNotes = match (true) {
+                        $allDelivered => 'Package delivered to recipient for run ' . $run->run_number . '.',
+                        $noneDelivered => 'Package could not be delivered; returned to destination warehouse.',
+                        default => "Partial package delivery ({$packagesDelivered}/{$totalPackages}); flagged for warehouse review.",
+                    };
+
+                    ShipmentItemTracking::query()->create([
+                        'shipment_item_id' => $shipmentItem->id,
+                        'status' => $lineStatus === DeliveryRunItem::STATUS_DELIVERED
+                            ? ItemStatus::DELIVERED->value
+                            : ItemStatus::AT_DESTINATION->value,
+                        'location' => $stop->town ?: $stop->gh_post_address ?: $stop->landmark,
+                        'notes' => $trackingNotes,
+                        'meta' => [
+                            'delivery_run_id' => $run->id,
+                            'delivery_run_number' => $run->run_number,
+                            'delivery_run_stop_id' => $stop->id,
+                            'packages_delivered' => $packagesDelivered,
+                            'total_packages' => $totalPackages,
+                            'confirmation_mode' => 'package_level',
+                        ],
+                        'created_by' => "driver:{$driver->id}",
+                        'created_at' => $now,
+                    ]);
+
+                    if ($shipmentItem->shipment) {
+                        $shipments->push($shipmentItem->shipment);
+                    }
+                }
+            }
+
+            $stopStatus = $allDelivered
+                ? DeliveryRunStop::STATUS_DELIVERED
+                : DeliveryRunStop::STATUS_FAILED;
+
+            $stop->update([
+                'status' => $stopStatus,
+                'arrived_at' => $stop->arrived_at ?? $now,
+                'delivered_at' => $now,
+                'delivery_latitude' => $latitude,
+                'delivery_longitude' => $longitude,
+                'proof_photo_path' => $upload['path'],
+                'proof_photo_size' => $upload['size'],
+                'failure_reason' => $allDelivered ? null : ($noneDelivered ? 'no_packages_delivered' : 'partial_packages'),
+                'failure_notes' => $allDelivered ? null : "{$packagesDelivered} of {$totalPackages} packages delivered. Requires warehouse review.",
+            ]);
+
+            $this->refreshRunStatus($run);
+            $run->refresh();
+
+            $shipments->unique('id')->each(function (Shipment $shipment) {
+                $this->syncShipmentDeliveryStatus($shipment);
+            });
+
+            if ($run->status === DeliveryRun::STATUS_COMPLETED && $run->assignedDriver) {
+                $run->assignedDriver->update(['status' => 'available']);
+            }
+
+            return [
+                'success' => true,
+                'message' => $allDelivered
+                    ? 'All packages delivered successfully.'
+                    : "{$packagesDelivered} of {$totalPackages} packages delivered. Flagged for warehouse review.",
             ];
         });
     }

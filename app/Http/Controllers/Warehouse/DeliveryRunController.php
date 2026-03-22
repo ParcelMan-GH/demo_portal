@@ -98,9 +98,11 @@ class DeliveryRunController extends Controller
                         'recipient_name' => $stop->recipient_name,
                         'recipient_phone' => $stop->recipient_phone,
                         'status' => $stop->status,
+                        'total_packages' => (int) $stop->total_packages,
                         'code_sent_at' => optional($stop->verification_code_sent_at)?->format('Y-m-d H:i:s'),
                         'attempts' => (int) $stop->verification_attempts,
                         'max_attempts' => (int) $stop->max_attempts,
+                        'verification_skipped' => (bool) $stop->verification_skipped,
                     ];
                 })->values(),
             ];
@@ -253,6 +255,10 @@ class DeliveryRunController extends Controller
                 'failure_reason' => $stop->failure_reason,
                 'failure_notes' => $stop->failure_notes,
                 'has_proof_photo' => !empty($stop->proof_photo_path),
+                'total_packages' => (int) $stop->total_packages,
+                'verification_skipped' => (bool) $stop->verification_skipped,
+                'verification_skip_reason' => $stop->verification_skip_reason,
+                'verification_skipped_at' => $stop->verification_skipped_at?->format('M d, Y H:i'),
                 'items_count' => $stop->items->count(),
                 'items' => $stop->items->map(fn($item) => [
                     'id' => $item->id,
@@ -305,6 +311,36 @@ class DeliveryRunController extends Controller
         $result = $this->deliveryService->resendStopCode($run, $stop, $warehouse);
 
         return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function updateStopPackages(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+
+        if ((int) $run->warehouse_id !== (int) $warehouse->id) {
+            return response()->json(['success' => false, 'message' => 'Run not found.'], 404);
+        }
+
+        if ((int) $stop->delivery_run_id !== (int) $run->id) {
+            return response()->json(['success' => false, 'message' => 'Stop not found.'], 404);
+        }
+
+        if (in_array($stop->status, [DeliveryRunStop::STATUS_DELIVERED, 'failed'], true)) {
+            return response()->json(['success' => false, 'message' => 'Cannot update packages for a completed stop.'], 422);
+        }
+
+        $validated = $request->validate([
+            'total_packages' => ['required', 'integer', 'min:1', 'max:999'],
+        ]);
+
+        $stop->update(['total_packages' => (int) $validated['total_packages']]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Package count updated.',
+            'data' => ['total_packages' => (int) $stop->total_packages],
+        ]);
     }
 
     private function authorizePermission(string $permission): void

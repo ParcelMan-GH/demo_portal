@@ -409,6 +409,7 @@ Route::prefix('warehouse')
         Route::post('deliveries/runs/{run}/assign-driver', [WarehouseDeliveryRunController::class, 'assignDriver'])->name('deliveries.runs.assign-driver');
         Route::post('deliveries/runs/{run}/dispatch', [WarehouseDeliveryRunController::class, 'dispatch'])->name('deliveries.runs.dispatch');
         Route::post('deliveries/runs/{run}/stops/{stop}/resend-code', [WarehouseDeliveryRunController::class, 'resendCode'])->name('deliveries.runs.stops.resend-code');
+        Route::patch('deliveries/runs/{run}/stops/{stop}/packages', [WarehouseDeliveryRunController::class, 'updateStopPackages'])->name('deliveries.runs.stops.update-packages');
         Route::get('deliveries/runs/{run}', [WarehouseDeliveryRunController::class, 'show'])->name('deliveries.runs.show');
 
         // Invoice Management

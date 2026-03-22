@@ -297,7 +297,13 @@
                                                         <p class="text-xs font-semibold text-slate-800 truncate" x-text="stop.recipient_name || '-'"></p>
                                                         <p class="text-[11px] text-slate-500 truncate" x-text="stop.recipient_phone || '-'"></p>
                                                     </div>
-                                                    <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold" :class="stopStatusClass(stop.status)" x-text="stop.status"></span>
+                                                    <div class="flex items-center gap-1.5">
+                                                        <span x-show="stop.verification_skipped" class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700" title="OTP verification was skipped">
+                                                            <svg class="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg>
+                                                            Unverified
+                                                        </span>
+                                                        <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold" :class="stopStatusClass(stop.status)" x-text="stop.status"></span>
+                                                    </div>
                                                 </div>
                                                 <div class="mt-2 flex items-center justify-between gap-2">
                                                     <p class="text-[11px] text-slate-500">Attempts: <span x-text="`${stop.attempts}/${stop.max_attempts}`"></span></p>
