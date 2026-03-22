@@ -431,7 +431,7 @@ class WarehouseDeliveryService
             }
         }
 
-        return DB::transaction(function () use ($run, $stop, $driver, $latitude, $longitude, $proofPhoto, $linePayloads) {
+        return DB::transaction(function () use ($run, $stop, $driver, $latitude, $longitude, $proofPhoto, $linePayloads, $deliveryNotes) {
             $run = DeliveryRun::query()
                 ->with(['items.shipmentItem.shipment', 'stops'])
                 ->lockForUpdate()
@@ -606,7 +606,7 @@ class WarehouseDeliveryService
             }
         }
 
-        return DB::transaction(function () use ($run, $stop, $driver, $packagesDelivered, $latitude, $longitude, $proofPhoto) {
+        return DB::transaction(function () use ($run, $stop, $driver, $packagesDelivered, $latitude, $longitude, $proofPhoto, $deliveryNotes) {
             $run = DeliveryRun::query()
                 ->with(['items.shipmentItem.shipment', 'stops'])
                 ->lockForUpdate()
