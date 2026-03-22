@@ -29,6 +29,7 @@ use App\Http\Controllers\Warehouse\ShipmentPaymentController as WarehouseShipmen
 use App\Http\Controllers\Warehouse\SortingController as WarehouseSortingController;
 use App\Http\Controllers\Warehouse\TransportManifestController as WarehouseTransportManifestController;
 use App\Http\Controllers\Warehouse\UserController as WarehouseUserController;
+use App\Http\Controllers\Warehouse\WalkinController as WarehouseWalkinController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -193,6 +194,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Shipment Management
         Route::get('shipments', [ShipmentController::class, 'index'])->name('shipments.index');
         Route::get('shipments-data', [ShipmentController::class, 'data'])->name('shipments.data');
+        Route::get('shipments/create', [ShipmentController::class, 'create'])->name('shipments.create');
+        Route::post('shipments', [ShipmentController::class, 'store'])->name('shipments.store');
+        Route::get('shipments/vendor-lookup', [ShipmentController::class, 'vendorLookup'])->name('shipments.vendor-lookup');
+        Route::post('shipments/vendor-create', [ShipmentController::class, 'vendorCreate'])->name('shipments.vendor-create');
+        Route::get('locations/search', [ShipmentController::class, 'locationSearch'])->name('locations.search');
         Route::get('shipments/{shipment}', [ShipmentController::class, 'showPage'])->name('shipments.show');
         Route::get('shipments/{shipment}/items', [ShipmentController::class, 'items'])->name('shipments.items');
         Route::get('shipments/{shipment}/tracking', [ShipmentController::class, 'tracking'])->name('shipments.tracking');
@@ -350,6 +356,13 @@ Route::prefix('warehouse')
     ->middleware(['auth:admin', 'admin.audit', 'warehouse.user'])
     ->group(function () {
         Route::get('/', [WarehouseDashboardController::class, 'index'])->name('dashboard');
+
+        // Walk-in Vendor Shipments
+        Route::get('walkin', [WarehouseWalkinController::class, 'create'])->name('walkin.create');
+        Route::post('walkin', [WarehouseWalkinController::class, 'store'])->name('walkin.store');
+        Route::get('walkin/vendor-lookup', [WarehouseWalkinController::class, 'vendorLookup'])->name('walkin.vendor-lookup');
+        Route::post('walkin/vendor-create', [WarehouseWalkinController::class, 'vendorCreate'])->name('walkin.vendor-create');
+        Route::get('locations/search', [WarehouseWalkinController::class, 'locationSearch'])->name('locations.search');
 
         // Warehouse Users
         Route::get('users', [WarehouseUserController::class, 'index'])->name('users.index');

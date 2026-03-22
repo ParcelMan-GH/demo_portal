@@ -14,6 +14,7 @@ use App\Events\PickupAssignmentStatusChanged;
 use App\Events\ShipmentStatusChanged;
 use App\Events\TransportManifestStatusChanged;
 use App\Events\VendorRegistered;
+use App\Events\WalkinShipmentReceived;
 use App\Events\WarehouseInvoiceCancelled;
 use App\Events\WarehouseInvoiceCreated;
 use App\Listeners\SendAdminDeliveryNotification;
@@ -28,6 +29,7 @@ use App\Listeners\SendDriverUnassignedNotification;
 use App\Listeners\SendAdminWarehouseInvoiceNotification;
 use App\Listeners\SendVendorInvoiceNotification;
 use App\Listeners\SendVendorShipmentNotification;
+use App\Listeners\SendWalkinShipmentNotifications;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 class EventServiceProvider extends ServiceProvider
@@ -83,6 +85,11 @@ class EventServiceProvider extends ServiceProvider
         ],
         WarehouseInvoiceCancelled::class => [
             SendAdminWarehouseInvoiceNotification::class,
+        ],
+
+        // Walk-in shipment
+        WalkinShipmentReceived::class => [
+            SendWalkinShipmentNotifications::class,
         ],
 
         // Vendor registration

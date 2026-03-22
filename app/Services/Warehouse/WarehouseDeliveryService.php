@@ -357,6 +357,11 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Delivery stop not found.'];
         }
 
+        // Auto-promote assigned → out_for_delivery when driver arrives at first stop
+        if ($run->status === DeliveryRun::STATUS_ASSIGNED) {
+            $run->update(['status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY]);
+        }
+
         if (!in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED], true)) {
             return ['success' => false, 'message' => 'Delivery run is not active.'];
         }

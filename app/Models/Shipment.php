@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\InvoiceStatus;
 use App\Enums\ShipmentDestinationMode;
+use App\Enums\ShipmentSource;
 use App\Enums\ShipmentStatus;
 use App\Helpers\PhoneHelper;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,6 +27,8 @@ class Shipment extends Model
         'vendor_id',
         'shipment_number',
         'status',
+        'source',
+        'created_by_user_id',
         'destination_mode',
         'current_invoice_id',
         'pickup_contact_name',
@@ -60,6 +63,7 @@ class Shipment extends Model
      */
     protected $casts = [
         'status' => ShipmentStatus::class,
+        'source' => ShipmentSource::class,
         'destination_mode' => ShipmentDestinationMode::class,
         'pickup_latitude' => 'decimal:8',
         'pickup_longitude' => 'decimal:8',
@@ -137,6 +141,16 @@ class Shipment extends Model
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(Vendor::class)->withTrashed();
+    }
+
+    public function createdByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function isWalkin(): bool
+    {
+        return $this->source?->isWalkin() ?? false;
     }
 
     /**

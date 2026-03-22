@@ -72,6 +72,12 @@
                     <div class="wh-nav-section-label mt-6">Receiving</div>
 
                     @if($canReceiving)
+                        <a href="{{ route('warehouse.walkin.create') }}"
+                           class="wh-nav-item {{ request()->routeIs('warehouse.walkin.*') ? 'active' : '' }}">
+                            <span class="wh-nav-bullet"></span>
+                            <span class="wh-nav-text">Walk-in Receiving</span>
+                        </a>
+
                         <a href="{{ route('warehouse.receipts.pending.index') }}"
                            class="wh-nav-item {{ request()->routeIs('warehouse.receipts.pending.*') ? 'active' : '' }}">
                             <span class="wh-nav-bullet"></span>

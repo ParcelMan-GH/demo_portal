@@ -108,6 +108,19 @@
                         <span class="sidebar-tooltip">Shipments</span>
                     </template>
                 </a>
+                <a href="{{ route('admin.shipments.create') }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.shipments.create') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3 pl-8'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[16px] h-[16px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                    </div>
+                    <span class="text-[11px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Walk-in Shipment</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Walk-in Shipment</span>
+                    </template>
+                </a>
                 @endhasPermission
 
                 @hasPermission('invoices.view')
