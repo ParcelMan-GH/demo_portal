@@ -3031,10 +3031,11 @@
                     notes: 'All items confirmed and loaded.'
                 },
                 exampleResponses: {
-                    '200': {
+                    '200 (warehouse)': {
                         success: true,
                         message: 'Pickup finalized successfully.',
                         data: {
+                            delivery_run_id: null,
                             assignment: {
                                 id: 1,
                                 shipment_id: 5,
@@ -3042,7 +3043,6 @@
                                 status: 'completed',
                                 is_direct_delivery: false,
                                 direct_delivery: null,
-                                auto_delivery: null,
                                 cancellation_reason: null,
                                 notes: 'All items confirmed and loaded.',
                                 pickup_latitude: 5.6037,
@@ -3116,6 +3116,37 @@
                                 },
                                 created_at: '2026-01-30T12:00:00+00:00',
                                 updated_at: '2026-02-01T08:25:00+00:00'
+                            }
+                        }
+                    },
+                    '200 (direct delivery)': {
+                        success: true,
+                        message: 'Pickup confirmed. Proceed to delivery.',
+                        data: {
+                            delivery_run_id: 15,
+                            assignment: {
+                                id: 2,
+                                shipment_id: 8,
+                                shipment_number: 'PCM-2026-00008',
+                                status: 'completed',
+                                is_direct_delivery: true,
+                                direct_delivery: {
+                                    recipient_name: 'Ama Mensah',
+                                    recipient_phone: '+233241234567',
+                                    location: {
+                                        region: 'Greater Accra',
+                                        district: 'Accra Metropolitan',
+                                        town: 'Osu',
+                                        latitude: '5.5558',
+                                        longitude: '-0.1845',
+                                        gh_post_address: 'GA-144-2020',
+                                        landmark: 'Near Oxford Street'
+                                    },
+                                    instructions: 'Call when you arrive'
+                                },
+                                cancellation_reason: null,
+                                notes: 'All items confirmed.',
+                                '...': 'same structure as warehouse response'
                             }
                         }
                     },
