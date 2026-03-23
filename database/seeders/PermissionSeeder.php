@@ -80,6 +80,10 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouse', 'action' => 'delivery_assign', 'name' => 'warehouse.delivery.assign', 'description' => 'Assign delivery drivers', 'sort_order' => 130],
             ['module' => 'warehouse', 'action' => 'delivery_code_reset', 'name' => 'warehouse.delivery.code.reset', 'description' => 'Regenerate delivery verification codes', 'sort_order' => 1301],
             ['module' => 'warehouse', 'action' => 'items_scan', 'name' => 'warehouse.items.scan', 'description' => 'Scan warehouse items in/out', 'sort_order' => 131],
+            ['module' => 'warehouse', 'action' => 'invoices_view', 'name' => 'warehouse.invoices.view', 'description' => 'View warehouse invoices', 'sort_order' => 132],
+            ['module' => 'warehouse', 'action' => 'invoices_create', 'name' => 'warehouse.invoices.create', 'description' => 'Create warehouse invoices', 'sort_order' => 133],
+            ['module' => 'warehouse', 'action' => 'invoices_edit', 'name' => 'warehouse.invoices.edit', 'description' => 'Edit warehouse invoices', 'sort_order' => 134],
+            ['module' => 'warehouse', 'action' => 'invoices_delete', 'name' => 'warehouse.invoices.delete', 'description' => 'Cancel warehouse invoices', 'sort_order' => 135],
 
             // Reports (2)
             ['module' => 'reports', 'action' => 'view', 'name' => 'reports.view', 'description' => 'View reports', 'sort_order' => 80],

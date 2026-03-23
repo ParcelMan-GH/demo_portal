@@ -17,7 +17,7 @@ class ShipmentPaymentController extends Controller
      */
     public function data(PickupAssignment $pickupAssignment): JsonResponse
     {
-        $this->authorizeAny(['invoices.view', 'warehouse.receiving.manage']);
+        $this->authorizeAny(['warehouse.invoices.view', 'warehouse.receiving.manage']);
 
         $shipment = $pickupAssignment->shipment;
         if (!$shipment) {
@@ -62,7 +62,7 @@ class ShipmentPaymentController extends Controller
      */
     public function store(Request $request, PickupAssignment $pickupAssignment): JsonResponse
     {
-        $this->authorizePermission('invoices.edit');
+        $this->authorizePermission('warehouse.invoices.edit');
 
         $shipment     = $pickupAssignment->shipment;
         $activeInvoice = $shipment?->invoice;
@@ -106,7 +106,7 @@ class ShipmentPaymentController extends Controller
      */
     public function download(ShipmentPayment $payment)
     {
-        $this->authorizeAny(['invoices.view', 'warehouse.receiving.manage']);
+        $this->authorizeAny(['warehouse.invoices.view', 'warehouse.receiving.manage']);
 
         $payment->load(['shipment.vendor', 'invoice', 'recordedBy']);
 
@@ -131,7 +131,7 @@ class ShipmentPaymentController extends Controller
      */
     public function print(ShipmentPayment $payment)
     {
-        $this->authorizeAny(['invoices.view', 'warehouse.receiving.manage']);
+        $this->authorizeAny(['warehouse.invoices.view', 'warehouse.receiving.manage']);
 
         $payment->load(['shipment.vendor', 'invoice', 'recordedBy']);
 

@@ -153,9 +153,9 @@ class ReceiptController extends Controller
         $receiptConfig['payment_download_url']    = route('warehouse.payments.download', ['payment' => '__ID__']);
         $receiptConfig['payment_print_url']       = route('warehouse.payments.print', ['payment' => '__ID__']);
         $receiptConfig['invoice_show_url']        = route('warehouse.invoices.show', ['invoice' => '__INVOICE__']);
-        $receiptConfig['can_create_invoice']      = $admin->hasPermission('invoices.create');
-        $receiptConfig['can_edit_invoice']        = $admin->hasPermission('invoices.edit');
-        $receiptConfig['can_view_invoice']        = $admin->hasPermission('invoices.view');
+        $receiptConfig['can_create_invoice']      = $admin->hasPermission('warehouse.invoices.create');
+        $receiptConfig['can_edit_invoice']        = $admin->hasPermission('warehouse.invoices.edit');
+        $receiptConfig['can_view_invoice']        = $admin->hasPermission('warehouse.invoices.view');
         $receiptConfig['is_super_admin']          = $admin->isSuperAdmin();
         $receiptConfig['invoice']                 = $invoice ? [
             'id'                => $invoice->id,
@@ -472,9 +472,9 @@ class ReceiptController extends Controller
         $receiptConfig['payment_download_url'] = route('warehouse.payments.download', ['payment' => '__ID__']);
         $receiptConfig['payment_print_url']   = route('warehouse.payments.print', ['payment' => '__ID__']);
         $receiptConfig['invoice_show_url']    = route('warehouse.invoices.show', ['invoice' => '__INVOICE__']);
-        $receiptConfig['can_create_invoice']  = $admin->hasPermission('invoices.create');
-        $receiptConfig['can_edit_invoice']    = $admin->hasPermission('invoices.edit');
-        $receiptConfig['can_view_invoice']    = $admin->hasPermission('invoices.view');
+        $receiptConfig['can_create_invoice']  = $admin->hasPermission('warehouse.invoices.create');
+        $receiptConfig['can_edit_invoice']    = $admin->hasPermission('warehouse.invoices.edit');
+        $receiptConfig['can_view_invoice']    = $admin->hasPermission('warehouse.invoices.view');
         $receiptConfig['is_super_admin']      = $admin->isSuperAdmin();
         $receiptConfig['invoice']             = $invoice ? [
             'id'             => $invoice->id,

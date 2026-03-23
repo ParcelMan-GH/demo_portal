@@ -134,9 +134,10 @@ class RoleSeeder extends Seeder
             'drivers.view',
             'drivers.assign',
             'warehouses.view',
-            'invoices.view',
-            'invoices.create',
-            'invoices.edit',
+            'warehouse.invoices.view',
+            'warehouse.invoices.create',
+            'warehouse.invoices.edit',
+            'warehouse.invoices.delete',
         ])->pluck('id');
         $warehouseManager->permissions()->sync($warehouseManagerPermissions);
 

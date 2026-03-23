@@ -24,12 +24,12 @@ class InvoiceController extends Controller
      */
     public function show(Invoice $invoice): View
     {
-        $this->authorizeAny(['invoices.view', 'warehouse.receiving.manage']);
+        $this->authorizeAny(['warehouse.invoices.view', 'warehouse.receiving.manage']);
 
         $invoice->load(['shipment.vendor', 'creator']);
 
         $admin    = Auth::guard('admin')->user();
-        $canManage = $admin->hasPermission('invoices.edit');
+        $canManage = $admin->hasPermission('warehouse.invoices.edit');
 
         return view('warehouse.invoices.show', compact('invoice', 'canManage'));
     }
@@ -39,7 +39,7 @@ class InvoiceController extends Controller
      */
     public function store(Request $request, PickupAssignment $pickupAssignment): JsonResponse
     {
-        $this->authorizePermission('invoices.create');
+        $this->authorizePermission('warehouse.invoices.create');
 
         $shipment = $pickupAssignment->shipment;
         if (!$shipment) {
@@ -84,7 +84,7 @@ class InvoiceController extends Controller
      */
     public function send(Invoice $invoice): JsonResponse
     {
-        $this->authorizePermission('invoices.create');
+        $this->authorizePermission('warehouse.invoices.create');
 
         $result = $this->invoiceService->send($invoice);
 
@@ -96,7 +96,7 @@ class InvoiceController extends Controller
      */
     public function cancel(Request $request, Invoice $invoice): JsonResponse
     {
-        $this->authorizePermission('invoices.delete');
+        $this->authorizePermission('warehouse.invoices.delete');
 
         $validated = $request->validate([
             'cancel_reason' => ['nullable', 'string'],
@@ -121,7 +121,7 @@ class InvoiceController extends Controller
      */
     public function update(Request $request, Invoice $invoice): JsonResponse
     {
-        $this->authorizePermission('invoices.edit');
+        $this->authorizePermission('warehouse.invoices.edit');
 
         if ($invoice->status->value !== 'pending') {
             return response()->json(['success' => false, 'message' => 'Only pending invoices can be updated.'], 422);
@@ -149,7 +149,7 @@ class InvoiceController extends Controller
      */
     public function adminAccept(Request $request, Invoice $invoice): JsonResponse
     {
-        $this->authorizePermission('invoices.edit');
+        $this->authorizePermission('warehouse.invoices.edit');
 
         $validated = $request->validate([
             'admin_notes' => ['nullable', 'string', 'max:500'],
@@ -170,7 +170,7 @@ class InvoiceController extends Controller
      */
     public function download(Invoice $invoice)
     {
-        $this->authorizeAny(['invoices.view', 'warehouse.receiving.manage']);
+        $this->authorizeAny(['warehouse.invoices.view', 'warehouse.receiving.manage']);
 
         $invoice->load('shipment.vendor');
 
@@ -197,7 +197,7 @@ class InvoiceController extends Controller
      */
     public function print(Invoice $invoice)
     {
-        $this->authorizeAny(['invoices.view', 'warehouse.receiving.manage']);
+        $this->authorizeAny(['warehouse.invoices.view', 'warehouse.receiving.manage']);
 
         $invoice->load('shipment.vendor');
 
@@ -221,7 +221,7 @@ class InvoiceController extends Controller
      */
     public function paymentsData(Invoice $invoice): JsonResponse
     {
-        $this->authorizeAny(['invoices.view', 'warehouse.receiving.manage']);
+        $this->authorizeAny(['warehouse.invoices.view', 'warehouse.receiving.manage']);
 
         $payments  = ShipmentPayment::where('invoice_id', $invoice->id)
             ->with(['recordedBy:id,name'])
@@ -256,7 +256,7 @@ class InvoiceController extends Controller
      */
     public function recordPayment(Request $request, Invoice $invoice): JsonResponse
     {
-        $this->authorizePermission('invoices.edit');
+        $this->authorizePermission('warehouse.invoices.edit');
 
         $validated = $request->validate([
             'amount'           => ['required', 'numeric', 'min:0.01'],
