@@ -372,8 +372,9 @@ class DriverAssignmentController extends Controller
 
             if ($freshAssignment instanceof PickupAssignment) {
                 $result['data']['assignment'] = $this->transformAssignmentForDriver($freshAssignment);
+                $result['data']['delivery_run_id'] = null;
 
-                // Direct delivery: auto-create virtual pipeline and return delivery info
+                // Direct delivery: auto-create full pipeline
                 $shipment = $freshAssignment->shipment;
                 if ($shipment?->fulfillment_type?->isDirect() && $freshAssignment->target_warehouse_id) {
                     $autoDelivery = app(DirectDeliveryService::class)->createVirtualPipeline(
@@ -381,7 +382,7 @@ class DriverAssignmentController extends Controller
                         $freshAssignment->driver_id,
                         $freshAssignment->target_warehouse_id
                     );
-                    $result['data']['assignment']['auto_delivery'] = $autoDelivery;
+                    $result['data']['delivery_run_id'] = $autoDelivery['delivery_run_id'];
                     $result['message'] = 'Pickup confirmed. Proceed to delivery.';
                 }
             }
@@ -438,7 +439,6 @@ class DriverAssignmentController extends Controller
                 'instructions' => $shipment->delivery_instructions,
             ];
 
-            // For PER_ITEM mode, use first item's delivery if shipment-level is empty
             if (!$directDelivery['recipient_name'] && $shipment->isPerItemDestination() && $shipment->items->isNotEmpty()) {
                 $firstItem = $shipment->items->first();
                 $directDelivery = [

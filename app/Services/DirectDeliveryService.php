@@ -94,7 +94,7 @@ class DirectDeliveryService
             $shipment->update(['status' => ShipmentStatus::SORTED]);
             $items->each(fn (ShipmentItem $i) => $i->update(['status' => ItemStatus::SORTED]));
 
-            // 3. DeliveryRun + Stop + Items (assigned to the same driver)
+            // 3. DeliveryRun + Stops + Items (assigned to the same driver)
             $runNumber = $this->generateRunNumber($warehouse);
             $run = DeliveryRun::create([
                 'run_number'         => $runNumber,
@@ -107,22 +107,26 @@ class DirectDeliveryService
                 'notes'              => 'Auto-created: direct delivery from pickup.',
             ]);
 
-            // Build stop from shipment delivery details
-            $stopData = $this->buildStopData($shipment);
-            $stop = DeliveryRunStop::create(array_merge($stopData, [
-                'delivery_run_id' => $run->id,
-                'status'          => 'pending',
-            ]));
+            // Group items by recipient to create stops
+            $stops = $this->buildStops($shipment, $items);
 
-            foreach ($items as $item) {
-                DeliveryRunItem::create([
-                    'delivery_run_id'      => $run->id,
-                    'delivery_run_stop_id' => $stop->id,
-                    'shipment_item_id'     => $item->id,
-                    'expected_quantity'     => $item->quantity,
-                    'delivered_quantity'    => 0,
-                    'status'               => 'pending',
-                ]);
+            foreach ($stops as $stopGroup) {
+                $stop = DeliveryRunStop::create(array_merge($stopGroup['stop_data'], [
+                    'delivery_run_id' => $run->id,
+                    'total_packages'  => count($stopGroup['items']),
+                    'status'          => 'pending',
+                ]));
+
+                foreach ($stopGroup['items'] as $item) {
+                    DeliveryRunItem::create([
+                        'delivery_run_id'      => $run->id,
+                        'delivery_run_stop_id' => $stop->id,
+                        'shipment_item_id'     => $item->id,
+                        'expected_quantity'     => $item->quantity,
+                        'delivered_quantity'    => 0,
+                        'status'               => 'pending',
+                    ]);
+                }
             }
 
             // Transition shipment → OUT_FOR_DELIVERY
@@ -143,60 +147,57 @@ class DirectDeliveryService
             return [
                 'delivery_run_id' => $run->id,
                 'run_number'      => $run->run_number,
-                'stop_id'         => $stop->id,
-                'recipient_name'  => $stop->recipient_name,
-                'recipient_phone' => $stop->recipient_phone,
-                'location'        => [
-                    'region'           => $stop->region?->name ?? null,
-                    'district'         => $stop->district?->name ?? null,
-                    'town'             => $stop->town,
-                    'latitude'         => $stop->latitude,
-                    'longitude'        => $stop->longitude,
-                    'gh_post_address'  => $stop->gh_post_address,
-                    'landmark'         => $stop->landmark,
-                ],
-                'instructions' => $shipment->delivery_instructions,
             ];
         });
     }
 
-    private function buildStopData(Shipment $shipment): array
+    /**
+     * Build stop groups. For single destination: one stop with all items.
+     * For per-item: group items by recipient (name + phone) into separate stops.
+     */
+    private function buildStops(Shipment $shipment, $items): array
     {
-        // For SINGLE destination, use shipment-level delivery fields
         if ($shipment->isSingleDestination()) {
-            return [
-                'recipient_name'  => $shipment->delivery_recipient_name,
-                'recipient_phone' => $shipment->delivery_recipient_phone,
-                'region_id'       => $shipment->delivery_region_id,
-                'district_id'     => $shipment->delivery_district_id,
-                'town'            => $shipment->delivery_town,
-                'latitude'        => $shipment->delivery_latitude,
-                'longitude'       => $shipment->delivery_longitude,
-                'gh_post_address' => $shipment->delivery_gh_post_address,
-                'landmark'        => $shipment->delivery_landmark,
-            ];
+            return [[
+                'stop_data' => [
+                    'recipient_name'  => $shipment->delivery_recipient_name,
+                    'recipient_phone' => $shipment->delivery_recipient_phone,
+                    'region_id'       => $shipment->delivery_region_id,
+                    'district_id'     => $shipment->delivery_district_id,
+                    'town'            => $shipment->delivery_town,
+                    'latitude'        => $shipment->delivery_latitude,
+                    'longitude'       => $shipment->delivery_longitude,
+                    'gh_post_address' => $shipment->delivery_gh_post_address,
+                    'landmark'        => $shipment->delivery_landmark,
+                ],
+                'items' => $items->all(),
+            ]];
         }
 
-        // For PER_ITEM, use the first item's delivery info for the stop
-        $firstItem = $shipment->items->first();
-        if ($firstItem) {
-            return [
-                'recipient_name'  => $firstItem->delivery_recipient_name,
-                'recipient_phone' => $firstItem->delivery_recipient_phone,
-                'region_id'       => $firstItem->delivery_region_id,
-                'district_id'     => $firstItem->delivery_district_id,
-                'town'            => $firstItem->delivery_town,
-                'latitude'        => $firstItem->delivery_latitude,
-                'longitude'       => $firstItem->delivery_longitude,
-                'gh_post_address' => $firstItem->delivery_gh_post_address,
-                'landmark'        => $firstItem->delivery_landmark,
-            ];
+        // Per-item: group by recipient name + phone
+        $grouped = [];
+        foreach ($items as $item) {
+            $key = mb_strtolower(trim(($item->delivery_recipient_name ?? '') . '|' . ($item->delivery_recipient_phone ?? '')));
+            if (!isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'stop_data' => [
+                        'recipient_name'  => $item->delivery_recipient_name,
+                        'recipient_phone' => $item->delivery_recipient_phone,
+                        'region_id'       => $item->delivery_region_id,
+                        'district_id'     => $item->delivery_district_id,
+                        'town'            => $item->delivery_town,
+                        'latitude'        => $item->delivery_latitude,
+                        'longitude'       => $item->delivery_longitude,
+                        'gh_post_address' => $item->delivery_gh_post_address,
+                        'landmark'        => $item->delivery_landmark,
+                    ],
+                    'items' => [],
+                ];
+            }
+            $grouped[$key]['items'][] = $item;
         }
 
-        return [
-            'recipient_name'  => null,
-            'recipient_phone' => null,
-        ];
+        return array_values($grouped);
     }
 
     private function generateBatchNumber(Warehouse $warehouse): string

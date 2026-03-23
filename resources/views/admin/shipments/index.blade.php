@@ -214,7 +214,7 @@
                             DEST. MODE
                         </th>
                         <th x-show="visibleColumns.fulfillment_type" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            FULFILLMENT
+                            PREFERENCE / ROUTING
                         </th>
                         <th x-show="visibleColumns.destination" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             DESTINATION
@@ -270,10 +270,17 @@
                                 </span>
                             </td>
                             <td x-show="visibleColumns.fulfillment_type" class="px-4 py-2.5 whitespace-nowrap">
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                      :class="shipment.fulfillment_type === 'direct' ? 'bg-amber-100 text-amber-700' : shipment.fulfillment_type === 'self_pickup' ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-600'"
-                                      x-text="shipment.fulfillment_type_label">
-                                </span>
+                                <div class="flex flex-col gap-1">
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold w-fit"
+                                          :class="(shipment.delivery_preference || 'deliver') === 'self_pickup' ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'"
+                                          x-text="(shipment.delivery_preference || 'deliver') === 'self_pickup' ? 'Recipient Collects' : 'Deliver to Recipient'">
+                                    </span>
+                                    <span x-show="shipment.fulfillment_type && (shipment.delivery_preference || 'deliver') === 'deliver'"
+                                          class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold w-fit"
+                                          :class="shipment.fulfillment_type === 'direct' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'"
+                                          x-text="shipment.fulfillment_type === 'direct' ? 'Direct Delivery' : 'Warehouse'">
+                                    </span>
+                                </div>
                             </td>
                             <td x-show="visibleColumns.destination" class="px-4 py-2.5 whitespace-nowrap">
                                 <div class="text-xs font-semibold text-slate-900" x-text="shipment.destination_summary_title"></div>
