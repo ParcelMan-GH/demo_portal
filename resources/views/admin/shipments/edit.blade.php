@@ -326,7 +326,7 @@
     </div>
 
     {{-- Assign Driver --}}
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6" x-show="['submitted', 'invoice_accepted'].includes(shipment.status)">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6" x-show="['submitted', 'invoice_accepted', 'pickup_assigned'].includes(shipment.status)">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <div class="flex items-center gap-2.5">
                 <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
@@ -334,14 +334,40 @@
                 </div>
                 <div>
                     <h2 class="text-sm font-bold text-slate-900">Pickup Assignment</h2>
-                    <p class="text-xs text-slate-500">Assign a driver to pick up this shipment</p>
+                    <p class="text-xs text-slate-500" x-text="currentAssignment ? 'Driver assigned — change before pickup starts' : 'Assign a driver to pick up this shipment'"></p>
                 </div>
             </div>
-            <button @@click="openAssignModal()" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-lg shadow-violet-500/25 transition-all">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                Assign Driver
-            </button>
+            <div class="flex items-center gap-2">
+                <template x-if="!currentAssignment">
+                    <button @@click="openAssignModal()" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-lg shadow-violet-500/25 transition-all">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Assign Driver
+                    </button>
+                </template>
+                <template x-if="currentAssignment && currentAssignment.status === 'assigned' && !currentAssignment.picked_up_at">
+                    <button @@click="openAssignModal(true)" class="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-violet-200 text-violet-700 text-xs font-semibold rounded-xl hover:bg-violet-50 transition-all">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                        Change Driver
+                    </button>
+                </template>
+            </div>
         </div>
+        {{-- Current assignment info --}}
+        <template x-if="currentAssignment">
+            <div class="px-6 py-4 flex items-center gap-4">
+                <div class="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm" x-text="(currentAssignment.driver_name || '?').charAt(0).toUpperCase()"></div>
+                <div class="flex-1">
+                    <p class="text-sm font-bold text-slate-900" x-text="currentAssignment.driver_name"></p>
+                    <p class="text-xs text-slate-500" x-text="currentAssignment.driver_phone"></p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-slate-500" x-text="currentAssignment.warehouse_name"></p>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                          :class="currentAssignment.status === 'assigned' ? 'bg-blue-100 text-blue-700' : currentAssignment.status === 'en_route' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'"
+                          x-text="currentAssignment.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())"></span>
+                </div>
+            </div>
+        </template>
     </div>
 
     {{-- Assign Driver Modal --}}
@@ -349,8 +375,8 @@
         <div @@click.stop class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-bold text-slate-900">Assign Driver</h3>
-                    <p class="text-xs text-slate-500">Select driver and target warehouse</p>
+                    <h3 class="text-sm font-bold text-slate-900" x-text="assignModal.isEdit ? 'Change Driver' : 'Assign Driver'"></h3>
+                    <p class="text-xs text-slate-500" x-text="assignModal.isEdit ? 'Select a new driver or warehouse' : 'Select driver and target warehouse'"></p>
                 </div>
                 <button @@click="assignModal.open = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -384,7 +410,7 @@
                     <button @@click="assignModal.open = false" class="px-4 py-2 text-xs font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50">Cancel</button>
                     <button @@click="submitAssignment()" :disabled="assignModal.submitting || !assignModal.driver_id || !assignModal.warehouse_id" class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-violet-500/25 disabled:opacity-50 transition-all">
                         <svg x-show="assignModal.submitting" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span x-text="assignModal.submitting ? 'Assigning...' : 'Assign Driver'"></span>
+                        <span x-text="assignModal.submitting ? (assignModal.isEdit ? 'Updating...' : 'Assigning...') : (assignModal.isEdit ? 'Update Assignment' : 'Assign Driver')"></span>
                     </button>
                 </div>
             </div>
@@ -464,7 +490,8 @@ function shipmentEditor() {
         duplicating: false,
         lightboxUrl: null,
         splitModal: { open: false, packageId: null, photos: [], selectedIds: [] },
-        assignModal: { open: false, driver_id: '', warehouse_id: '', notes: '', drivers: [], warehouses: [], loading: false, submitting: false },
+        currentAssignment: null,
+        assignModal: { open: false, isEdit: false, driver_id: '', warehouse_id: '', notes: '', drivers: [], warehouses: [], loading: false, submitting: false },
 
         init() {
             this.config = JSON.parse(this.$root.dataset.editConfig);
@@ -476,6 +503,8 @@ function shipmentEditor() {
             this.form.delivery = this.shipment.delivery ? { ...this.shipment.delivery } : {};
             this.form.delivery_preference = this.shipment.delivery_preference || 'deliver';
             this.form.fulfillment_type = this.shipment.fulfillment_type;
+
+            this.currentAssignment = this.config.currentAssignment || null;
 
             if (this.form.pickup.region_id) this.loadDistricts('pickup');
             if (this.form.delivery.region_id) this.loadDistricts('delivery');
@@ -633,10 +662,11 @@ function shipmentEditor() {
             }
         },
 
-        async openAssignModal() {
+        async openAssignModal(isEdit = false) {
             this.assignModal.open = true;
-            this.assignModal.driver_id = '';
-            this.assignModal.warehouse_id = '';
+            this.assignModal.isEdit = isEdit;
+            this.assignModal.driver_id = isEdit && this.currentAssignment ? String(this.currentAssignment.driver_id) : '';
+            this.assignModal.warehouse_id = isEdit && this.currentAssignment ? String(this.currentAssignment.target_warehouse_id) : '';
             this.assignModal.notes = '';
             this.assignModal.loading = true;
             try {
@@ -652,9 +682,12 @@ function shipmentEditor() {
 
         async submitAssignment() {
             this.assignModal.submitting = true;
+            const isEdit = this.assignModal.isEdit;
+            const url = isEdit ? this.config.updateAssignmentEndpointTemplate : this.config.assignDriverEndpoint;
+            const method = isEdit ? 'PUT' : 'POST';
             try {
-                const res = await this._fetch(this.config.assignDriverEndpoint, {
-                    method: 'POST',
+                const res = await this._fetch(url, {
+                    method: method,
                     body: JSON.stringify({
                         driver_id: this.assignModal.driver_id,
                         target_warehouse_id: this.assignModal.warehouse_id,
@@ -664,7 +697,23 @@ function shipmentEditor() {
                 if (res.success) {
                     this.assignModal.open = false;
                     this.shipment.status = 'pickup_assigned';
-                    this._toast('Driver assigned successfully!', 'success');
+                    // Update displayed assignment info
+                    const driver = this.assignModal.drivers.find(d => d.id == this.assignModal.driver_id);
+                    const warehouse = this.assignModal.warehouses.find(w => w.id == this.assignModal.warehouse_id);
+                    this.currentAssignment = {
+                        id: this.currentAssignment?.id || res.data?.assignment?.id,
+                        status: 'assigned',
+                        driver_id: this.assignModal.driver_id,
+                        driver_name: driver?.name || 'Driver',
+                        driver_phone: driver?.phone || '',
+                        target_warehouse_id: this.assignModal.warehouse_id,
+                        warehouse_name: warehouse?.name || 'Warehouse',
+                        picked_up_at: null,
+                    };
+                    if (res.data?.assignment?.id && !this.config.updateAssignmentEndpointTemplate) {
+                        this.config.updateAssignmentEndpointTemplate = this.config.assignDriverEndpoint.replace(/assign.*$/, 'assignments/' + res.data.assignment.id + '/update');
+                    }
+                    this._toast(isEdit ? 'Driver changed successfully!' : 'Driver assigned successfully!', 'success');
                 } else {
                     this._toast(res.message || 'Failed to assign.', 'error');
                 }

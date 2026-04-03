@@ -891,10 +891,23 @@ class ShipmentController extends Controller
             'locationSearchUrl' => route('admin.locations.search'),
             'districtsByRegionUrlTemplate' => '/admin/locations-data/districts?region_id=__REGION__',
             'assignDriverEndpoint' => route('admin.assignments.assign', $shipment),
+            'updateAssignmentEndpointTemplate' => $shipment->pickupAssignment
+                ? route('admin.assignments.update', ['pickupAssignment' => $shipment->pickupAssignment->id])
+                : null,
             'availableDriversEndpoint' => route('admin.assignments.available-drivers'),
             'availableWarehousesEndpoint' => route('admin.assignments.available-warehouses'),
             'duplicateUrl' => route('admin.shipments.duplicate', $shipment),
             'showUrl' => route('admin.shipments.show', $shipment),
+            'currentAssignment' => $shipment->pickupAssignment ? [
+                'id' => $shipment->pickupAssignment->id,
+                'status' => $shipment->pickupAssignment->status->value,
+                'driver_id' => $shipment->pickupAssignment->driver_id,
+                'driver_name' => $shipment->pickupAssignment->driver?->name,
+                'driver_phone' => $shipment->pickupAssignment->driver?->phone,
+                'target_warehouse_id' => $shipment->pickupAssignment->target_warehouse_id,
+                'warehouse_name' => $shipment->pickupAssignment->targetWarehouse?->name,
+                'picked_up_at' => $shipment->pickupAssignment->picked_up_at,
+            ] : null,
             'regions' => $regions,
             'shipment' => [
                 'id' => $shipment->id,
