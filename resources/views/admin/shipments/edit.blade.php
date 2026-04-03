@@ -171,7 +171,7 @@
                                     <select x-model="form.pickup.region_id" @@change="loadDistricts('pickup')"
                                             class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                         <option value="">Select Region</option>
-                                        <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
+                                        <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" :selected="String(r.id) === form.pickup.region_id" x-text="r.name"></option></template>
                                     </select>
                                 </div>
                                 <div>
@@ -179,7 +179,7 @@
                                     <select x-model="form.pickup.district_id"
                                             class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                         <option value="">Select District</option>
-                                        <template x-for="d in pickupDistricts" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
+                                        <template x-for="d in pickupDistricts" :key="d.id"><option :value="String(d.id)" :selected="String(d.id) === form.pickup.district_id" x-text="d.name"></option></template>
                                     </select>
                                 </div>
                                 <div>
@@ -290,7 +290,7 @@
                                         <select x-model="form.delivery.region_id" @@change="loadDistricts('delivery')"
                                                 class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                             <option value="">Select Region</option>
-                                            <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
+                                            <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" :selected="String(r.id) === form.delivery.region_id" x-text="r.name"></option></template>
                                         </select>
                                     </div>
                                     <div>
@@ -298,7 +298,7 @@
                                         <select x-model="form.delivery.district_id"
                                                 class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                             <option value="">Select District</option>
-                                            <template x-for="d in deliveryDistricts" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
+                                            <template x-for="d in deliveryDistricts" :key="d.id"><option :value="String(d.id)" :selected="String(d.id) === form.delivery.district_id" x-text="d.name"></option></template>
                                         </select>
                                     </div>
                                     <div>
@@ -464,7 +464,7 @@
                                                     <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                                                     Delivery details for this package
                                                 </h4>
-                                                <div class="grid grid-cols-3 gap-3 mb-3">
+                                                <div class="grid grid-cols-2 gap-3 mb-3">
                                                     <div>
                                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Delivery Preference</label>
                                                         <select x-model="pkg.delivery_preference"
@@ -498,7 +498,7 @@
                                                         <select x-model="pkg.delivery_region_id" @@change="loadPackageDistricts(pkg)"
                                                                 class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                                             <option value="">Select Region</option>
-                                                            <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
+                                                            <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" :selected="String(r.id) === pkg.delivery_region_id" x-text="r.name"></option></template>
                                                         </select>
                                                     </div>
                                                     <div>
@@ -506,7 +506,7 @@
                                                         <select x-model="pkg.delivery_district_id"
                                                                 class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                                             <option value="">Select District</option>
-                                                            <template x-for="d in (pkg._districts || [])" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
+                                                            <template x-for="d in (pkg._districts || [])" :key="d.id"><option :value="String(d.id)" :selected="String(d.id) === pkg.delivery_district_id" x-text="d.name"></option></template>
                                                         </select>
                                                     </div>
                                                     <div>
