@@ -149,12 +149,12 @@
                                 <div>
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Contact Name</label>
                                     <input type="text" x-model="form.pickup.contact_name"
-                                           class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                           class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                 </div>
                                 <div>
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Contact Phone</label>
                                     <input type="text" x-model="form.pickup.contact_phone"
-                                           class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                           class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                 </div>
                             </div>
                         </div>
@@ -169,7 +169,7 @@
                                 <div>
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Region</label>
                                     <select x-model="form.pickup.region_id" @@change="loadDistricts('pickup')"
-                                            class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                            class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                         <option value="">Select Region</option>
                                         <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
                                     </select>
@@ -177,7 +177,7 @@
                                 <div>
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">District</label>
                                     <select x-model="form.pickup.district_id"
-                                            class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                            class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                         <option value="">Select District</option>
                                         <template x-for="d in pickupDistricts" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
                                     </select>
@@ -185,17 +185,17 @@
                                 <div>
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Town / Area</label>
                                     <input type="text" x-model="form.pickup.town"
-                                           class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                           class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                 </div>
                                 <div>
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Landmark</label>
                                     <input type="text" x-model="form.pickup.landmark"
-                                           class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                           class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                 </div>
                                 <div class="col-span-2">
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Instructions</label>
                                     <textarea x-model="form.pickup.instructions" rows="2"
-                                              class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all resize-none"></textarea>
+                                              class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all resize-none"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -238,11 +238,11 @@
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                     Routing
                                 </p>
-                                <div class="grid grid-cols-3 gap-3">
+                                <div class="grid grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Delivery Preference</label>
                                         <select x-model="form.delivery_preference"
-                                                class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                             <option value="deliver">Deliver to Recipient</option>
                                             <option value="self_pickup">Recipient Collects</option>
                                         </select>
@@ -250,7 +250,7 @@
                                     <div x-show="form.delivery_preference === 'deliver'">
                                         <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Routing (Admin)</label>
                                         <select x-model="form.fulfillment_type"
-                                                class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                             <option value="warehouse">Warehouse</option>
                                             <option value="direct">Direct Delivery</option>
                                         </select>
@@ -268,12 +268,12 @@
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Recipient Name</label>
                                         <input type="text" x-model="form.delivery.recipient_name"
-                                               class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                               class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                     </div>
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Recipient Phone</label>
                                         <input type="text" x-model="form.delivery.recipient_phone"
-                                               class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                               class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                     </div>
                                 </div>
                             </div>
@@ -288,7 +288,7 @@
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Region</label>
                                         <select x-model="form.delivery.region_id" @@change="loadDistricts('delivery')"
-                                                class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                             <option value="">Select Region</option>
                                             <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
                                         </select>
@@ -296,7 +296,7 @@
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">District</label>
                                         <select x-model="form.delivery.district_id"
-                                                class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                             <option value="">Select District</option>
                                             <template x-for="d in deliveryDistricts" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
                                         </select>
@@ -304,17 +304,17 @@
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Town / Area</label>
                                         <input type="text" x-model="form.delivery.town"
-                                               class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                               class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                     </div>
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Landmark</label>
                                         <input type="text" x-model="form.delivery.landmark"
-                                               class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                               class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                     </div>
                                     <div class="col-span-2">
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Delivery Instructions</label>
                                         <textarea x-model="form.delivery.instructions" rows="2"
-                                                  class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all resize-none"></textarea>
+                                                  class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all resize-none"></textarea>
                                     </div>
                                 </div>
                             </div>
@@ -447,13 +447,13 @@
                                         <div class="grid grid-cols-2 gap-3 mb-4">
                                             <div>
                                                 <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Description <span class="text-slate-300 font-normal normal-case">(what's inside)</span></label>
-                                                <textarea x-model="pkg.description" rows="2" placeholder="e.g. 2x Nike shoes, 1x phone case"
-                                                          class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none transition-all resize-none"></textarea>
+                                                <input type="text" x-model="pkg.description" placeholder="e.g. 2x Nike shoes, 1x phone case"
+                                                       class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none transition-all">
                                             </div>
                                             <div>
                                                 <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Quantity <span class="text-slate-300 font-normal normal-case">(skip if sealed)</span></label>
                                                 <input type="number" x-model.number="pkg.quantity" min="1" placeholder="—"
-                                                       class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none transition-all">
+                                                       class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none transition-all">
                                             </div>
                                         </div>
 
