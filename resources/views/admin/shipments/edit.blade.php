@@ -919,22 +919,36 @@ function shipmentEditor() {
                 delivery_region_id: String(pkg.delivery_region_id || ''),
                 delivery_district_id: String(pkg.delivery_district_id || ''),
                 _districts: [],
+                _saving: false,
+                _saved: false,
             }));
             // Load districts for packages that have a region set
             this.packages.forEach(pkg => {
                 if (pkg.delivery_region_id) this.loadPackageDistricts(pkg);
             });
             this.destinationMode = this.shipment.destination_mode;
-            this.form.pickup = { ...this.shipment.pickup };
-            this.form.delivery = this.shipment.delivery ? { ...this.shipment.delivery } : {};
+            const p = this.shipment.pickup || {};
+            this.form.pickup = {
+                contact_name: p.contact_name || '',
+                contact_phone: p.contact_phone || '',
+                region_id: p.region_id ? String(p.region_id) : '',
+                district_id: p.district_id ? String(p.district_id) : '',
+                town: p.town || '',
+                landmark: p.landmark || '',
+                instructions: p.instructions || '',
+            };
+            const d = this.shipment.delivery || {};
+            this.form.delivery = {
+                recipient_name: d.recipient_name || '',
+                recipient_phone: d.recipient_phone || '',
+                region_id: d.region_id ? String(d.region_id) : '',
+                district_id: d.district_id ? String(d.district_id) : '',
+                town: d.town || '',
+                landmark: d.landmark || '',
+                instructions: d.instructions || '',
+            };
             this.form.delivery_preference = this.shipment.delivery_preference || 'deliver';
             this.form.fulfillment_type = this.shipment.fulfillment_type;
-
-            // Fix region/district binding: coerce to string so <select> x-model matches
-            this.form.pickup.region_id = String(this.shipment.pickup?.region_id || '');
-            this.form.pickup.district_id = String(this.shipment.pickup?.district_id || '');
-            this.form.delivery.region_id = String(this.shipment.delivery?.region_id || '');
-            this.form.delivery.district_id = String(this.shipment.delivery?.district_id || '');
 
             this.currentAssignment = this.config.currentAssignment || null;
             this.canEditShipmentFields = this.config.canEditShipmentFields ?? true;
