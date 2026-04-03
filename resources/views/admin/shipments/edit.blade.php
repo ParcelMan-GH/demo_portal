@@ -40,7 +40,6 @@
                 <div>
                     <h3 class="text-sm font-bold text-amber-900">Sender's Notes</h3>
                     <p class="text-sm text-amber-800 mt-1 leading-relaxed" x-text="shipment.sender_notes"></p>
-                    <p class="text-[10px] text-amber-600 mt-2">From: <span x-text="shipment.vendor_name"></span> (<span x-text="shipment.vendor_phone"></span>)</p>
                 </div>
             </div>
         </div>
@@ -82,11 +81,11 @@
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Contact Name</label>
-                    <input type="text" x-model="form.pickup.contact_name" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                    <input type="text" x-model="form.pickup.contact_name" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                 </div>
                 <div>
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Contact Phone</label>
-                    <input type="text" x-model="form.pickup.contact_phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                    <input type="text" x-model="form.pickup.contact_phone" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                 </div>
                 <div>
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Region</label>
@@ -97,22 +96,22 @@
                 </div>
                 <div>
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">District</label>
-                    <select x-model="form.pickup.district_id" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                    <select x-model="form.pickup.district_id" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                         <option value="">Select District</option>
                         <template x-for="d in pickupDistricts" :key="d.id"><option :value="d.id" x-text="d.name"></option></template>
                     </select>
                 </div>
                 <div>
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Town / Area</label>
-                    <input type="text" x-model="form.pickup.town" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                    <input type="text" x-model="form.pickup.town" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                 </div>
                 <div>
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Landmark</label>
-                    <input type="text" x-model="form.pickup.landmark" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                    <input type="text" x-model="form.pickup.landmark" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                 </div>
                 <div class="col-span-2">
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Instructions</label>
-                    <textarea x-model="form.pickup.instructions" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
+                    <textarea x-model="form.pickup.instructions" @@change="autoSave()" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
                 </div>
             </div>
         </div>
@@ -131,14 +130,14 @@
                 <div class="grid grid-cols-3 gap-4 mb-4">
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Delivery Preference</label>
-                        <select x-model="form.delivery_preference" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <select x-model="form.delivery_preference" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                             <option value="deliver">Deliver to Recipient</option>
                             <option value="self_pickup">Recipient Collects</option>
                         </select>
                     </div>
                     <div x-show="form.delivery_preference === 'deliver'">
                         <label class="block text-[10px] font-semibold text-slate-400 mb-1">Routing (Admin)</label>
-                        <select x-model="form.fulfillment_type" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <select x-model="form.fulfillment_type" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                             <option value="warehouse">Warehouse</option>
                             <option value="direct">Direct Delivery</option>
                         </select>
@@ -147,37 +146,37 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient Name</label>
-                        <input type="text" x-model="form.delivery.recipient_name" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <input type="text" x-model="form.delivery.recipient_name" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                     </div>
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient Phone</label>
-                        <input type="text" x-model="form.delivery.recipient_phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <input type="text" x-model="form.delivery.recipient_phone" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                     </div>
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Region</label>
-                        <select x-model="form.delivery.region_id" @@change="loadDistricts('delivery')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <select x-model="form.delivery.region_id" @@change="loadDistricts('delivery'); autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                             <option value="">Select Region</option>
                             <template x-for="r in regions" :key="r.id"><option :value="r.id" x-text="r.name"></option></template>
                         </select>
                     </div>
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">District</label>
-                        <select x-model="form.delivery.district_id" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <select x-model="form.delivery.district_id" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                             <option value="">Select District</option>
                             <template x-for="d in deliveryDistricts" :key="d.id"><option :value="d.id" x-text="d.name"></option></template>
                         </select>
                     </div>
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Town / Area</label>
-                        <input type="text" x-model="form.delivery.town" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <input type="text" x-model="form.delivery.town" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                     </div>
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Landmark</label>
-                        <input type="text" x-model="form.delivery.landmark" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <input type="text" x-model="form.delivery.landmark" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                     </div>
                     <div class="col-span-2">
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Delivery Instructions</label>
-                        <textarea x-model="form.delivery.instructions" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
+                        <textarea x-model="form.delivery.instructions" @@change="autoSave()" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
                     </div>
                 </div>
             </div>
@@ -215,6 +214,7 @@
                             <span class="w-6 h-6 rounded-lg bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center" x-text="pkgIndex + 1"></span>
                             <span class="text-xs font-bold text-slate-700">Package <span x-text="pkgIndex + 1"></span></span>
                             <span x-show="pkg.tracking_code" class="text-[10px] font-mono text-slate-400" x-text="pkg.tracking_code"></span>
+                            <span x-show="pkg._saved" x-transition.opacity class="text-[10px] font-semibold text-emerald-600">Saved</span>
                         </div>
                         <div class="flex items-center gap-1">
                             <button @@click="splitPackageModal(pkg)" x-show="pkg.photos.length > 1" class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Split Package">
@@ -241,7 +241,7 @@
                                 <div class="relative group w-20 h-20 rounded-xl overflow-hidden border border-slate-200 bg-slate-100" x-data="{ moveOpen: false }">
                                     <img :src="photo.url" class="w-full h-full object-cover cursor-pointer" @@click="openLightbox(photo.url)">
                                     <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
-                                        <button @@click.stop="moveOpen = !moveOpen" class="w-6 h-6 rounded-full bg-white/90 text-blue-600 flex items-center justify-center" title="Move to another package">
+                                        <button x-show="packages.length > 1" @@click.stop="moveOpen = !moveOpen" class="w-6 h-6 rounded-full bg-white/90 text-blue-600 flex items-center justify-center" title="Move to another package">
                                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                                         </button>
                                         <button @@click="deletePhoto(pkg, photo)" class="w-6 h-6 rounded-full bg-white/90 text-rose-600 flex items-center justify-center" title="Delete">
@@ -274,8 +274,8 @@
                                 <textarea x-model="pkg.description" rows="2" @@change="savePackage(pkg)" placeholder="e.g. 2x Nike shoes, 1x phone case" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
                             </div>
                             <div>
-                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Quantity</label>
-                                <input type="number" x-model.number="pkg.quantity" min="1" @@change="savePackage(pkg)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                <label class="block text-[10px] font-semibold text-slate-400 mb-1">Qty <span class="text-slate-300 font-normal">(skip if sealed)</span></label>
+                                <input type="number" x-model.number="pkg.quantity" min="1" @@change="savePackage(pkg)" placeholder="—" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                             </div>
                         </div>
 
@@ -391,13 +391,20 @@
         </div>
     </div>
 
-    {{-- Save Bar --}}
+    {{-- Bottom Bar --}}
     <div class="sticky bottom-0 z-20 bg-white/90 backdrop-blur-xl border-t border-slate-200 rounded-t-2xl shadow-lg -mx-4 px-4 py-3 flex items-center justify-between">
-        <a :href="config.showUrl" class="text-sm text-slate-500 hover:text-slate-700 transition-colors">Cancel</a>
-        <button @@click="saveAll()" :disabled="saving" class="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-50 flex items-center gap-2">
-            <svg x-show="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-            <span x-text="saving ? 'Saving...' : 'Save Changes'"></span>
-        </button>
+        <a :href="config.showUrl" class="text-sm text-slate-500 hover:text-slate-700 transition-colors">Back to Shipment</a>
+        <div class="flex items-center gap-3">
+            <span x-show="saving" class="text-xs text-slate-400 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                Saving...
+            </span>
+            <span x-show="shipmentSaved && !saving" x-transition.opacity class="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                All changes saved
+            </span>
+            <span x-show="!saving && !shipmentSaved" class="text-[10px] text-slate-400">Changes auto-save on edit</span>
+        </div>
     </div>
 
     </div>
@@ -452,6 +459,8 @@ function shipmentEditor() {
         pickupDistricts: [],
         deliveryDistricts: [],
         saving: false,
+        shipmentSaved: false,
+        autoSaveTimer: null,
         duplicating: false,
         lightboxUrl: null,
         splitModal: { open: false, packageId: null, photos: [], selectedIds: [] },
@@ -482,6 +491,11 @@ function shipmentEditor() {
             else this.deliveryDistricts = data.data?.districts || [];
         },
 
+        autoSave() {
+            clearTimeout(this.autoSaveTimer);
+            this.autoSaveTimer = setTimeout(() => this.saveAll(), 800);
+        },
+
         async saveAll() {
             this.saving = true;
             try {
@@ -509,7 +523,10 @@ function shipmentEditor() {
                     });
                 }
                 const res = await this._fetch(this.config.saveUrl, { method: 'PUT', body: JSON.stringify(payload) });
-                if (res.success) this._toast('Shipment details saved.', 'success');
+                if (res.success) {
+                    this.shipmentSaved = true;
+                    setTimeout(() => this.shipmentSaved = false, 2000);
+                }
                 else this._toast(res.message || 'Failed to save.', 'error');
             } catch (e) { this._toast(e.message || 'Error saving.', 'error'); }
             finally { this.saving = false; }
@@ -527,7 +544,11 @@ function shipmentEditor() {
                 delivery_town: pkg.delivery_town || null,
                 delivery_landmark: pkg.delivery_landmark || null,
             };
-            await this._fetch(url, { method: 'PUT', body: JSON.stringify(payload) });
+            const res = await this._fetch(url, { method: 'PUT', body: JSON.stringify(payload) });
+            if (res.success) {
+                pkg._saved = true;
+                setTimeout(() => pkg._saved = false, 2000);
+            }
         },
 
         async addPackage() {
@@ -642,8 +663,8 @@ function shipmentEditor() {
                 });
                 if (res.success) {
                     this.assignModal.open = false;
+                    this.shipment.status = 'pickup_assigned';
                     this._toast('Driver assigned successfully!', 'success');
-                    setTimeout(() => window.location.href = this.config.showUrl, 1500);
                 } else {
                     this._toast(res.message || 'Failed to assign.', 'error');
                 }

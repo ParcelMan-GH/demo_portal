@@ -947,7 +947,7 @@ class ShipmentController extends Controller
                         'delivery_instructions' => $item->delivery_instructions,
                         'photos' => $item->images->map(fn ($img) => [
                             'id' => $img->id,
-                            'url' => $img->getSignedUrl(),
+                            'url' => $img->getSignedUrl()['url'] ?? null,
                             'original_name' => $img->original_name,
                             'size_human' => $img->size_human,
                         ])->values(),
@@ -1139,7 +1139,7 @@ class ShipmentController extends Controller
                     'quantity' => $newItem->quantity,
                     'photos' => $newItem->images->map(fn ($img) => [
                         'id' => $img->id,
-                        'url' => $img->getSignedUrl(),
+                        'url' => $img->getSignedUrl()['url'] ?? null,
                         'original_name' => $img->original_name,
                         'size_human' => $img->size_human,
                     ])->values(),
@@ -1175,7 +1175,7 @@ class ShipmentController extends Controller
                 ]);
                 $uploaded[] = [
                     'id' => $image->id,
-                    'url' => $image->getSignedUrl(),
+                    'url' => $image->getSignedUrl()['url'] ?? null,
                     'original_name' => $image->original_name,
                     'size_human' => $image->size_human,
                 ];

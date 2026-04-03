@@ -159,7 +159,7 @@ $shipmentConfig = [
                                         <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                         </svg>
-                                        <span>{{ number_format($itemsCount) }} item(s)</span>
+                                        <span>{{ number_format($itemsCount) }} package(s)</span>
                                     </div>
                                 </div>
 
@@ -173,21 +173,28 @@ $shipmentConfig = [
                                     </div>
                                 </div>
                             @else
+                                @if($shipment->delivery_recipient_name || $shipment->delivery_recipient_phone)
                                 <div class="flex flex-wrap items-center gap-2 text-xs">
+                                    @if($shipment->delivery_recipient_name)
                                     <div class="flex items-center gap-1.5 text-slate-300">
                                         <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                         </svg>
-                                        <span class="truncate">{{ $shipment->delivery_recipient_name ?: '-' }}</span>
+                                        <span class="truncate">{{ $shipment->delivery_recipient_name }}</span>
                                     </div>
+                                    @endif
+                                    @if($shipment->delivery_recipient_phone)
                                     <div class="flex items-center gap-1.5 text-slate-300">
                                         <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                                         </svg>
-                                        {{ $shipment->delivery_recipient_phone ?: '-' }}
+                                        {{ $shipment->delivery_recipient_phone }}
                                     </div>
+                                    @endif
                                 </div>
+                                @endif
 
+                                @if($shipment->deliveryRegion?->name || $shipment->delivery_town)
                                 <div class="flex flex-wrap items-center gap-2 text-xs">
                                     <div class="flex items-center gap-1.5 text-slate-300">
                                         <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,12 +202,12 @@ $shipmentConfig = [
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                                         </svg>
                                         <span class="truncate">
-                                            {{ $shipment->deliveryRegion?->name ?? '-' }}
-                                            @if($shipment->deliveryDistrict?->name), {{ $shipment->deliveryDistrict?->name }}@endif
+                                            {{ $shipment->deliveryRegion?->name }}@if($shipment->deliveryDistrict?->name), {{ $shipment->deliveryDistrict?->name }}@endif
                                             @if($shipment->delivery_town), {{ $shipment->delivery_town }}@endif
                                         </span>
                                     </div>
                                 </div>
+                                @endif
                             @endif
 
                             <div class="flex flex-wrap items-center gap-1.5">
@@ -442,7 +449,6 @@ $shipmentConfig = [
                             <div>
                                 <h3 class="text-sm font-bold text-amber-900">Sender's Notes</h3>
                                 <p class="text-sm text-amber-800 mt-1 leading-relaxed" x-text="shipment.sender_notes"></p>
-                                <p class="text-[10px] text-amber-600 mt-2">From: <span x-text="shipment.vendor_name"></span> <span x-show="shipment.vendor_phone">(<span x-text="shipment.vendor_phone"></span>)</span></p>
                             </div>
                         </div>
                     </div>
