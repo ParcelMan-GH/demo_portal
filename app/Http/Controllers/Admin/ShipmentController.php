@@ -1094,7 +1094,7 @@ class ShipmentController extends Controller
         // Delete associated images from storage
         $storageService = app(StorageService::class);
         foreach ($item->images as $image) {
-            $storageService->delete($image->storage_path);
+            $storageService->delete($image->path);
             $image->delete();
         }
 
@@ -1168,7 +1168,7 @@ class ShipmentController extends Controller
             $result = $storageService->uploadFile($file, "shipments/{$shipment->id}/items/{$item->id}");
             if ($result['success']) {
                 $image = $item->images()->create([
-                    'storage_path' => $result['path'],
+                    'path' => $result['path'],
                     'original_name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
                     'size' => $file->getSize(),
@@ -1216,7 +1216,7 @@ class ShipmentController extends Controller
         $this->authorizePermission('shipments.edit');
 
         $storageService = app(StorageService::class);
-        $storageService->delete($image->storage_path);
+        $storageService->delete($image->path);
         $image->delete();
 
         return response()->json(['success' => true, 'message' => 'Photo deleted.']);
@@ -1253,7 +1253,7 @@ class ShipmentController extends Controller
             // Copy image records (point to same storage files — no re-upload)
             foreach ($item->images as $image) {
                 $newItem->images()->create([
-                    'storage_path' => $image->storage_path,
+                    'path' => $image->path,
                     'original_name' => $image->original_name,
                     'mime_type' => $image->mime_type,
                     'size' => $image->size,
