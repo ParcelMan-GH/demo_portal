@@ -494,6 +494,22 @@
                                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                                     </div>
                                                     <div>
+                                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Region</label>
+                                                        <select x-model="pkg.delivery_region_id" @@change="loadPackageDistricts(pkg)"
+                                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                            <option value="">Select Region</option>
+                                                            <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">District</label>
+                                                        <select x-model="pkg.delivery_district_id"
+                                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                            <option value="">Select District</option>
+                                                            <template x-for="d in (pkg._districts || [])" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
+                                                        </select>
+                                                    </div>
+                                                    <div>
                                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Town / Area</label>
                                                         <input type="text" x-model="pkg.delivery_town"
                                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
@@ -502,6 +518,12 @@
                                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Landmark</label>
                                                         <input type="text" x-model="pkg.delivery_landmark"
                                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                    </div>
+                                                    <div class="col-span-2">
+                                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Delivery Instructions</label>
+                                                        <input type="text" x-model="pkg.delivery_instructions"
+                                                               class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all"
+                                                               placeholder="e.g. Call before delivery">
                                                     </div>
                                                 </div>
                                             </div>
@@ -892,7 +914,16 @@ function shipmentEditor() {
             this.config = JSON.parse(this.$root.dataset.editConfig);
             this.shipment = this.config.shipment;
             this.regions = this.config.regions;
-            this.packages = this.shipment.packages || [];
+            this.packages = (this.shipment.packages || []).map(pkg => ({
+                ...pkg,
+                delivery_region_id: String(pkg.delivery_region_id || ''),
+                delivery_district_id: String(pkg.delivery_district_id || ''),
+                _districts: [],
+            }));
+            // Load districts for packages that have a region set
+            this.packages.forEach(pkg => {
+                if (pkg.delivery_region_id) this.loadPackageDistricts(pkg);
+            });
             this.destinationMode = this.shipment.destination_mode;
             this.form.pickup = { ...this.shipment.pickup };
             this.form.delivery = this.shipment.delivery ? { ...this.shipment.delivery } : {};
@@ -926,6 +957,17 @@ function shipmentEditor() {
             await this.$nextTick();
             if (type === 'pickup') this.form.pickup.district_id = savedDistrictId;
             else this.form.delivery.district_id = savedDistrictId;
+        },
+
+        async loadPackageDistricts(pkg) {
+            if (!pkg.delivery_region_id) { pkg._districts = []; return; }
+            const savedDistrictId = pkg.delivery_district_id;
+            const url = this.config.districtsByRegionUrlTemplate.replace('__REGION__', pkg.delivery_region_id);
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            const data = await res.json();
+            pkg._districts = data.data?.districts || [];
+            await this.$nextTick();
+            pkg.delivery_district_id = savedDistrictId;
         },
 
         async savePickup() {
@@ -988,8 +1030,11 @@ function shipmentEditor() {
                 fulfillment_type: pkg.fulfillment_type || null,
                 delivery_recipient_name: pkg.delivery_recipient_name || null,
                 delivery_recipient_phone: pkg.delivery_recipient_phone || null,
+                delivery_region_id: pkg.delivery_region_id || null,
+                delivery_district_id: pkg.delivery_district_id || null,
                 delivery_town: pkg.delivery_town || null,
                 delivery_landmark: pkg.delivery_landmark || null,
+                delivery_instructions: pkg.delivery_instructions || null,
             };
             try {
                 const res = await this._fetch(url, { method: 'PUT', body: JSON.stringify(payload) });
