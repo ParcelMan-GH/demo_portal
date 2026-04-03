@@ -287,7 +287,20 @@ class Shipment extends Model
      */
     public function canBeDeleted(): bool
     {
-        return $this->status->canBeDeleted();
+        // Draft can always be deleted
+        if ($this->status === ShipmentStatus::DRAFT) {
+            return true;
+        }
+
+        // Submitted can be deleted if no processing has started
+        if ($this->status === ShipmentStatus::SUBMITTED) {
+            $hasAssignment = $this->pickupAssignment()->exists();
+            $hasInvoice = $this->invoices()->exists();
+
+            return !$hasAssignment && !$hasInvoice;
+        }
+
+        return false;
     }
 
     /**
