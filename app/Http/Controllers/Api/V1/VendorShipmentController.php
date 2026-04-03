@@ -241,7 +241,7 @@ class VendorShipmentController extends Controller
                 $images = $item->images()->whereIn('id', $removePhotoIds)->get();
                 $storageService = app(\App\Services\StorageService::class);
                 foreach ($images as $image) {
-                    $storageService->deleteFile($image->storage_path);
+                    $storageService->delete($image->storage_path);
                     $image->delete();
                 }
             }

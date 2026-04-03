@@ -1094,7 +1094,7 @@ class ShipmentController extends Controller
         // Delete associated images from storage
         $storageService = app(StorageService::class);
         foreach ($item->images as $image) {
-            $storageService->deleteFile($image->storage_path);
+            $storageService->delete($image->storage_path);
             $image->delete();
         }
 
@@ -1216,7 +1216,7 @@ class ShipmentController extends Controller
         $this->authorizePermission('shipments.edit');
 
         $storageService = app(StorageService::class);
-        $storageService->deleteFile($image->storage_path);
+        $storageService->delete($image->storage_path);
         $image->delete();
 
         return response()->json(['success' => true, 'message' => 'Photo deleted.']);
