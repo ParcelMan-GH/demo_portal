@@ -26,13 +26,16 @@ class UpdateShipmentRequest extends FormRequest
         $shipment = $this->route('shipment');
         $isSubmitted = $shipment instanceof Shipment && $shipment->status->value === 'submitted';
 
-        // Submitted shipments: vendors can only edit these 4 fields
+        // Submitted shipments: vendors can only edit these fields + photos
         if ($isSubmitted) {
             return [
                 'destination_mode' => ['sometimes', 'string', Rule::in($modes)],
                 'pickup_town' => ['sometimes', 'nullable', 'string', 'max:255'],
                 'sender_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
-                // Photos are handled via separate item image endpoints
+                'new_photos' => ['sometimes', 'array'],
+                'new_photos.*' => ['file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+                'remove_photo_ids' => ['sometimes', 'array'],
+                'remove_photo_ids.*' => ['integer'],
             ];
         }
 

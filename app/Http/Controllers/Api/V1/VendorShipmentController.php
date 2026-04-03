@@ -220,10 +220,47 @@ class VendorShipmentController extends Controller
             ], 404);
         }
 
-        $result = $this->shipmentService->update($shipment, $request->validated(), $request);
+        $validated = $request->validated();
 
-        $statusCode = $result['success'] ? 200 : 400;
-        return response()->json($result, $statusCode);
+        // Extract photo operations before passing to service
+        $newPhotos = $request->file('new_photos', []);
+        $removePhotoIds = $validated['remove_photo_ids'] ?? [];
+        unset($validated['new_photos'], $validated['remove_photo_ids']);
+
+        $result = $this->shipmentService->update($shipment, $validated, $request);
+
+        if (!$result['success']) {
+            return response()->json($result, 400);
+        }
+
+        // Handle photo operations on the first item (unprocessed = 1 item holds all photos)
+        $item = $shipment->items()->first();
+        if ($item) {
+            // Remove photos
+            if (!empty($removePhotoIds)) {
+                $images = $item->images()->whereIn('id', $removePhotoIds)->get();
+                $storageService = app(\App\Services\StorageService::class);
+                foreach ($images as $image) {
+                    $storageService->deleteFile($image->storage_path);
+                    $image->delete();
+                }
+            }
+
+            // Upload new photos
+            $newPhotos = is_array($newPhotos) ? array_values(array_filter($newPhotos)) : [];
+            if (!empty($newPhotos)) {
+                $this->shipmentItemService->uploadImages($item, $newPhotos, $request);
+            }
+        }
+
+        // Reload and return
+        $showResult = $this->shipmentService->show($shipment->fresh());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shipment updated successfully.',
+            'data' => $showResult['data'],
+        ]);
     }
 
     /**
