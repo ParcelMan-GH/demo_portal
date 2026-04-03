@@ -18,7 +18,7 @@ class ShipmentItemService
         private StorageService $storageService
     ) {}
 
-    public function addItem(Shipment $shipment, array $data, Request $request): array
+    public function addItem(Shipment $shipment, array $data, Request $request, ?array $images = null): array
     {
         if (!$shipment->canBeEdited()) {
             return [
@@ -29,7 +29,7 @@ class ShipmentItemService
         }
 
         $itemPayload = [
-            'description' => $data['description'],
+            'description' => $data['description'] ?? null,
             'quantity' => $data['quantity'] ?? 1,
         ];
 
@@ -55,7 +55,7 @@ class ShipmentItemService
         $item = $shipment->items()->create($itemPayload);
         $uploadedImageCount = 0;
 
-        $files = $request->file('images', []);
+        $files = $images ?? $request->file('images', []);
         $files = array_values(array_filter(is_array($files) ? $files : []));
 
         if (!empty($files)) {

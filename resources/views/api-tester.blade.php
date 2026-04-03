@@ -1241,150 +1241,74 @@
                 method: 'POST',
                 url: '/api/v1/vendor/shipments',
                 name: 'Create Shipment',
-                description: 'Create a draft shipment with pickup details and destination mode. Send `destination_mode` as `single` or `per_item`.',
+                description: 'Create and auto-submit a shipment with inline items and images. The shipment is photo-based — vendors snap pictures of packages and submit. Admin fills in details later. Only pickup name, phone, destination_mode, and at least one item with images are required.',
                 auth: true,
                 group: 'shipments',
                 userType: 'vendor',
                 bodyType: 'formdata',
                 useFormInputs: true,
                 fields: [
-                    { name: 'destination_mode', type: 'enum', required: true, description: 'Destination mode. Pass exact value: `single` or `per_item`. `single` = use shipment-level delivery fields. `per_item` = do not send shipment-level delivery fields; provide delivery on each item.', options: ['single', 'per_item'], labels: { single: 'Single destination for all items', per_item: 'Each item has its own destination' } },
-                    { name: 'fulfillment_type', type: 'enum', required: false, description: 'Fulfillment method (single destination only). `warehouse` = standard warehouse delivery (default). `self_pickup` = recipient collects from warehouse. `direct` = driver delivers directly after pickup, no warehouse stop.', options: ['warehouse', 'self_pickup', 'direct'], labels: { warehouse: 'Warehouse Delivery (default)', self_pickup: 'Self Pickup by Recipient', direct: 'Direct Delivery' }, showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: 'destination_mode', type: 'enum', required: true, description: '`single` = one delivery address. `per_item` = each item can have its own destination.', options: ['single', 'per_item'] },
+                    { name: 'delivery_preference', type: 'enum', required: false, description: 'How recipient gets parcel (single mode only). Default: deliver.', options: ['deliver', 'self_pickup'], showWhen: { field: 'destination_mode', value: 'single' } },
 
-                    { name: 'pickup_contact_name', type: 'string', required: true, description: 'Pickup contact full name', example: 'Kwame Mensah' },
-                    { name: 'pickup_contact_phone', type: 'string', required: true, description: 'Pickup contact phone number', example: '+233244123456' },
-                    { name: 'pickup_contact_phone_confirm', type: 'string', required: true, description: 'Confirm pickup phone (must match)', example: '+233244123456' },
-                    { name: '_pickup_location_method', type: 'enum', uiOnly: true, required: false, description: 'Pickup location input method (UI only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Location Search (town/city)', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' } },
-                    { name: '_pickup_location_search', type: 'location-search', uiOnly: true, required: false, description: 'Search for a town or city — selecting a result auto-fills the region ID, district ID and town below', fills: { region_id: 'pickup_region_id', district_id: 'pickup_district_id', town: 'pickup_town' }, showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
-                    { name: 'pickup_region_id', type: 'string', required: false, description: 'Auto-filled from location search (region ID)', example: '1', readonly: true, showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
-                    { name: 'pickup_district_id', type: 'string', required: false, description: 'Auto-filled from location search (district ID)', example: '3', readonly: true, showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
-                    { name: 'pickup_town', type: 'string', required: false, description: 'Auto-filled from location search (town name)', example: 'Osu', readonly: true, showWhen: { field: '_pickup_location_method', value: 'dropdown' } },
-                    { name: 'pickup_latitude', type: 'number', required: false, description: 'Pickup GPS latitude (-90 to 90)', example: '5.5913', showWhen: { field: '_pickup_location_method', value: 'coordinates' } },
-                    { name: 'pickup_longitude', type: 'number', required: false, description: 'Pickup GPS longitude (-180 to 180)', example: '-0.1864', showWhen: { field: '_pickup_location_method', value: 'coordinates' } },
-                    { name: 'pickup_gh_post_address', type: 'string', required: false, description: 'Pickup Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_pickup_location_method', value: 'gh_post' } },
+                    { name: 'pickup_contact_name', type: 'string', required: true, description: 'Sender name', example: 'Tony Mensah' },
+                    { name: 'pickup_contact_phone', type: 'string', required: true, description: 'Sender phone', example: '+233542796510' },
+                    { name: 'pickup_town', type: 'string', required: false, description: 'Pickup area (free text)', example: 'Lapaz' },
                     { name: 'pickup_landmark', type: 'string', required: false, description: 'Pickup landmark', example: 'Near the big church' },
                     { name: 'pickup_instructions', type: 'string', required: false, description: 'Pickup instructions', example: 'Call before arrival' },
 
-                    { name: 'delivery_recipient_name', type: 'string', required: false, description: 'Delivery recipient full name (single mode only)', example: 'Ama Mensah', showWhen: { field: 'destination_mode', value: 'single' } },
-                    { name: 'delivery_recipient_phone', type: 'string', required: false, description: 'Delivery recipient phone (single mode only)', example: '+233241234567', showWhen: { field: 'destination_mode', value: 'single' } },
-                    { name: 'delivery_recipient_phone_confirm', type: 'string', required: false, description: 'Confirm delivery phone (single mode only)', example: '+233241234567', showWhen: { field: 'destination_mode', value: 'single' } },
-                    { name: '_delivery_location_method', type: 'enum', uiOnly: true, required: false, description: 'Delivery location input method (single mode only)', options: ['dropdown', 'coordinates', 'gh_post'], labels: { dropdown: 'Location Search (town/city)', coordinates: 'GPS Coordinates', gh_post: 'Ghana Post Address' }, showWhen: { field: 'destination_mode', value: 'single' } },
-                    { name: '_delivery_location_search', type: 'location-search', uiOnly: true, required: false, description: 'Search for a town or city — selecting a result auto-fills the region ID, district ID and town below', fills: { region_id: 'delivery_region_id', district_id: 'delivery_district_id', town: 'delivery_town' }, showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
-                    { name: 'delivery_region_id', type: 'string', required: false, description: 'Auto-filled from location search (region ID)', example: '1', readonly: true, showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
-                    { name: 'delivery_district_id', type: 'string', required: false, description: 'Auto-filled from location search (district ID)', example: '3', readonly: true, showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
-                    { name: 'delivery_town', type: 'string', required: false, description: 'Auto-filled from location search (town name)', example: 'Tema', readonly: true, showWhen: { field: '_delivery_location_method', value: 'dropdown' } },
-                    { name: 'delivery_latitude', type: 'number', required: false, description: 'Delivery GPS latitude (-90 to 90)', example: '5.6037', showWhen: { field: '_delivery_location_method', value: 'coordinates' } },
-                    { name: 'delivery_longitude', type: 'number', required: false, description: 'Delivery GPS longitude (-180 to 180)', example: '-0.1870', showWhen: { field: '_delivery_location_method', value: 'coordinates' } },
-                    { name: 'delivery_gh_post_address', type: 'string', required: false, description: 'Delivery Ghana Post address', example: 'GA-123-4567', showWhen: { field: '_delivery_location_method', value: 'gh_post' } },
-                    { name: 'delivery_landmark', type: 'string', required: false, description: 'Delivery landmark', example: 'Near the market', showWhen: { field: 'destination_mode', value: 'single' } },
-                    { name: 'delivery_instructions', type: 'string', required: false, description: 'Delivery instructions', example: 'Call before delivery', showWhen: { field: 'destination_mode', value: 'single' } }
+                    { name: 'delivery_recipient_name', type: 'string', required: false, description: 'Recipient name (optional, admin fills later)', example: 'Mark', showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: 'delivery_recipient_phone', type: 'string', required: false, description: 'Recipient phone (optional)', example: '+233241234567', showWhen: { field: 'destination_mode', value: 'single' } },
+                    { name: 'delivery_town', type: 'string', required: false, description: 'Delivery area (free text)', example: 'Madina', showWhen: { field: 'destination_mode', value: 'single' } },
+
+                    { name: 'sender_notes', type: 'string', required: false, description: 'General notes for admin. E.g. "3 boxes to Madina, 2 to Tema, call me to confirm"', example: 'Big box is for Mark, small ones for Ama' },
+
+                    { name: 'items[0][description]', type: 'string', required: false, description: 'Item description (optional, admin fills later)', example: '' },
+                    { name: 'items[0][quantity]', type: 'number', required: false, description: 'Quantity (default 1)', example: '1' },
+                    { name: 'items[0][images][]', type: 'file', required: true, description: 'Package photos (at least 1 per item, max 2MB each, max 500 total)', multiple: true },
+                    { name: 'items[0][delivery_town]', type: 'string', required: false, description: 'Item delivery area (per_item mode only)', example: 'Tema', showWhen: { field: 'destination_mode', value: 'per_item' } },
+                    { name: 'items[0][delivery_recipient_name]', type: 'string', required: false, description: 'Item recipient (per_item mode only)', example: 'Ama', showWhen: { field: 'destination_mode', value: 'per_item' } },
                 ],
                 sampleBody: null,
                 exampleResponses: {
-                    '201_single': {
+                    '201': {
                         success: true,
-                        message: 'Shipment created successfully.',
+                        message: 'Shipment submitted successfully.',
                         data: {
                             shipment: {
-                                id: 1,
-                                shipment_number: 'PCM-2026-00001',
-                                status: 'draft',
-                                fulfillment_type: 'warehouse',
+                                id: 35,
+                                shipment_number: 'PCM-2026-00035',
+                                status: 'submitted',
+                                delivery_preference: 'deliver',
+                                fulfillment_type: null,
                                 destination_mode: 'single',
+                                sender_notes: 'Big box is for Mark',
                                 pickup: {
-                                    contact_name: 'Kwame Mensah',
-                                    contact_phone: '+233244123456',
-                                    location: {
-                                        type: 'dropdown',
-                                        region: 'Greater Accra',
-                                        region_id: 1,
-                                        district: 'Accra Metropolitan',
-                                        district_id: 1,
-                                        town: 'Labone',
-                                        latitude: null,
-                                        longitude: null,
-                                        gh_post_address: null,
-                                        landmark: 'Blue gate'
-                                    },
-                                    instructions: 'Pickup from reception'
+                                    contact_name: 'Tony Mensah',
+                                    contact_phone: '+233542796510',
+                                    location: { town: 'Lapaz' }
                                 },
                                 delivery: {
-                                    recipient_name: 'Ama Mensah',
-                                    recipient_phone: '+233241234567',
-                                    location: {
-                                        type: 'dropdown',
-                                        region: 'Greater Accra',
-                                        region_id: 1,
-                                        district: 'Accra Metropolitan',
-                                        district_id: 1,
-                                        town: 'Osu',
-                                        latitude: null,
-                                        longitude: null,
-                                        gh_post_address: null,
-                                        landmark: 'Near the market'
-                                    },
-                                    instructions: 'Call before delivery'
+                                    recipient_name: 'Mark',
+                                    recipient_phone: null,
+                                    location: { town: 'Madina' }
                                 },
-                                items: [],
-                                collection: null,
-                                can_edit: true,
-                                can_delete: true,
-                                can_submit: false,
-                                submitted_at: null,
-                                created_at: '2026-02-10T11:14:37+00:00',
-                                updated_at: '2026-02-10T11:14:37+00:00',
-                                invoice: null,
-                                invoice_history: [],
-                                pickup_assignment: null
-                            }
-                        }
-                    },
-                    '201_per_item': {
-                        success: true,
-                        message: 'Shipment created successfully.',
-                        data: {
-                            shipment: {
-                                id: 2,
-                                shipment_number: 'PCM-2026-00002',
-                                status: 'draft',
-                                fulfillment_type: 'warehouse',
-                                destination_mode: 'per_item',
-                                pickup: {
-                                    contact_name: 'Yaw Asante',
-                                    contact_phone: '+233247000333',
-                                    location: {
-                                        type: 'coordinates',
-                                        region: null,
-                                        region_id: null,
-                                        district: null,
-                                        district_id: null,
-                                        town: null,
-                                        latitude: '5.59130000',
-                                        longitude: '-0.18640000',
-                                        gh_post_address: null,
-                                        landmark: 'Near police station'
-                                    },
-                                    instructions: null
-                                },
-                                delivery: null,
-                                items: [],
-                                collection: null,
-                                can_edit: true,
-                                can_delete: true,
-                                can_submit: false,
-                                submitted_at: null,
-                                created_at: '2026-02-10T18:10:00+00:00',
-                                updated_at: '2026-02-10T18:10:00+00:00',
-                                invoice: null,
-                                invoice_history: [],
-                                pickup_assignment: null
+                                items: [
+                                    {
+                                        id: 12,
+                                        description: null,
+                                        quantity: 1,
+                                        delivery_preference: 'deliver',
+                                        images: ['https://...photo1.jpg', 'https://...photo2.jpg']
+                                    }
+                                ]
                             }
                         }
                     },
                     '422': {
                         success: false,
                         message: 'Validation failed.',
-                        errors: { location: ['At least one location method is required.'] }
+                        errors: { 'items': ['At least one item with images is required.'] }
                     }
                 }
             },

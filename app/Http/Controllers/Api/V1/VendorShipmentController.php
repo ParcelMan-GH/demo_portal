@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Vendor\Shipment\CreateShipmentRequest;
 use App\Http\Requests\Api\Vendor\Shipment\UpdateShipmentRequest;
 use App\Models\Shipment;
+use App\Services\ShipmentItemService;
 use App\Services\ShipmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,8 @@ use Illuminate\Validation\Rule;
 class VendorShipmentController extends Controller
 {
     public function __construct(
-        private ShipmentService $shipmentService
+        private ShipmentService $shipmentService,
+        private ShipmentItemService $shipmentItemService
     ) {}
 
     /**
@@ -136,10 +138,53 @@ class VendorShipmentController extends Controller
     public function store(CreateShipmentRequest $request): JsonResponse
     {
         $vendor = $request->user();
-        $result = $this->shipmentService->create($vendor, $request->validated(), $request);
+        $validated = $request->validated();
 
-        $statusCode = $result['success'] ? 201 : 400;
-        return response()->json($result, $statusCode);
+        // Extract items before creating shipment
+        $itemsData = $validated['items'] ?? [];
+        unset($validated['items']);
+
+        // Create shipment
+        $result = $this->shipmentService->create($vendor, $validated, $request);
+
+        if (!$result['success']) {
+            return response()->json($result, 400);
+        }
+
+        $shipment = Shipment::find($result['data']['shipment']['id']);
+
+        // Create inline items with images
+        $failedImages = 0;
+        foreach ($itemsData as $index => $itemData) {
+            $images = $request->file("items.{$index}.images", []);
+            $images = is_array($images) ? array_values(array_filter($images)) : [];
+
+            $itemResult = $this->shipmentItemService->addItem(
+                shipment: $shipment,
+                data: $itemData,
+                request: $request,
+                images: $images
+            );
+
+            if (!($itemResult['success'] ?? false)) {
+                $failedImages++;
+            }
+        }
+
+        // Auto-submit the shipment
+        $submitResult = $this->shipmentService->submit($shipment, $request);
+
+        // Reload and return
+        $shipment->refresh();
+        $showResult = $this->shipmentService->show($shipment);
+
+        return response()->json([
+            'success' => true,
+            'message' => $submitResult['success']
+                ? 'Shipment submitted successfully.'
+                : 'Shipment created but could not be auto-submitted: ' . ($submitResult['message'] ?? ''),
+            'data' => $showResult['data'],
+        ], 201);
     }
 
     /**

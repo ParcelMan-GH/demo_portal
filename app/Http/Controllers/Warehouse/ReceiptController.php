@@ -103,7 +103,8 @@ class ReceiptController extends Controller
                     ])->values();
 
                 $vendorPhotos = $item->images
-                    ->map(fn ($image) => $image->getSignedUrl())
+                    ->map(fn ($image) => $image->getSignedUrl()['url'] ?? null)
+                    ->filter()
                     ->values();
 
                 $vendorQuantity = (int) $item->quantity;
@@ -427,7 +428,7 @@ class ReceiptController extends Controller
                         'created_at' => optional($photo->created_at)?->toIso8601String(),
                     ])->values();
 
-                $vendorPhotos    = $item->images->map(fn ($image) => $image->getSignedUrl())->values();
+                $vendorPhotos    = $item->images->map(fn ($image) => $image->getSignedUrl()['url'] ?? null)->filter()->values();
                 $vendorQuantity  = (int) $item->quantity;
                 $driverQuantity  = $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : null;
                 $expectedQuantity = $driverQuantity ?? $vendorQuantity;

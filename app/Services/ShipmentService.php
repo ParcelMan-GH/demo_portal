@@ -377,6 +377,7 @@ class ShipmentService
             'pickup_gh_post_address' => $data['pickup_gh_post_address'] ?? $shipment?->pickup_gh_post_address,
             'pickup_landmark' => $data['pickup_landmark'] ?? $shipment?->pickup_landmark,
             'pickup_instructions' => $data['pickup_instructions'] ?? $shipment?->pickup_instructions,
+            'sender_notes' => $data['sender_notes'] ?? $shipment?->sender_notes,
         ];
 
         if ($mode === ShipmentDestinationMode::SINGLE->value) {
@@ -533,6 +534,7 @@ class ShipmentService
             'delivery_preference' => $shipment->delivery_preference ?? 'deliver',
             'fulfillment_type' => $shipment->fulfillment_type?->value ?? null,
             'destination_mode' => $shipment->destination_mode->value,
+            'sender_notes' => $shipment->sender_notes,
         ];
 
         if ($includeLegacyDeliveryAliases) {
