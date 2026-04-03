@@ -92,9 +92,9 @@
                             </div>
                         </div>
                     </div>
-                    <div class="p-5">
+                    <div class="p-5" :class="!canEditShipmentFields ? 'opacity-60 pointer-events-none' : ''">
                         <div class="grid grid-cols-2 gap-3">
-                            <div @@click="if (destinationMode !== 'single') switchDestinationMode('single')"
+                            <div @@click="if (canEditShipmentFields && destinationMode !== 'single') switchDestinationMode('single')"
                                  class="cursor-pointer p-4 rounded-2xl border-2 transition-all duration-200"
                                  :class="destinationMode === 'single' ? 'border-blue-500 bg-blue-50 shadow-sm shadow-blue-200/60' : 'border-slate-200 hover:border-blue-200 hover:bg-blue-50/40'">
                                 <div class="flex items-center gap-2 mb-2">
@@ -106,7 +106,7 @@
                                 </div>
                                 <p class="text-[11px] text-slate-500 ml-7">All packages go to one address</p>
                             </div>
-                            <div @@click="if (destinationMode !== 'per_item') switchDestinationMode('per_item')"
+                            <div @@click="if (canEditShipmentFields && destinationMode !== 'per_item') switchDestinationMode('per_item')"
                                  class="cursor-pointer p-4 rounded-2xl border-2 transition-all duration-200"
                                  :class="destinationMode === 'per_item' ? 'border-violet-500 bg-violet-50 shadow-sm shadow-violet-200/60' : 'border-slate-200 hover:border-violet-200 hover:bg-violet-50/40'">
                                 <div class="flex items-center gap-2 mb-2">
@@ -138,7 +138,7 @@
                         </div>
                     </div>
 
-                    <div class="p-4 space-y-3">
+                    <fieldset :disabled="!canEditShipmentFields" class="p-4 space-y-3" :class="!canEditShipmentFields ? 'opacity-60 pointer-events-none' : ''">
                         {{-- Contact group --}}
                         <div class="bg-slate-50/60 border border-slate-100 rounded-xl p-3">
                             <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -199,9 +199,9 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </fieldset>
                     {{-- Footer --}}
-                    <div class="px-5 py-3 border-t border-slate-100/80 bg-slate-50/30 rounded-b-3xl flex items-center justify-end gap-2">
+                    <div x-show="canEditShipmentFields" class="px-5 py-3 border-t border-slate-100/80 bg-slate-50/30 rounded-b-3xl flex items-center justify-end gap-2">
                         <span x-show="pickupSaved" x-transition.opacity class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                             Saved
@@ -231,7 +231,7 @@
                             </div>
                         </div>
 
-                        <div class="p-4 space-y-3">
+                        <fieldset :disabled="!canEditShipmentFields" class="p-4 space-y-3" :class="!canEditShipmentFields ? 'opacity-60 pointer-events-none' : ''">
                             {{-- Routing preferences --}}
                             <div class="bg-slate-50/60 border border-slate-100 rounded-xl p-3">
                                 <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -318,9 +318,9 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </fieldset>
                         {{-- Footer --}}
-                        <div class="px-5 py-3 border-t border-slate-100/80 bg-slate-50/30 rounded-b-3xl flex items-center justify-end gap-2">
+                        <div x-show="canEditShipmentFields" class="px-5 py-3 border-t border-slate-100/80 bg-slate-50/30 rounded-b-3xl flex items-center justify-end gap-2">
                             <span x-show="deliverySaved" x-transition.opacity class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                 Saved
@@ -885,6 +885,7 @@ function shipmentEditor() {
         lightboxUrl: null,
         splitModal: { open: false, packageId: null, photos: [], selectedIds: [] },
         currentAssignment: null,
+        canEditShipmentFields: true,
         assignModal: { open: false, isEdit: false, driver_id: '', warehouse_id: '', notes: '', drivers: [], warehouses: [], loading: false, submitting: false },
 
         init() {
@@ -905,6 +906,7 @@ function shipmentEditor() {
             this.form.delivery.district_id = String(this.shipment.delivery?.district_id || '');
 
             this.currentAssignment = this.config.currentAssignment || null;
+            this.canEditShipmentFields = this.config.canEditShipmentFields ?? true;
 
             if (this.form.pickup.region_id) this.loadDistricts('pickup');
             if (this.form.delivery.region_id) this.loadDistricts('delivery');
