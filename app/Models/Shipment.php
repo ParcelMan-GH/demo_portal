@@ -279,7 +279,21 @@ class Shipment extends Model
      */
     public function canBeEdited(): bool
     {
-        return $this->status->canBeEdited();
+        if ($this->status === ShipmentStatus::DRAFT) {
+            return true;
+        }
+
+        // Submitted + unprocessed (no admin processing yet)
+        if ($this->status === ShipmentStatus::SUBMITTED) {
+            $hasAssignment = $this->pickupAssignment()->exists();
+            $hasInvoice = $this->invoices()->exists();
+            $isProcessed = $this->items()->count() > 1
+                || $this->items()->whereNotNull('description')->exists();
+
+            return !$hasAssignment && !$hasInvoice && !$isProcessed;
+        }
+
+        return false;
     }
 
     /**

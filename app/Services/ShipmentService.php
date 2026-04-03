@@ -211,11 +211,17 @@ class ShipmentService
             && $data['destination_mode'] !== $shipment->destination_mode->value
             && $shipment->items()->exists()
         ) {
-            return [
-                'success' => false,
-                'message' => 'Cannot change destination mode when items have been added. Remove all items first.',
-                'data' => null,
-            ];
+            // Allow switch for unprocessed shipments (photo-only, no descriptions)
+            $isProcessed = $shipment->items()->count() > 1
+                || $shipment->items()->whereNotNull('description')->exists();
+
+            if ($isProcessed) {
+                return [
+                    'success' => false,
+                    'message' => 'Cannot change destination mode when packages have been processed. Remove all packages first.',
+                    'data' => null,
+                ];
+            }
         }
 
         $payload = $this->buildShipmentPayload($data, $shipment);
@@ -302,24 +308,8 @@ class ShipmentService
                 ];
             }
         } else {
-            $invalidItems = $shipment->items()
-                ->where(function ($q) {
-                    $q->whereNull('delivery_recipient_name')
-                        ->orWhereNull('delivery_recipient_phone')
-                        ->orWhere(function ($locationQ) {
-                            $locationQ
-                                ->where(function ($dropdownQ) {
-                                    $dropdownQ->whereNull('delivery_region_id')
-                                        ->orWhereNull('delivery_district_id');
-                                })
-                                ->where(function ($coordsQ) {
-                                    $coordsQ->whereNull('delivery_latitude')
-                                        ->orWhereNull('delivery_longitude');
-                                })
-                                ->whereNull('delivery_gh_post_address');
-                        });
-                })
-                ->count();
+            // Simplified flow: per-item delivery details are optional — admin fills them in later
+            $invalidItems = 0;
 
             if ($invalidItems > 0) {
                 return [
@@ -416,21 +406,15 @@ class ShipmentService
         $hasDropdown = filled($shipment->pickup_region_id) && filled($shipment->pickup_district_id);
         $hasCoordinates = filled($shipment->pickup_latitude) && filled($shipment->pickup_longitude);
         $hasGhPost = filled($shipment->pickup_gh_post_address);
+        $hasTown = filled($shipment->pickup_town);
 
-        return $hasDropdown || $hasCoordinates || $hasGhPost;
+        return $hasDropdown || $hasCoordinates || $hasGhPost || $hasTown;
     }
 
     private function hasValidSingleDelivery(Shipment $shipment): bool
     {
-        if (blank($shipment->delivery_recipient_name) || blank($shipment->delivery_recipient_phone)) {
-            return false;
-        }
-
-        $hasDropdown = filled($shipment->delivery_region_id) && filled($shipment->delivery_district_id);
-        $hasCoordinates = filled($shipment->delivery_latitude) && filled($shipment->delivery_longitude);
-        $hasGhPost = filled($shipment->delivery_gh_post_address);
-
-        return $hasDropdown || $hasCoordinates || $hasGhPost;
+        // Simplified flow: delivery details are optional — admin fills them in later
+        return true;
     }
 
     private function transformShipment(Shipment $shipment, array $options = []): array
@@ -572,6 +556,9 @@ class ShipmentService
                 : false,
 
             'can_edit' => $shipment->canBeEdited(),
+            'can_edit_fields' => $shipment->canBeEdited() && $shipment->status === ShipmentStatus::SUBMITTED
+                ? ['destination_mode', 'pickup_town', 'sender_notes', 'photos']
+                : ($shipment->canBeEdited() ? ['all'] : []),
             'can_delete' => $shipment->canBeDeleted(),
             'can_submit' => $shipment->canBeSubmitted(),
 
