@@ -7,7 +7,7 @@
 @section('content')
 <div x-data="shipmentEditor()" x-init="init()" data-edit-config='@json($editConfig)'>
 
-    <div class="max-w-5xl mx-auto">
+    <div class="max-w-5xl mx-auto pb-24">
 
     {{-- Header --}}
     <div class="flex items-center justify-between mb-6">
@@ -45,13 +45,19 @@
         </div>
     </template>
 
-    {{-- Destination Mode --}}
+    {{-- Step 2: Drop-off Type --}}
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
                 <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
             </div>
-            <h2 class="text-sm font-bold text-slate-900">Drop-off Type</h2>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wide">Step 2</span>
+                    <h2 class="text-sm font-bold text-slate-900">Drop-off Type</h2>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">Choose whether all packages share one address or each has its own.</p>
+            </div>
         </div>
         <div class="p-6">
             <div class="grid grid-cols-2 gap-3">
@@ -69,75 +75,98 @@
         </div>
     </div>
 
-    {{-- Pickup Details --}}
+    {{-- Step 1: Pickup Details --}}
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
                 <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
             </div>
-            <h2 class="text-sm font-bold text-slate-900">Pickup Details</h2>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-bold text-violet-600 uppercase tracking-wide">Step 1</span>
+                    <h2 class="text-sm font-bold text-slate-900">Pickup Details</h2>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">Fill in the pickup location details. The driver will use this to find the sender.</p>
+            </div>
         </div>
         <div class="p-6">
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Contact Name</label>
-                    <input type="text" x-model="form.pickup.contact_name" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                    <input type="text" x-model="form.pickup.contact_name" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                 </div>
                 <div>
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Contact Phone</label>
-                    <input type="text" x-model="form.pickup.contact_phone" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                    <input type="text" x-model="form.pickup.contact_phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                 </div>
                 <div>
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Region</label>
                     <select x-model="form.pickup.region_id" @@change="loadDistricts('pickup')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                         <option value="">Select Region</option>
-                        <template x-for="r in regions" :key="r.id"><option :value="r.id" x-text="r.name"></option></template>
+                        <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
                     </select>
                 </div>
                 <div>
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">District</label>
-                    <select x-model="form.pickup.district_id" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                    <select x-model="form.pickup.district_id" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                         <option value="">Select District</option>
-                        <template x-for="d in pickupDistricts" :key="d.id"><option :value="d.id" x-text="d.name"></option></template>
+                        <template x-for="d in pickupDistricts" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
                     </select>
                 </div>
                 <div>
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Town / Area</label>
-                    <input type="text" x-model="form.pickup.town" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                    <input type="text" x-model="form.pickup.town" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                 </div>
                 <div>
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Landmark</label>
-                    <input type="text" x-model="form.pickup.landmark" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                    <input type="text" x-model="form.pickup.landmark" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                 </div>
                 <div class="col-span-2">
                     <label class="block text-[10px] font-semibold text-slate-500 mb-1">Instructions</label>
-                    <textarea x-model="form.pickup.instructions" @@change="autoSave()" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
+                    <textarea x-model="form.pickup.instructions" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
                 </div>
+            </div>
+            {{-- Save button --}}
+            <div class="mt-5 flex items-center justify-end gap-3">
+                <span x-show="pickupSaved" x-transition.opacity class="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    Saved ✓
+                </span>
+                <button @@click="savePickup()" :disabled="savingPickup" class="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-60">
+                    <svg x-show="savingPickup" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <span x-text="savingPickup ? 'Saving...' : 'Save Pickup Details'"></span>
+                </button>
             </div>
         </div>
     </div>
 
-    {{-- Delivery Details (single mode only) --}}
+    {{-- Step 3: Delivery Details (single mode only) --}}
     <template x-if="shipment.destination_mode === 'single'">
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6">
-            <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-2.5">
-                <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
                     <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                 </div>
-                <h2 class="text-sm font-bold text-slate-900">Delivery Details</h2>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">Step 3</span>
+                        <h2 class="text-sm font-bold text-slate-900">Delivery Details</h2>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">Where should the driver deliver? Set the recipient and address for all packages.</p>
+                </div>
             </div>
             <div class="p-6">
                 <div class="grid grid-cols-3 gap-4 mb-4">
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Delivery Preference</label>
-                        <select x-model="form.delivery_preference" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <select x-model="form.delivery_preference" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                             <option value="deliver">Deliver to Recipient</option>
                             <option value="self_pickup">Recipient Collects</option>
                         </select>
                     </div>
                     <div x-show="form.delivery_preference === 'deliver'">
                         <label class="block text-[10px] font-semibold text-slate-400 mb-1">Routing (Admin)</label>
-                        <select x-model="form.fulfillment_type" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <select x-model="form.fulfillment_type" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                             <option value="warehouse">Warehouse</option>
                             <option value="direct">Direct Delivery</option>
                         </select>
@@ -146,52 +175,69 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient Name</label>
-                        <input type="text" x-model="form.delivery.recipient_name" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <input type="text" x-model="form.delivery.recipient_name" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                     </div>
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient Phone</label>
-                        <input type="text" x-model="form.delivery.recipient_phone" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <input type="text" x-model="form.delivery.recipient_phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                     </div>
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Region</label>
-                        <select x-model="form.delivery.region_id" @@change="loadDistricts('delivery'); autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <select x-model="form.delivery.region_id" @@change="loadDistricts('delivery')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                             <option value="">Select Region</option>
-                            <template x-for="r in regions" :key="r.id"><option :value="r.id" x-text="r.name"></option></template>
+                            <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
                         </select>
                     </div>
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">District</label>
-                        <select x-model="form.delivery.district_id" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <select x-model="form.delivery.district_id" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                             <option value="">Select District</option>
-                            <template x-for="d in deliveryDistricts" :key="d.id"><option :value="d.id" x-text="d.name"></option></template>
+                            <template x-for="d in deliveryDistricts" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
                         </select>
                     </div>
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Town / Area</label>
-                        <input type="text" x-model="form.delivery.town" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <input type="text" x-model="form.delivery.town" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                     </div>
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Landmark</label>
-                        <input type="text" x-model="form.delivery.landmark" @@change="autoSave()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                        <input type="text" x-model="form.delivery.landmark" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                     </div>
                     <div class="col-span-2">
                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Delivery Instructions</label>
-                        <textarea x-model="form.delivery.instructions" @@change="autoSave()" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
+                        <textarea x-model="form.delivery.instructions" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
                     </div>
+                </div>
+                {{-- Save button --}}
+                <div class="mt-5 flex items-center justify-end gap-3">
+                    <span x-show="deliverySaved" x-transition.opacity class="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        Saved ✓
+                    </span>
+                    <button @@click="saveDelivery()" :disabled="savingDelivery" class="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-60">
+                        <svg x-show="savingDelivery" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <span x-text="savingDelivery ? 'Saving...' : 'Save Delivery Details'"></span>
+                    </button>
                 </div>
             </div>
         </div>
     </template>
 
-    {{-- Packages --}}
+    {{-- Step 3 (per_item): Packages --}}
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div class="flex items-center gap-2.5">
-                <div class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
                     <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                 </div>
-                <h2 class="text-sm font-bold text-slate-900">Packages</h2>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600" x-text="packages.length + ' package' + (packages.length !== 1 ? 's' : '')"></span>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-bold text-orange-600 uppercase tracking-wide">Step 3</span>
+                        <h2 class="text-sm font-bold text-slate-900">Packages</h2>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600" x-text="packages.length + ' package' + (packages.length !== 1 ? 's' : '')"></span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">Describe each package. Upload photos for reference. Save each card individually.</p>
+                </div>
             </div>
             <button @@click="addPackage()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-xl hover:bg-slate-800 transition-all">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -214,7 +260,6 @@
                             <span class="w-6 h-6 rounded-lg bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center" x-text="pkgIndex + 1"></span>
                             <span class="text-xs font-bold text-slate-700">Package <span x-text="pkgIndex + 1"></span></span>
                             <span x-show="pkg.tracking_code" class="text-[10px] font-mono text-slate-400" x-text="pkg.tracking_code"></span>
-                            <span x-show="pkg._saved" x-transition.opacity class="text-[10px] font-semibold text-emerald-600">Saved</span>
                         </div>
                         <div class="flex items-center gap-1">
                             <button @@click="splitPackageModal(pkg)" x-show="pkg.photos.length > 1" class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Split Package">
@@ -271,11 +316,11 @@
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-[10px] font-semibold text-slate-500 mb-1">Description (what's inside)</label>
-                                <textarea x-model="pkg.description" rows="2" @@change="savePackage(pkg)" placeholder="e.g. 2x Nike shoes, 1x phone case" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
+                                <textarea x-model="pkg.description" rows="2" placeholder="e.g. 2x Nike shoes, 1x phone case" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
                             </div>
                             <div>
                                 <label class="block text-[10px] font-semibold text-slate-400 mb-1">Qty <span class="text-slate-300 font-normal">(skip if sealed)</span></label>
-                                <input type="number" x-model.number="pkg.quantity" min="1" @@change="savePackage(pkg)" placeholder="—" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                <input type="number" x-model.number="pkg.quantity" min="1" placeholder="—" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                             </div>
                         </div>
 
@@ -286,14 +331,14 @@
                                 <div class="grid grid-cols-3 gap-3 mb-3">
                                     <div>
                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Delivery Preference</label>
-                                        <select x-model="pkg.delivery_preference" @@change="savePackage(pkg)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                        <select x-model="pkg.delivery_preference" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                                             <option value="deliver">Deliver to Recipient</option>
                                             <option value="self_pickup">Recipient Collects</option>
                                         </select>
                                     </div>
                                     <div x-show="pkg.delivery_preference === 'deliver'">
                                         <label class="block text-[10px] font-semibold text-slate-400 mb-1">Routing</label>
-                                        <select x-model="pkg.fulfillment_type" @@change="savePackage(pkg)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                        <select x-model="pkg.fulfillment_type" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                                             <option value="warehouse">Warehouse</option>
                                             <option value="direct">Direct</option>
                                         </select>
@@ -302,23 +347,35 @@
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient Name</label>
-                                        <input type="text" x-model="pkg.delivery_recipient_name" @@change="savePackage(pkg)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                        <input type="text" x-model="pkg.delivery_recipient_name" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                                     </div>
                                     <div>
                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient Phone</label>
-                                        <input type="text" x-model="pkg.delivery_recipient_phone" @@change="savePackage(pkg)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                        <input type="text" x-model="pkg.delivery_recipient_phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                                     </div>
                                     <div>
                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Town / Area</label>
-                                        <input type="text" x-model="pkg.delivery_town" @@change="savePackage(pkg)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                        <input type="text" x-model="pkg.delivery_town" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                                     </div>
                                     <div>
                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Landmark</label>
-                                        <input type="text" x-model="pkg.delivery_landmark" @@change="savePackage(pkg)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                        <input type="text" x-model="pkg.delivery_landmark" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
                                     </div>
                                 </div>
                             </div>
                         </template>
+
+                        {{-- Package Save button --}}
+                        <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                            <span x-show="pkg._saved" x-transition.opacity class="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Saved ✓
+                            </span>
+                            <button @@click="savePackage(pkg)" :disabled="pkg._saving" class="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-60">
+                                <svg x-show="pkg._saving" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                <span x-text="pkg._saving ? 'Saving...' : 'Save Package'"></span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </template>
@@ -328,8 +385,8 @@
     {{-- Assign Driver --}}
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6" x-show="['submitted', 'invoice_accepted', 'pickup_assigned'].includes(shipment.status)">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div class="flex items-center gap-2.5">
-                <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
                     <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 </div>
                 <div>
@@ -418,19 +475,12 @@
     </div>
 
     {{-- Bottom Bar --}}
-    <div class="sticky bottom-0 z-20 bg-white/90 backdrop-blur-xl border-t border-slate-200 rounded-t-2xl shadow-lg -mx-4 px-4 py-3 flex items-center justify-between">
-        <a :href="config.showUrl" class="text-sm text-slate-500 hover:text-slate-700 transition-colors">Back to Shipment</a>
-        <div class="flex items-center gap-3">
-            <span x-show="saving" class="text-xs text-slate-400 flex items-center gap-1.5">
-                <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                Saving...
-            </span>
-            <span x-show="shipmentSaved && !saving" x-transition.opacity class="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                All changes saved
-            </span>
-            <span x-show="!saving && !shipmentSaved" class="text-[10px] text-slate-400">Changes auto-save on edit</span>
-        </div>
+    <div class="fixed bottom-0 left-0 right-0 z-20 bg-white/90 backdrop-blur-xl border-t border-slate-200 shadow-lg px-6 py-3 flex items-center justify-between">
+        <a :href="config.showUrl" class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors font-medium">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Back to Shipment
+        </a>
+        <span class="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600" x-text="shipment.status ? shipment.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : ''"></span>
     </div>
 
     </div>
@@ -484,9 +534,10 @@ function shipmentEditor() {
         form: { pickup: {}, delivery: {}, delivery_preference: 'deliver', fulfillment_type: null },
         pickupDistricts: [],
         deliveryDistricts: [],
-        saving: false,
-        shipmentSaved: false,
-        autoSaveTimer: null,
+        savingPickup: false,
+        pickupSaved: false,
+        savingDelivery: false,
+        deliverySaved: false,
         duplicating: false,
         lightboxUrl: null,
         splitModal: { open: false, packageId: null, photos: [], selectedIds: [] },
@@ -504,6 +555,12 @@ function shipmentEditor() {
             this.form.delivery_preference = this.shipment.delivery_preference || 'deliver';
             this.form.fulfillment_type = this.shipment.fulfillment_type;
 
+            // Fix region/district binding: coerce to string so <select> x-model matches
+            this.form.pickup.region_id = String(this.shipment.pickup?.region_id || '');
+            this.form.pickup.district_id = String(this.shipment.pickup?.district_id || '');
+            this.form.delivery.region_id = String(this.shipment.delivery?.region_id || '');
+            this.form.delivery.district_id = String(this.shipment.delivery?.district_id || '');
+
             this.currentAssignment = this.config.currentAssignment || null;
 
             if (this.form.pickup.region_id) this.loadDistricts('pickup');
@@ -520,48 +577,58 @@ function shipmentEditor() {
             else this.deliveryDistricts = data.data?.districts || [];
         },
 
-        autoSave() {
-            clearTimeout(this.autoSaveTimer);
-            this.autoSaveTimer = setTimeout(() => this.saveAll(), 800);
-        },
-
-        async saveAll() {
-            this.saving = true;
+        async savePickup() {
+            this.savingPickup = true;
             try {
                 const payload = {
                     destination_mode: this.destinationMode,
-                    pickup_contact_name: this.form.pickup.contact_name,
-                    pickup_contact_phone: this.form.pickup.contact_phone,
+                    pickup_contact_name: this.form.pickup.contact_name || null,
+                    pickup_contact_phone: this.form.pickup.contact_phone || null,
                     pickup_region_id: this.form.pickup.region_id || null,
                     pickup_district_id: this.form.pickup.district_id || null,
                     pickup_town: this.form.pickup.town || null,
                     pickup_landmark: this.form.pickup.landmark || null,
                     pickup_instructions: this.form.pickup.instructions || null,
-                    delivery_preference: this.form.delivery_preference,
-                    fulfillment_type: this.form.delivery_preference === 'deliver' ? (this.form.fulfillment_type || 'warehouse') : null,
                 };
-                if (this.shipment.destination_mode === 'single') {
-                    Object.assign(payload, {
-                        delivery_recipient_name: this.form.delivery.recipient_name || null,
-                        delivery_recipient_phone: this.form.delivery.recipient_phone || null,
-                        delivery_region_id: this.form.delivery.region_id || null,
-                        delivery_district_id: this.form.delivery.district_id || null,
-                        delivery_town: this.form.delivery.town || null,
-                        delivery_landmark: this.form.delivery.landmark || null,
-                        delivery_instructions: this.form.delivery.instructions || null,
-                    });
-                }
                 const res = await this._fetch(this.config.saveUrl, { method: 'PUT', body: JSON.stringify(payload) });
                 if (res.success) {
-                    this.shipmentSaved = true;
-                    setTimeout(() => this.shipmentSaved = false, 2000);
+                    this.pickupSaved = true;
+                    setTimeout(() => this.pickupSaved = false, 2000);
+                } else {
+                    this._toast(res.message || 'Failed to save pickup details.', 'error');
                 }
-                else this._toast(res.message || 'Failed to save.', 'error');
-            } catch (e) { this._toast(e.message || 'Error saving.', 'error'); }
-            finally { this.saving = false; }
+            } catch (e) { this._toast(e.message || 'Error saving pickup details.', 'error'); }
+            finally { this.savingPickup = false; }
+        },
+
+        async saveDelivery() {
+            this.savingDelivery = true;
+            try {
+                const payload = {
+                    destination_mode: this.destinationMode,
+                    delivery_preference: this.form.delivery_preference,
+                    fulfillment_type: this.form.delivery_preference === 'deliver' ? (this.form.fulfillment_type || 'warehouse') : null,
+                    delivery_recipient_name: this.form.delivery.recipient_name || null,
+                    delivery_recipient_phone: this.form.delivery.recipient_phone || null,
+                    delivery_region_id: this.form.delivery.region_id || null,
+                    delivery_district_id: this.form.delivery.district_id || null,
+                    delivery_town: this.form.delivery.town || null,
+                    delivery_landmark: this.form.delivery.landmark || null,
+                    delivery_instructions: this.form.delivery.instructions || null,
+                };
+                const res = await this._fetch(this.config.saveUrl, { method: 'PUT', body: JSON.stringify(payload) });
+                if (res.success) {
+                    this.deliverySaved = true;
+                    setTimeout(() => this.deliverySaved = false, 2000);
+                } else {
+                    this._toast(res.message || 'Failed to save delivery details.', 'error');
+                }
+            } catch (e) { this._toast(e.message || 'Error saving delivery details.', 'error'); }
+            finally { this.savingDelivery = false; }
         },
 
         async savePackage(pkg) {
+            pkg._saving = true;
             const url = this.config.updatePackageUrlTemplate.replace('__PKG__', pkg.id);
             const payload = {
                 description: pkg.description || null,
@@ -573,17 +640,22 @@ function shipmentEditor() {
                 delivery_town: pkg.delivery_town || null,
                 delivery_landmark: pkg.delivery_landmark || null,
             };
-            const res = await this._fetch(url, { method: 'PUT', body: JSON.stringify(payload) });
-            if (res.success) {
-                pkg._saved = true;
-                setTimeout(() => pkg._saved = false, 2000);
-            }
+            try {
+                const res = await this._fetch(url, { method: 'PUT', body: JSON.stringify(payload) });
+                if (res.success) {
+                    pkg._saved = true;
+                    setTimeout(() => pkg._saved = false, 2000);
+                } else {
+                    this._toast(res.message || 'Failed to save package.', 'error');
+                }
+            } catch (e) { this._toast(e.message || 'Error saving package.', 'error'); }
+            finally { pkg._saving = false; }
         },
 
         async addPackage() {
             const res = await this._fetch(this.config.addPackageUrl, { method: 'POST', body: JSON.stringify({}) });
             if (res.success && res.data?.package) {
-                this.packages.push({ ...res.data.package, photos: [], delivery_preference: 'deliver', fulfillment_type: null, delivery_recipient_name: null, delivery_recipient_phone: null, delivery_town: null, delivery_landmark: null });
+                this.packages.push({ ...res.data.package, photos: [], delivery_preference: 'deliver', fulfillment_type: null, delivery_recipient_name: null, delivery_recipient_phone: null, delivery_town: null, delivery_landmark: null, _saved: false, _saving: false });
                 this._toast('Package added.', 'success');
             }
         },
@@ -656,7 +728,7 @@ function shipmentEditor() {
                 if (srcPkg) {
                     srcPkg.photos = srcPkg.photos.filter(p => !this.splitModal.selectedIds.includes(p.id));
                 }
-                this.packages.push({ ...res.data.package, delivery_preference: 'deliver', fulfillment_type: null, delivery_recipient_name: null, delivery_recipient_phone: null, delivery_town: null, delivery_landmark: null });
+                this.packages.push({ ...res.data.package, delivery_preference: 'deliver', fulfillment_type: null, delivery_recipient_name: null, delivery_recipient_phone: null, delivery_town: null, delivery_landmark: null, _saved: false, _saving: false });
                 this.splitModal.open = false;
                 this._toast(res.message, 'success');
             }
@@ -697,7 +769,6 @@ function shipmentEditor() {
                 if (res.success) {
                     this.assignModal.open = false;
                     this.shipment.status = 'pickup_assigned';
-                    // Update displayed assignment info
                     const driver = this.assignModal.drivers.find(d => d.id == this.assignModal.driver_id);
                     const warehouse = this.assignModal.warehouses.find(w => w.id == this.assignModal.warehouse_id);
                     this.currentAssignment = {
