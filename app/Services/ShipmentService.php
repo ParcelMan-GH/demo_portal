@@ -567,6 +567,9 @@ class ShipmentService
             'total_photos_count' => $shipment->relationLoaded('items')
                 ? $shipment->items->sum(fn ($item) => $item->relationLoaded('images') ? $item->images->count() : 0)
                 : 0,
+            'is_processed' => $shipment->relationLoaded('items')
+                ? $shipment->items->count() > 1 || $shipment->items->contains(fn ($item) => !is_null($item->description))
+                : false,
 
             'can_edit' => $shipment->canBeEdited(),
             'can_delete' => $shipment->canBeDeleted(),
