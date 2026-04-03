@@ -53,6 +53,8 @@ class Shipment extends Model
         'delivery_gh_post_address',
         'delivery_landmark',
         'delivery_instructions',
+        'delivery_preference',
+        'sender_notes',
         'submitted_at',
         'cancelled_at',
         'cancellation_reason',
