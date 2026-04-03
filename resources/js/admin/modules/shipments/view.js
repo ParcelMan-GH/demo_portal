@@ -15,6 +15,9 @@ function shipmentShow() {
         assignmentUiError: '',
         assignmentActionLoading: false,
 
+        // Duplicate
+        duplicating: false,
+
         // Fulfillment type
         ftLoading: false,
         ftToast: '',
@@ -300,6 +303,32 @@ function shipmentShow() {
                 this.showFtToast('An error occurred. Please try again.', 'error');
             }
             this.ftLoading = false;
+        },
+
+        async duplicateShipment() {
+            if (!confirm('Create a duplicate of this shipment as a draft? All packages and photos will be copied.')) return;
+            this.duplicating = true;
+            try {
+                const url = this.config.duplicateEndpoint;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({}),
+                });
+                const result = await response.json();
+                if (result.success && result.data?.edit_url) {
+                    window.location.href = result.data.edit_url;
+                } else {
+                    alert(result.message || 'Failed to duplicate.');
+                }
+            } catch (e) {
+                alert('An error occurred.');
+            }
+            this.duplicating = false;
         },
 
         init() {

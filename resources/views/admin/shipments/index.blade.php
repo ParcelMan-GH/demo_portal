@@ -223,7 +223,7 @@
                             DELIVERY LOCATION
                         </th>
                         <th x-show="visibleColumns.items" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            ITEMS
+                            PACKAGES
                         </th>
                         <th x-show="visibleColumns.status" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             STATUS
@@ -258,7 +258,9 @@
 
                     <template x-for="shipment in shipments" :key="shipment.id">
                         <tr class="hover:bg-slate-50/70">
-                            <td x-show="visibleColumns.shipment_number" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="shipment.shipment_number"></td>
+                            <td x-show="visibleColumns.shipment_number" class="px-4 py-2.5 whitespace-nowrap">
+                                <a :href="'/admin/shipments/' + shipment.id" class="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors" x-text="shipment.shipment_number"></a>
+                            </td>
                             <td x-show="visibleColumns.vendor" class="px-4 py-2.5 whitespace-nowrap">
                                 <div class="text-xs font-semibold text-slate-900" x-text="shipment.vendor_name"></div>
                                 <div class="text-[10px] text-slate-500" x-text="shipment.vendor_business"></div>

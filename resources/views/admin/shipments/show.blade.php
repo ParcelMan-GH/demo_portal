@@ -20,6 +20,7 @@ $shipmentConfig = [
     'availableWarehousesEndpoint' => route('admin.assignments.available-warehouses'),
     'receiveAssignmentEndpointTemplate' => route('admin.assignments.receive', ['pickupAssignment' => '__ASSIGNMENT__']),
     'updateFulfillmentTypeEndpoint' => route('admin.shipments.update-fulfillment-type', $shipment),
+    'duplicateEndpoint' => route('admin.shipments.duplicate', $shipment),
     'canManage' => $canManage,
     'isSuperAdmin' => auth('admin')->user()?->isSuperAdmin() ?? false,
     'paymentsDataEndpoint' => route('admin.shipments.payments.data', $shipment),
@@ -103,6 +104,16 @@ $shipmentConfig = [
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                             </svg>
                             Assign Driver
+                        </button>
+                        <a href="{{ route('admin.shipments.edit', $shipment) }}"
+                           class="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs font-semibold rounded-xl border border-blue-500/30 transition-all backdrop-blur-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                            Edit Shipment
+                        </a>
+                        <button @@click="duplicateShipment()" :disabled="duplicating"
+                                class="inline-flex items-center gap-2 px-4 py-2 bg-slate-500/20 hover:bg-slate-500/30 text-slate-300 text-xs font-semibold rounded-xl border border-slate-500/30 transition-all backdrop-blur-sm disabled:opacity-50">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <span x-text="duplicating ? 'Duplicating...' : 'Duplicate'"></span>
                         </button>
                     </div>
                     @endif
@@ -250,7 +261,7 @@ $shipmentConfig = [
                                 </div>
                                 <div>
                                     <p class="text-lg font-bold text-white leading-none">{{ number_format($itemsCount) }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Items</p>
+                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Packages</p>
                                 </div>
                             </div>
 
@@ -405,7 +416,7 @@ $shipmentConfig = [
             <div x-show="activeTab === 'overview'" x-cloak>
                 <div class="grid grid-cols-1 xl:grid-cols-5 gap-5">
 
-                    <!-- Left Column: Shipment Info + Items -->
+                    <!-- Left Column: Shipment Info + Packages -->
                     <div class="xl:col-span-3 space-y-4">
 
                         <!-- Card A: Shipment Profile -->
@@ -478,7 +489,7 @@ $shipmentConfig = [
                                 <template x-if="isPerItemMode()">
                                     <div class="space-y-2 text-xs">
                                         <p class="text-slate-500">Mode: <span class="font-semibold text-slate-800">Per-item destination</span></p>
-                                        <p class="text-slate-400 italic">Each item has its own recipient &amp; delivery address — see Items below.</p>
+                                        <p class="text-slate-400 italic">Each package has its own recipient &amp; delivery address — see Packages below.</p>
                                     </div>
                                 </template>
                                 <template x-if="!isPerItemMode()">
@@ -504,14 +515,14 @@ $shipmentConfig = [
                             </div>
                         </div>
 
-                        <!-- Card C: Items -->
+                        <!-- Card C: Packages -->
                         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                             <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                                 <div class="flex items-center gap-2.5">
                                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                     </svg>
-                                    <h3 class="text-sm font-bold text-slate-900">Items</h3>
+                                    <h3 class="text-sm font-bold text-slate-900">Packages</h3>
                                     <span class="inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-100 text-slate-600">{{ $itemsCount }}</span>
                                 </div>
                                 <span x-show="isPerItemMode()" class="text-[10px] text-slate-400 font-medium">Per-item destinations</span>
@@ -2099,7 +2110,7 @@ $shipmentConfig = [
                             </template>
                         </div>
 
-                        {{-- ─── SECTION 2: Items Journey ─── --}}
+                        {{-- ─── SECTION 2: Packages Journey ─── --}}
                         <template x-if="tracking.items.length > 0">
                             <div>
                                 <!-- Section Header -->
@@ -2111,7 +2122,7 @@ $shipmentConfig = [
                                             </svg>
                                         </div>
                                         <div>
-                                            <h3 class="text-base font-bold text-slate-900">Items Journey</h3>
+                                            <h3 class="text-base font-bold text-slate-900">Packages Journey</h3>
                                             <p class="text-xs text-slate-400 mt-0.5">Individual item tracking through the pipeline</p>
                                         </div>
                                     </div>
@@ -2125,8 +2136,8 @@ $shipmentConfig = [
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                                         </svg>
                                         <div>
-                                            <p class="text-xs font-bold text-amber-800">Items Separated</p>
-                                            <p class="text-xs text-amber-600 mt-0.5 leading-relaxed">Items have been placed into different sort batches. Check each item below for its individual route.</p>
+                                            <p class="text-xs font-bold text-amber-800">Packages Separated</p>
+                                            <p class="text-xs text-amber-600 mt-0.5 leading-relaxed">Packages have been placed into different sort batches. Check each package below for its individual route.</p>
                                         </div>
                                     </div>
                                 </template>

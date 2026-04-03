@@ -7,9 +7,16 @@ use App\Enums\PickupAssignmentStatus;
 use App\Enums\ShipmentStatus;
 use App\Exports\ShipmentsExport;
 use App\Http\Controllers\Controller;
+use App\Enums\FulfillmentType;
+use App\Enums\ShipmentDestinationMode;
+use App\Models\District;
 use App\Models\Location;
+use App\Models\Region;
 use App\Models\Shipment;
+use App\Models\ShipmentItem;
+use App\Models\ShipmentItemImage;
 use App\Models\Warehouse;
+use App\Services\StorageService;
 use App\Services\WalkinShipmentService;
 use App\Support\GenericPdfExporter;
 use Illuminate\Http\JsonResponse;
@@ -851,5 +858,412 @@ class ShipmentController extends Controller
             'title' => '-',
             'subtitle' => '-',
         ];
+    }
+
+    // ─── EDIT PAGE ─────────────────────────────────────────────────────────────
+
+    public function editPage(Shipment $shipment)
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $shipment->load([
+            'vendor', 'items.images', 'items.deliveryRegion', 'items.deliveryDistrict',
+            'pickupRegion', 'pickupDistrict', 'deliveryRegion', 'deliveryDistrict',
+        ]);
+
+        $regions = Region::active()->select('id', 'name', 'code')->orderBy('name')->get();
+
+        $editConfig = [
+            'shipmentId' => $shipment->id,
+            'saveUrl' => route('admin.shipments.update', $shipment),
+            'addPackageUrl' => route('admin.shipments.packages.add', $shipment),
+            'updatePackageUrlTemplate' => route('admin.shipments.packages.update', ['shipment' => $shipment->id, 'item' => '__PKG__']),
+            'deletePackageUrlTemplate' => route('admin.shipments.packages.delete', ['shipment' => $shipment->id, 'item' => '__PKG__']),
+            'splitPackageUrlTemplate' => route('admin.shipments.packages.split', ['shipment' => $shipment->id, 'item' => '__PKG__']),
+            'uploadPhotosUrlTemplate' => route('admin.shipments.packages.photos.upload', ['shipment' => $shipment->id, 'item' => '__PKG__']),
+            'movePhotoUrl' => route('admin.shipments.packages.photos.move', $shipment),
+            'deletePhotoUrlTemplate' => route('admin.shipments.packages.photos.delete', ['image' => '__IMG__']),
+            'locationSearchUrl' => route('admin.locations.search'),
+            'districtsByRegionUrlTemplate' => '/admin/locations-data/districts?region_id=__REGION__',
+            'assignDriverEndpoint' => route('admin.assignments.assign', $shipment),
+            'availableDriversEndpoint' => route('admin.assignments.available-drivers'),
+            'availableWarehousesEndpoint' => route('admin.assignments.available-warehouses'),
+            'duplicateUrl' => route('admin.shipments.duplicate', $shipment),
+            'showUrl' => route('admin.shipments.show', $shipment),
+            'regions' => $regions,
+            'shipment' => [
+                'id' => $shipment->id,
+                'shipment_number' => $shipment->shipment_number,
+                'status' => $shipment->status->value,
+                'destination_mode' => $shipment->destination_mode->value,
+                'delivery_preference' => $shipment->delivery_preference ?? 'deliver',
+                'fulfillment_type' => $shipment->fulfillment_type?->value,
+                'sender_notes' => $shipment->sender_notes,
+                'vendor_name' => $shipment->vendor?->name,
+                'vendor_phone' => $shipment->vendor?->phone,
+                'pickup' => [
+                    'contact_name' => $shipment->pickup_contact_name,
+                    'contact_phone' => $shipment->pickup_contact_phone,
+                    'region_id' => $shipment->pickup_region_id,
+                    'district_id' => $shipment->pickup_district_id,
+                    'town' => $shipment->pickup_town,
+                    'latitude' => $shipment->pickup_latitude,
+                    'longitude' => $shipment->pickup_longitude,
+                    'gh_post_address' => $shipment->pickup_gh_post_address,
+                    'landmark' => $shipment->pickup_landmark,
+                    'instructions' => $shipment->pickup_instructions,
+                ],
+                'delivery' => $shipment->destination_mode === ShipmentDestinationMode::SINGLE ? [
+                    'recipient_name' => $shipment->delivery_recipient_name,
+                    'recipient_phone' => $shipment->delivery_recipient_phone,
+                    'region_id' => $shipment->delivery_region_id,
+                    'district_id' => $shipment->delivery_district_id,
+                    'town' => $shipment->delivery_town,
+                    'latitude' => $shipment->delivery_latitude,
+                    'longitude' => $shipment->delivery_longitude,
+                    'gh_post_address' => $shipment->delivery_gh_post_address,
+                    'landmark' => $shipment->delivery_landmark,
+                    'instructions' => $shipment->delivery_instructions,
+                ] : null,
+                'packages' => $shipment->items->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'description' => $item->description,
+                        'quantity' => $item->quantity,
+                        'tracking_code' => $item->tracking_code,
+                        'delivery_preference' => $item->delivery_preference ?? 'deliver',
+                        'fulfillment_type' => $item->fulfillment_type?->value,
+                        'delivery_recipient_name' => $item->delivery_recipient_name,
+                        'delivery_recipient_phone' => $item->delivery_recipient_phone,
+                        'delivery_region_id' => $item->delivery_region_id,
+                        'delivery_district_id' => $item->delivery_district_id,
+                        'delivery_town' => $item->delivery_town,
+                        'delivery_landmark' => $item->delivery_landmark,
+                        'delivery_instructions' => $item->delivery_instructions,
+                        'photos' => $item->images->map(fn ($img) => [
+                            'id' => $img->id,
+                            'url' => $img->getSignedUrl(),
+                            'original_name' => $img->original_name,
+                            'size_human' => $img->size_human,
+                        ])->values(),
+                    ];
+                })->values(),
+            ],
+        ];
+
+        return view('admin.shipments.edit', [
+            'shipment' => $shipment,
+            'editConfig' => $editConfig,
+        ]);
+    }
+
+    public function updateShipment(Request $request, Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $validated = $request->validate([
+            'destination_mode' => ['nullable', 'string', 'in:single,per_item'],
+            'pickup_contact_name' => ['nullable', 'string', 'max:255'],
+            'pickup_contact_phone' => ['nullable', 'string', 'max:20'],
+            'pickup_region_id' => ['nullable', 'exists:regions,id'],
+            'pickup_district_id' => ['nullable', 'exists:districts,id'],
+            'pickup_town' => ['nullable', 'string', 'max:255'],
+            'pickup_landmark' => ['nullable', 'string', 'max:255'],
+            'pickup_instructions' => ['nullable', 'string', 'max:1000'],
+            'delivery_preference' => ['nullable', 'string', 'in:deliver,self_pickup'],
+            'fulfillment_type' => ['nullable', 'string', 'in:warehouse,direct'],
+            'delivery_recipient_name' => ['nullable', 'string', 'max:255'],
+            'delivery_recipient_phone' => ['nullable', 'string', 'max:20'],
+            'delivery_region_id' => ['nullable', 'exists:regions,id'],
+            'delivery_district_id' => ['nullable', 'exists:districts,id'],
+            'delivery_town' => ['nullable', 'string', 'max:255'],
+            'delivery_landmark' => ['nullable', 'string', 'max:255'],
+            'delivery_instructions' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        // Handle destination_mode switch
+        $newMode = $validated['destination_mode'] ?? null;
+        $oldMode = $shipment->destination_mode->value;
+
+        if ($newMode && $newMode !== $oldMode) {
+            if ($newMode === 'per_item') {
+                // Single → Per-item: clear shipment-level delivery fields
+                $validated = array_merge($validated, [
+                    'delivery_recipient_name' => null,
+                    'delivery_recipient_phone' => null,
+                    'delivery_region_id' => null,
+                    'delivery_district_id' => null,
+                    'delivery_town' => null,
+                    'delivery_latitude' => null,
+                    'delivery_longitude' => null,
+                    'delivery_gh_post_address' => null,
+                    'delivery_landmark' => null,
+                    'delivery_instructions' => null,
+                    'delivery_preference' => null,
+                    'fulfillment_type' => null,
+                ]);
+            } else {
+                // Per-item → Single: clear all package-level delivery fields
+                $shipment->items()->update([
+                    'delivery_recipient_name' => null,
+                    'delivery_recipient_phone' => null,
+                    'delivery_region_id' => null,
+                    'delivery_district_id' => null,
+                    'delivery_town' => null,
+                    'delivery_latitude' => null,
+                    'delivery_longitude' => null,
+                    'delivery_gh_post_address' => null,
+                    'delivery_landmark' => null,
+                    'delivery_instructions' => null,
+                    'delivery_preference' => null,
+                    'fulfillment_type' => null,
+                ]);
+            }
+        }
+
+        $shipment->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shipment updated.',
+            'data' => ['destination_mode' => $shipment->destination_mode->value],
+        ]);
+    }
+
+    public function addPackage(Request $request, Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $validated = $request->validate([
+            'description' => ['nullable', 'string', 'max:500'],
+            'quantity' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $item = $shipment->items()->create([
+            'description' => $validated['description'] ?? null,
+            'quantity' => $validated['quantity'] ?? 1,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Package added.',
+            'data' => ['package' => ['id' => $item->id, 'description' => $item->description, 'quantity' => $item->quantity, 'photos' => []]],
+        ]);
+    }
+
+    public function updatePackage(Request $request, Shipment $shipment, ShipmentItem $item): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        if ($item->shipment_id !== $shipment->id) {
+            return response()->json(['success' => false, 'message' => 'Package not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'description' => ['nullable', 'string', 'max:500'],
+            'quantity' => ['nullable', 'integer', 'min:1'],
+            'delivery_preference' => ['nullable', 'string', 'in:deliver,self_pickup'],
+            'fulfillment_type' => ['nullable', 'string', 'in:warehouse,direct'],
+            'delivery_recipient_name' => ['nullable', 'string', 'max:255'],
+            'delivery_recipient_phone' => ['nullable', 'string', 'max:20'],
+            'delivery_region_id' => ['nullable', 'exists:regions,id'],
+            'delivery_district_id' => ['nullable', 'exists:districts,id'],
+            'delivery_town' => ['nullable', 'string', 'max:255'],
+            'delivery_landmark' => ['nullable', 'string', 'max:255'],
+            'delivery_instructions' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $item->update($validated);
+
+        return response()->json(['success' => true, 'message' => 'Package updated.']);
+    }
+
+    public function deletePackage(Request $request, Shipment $shipment, ShipmentItem $item): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        if ($item->shipment_id !== $shipment->id) {
+            return response()->json(['success' => false, 'message' => 'Package not found.'], 404);
+        }
+
+        // Delete associated images from storage
+        $storageService = app(StorageService::class);
+        foreach ($item->images as $image) {
+            $storageService->deleteFile($image->storage_path);
+            $image->delete();
+        }
+
+        $item->delete();
+
+        return response()->json(['success' => true, 'message' => 'Package deleted.']);
+    }
+
+    public function splitPackage(Request $request, Shipment $shipment, ShipmentItem $item): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        if ($item->shipment_id !== $shipment->id) {
+            return response()->json(['success' => false, 'message' => 'Package not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'photo_ids' => ['required', 'array', 'min:1'],
+            'photo_ids.*' => ['required', 'integer'],
+        ]);
+
+        // Create new package
+        $newItem = $shipment->items()->create([
+            'description' => null,
+            'quantity' => 1,
+        ]);
+
+        // Move selected photos to new package
+        $movedCount = ShipmentItemImage::whereIn('id', $validated['photo_ids'])
+            ->where('shipment_item_id', $item->id)
+            ->update(['shipment_item_id' => $newItem->id]);
+
+        $newItem->load('images');
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$movedCount} photo(s) moved to new package.",
+            'data' => [
+                'package' => [
+                    'id' => $newItem->id,
+                    'description' => $newItem->description,
+                    'quantity' => $newItem->quantity,
+                    'photos' => $newItem->images->map(fn ($img) => [
+                        'id' => $img->id,
+                        'url' => $img->getSignedUrl(),
+                        'original_name' => $img->original_name,
+                        'size_human' => $img->size_human,
+                    ])->values(),
+                ],
+            ],
+        ]);
+    }
+
+    public function uploadPhotos(Request $request, Shipment $shipment, ShipmentItem $item): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        if ($item->shipment_id !== $shipment->id) {
+            return response()->json(['success' => false, 'message' => 'Package not found.'], 404);
+        }
+
+        $request->validate([
+            'photos' => ['required', 'array', 'min:1'],
+            'photos.*' => ['required', 'file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+        ]);
+
+        $storageService = app(StorageService::class);
+        $uploaded = [];
+
+        foreach ($request->file('photos', []) as $file) {
+            $result = $storageService->uploadFile($file, "shipments/{$shipment->id}/items/{$item->id}");
+            if ($result['success']) {
+                $image = $item->images()->create([
+                    'storage_path' => $result['path'],
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                ]);
+                $uploaded[] = [
+                    'id' => $image->id,
+                    'url' => $image->getSignedUrl(),
+                    'original_name' => $image->original_name,
+                    'size_human' => $image->size_human,
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => count($uploaded) . ' photo(s) uploaded.',
+            'data' => ['photos' => $uploaded],
+        ]);
+    }
+
+    public function movePhoto(Request $request, Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $validated = $request->validate([
+            'photo_id' => ['required', 'integer'],
+            'target_package_id' => ['required', 'integer'],
+        ]);
+
+        $image = ShipmentItemImage::findOrFail($validated['photo_id']);
+        $sourceItem = ShipmentItem::findOrFail($image->shipment_item_id);
+        $targetItem = ShipmentItem::findOrFail($validated['target_package_id']);
+
+        if ($sourceItem->shipment_id !== $shipment->id || $targetItem->shipment_id !== $shipment->id) {
+            return response()->json(['success' => false, 'message' => 'Invalid package.'], 404);
+        }
+
+        $image->update(['shipment_item_id' => $targetItem->id]);
+
+        return response()->json(['success' => true, 'message' => 'Photo moved.']);
+    }
+
+    public function deletePhoto(Request $request, ShipmentItemImage $image): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $storageService = app(StorageService::class);
+        $storageService->deleteFile($image->storage_path);
+        $image->delete();
+
+        return response()->json(['success' => true, 'message' => 'Photo deleted.']);
+    }
+
+    public function duplicate(Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $shipment->load(['items.images']);
+
+        // Clone shipment
+        $newShipment = $shipment->replicate([
+            'shipment_number', 'status', 'submitted_at', 'cancelled_at', 'cancellation_reason',
+            'current_invoice_id', 'created_at', 'updated_at', 'deleted_at',
+        ]);
+        $newShipment->status = ShipmentStatus::DRAFT;
+        $newShipment->submitted_at = null;
+        $newShipment->cancelled_at = null;
+        $newShipment->cancellation_reason = null;
+        $newShipment->current_invoice_id = null;
+        $newShipment->save(); // shipment_number auto-generated via model boot
+
+        // Clone packages and photo references
+        foreach ($shipment->items as $item) {
+            $newItem = $item->replicate([
+                'tracking_code', 'status', 'created_at', 'updated_at',
+            ]);
+            $newItem->shipment_id = $newShipment->id;
+            $newItem->tracking_code = null;
+            $newItem->status = 'pending';
+            $newItem->save();
+
+            // Copy image records (point to same storage files — no re-upload)
+            foreach ($item->images as $image) {
+                $newItem->images()->create([
+                    'storage_path' => $image->storage_path,
+                    'original_name' => $image->original_name,
+                    'mime_type' => $image->mime_type,
+                    'size' => $image->size,
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shipment duplicated as draft.',
+            'data' => [
+                'shipment_id' => $newShipment->id,
+                'shipment_number' => $newShipment->shipment_number,
+                'edit_url' => route('admin.shipments.edit', $newShipment),
+            ],
+        ]);
     }
 }

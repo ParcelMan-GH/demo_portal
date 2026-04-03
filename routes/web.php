@@ -201,6 +201,16 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('shipments/vendor-create', [ShipmentController::class, 'vendorCreate'])->name('shipments.vendor-create');
         Route::get('locations/search', [ShipmentController::class, 'locationSearch'])->name('locations.search');
         Route::get('shipments/{shipment}', [ShipmentController::class, 'showPage'])->name('shipments.show');
+        Route::get('shipments/{shipment}/edit', [ShipmentController::class, 'editPage'])->name('shipments.edit');
+        Route::post('shipments/{shipment}/duplicate', [ShipmentController::class, 'duplicate'])->name('shipments.duplicate');
+        Route::put('shipments/{shipment}', [ShipmentController::class, 'updateShipment'])->name('shipments.update');
+        Route::post('shipments/{shipment}/packages', [ShipmentController::class, 'addPackage'])->name('shipments.packages.add');
+        Route::put('shipments/{shipment}/packages/{item}', [ShipmentController::class, 'updatePackage'])->name('shipments.packages.update');
+        Route::delete('shipments/{shipment}/packages/{item}', [ShipmentController::class, 'deletePackage'])->name('shipments.packages.delete');
+        Route::post('shipments/{shipment}/packages/{item}/split', [ShipmentController::class, 'splitPackage'])->name('shipments.packages.split');
+        Route::post('shipments/{shipment}/packages/{item}/photos', [ShipmentController::class, 'uploadPhotos'])->name('shipments.packages.photos.upload');
+        Route::post('shipments/{shipment}/photos/move', [ShipmentController::class, 'movePhoto'])->name('shipments.packages.photos.move');
+        Route::delete('shipments/photos/{image}', [ShipmentController::class, 'deletePhoto'])->name('shipments.packages.photos.delete');
         Route::get('shipments/{shipment}/items', [ShipmentController::class, 'items'])->name('shipments.items');
         Route::get('shipments/{shipment}/tracking', [ShipmentController::class, 'tracking'])->name('shipments.tracking');
         Route::post('shipments/{shipment}/fulfillment-type', [ShipmentController::class, 'updateFulfillmentType'])->name('shipments.update-fulfillment-type');

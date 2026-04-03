@@ -34,7 +34,7 @@ function buildShipmentsTable(config) {
             { key: 'fulfillment_type', label: 'Fulfillment' },
             { key: 'destination', label: 'Destination' },
             { key: 'location', label: 'Delivery Location' },
-            { key: 'items', label: 'Items' },
+            { key: 'items', label: 'Packages' },
             { key: 'status', label: 'Status' },
             { key: 'submitted_at', label: 'Submitted At' },
             { key: 'actions', label: 'Actions' },
