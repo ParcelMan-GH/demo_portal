@@ -18,6 +18,10 @@ function shipmentShow() {
         // Duplicate
         duplicating: false,
 
+        // Receiving
+        receivingLoaded: false,
+        receiving: { loading: false, saving: false, canReceive: false, packages: [], receipt: null, assignmentId: null },
+
         // Fulfillment type
         ftLoading: false,
         ftToast: '',
@@ -329,6 +333,105 @@ function shipmentShow() {
                 alert('An error occurred.');
             }
             this.duplicating = false;
+        },
+
+        async loadReceiving() {
+            this.receiving.loading = true;
+            this.receivingLoaded = true;
+            try {
+                const response = await fetch(this.config.receivingDataEndpoint, {
+                    headers: { 'Accept': 'application/json' },
+                });
+                const result = await response.json();
+                if (result.success) {
+                    this.receiving.packages = result.data.packages || [];
+                    this.receiving.canReceive = result.data.can_receive;
+                    this.receiving.receipt = result.data.receipt;
+                    this.receiving.assignmentId = result.data.assignment_id;
+                }
+            } catch (e) { console.error('Failed to load receiving data', e); }
+            this.receiving.loading = false;
+        },
+
+        async receivePackage(pkg) {
+            this.receiving.saving = true;
+            const url = this.config.receiveSaveEndpoint.replace('__ITEM__', pkg.shipment_item_id);
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        received_quantity: pkg.received_quantity || 0,
+                        damaged_quantity: pkg.damaged_quantity || 0,
+                        condition_status: pkg.condition_status || 'ok',
+                        notes: pkg.notes || null,
+                        description: pkg.description || null,
+                    }),
+                });
+                const result = await response.json();
+                if (result.success) {
+                    if (result.data?.barcode_value) pkg.barcode_value = result.data.barcode_value;
+                    if (result.data?.barcode_print_count) pkg.barcode_print_count = result.data.barcode_print_count;
+                    window.showToast?.('Package received.', 'success');
+                } else {
+                    window.showToast?.(result.message || 'Failed.', 'error');
+                }
+            } catch (e) { window.showToast?.('Error receiving package.', 'error'); }
+            this.receiving.saving = false;
+        },
+
+        async printLabel(pkg) {
+            const url = this.config.receivePrintLabelEndpoint.replace('__ITEM__', pkg.shipment_item_id);
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                });
+                const result = await response.json();
+                if (result.success) {
+                    if (result.data?.barcode_value) pkg.barcode_value = result.data.barcode_value;
+                    if (result.data?.barcode_print_count) pkg.barcode_print_count = result.data.barcode_print_count;
+                    if (result.data?.label_html) {
+                        const w = window.open('', '_blank', 'width=400,height=600');
+                        if (w) { w.document.write(result.data.label_html); w.document.close(); setTimeout(() => w.print(), 300); }
+                    }
+                    window.showToast?.('Label generated.', 'success');
+                } else {
+                    window.showToast?.(result.message || 'Failed.', 'error');
+                }
+            } catch (e) { window.showToast?.('Error printing label.', 'error'); }
+        },
+
+        async finalizeReceiving() {
+            if (!confirm('Finalize receiving? This will update the shipment status to "at warehouse".')) return;
+            this.receiving.saving = true;
+            try {
+                const response = await fetch(this.config.receiveFinalizeEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({}),
+                });
+                const result = await response.json();
+                if (result.success) {
+                    window.showToast?.('Receiving finalized!', 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    window.showToast?.(result.message || 'Failed to finalize.', 'error');
+                }
+            } catch (e) { window.showToast?.('Error finalizing.', 'error'); }
+            this.receiving.saving = false;
         },
 
         init() {

@@ -162,7 +162,7 @@
                             </div>
                             <div>
                                 <p class="text-base lg:text-lg font-bold text-white leading-none">{{ number_format($items->count()) }}</p>
-                                <p class="text-[9px] leading-tight text-slate-400 mt-0.5 font-medium">Items</p>
+                                <p class="text-[9px] leading-tight text-slate-400 mt-0.5 font-medium">Packages</p>
                             </div>
                         </div>
 
@@ -174,7 +174,7 @@
                             </div>
                             <div>
                                 <p class="text-base lg:text-lg font-bold text-white leading-none">{{ number_format($itemConfirmations->count()) }}</p>
-                                <p class="text-[9px] leading-tight text-slate-400 mt-0.5 font-medium">Confirmed Items</p>
+                                <p class="text-[9px] leading-tight text-slate-400 mt-0.5 font-medium">Confirmed Pkgs</p>
                             </div>
                         </div>
 
@@ -489,14 +489,14 @@
                         </div>
                         @endif
 
-                        <!-- Card C: Items -->
+                        <!-- Card C: Packages -->
                         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                             <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
                                 <div class="flex items-center gap-2">
                                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                     </svg>
-                                    <h3 class="text-sm font-bold text-slate-900">Items</h3>
+                                    <h3 class="text-sm font-bold text-slate-900">Packages</h3>
                                     <span class="inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-100 text-slate-600">{{ $items->count() }}</span>
                                 </div>
                                 @if($shipment?->isPerItemDestination())
@@ -722,7 +722,7 @@
                                 </div>
                                 <div class="flex items-start justify-between gap-3 py-2.5">
                                     <div>
-                                        <p class="text-xs text-slate-700 font-medium">Total Items</p>
+                                        <p class="text-xs text-slate-700 font-medium">Total Packages</p>
                                         <p class="text-[10px] text-slate-400 mt-0.5">Shipment line items declared by vendor</p>
                                     </div>
                                     <span class="font-bold text-slate-800 text-sm flex-shrink-0">{{ $items->count() }}</span>
@@ -730,7 +730,7 @@
                                 <div class="flex items-start justify-between gap-3 py-2.5">
                                     <div>
                                         <p class="text-xs text-slate-700 font-medium">Driver Confirmed</p>
-                                        <p class="text-[10px] text-slate-400 mt-0.5">Items the driver verified at pickup</p>
+                                        <p class="text-[10px] text-slate-400 mt-0.5">Packages the driver verified at pickup</p>
                                     </div>
                                     <span class="font-bold text-slate-800 text-sm flex-shrink-0">{{ $itemConfirmations->count() }}</span>
                                 </div>
@@ -765,7 +765,7 @@
                         'Assigned'          => 'Driver assigned to this pickup',
                         'En Route'          => 'Driver en route to vendor location',
                         'Arrived Pickup'    => 'Driver arrived at vendor location',
-                        'Picked Up'         => 'Items picked up from vendor',
+                        'Picked Up'         => 'Packages picked up from vendor',
                         'Arrived Warehouse' => 'Driver arrived at warehouse',
                         'Received'          => 'Shipment received at warehouse',
                         'Completed'         => 'Pickup assignment completed',
@@ -1445,7 +1445,7 @@
                 <div class="grid grid-cols-3 gap-3 mb-6">
                     <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 text-center">
                         <p class="text-2xl font-black text-slate-800" x-text="items.length"></p>
-                        <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mt-1">Total Items</p>
+                        <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mt-1">Total Packages</p>
                     </div>
                     <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 text-center">
                         <p class="text-2xl font-black text-emerald-600" x-text="items.filter(i => i.received_quantity > 0).length"></p>
@@ -1470,7 +1470,7 @@
                     </div>
                 </template>
 
-                {{-- ── Items Grid ──────────────────────────────── --}}
+                {{-- ── Packages Grid ──────────────────────────────── --}}
                 <template x-if="items.length > 0">
                     <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                         <template x-for="item in items" :key="item.shipment_item_id">
@@ -1659,7 +1659,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </template>
                                         </svg>
-                                        <span x-text="item.received_quantity > 0 ? 'Edit Receipt' : 'Receive Item'"></span>
+                                        <span x-text="item.received_quantity > 0 ? 'Edit Receipt' : 'Receive Package'"></span>
                                     </button>
                                 </div>
 
@@ -1682,7 +1682,7 @@
                                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                                     </div>
                                     <div>
-                                        <h4 class="text-base font-bold text-slate-900">Receive Item</h4>
+                                        <h4 class="text-base font-bold text-slate-900">Receive Package</h4>
                                         <p class="text-xs text-slate-500 mt-0.5 font-medium" x-text="items[receiveModal.itemIndex]?.description"></p>
                                     </div>
                                 </div>

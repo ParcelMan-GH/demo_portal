@@ -213,6 +213,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::delete('shipments/photos/{image}', [ShipmentController::class, 'deletePhoto'])->name('shipments.packages.photos.delete');
         Route::get('shipments/{shipment}/items', [ShipmentController::class, 'items'])->name('shipments.items');
         Route::get('shipments/{shipment}/tracking', [ShipmentController::class, 'tracking'])->name('shipments.tracking');
+        Route::get('shipments/{shipment}/receiving-data', [ShipmentController::class, 'receivingData'])->name('shipments.receiving-data');
+        Route::post('shipments/{shipment}/receiving/{item}/save', [ShipmentController::class, 'receivePackage'])->name('shipments.receiving.save');
+        Route::post('shipments/{shipment}/receiving/{item}/print-label', [ShipmentController::class, 'printPackageLabel'])->name('shipments.receiving.print-label');
+        Route::post('shipments/{shipment}/receiving/finalize', [ShipmentController::class, 'finalizeReceiving'])->name('shipments.receiving.finalize');
         Route::post('shipments/{shipment}/fulfillment-type', [ShipmentController::class, 'updateFulfillmentType'])->name('shipments.update-fulfillment-type');
         Route::get('shipments-export', [ShipmentController::class, 'export'])->name('shipments.export');
 

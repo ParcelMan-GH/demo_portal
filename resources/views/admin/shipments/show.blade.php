@@ -21,6 +21,10 @@ $shipmentConfig = [
     'receiveAssignmentEndpointTemplate' => route('admin.assignments.receive', ['pickupAssignment' => '__ASSIGNMENT__']),
     'updateFulfillmentTypeEndpoint' => route('admin.shipments.update-fulfillment-type', $shipment),
     'duplicateEndpoint' => route('admin.shipments.duplicate', $shipment),
+    'receivingDataEndpoint' => route('admin.shipments.receiving-data', $shipment),
+    'receiveSaveEndpoint' => route('admin.shipments.receiving.save', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
+    'receivePrintLabelEndpoint' => route('admin.shipments.receiving.print-label', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
+    'receiveFinalizeEndpoint' => route('admin.shipments.receiving.finalize', $shipment),
     'canManage' => $canManage,
     'isSuperAdmin' => auth('admin')->user()?->isSuperAdmin() ?? false,
     'paymentsDataEndpoint' => route('admin.shipments.payments.data', $shipment),
@@ -403,6 +407,20 @@ $shipmentConfig = [
                     </svg>
                 </div>
                 <span class="text-xs transition-colors" :class="activeTab === 'tracking' ? 'font-bold text-amber-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Tracking</span>
+            </button>
+
+            <!-- Receiving -->
+            <button @@click="activeTab = 'receiving'; if (!receivingLoaded) loadReceiving()"
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg transition-all duration-150 text-left"
+                :class="activeTab === 'receiving' ? 'bg-orange-50 ring-1 ring-orange-100 shadow-sm' : 'hover:bg-slate-50'"
+                x-show="['picked_up','at_warehouse','sorted','in_transit','at_destination','out_for_delivery','delivered'].includes(shipment.status)">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'receiving' ? 'bg-orange-500 shadow-sm shadow-orange-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'receiving' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                </div>
+                <span class="text-xs transition-colors" :class="activeTab === 'receiving' ? 'font-bold text-orange-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Receiving</span>
             </button>
 
         </aside>
@@ -2502,6 +2520,137 @@ $shipmentConfig = [
                             </div>
                         </template>
 
+                    </div>
+                </template>
+
+            </div>
+
+            <!-- ═══════════════════════════════════════ -->
+            <!-- RECEIVING TAB                           -->
+            <!-- ═══════════════════════════════════════ -->
+            <div x-show="activeTab === 'receiving'" x-cloak>
+
+                <!-- Loading -->
+                <div x-show="receiving.loading" class="flex items-center justify-center py-20">
+                    <div class="flex gap-1.5">
+                        <div class="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style="animation-delay:0ms"></div>
+                        <div class="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style="animation-delay:150ms"></div>
+                        <div class="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style="animation-delay:300ms"></div>
+                    </div>
+                </div>
+
+                <!-- Not picked up yet -->
+                <template x-if="!receiving.loading && !receiving.canReceive">
+                    <div class="text-center py-16">
+                        <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-amber-100 flex items-center justify-center">
+                            <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        </div>
+                        <p class="text-sm font-bold text-slate-800">Waiting for Pickup</p>
+                        <p class="text-xs text-slate-500 mt-1">Packages can be received once the driver completes pickup.</p>
+                    </div>
+                </template>
+
+                <!-- Packages list -->
+                <template x-if="!receiving.loading && receiving.canReceive">
+                    <div>
+                        <!-- Stats -->
+                        <div class="grid grid-cols-3 gap-3 mb-6">
+                            <div class="bg-white rounded-xl border border-slate-200 p-3">
+                                <p class="text-lg font-bold text-slate-900" x-text="receiving.packages.length"></p>
+                                <p class="text-[10px] text-slate-500 font-semibold uppercase">Total Packages</p>
+                            </div>
+                            <div class="bg-white rounded-xl border border-emerald-200 p-3">
+                                <p class="text-lg font-bold text-emerald-700" x-text="receiving.packages.filter(p => p.received_quantity > 0).length"></p>
+                                <p class="text-[10px] text-emerald-600 font-semibold uppercase">Received</p>
+                            </div>
+                            <div class="bg-white rounded-xl border border-slate-200 p-3">
+                                <p class="text-lg font-bold text-slate-400" x-text="receiving.packages.filter(p => p.received_quantity === 0).length"></p>
+                                <p class="text-[10px] text-slate-500 font-semibold uppercase">Pending</p>
+                            </div>
+                        </div>
+
+                        <!-- Package Cards -->
+                        <div class="space-y-4">
+                            <template x-for="(pkg, pIdx) in receiving.packages" :key="pkg.shipment_item_id">
+                                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                    <!-- Header -->
+                                    <div class="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                        <div class="flex items-center gap-2">
+                                            <span class="w-6 h-6 rounded-lg text-white text-[10px] font-bold flex items-center justify-center"
+                                                  :class="pkg.received_quantity > 0 ? 'bg-emerald-500' : 'bg-orange-500'"
+                                                  x-text="pIdx + 1"></span>
+                                            <span class="text-xs font-bold text-slate-700">Package <span x-text="pIdx + 1"></span></span>
+                                            <span x-show="pkg.tracking_code" class="text-[10px] font-mono text-slate-400" x-text="pkg.tracking_code"></span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span x-show="pkg.received_quantity > 0" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">Received</span>
+                                            <span x-show="pkg.received_quantity === 0" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">Pending</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Photos -->
+                                    <div class="px-4 py-3 border-b border-slate-100" x-show="pkg.vendor_photos.length > 0 || pkg.driver_photos.length > 0">
+                                        <div class="flex flex-wrap gap-1.5">
+                                            <template x-for="(url, i) in pkg.vendor_photos" :key="'v'+i">
+                                                <img :src="url" class="w-14 h-14 rounded-lg object-cover border border-slate-200 cursor-pointer" @@click="$dispatch('open-lightbox', { url: url })">
+                                            </template>
+                                            <template x-for="(photo, i) in pkg.driver_photos" :key="'d'+photo.id">
+                                                <img :src="photo.url" class="w-14 h-14 rounded-lg object-cover border border-blue-200 cursor-pointer" @@click="$dispatch('open-lightbox', { url: photo.url })">
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    <!-- Description & Receive Form -->
+                                    <div class="px-4 py-3">
+                                        <div class="grid grid-cols-3 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Description</label>
+                                                <input type="text" :value="pkg.description || ''" @@change="pkg.description = $event.target.value" placeholder="What's inside?" class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none">
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Received Qty</label>
+                                                <input type="number" x-model.number="pkg.received_quantity" min="0" class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none">
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Condition</label>
+                                                <select x-model="pkg.condition_status" class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none">
+                                                    <option value="ok">OK</option>
+                                                    <option value="damaged">Damaged</option>
+                                                    <option value="partial">Partial</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="block text-[10px] font-semibold text-slate-500 mb-1">Notes</label>
+                                            <textarea x-model="pkg.notes" rows="1" class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none resize-none" placeholder="Receiving notes..."></textarea>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button @@click="receivePackage(pkg)" :disabled="receiving.saving" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-semibold rounded-lg transition-all disabled:opacity-50">
+                                                <svg x-show="receiving.saving" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                                <span x-text="pkg.received_quantity > 0 ? 'Update' : 'Receive'"></span>
+                                            </button>
+                                            <button @@click="printLabel(pkg)" :disabled="pkg.received_quantity === 0" class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white text-slate-700 text-[11px] font-semibold rounded-lg hover:bg-slate-50 transition-all disabled:opacity-50">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                                <span x-text="pkg.barcode_value ? 'Reprint Label' : 'Print Label'"></span>
+                                            </button>
+                                            <span x-show="pkg.barcode_value" class="text-[10px] font-mono text-slate-400" x-text="pkg.barcode_value"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Finalize -->
+                        <div class="mt-6 flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                            <div>
+                                <p class="text-sm font-bold text-slate-800">Finalize Receiving</p>
+                                <p class="text-xs text-slate-500">Mark all packages as received and move shipment to warehouse status</p>
+                            </div>
+                            <button @@click="finalizeReceiving()" :disabled="receiving.saving || receiving.packages.every(p => p.received_quantity === 0)"
+                                    class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all disabled:opacity-50 shadow-sm">
+                                Finalize
+                            </button>
+                        </div>
                     </div>
                 </template>
 

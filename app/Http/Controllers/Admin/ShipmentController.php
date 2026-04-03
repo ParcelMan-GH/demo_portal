@@ -16,8 +16,11 @@ use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemImage;
 use App\Models\Warehouse;
+use App\Models\PickupAssignment;
+use App\Models\WarehouseReceipt;
 use App\Services\StorageService;
 use App\Services\WalkinShipmentService;
+use App\Services\Warehouse\WarehouseReceivingService;
 use App\Support\GenericPdfExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -1265,5 +1268,198 @@ class ShipmentController extends Controller
                 'edit_url' => route('admin.shipments.edit', $newShipment),
             ],
         ]);
+    }
+
+    // ─── RECEIVING (Super Admin) ───────────────────────────────────────────────
+
+    public function receivingData(Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.view');
+
+        $assignment = $shipment->pickupAssignment;
+        if (!$assignment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No pickup assignment found for this shipment.',
+                'data' => ['packages' => [], 'can_receive' => false, 'receipt' => null],
+            ]);
+        }
+
+        $assignment->load(['itemConfirmations', 'photos', 'warehouseReceipt.items.photos']);
+        $shipment->load(['items.images']);
+
+        $receivingService = app(WarehouseReceivingService::class);
+        $storageService = app(StorageService::class);
+        $receipt = $assignment->warehouseReceipt;
+
+        $packages = $shipment->items->map(function (ShipmentItem $item) use ($assignment, $receipt, $receivingService, $storageService) {
+            $receiptItem = $receipt?->items?->firstWhere('shipment_item_id', $item->id);
+            $driverConfirmation = $assignment->itemConfirmations->firstWhere('shipment_item_id', $item->id);
+            $driverPhotos = $assignment->photos
+                ->where('shipment_item_id', $item->id)->values()
+                ->map(fn ($photo) => [
+                    'id' => $photo->id,
+                    'url' => $storageService->getUrl($photo->path),
+                ])->values();
+
+            $vendorPhotos = $item->images->map(fn ($img) => $img->getSignedUrl()['url'] ?? $img->getSignedUrl())->filter()->values();
+
+            $vendorQuantity = (int) $item->quantity;
+            $driverQuantity = $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : null;
+
+            return [
+                'shipment_item_id' => $item->id,
+                'description' => $item->description,
+                'tracking_code' => $item->tracking_code,
+                'vendor_quantity' => $vendorQuantity,
+                'driver_confirmed_quantity' => $driverQuantity,
+                'expected_quantity' => $driverQuantity ?? $vendorQuantity,
+                'vendor_photos' => $vendorPhotos,
+                'driver_photos' => $driverPhotos,
+                'received_quantity' => (int) ($receiptItem?->received_quantity ?? 0),
+                'damaged_quantity' => (int) ($receiptItem?->damaged_quantity ?? 0),
+                'condition_status' => $receiptItem?->condition_status ?? 'ok',
+                'notes' => $receiptItem?->notes,
+                'barcode_value' => $receiptItem?->barcode_value,
+                'barcode_print_count' => (int) ($receiptItem?->barcode_print_count ?? 0),
+                'photos' => $receiptItem
+                    ? $receivingService->serializeReceiptItem($receiptItem)['photos']
+                    : [],
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'packages' => $packages,
+                'can_receive' => !is_null($assignment->picked_up_at),
+                'receipt' => $receipt ? [
+                    'id' => $receipt->id,
+                    'status' => $receipt->status,
+                ] : null,
+                'assignment_id' => $assignment->id,
+            ],
+        ]);
+    }
+
+    public function receivePackage(Request $request, Shipment $shipment, ShipmentItem $item): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        if ($item->shipment_id !== $shipment->id) {
+            return response()->json(['success' => false, 'message' => 'Package not found.'], 404);
+        }
+
+        $assignment = $shipment->pickupAssignment;
+        if (!$assignment || is_null($assignment->picked_up_at)) {
+            return response()->json(['success' => false, 'message' => 'Shipment has not been picked up yet.'], 422);
+        }
+
+        $warehouse = $assignment->targetWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'No target warehouse found.'], 422);
+        }
+
+        $validated = $request->validate([
+            'received_quantity' => ['required', 'integer', 'min:0'],
+            'damaged_quantity' => ['nullable', 'integer', 'min:0'],
+            'condition_status' => ['nullable', 'in:ok,damaged,partial'],
+            'notes' => ['nullable', 'string', 'max:3000'],
+            'description' => ['nullable', 'string', 'max:500'],
+            'quantity' => ['nullable', 'integer', 'min:1'],
+            'photos' => ['nullable', 'array'],
+            'photos.*' => ['file', 'image', 'max:12288'],
+            'remove_photo_ids' => ['nullable', 'array'],
+            'remove_photo_ids.*' => ['integer'],
+        ]);
+
+        // Update package details if provided
+        $packageUpdates = array_filter([
+            'description' => $validated['description'] ?? null,
+            'quantity' => $validated['quantity'] ?? null,
+        ], fn ($v) => !is_null($v));
+        if (!empty($packageUpdates)) {
+            $item->update($packageUpdates);
+        }
+
+        $receivingService = app(WarehouseReceivingService::class);
+        $result = $receivingService->upsertReceiptItem(
+            assignment: $assignment,
+            shipmentItem: $item,
+            warehouse: $warehouse,
+            user: Auth::guard('admin')->user(),
+            receivedQuantity: (int) $validated['received_quantity'],
+            damagedQuantity: (int) ($validated['damaged_quantity'] ?? 0),
+            conditionStatus: $validated['condition_status'] ?? null,
+            notes: $validated['notes'] ?? null,
+            photos: $request->file('photos', []),
+            removePhotoIds: $validated['remove_photo_ids'] ?? []
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function printPackageLabel(Shipment $shipment, ShipmentItem $item): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        if ($item->shipment_id !== $shipment->id) {
+            return response()->json(['success' => false, 'message' => 'Package not found.'], 404);
+        }
+
+        $assignment = $shipment->pickupAssignment;
+        if (!$assignment) {
+            return response()->json(['success' => false, 'message' => 'No pickup assignment found.'], 422);
+        }
+
+        $warehouse = $assignment->targetWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'No target warehouse found.'], 422);
+        }
+
+        $receivingService = app(WarehouseReceivingService::class);
+        $result = $receivingService->printItemLabel(
+            assignment: $assignment,
+            shipmentItem: $item,
+            warehouse: $warehouse,
+            user: Auth::guard('admin')->user()
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function finalizeReceiving(Request $request, Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $assignment = $shipment->pickupAssignment;
+        if (!$assignment) {
+            return response()->json(['success' => false, 'message' => 'No pickup assignment found.'], 422);
+        }
+
+        if (is_null($assignment->picked_up_at)) {
+            return response()->json(['success' => false, 'message' => 'Shipment has not been picked up yet.'], 422);
+        }
+
+        $warehouse = $assignment->targetWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'No target warehouse found.'], 422);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string', 'max:3000'],
+            'approval_reason' => ['nullable', 'string', 'max:3000'],
+        ]);
+
+        $receivingService = app(WarehouseReceivingService::class);
+        $result = $receivingService->finalizeReceipt(
+            assignment: $assignment,
+            warehouse: $warehouse,
+            user: Auth::guard('admin')->user(),
+            notes: $validated['notes'] ?? null,
+            approvalReason: $validated['approval_reason'] ?? null
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
     }
 }
