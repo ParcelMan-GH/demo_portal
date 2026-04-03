@@ -20,6 +20,7 @@ function shipmentShow() {
 
         // Receiving
         receivingLoaded: false,
+        receivingLightbox: null,
         receiving: { loading: false, saving: false, canReceive: false, packages: [], receipt: null, assignmentId: null },
 
         // Fulfillment type

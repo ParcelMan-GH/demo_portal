@@ -2611,31 +2611,57 @@ $shipmentConfig = [
                                     </div>
 
                                     <!-- Photos -->
-                                    <div class="px-4 py-3 border-b border-slate-100" x-show="pkg.vendor_photos.length > 0 || pkg.driver_photos.length > 0">
-                                        <div class="flex flex-wrap gap-1.5">
-                                            <template x-for="(url, i) in pkg.vendor_photos" :key="'v'+i">
-                                                <img :src="url" class="w-14 h-14 rounded-lg object-cover border border-slate-200 cursor-pointer" @@click="$dispatch('open-lightbox', { url: url })">
-                                            </template>
-                                            <template x-for="(photo, i) in pkg.driver_photos" :key="'d'+photo.id">
-                                                <img :src="photo.url" class="w-14 h-14 rounded-lg object-cover border border-blue-200 cursor-pointer" @@click="$dispatch('open-lightbox', { url: photo.url })">
-                                            </template>
-                                        </div>
+                                    <div class="px-4 py-3 border-b border-slate-100 space-y-3" x-show="pkg.vendor_photos.length > 0 || pkg.driver_photos.length > 0">
+                                        <template x-if="pkg.vendor_photos.length > 0">
+                                            <div>
+                                                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Vendor Photos (<span x-text="pkg.vendor_photos.length"></span>)</p>
+                                                <div class="flex flex-wrap gap-2">
+                                                    <template x-for="(url, i) in pkg.vendor_photos" :key="'v'+i">
+                                                        <img :src="url" class="w-20 h-20 rounded-xl object-cover border border-slate-200 cursor-pointer hover:ring-2 hover:ring-orange-400 transition-all" @@click="receivingLightbox = url">
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="pkg.driver_photos.length > 0">
+                                            <div>
+                                                <p class="text-[10px] font-semibold text-blue-500 uppercase tracking-wider mb-2">Driver Photos (<span x-text="pkg.driver_photos.length"></span>)</p>
+                                                <div class="flex flex-wrap gap-2">
+                                                    <template x-for="(photo, i) in pkg.driver_photos" :key="'d'+photo.id">
+                                                        <img :src="photo.url" class="w-20 h-20 rounded-xl object-cover border-2 border-blue-200 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all" @@click="receivingLightbox = photo.url">
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
                                     </div>
 
                                     <!-- Description & Receive Form -->
+                                    {{-- Driver confirmation info --}}
+                                    <template x-if="pkg.driver_confirmed_quantity !== null">
+                                        <div class="px-4 py-2 border-b border-slate-100 bg-blue-50/50 flex items-center gap-3">
+                                            <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            <div class="flex items-center gap-4 text-xs">
+                                                <span class="text-blue-700 font-semibold">Driver confirmed: <span x-text="pkg.driver_confirmed_quantity"></span></span>
+                                                <span class="text-slate-400">|</span>
+                                                <span class="text-slate-500">Vendor qty: <span x-text="pkg.vendor_quantity"></span></span>
+                                                <span class="text-slate-400">|</span>
+                                                <span class="text-slate-500">Expected: <span x-text="pkg.expected_quantity"></span></span>
+                                            </div>
+                                        </div>
+                                    </template>
+
                                     <div class="px-4 py-3">
                                         <div class="grid grid-cols-3 gap-3 mb-3">
                                             <div>
                                                 <label class="block text-[10px] font-semibold text-slate-500 mb-1">Description</label>
-                                                <input type="text" :value="pkg.description || ''" @@change="pkg.description = $event.target.value" placeholder="What's inside?" class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none">
+                                                <input type="text" :value="pkg.description || ''" @@change="pkg.description = $event.target.value" placeholder="What's inside?" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none">
                                             </div>
                                             <div>
                                                 <label class="block text-[10px] font-semibold text-slate-500 mb-1">Received Qty</label>
-                                                <input type="number" x-model.number="pkg.received_quantity" min="0" class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none">
+                                                <input type="number" x-model.number="pkg.received_quantity" min="0" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none">
                                             </div>
                                             <div>
                                                 <label class="block text-[10px] font-semibold text-slate-500 mb-1">Condition</label>
-                                                <select x-model="pkg.condition_status" class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none">
+                                                <select x-model="pkg.condition_status" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none">
                                                     <option value="ok">OK</option>
                                                     <option value="damaged">Damaged</option>
                                                     <option value="partial">Partial</option>
@@ -2644,7 +2670,7 @@ $shipmentConfig = [
                                         </div>
                                         <div class="mb-3">
                                             <label class="block text-[10px] font-semibold text-slate-500 mb-1">Notes</label>
-                                            <textarea x-model="pkg.notes" rows="1" class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none resize-none" placeholder="Receiving notes..."></textarea>
+                                            <input type="text" x-model="pkg.notes" placeholder="Receiving notes..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none">
                                         </div>
                                         <div class="flex items-center gap-2">
                                             <button @@click="receivePackage(pkg)" :disabled="receiving.saving" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-semibold rounded-lg transition-all disabled:opacity-50">
@@ -2675,6 +2701,15 @@ $shipmentConfig = [
                         </div>
                     </div>
                 </template>
+
+                {{-- Receiving Lightbox --}}
+                <div x-show="receivingLightbox" @@click="receivingLightbox = null" @@keydown.escape.window="receivingLightbox = null"
+                     x-transition.opacity class="fixed inset-0 z-[200] bg-black/85 flex items-center justify-center p-8 cursor-pointer" style="display:none">
+                    <img :src="receivingLightbox" class="max-w-full max-h-full rounded-2xl shadow-2xl">
+                    <button @@click="receivingLightbox = null" class="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
 
             </div>
 
