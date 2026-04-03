@@ -7,465 +7,814 @@
 @section('content')
 <div x-data="shipmentEditor()" x-init="init()" data-edit-config='@json($editConfig)'>
 
-    <div class="max-w-5xl mx-auto pb-24">
+    {{-- ═══════════════════════════════════════════════════════════ --}}
+    {{-- HERO HEADER                                                --}}
+    {{-- ═══════════════════════════════════════════════════════════ --}}
+    <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30 mb-8">
+        <div class="relative">
+            {{-- Grid background pattern --}}
+            <div class="absolute inset-0 opacity-[0.07]">
+                <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <defs>
+                        <pattern id="editgrid" width="10" height="10" patternUnits="userSpaceOnUse">
+                            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" stroke-width="0.5"/>
+                        </pattern>
+                    </defs>
+                    <rect width="100" height="100" fill="url(#editgrid)"/>
+                </svg>
+            </div>
+            {{-- Decorative glow --}}
+            <div class="absolute top-0 right-0 w-96 h-64 bg-gradient-to-bl from-blue-500/20 via-violet-500/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>
 
-    {{-- Header --}}
-    <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-3">
-            <a href="{{ route('admin.shipments.show', $shipment) }}" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 flex items-center justify-center transition-all">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-            </a>
-            <div>
-                <h1 class="text-lg font-bold text-slate-900">Edit Shipment <span class="text-slate-400 font-mono" x-text="shipment.shipment_number"></span></h1>
-                <p class="text-xs text-slate-500 mt-0.5">Fill in missing details, manage packages, assign destinations</p>
-            </div>
-        </div>
-        <div class="flex items-center gap-2">
-            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600" x-text="shipment.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())"></span>
-            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold" :class="destinationMode === 'per_item' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'" x-text="destinationMode === 'per_item' ? 'Multiple Drop-offs' : 'One Drop-off'"></span>
-            <button @@click="duplicateShipment()" :disabled="duplicating" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                <span x-text="duplicating ? 'Duplicating...' : 'Duplicate'"></span>
-            </button>
-        </div>
-    </div>
-
-    {{-- Sender Notes Banner --}}
-    <template x-if="shipment.sender_notes">
-        <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
-            <div class="flex items-start gap-3">
-                <div class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-amber-900">Sender's Notes</h3>
-                    <p class="text-sm text-amber-800 mt-1 leading-relaxed" x-text="shipment.sender_notes"></p>
-                </div>
-            </div>
-        </div>
-    </template>
-
-    {{-- Step 2: Drop-off Type --}}
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-            </div>
-            <div>
-                <div class="flex items-center gap-2">
-                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wide">Step 2</span>
-                    <h2 class="text-sm font-bold text-slate-900">Drop-off Type</h2>
-                </div>
-                <p class="text-xs text-slate-500 mt-0.5">Choose whether all packages share one address or each has its own.</p>
-            </div>
-        </div>
-        <div class="p-6">
-            <div class="grid grid-cols-2 gap-3">
-                <div @@click="if (destinationMode !== 'single') switchDestinationMode('single')" class="cursor-pointer p-4 rounded-2xl border-2 transition-all"
-                     :class="destinationMode === 'single' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'">
-                    <p class="text-sm font-bold text-slate-900">One Drop-off</p>
-                    <p class="text-xs text-slate-500 mt-1">All packages go to one address</p>
-                </div>
-                <div @@click="if (destinationMode !== 'per_item') switchDestinationMode('per_item')" class="cursor-pointer p-4 rounded-2xl border-2 transition-all"
-                     :class="destinationMode === 'per_item' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'">
-                    <p class="text-sm font-bold text-slate-900">Multiple Drop-offs</p>
-                    <p class="text-xs text-slate-500 mt-1">Each package has its own delivery address</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Step 1: Pickup Details --}}
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-            </div>
-            <div>
-                <div class="flex items-center gap-2">
-                    <span class="text-[10px] font-bold text-violet-600 uppercase tracking-wide">Step 1</span>
-                    <h2 class="text-sm font-bold text-slate-900">Pickup Details</h2>
-                </div>
-                <p class="text-xs text-slate-500 mt-0.5">Fill in the pickup location details. The driver will use this to find the sender.</p>
-            </div>
-        </div>
-        <div class="p-6">
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Contact Name</label>
-                    <input type="text" x-model="form.pickup.contact_name" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Contact Phone</label>
-                    <input type="text" x-model="form.pickup.contact_phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Region</label>
-                    <select x-model="form.pickup.region_id" @@change="loadDistricts('pickup')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                        <option value="">Select Region</option>
-                        <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">District</label>
-                    <select x-model="form.pickup.district_id" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                        <option value="">Select District</option>
-                        <template x-for="d in pickupDistricts" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Town / Area</label>
-                    <input type="text" x-model="form.pickup.town" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Landmark</label>
-                    <input type="text" x-model="form.pickup.landmark" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                </div>
-                <div class="col-span-2">
-                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Instructions</label>
-                    <textarea x-model="form.pickup.instructions" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
-                </div>
-            </div>
-            {{-- Save button --}}
-            <div class="mt-5 flex items-center justify-end gap-3">
-                <span x-show="pickupSaved" x-transition.opacity class="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    Saved ✓
-                </span>
-                <button @@click="savePickup()" :disabled="savingPickup" class="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-60">
-                    <svg x-show="savingPickup" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                    <span x-text="savingPickup ? 'Saving...' : 'Save Pickup Details'"></span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    {{-- Step 3: Delivery Details (single mode only) --}}
-    <template x-if="shipment.destination_mode === 'single'">
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6">
-            <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                </div>
-                <div>
+            <div class="relative px-6 lg:px-8 py-6">
+                {{-- Top row --}}
+                <div class="flex items-center justify-between mb-6">
+                    <a href="{{ route('admin.shipments.show', $shipment) }}" class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-medium transition-all backdrop-blur-sm">
+                        <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                        Back to Shipment
+                    </a>
                     <div class="flex items-center gap-2">
-                        <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">Step 3</span>
-                        <h2 class="text-sm font-bold text-slate-900">Delivery Details</h2>
-                    </div>
-                    <p class="text-xs text-slate-500 mt-0.5">Where should the driver deliver? Set the recipient and address for all packages.</p>
-                </div>
-            </div>
-            <div class="p-6">
-                <div class="grid grid-cols-3 gap-4 mb-4">
-                    <div>
-                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Delivery Preference</label>
-                        <select x-model="form.delivery_preference" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                            <option value="deliver">Deliver to Recipient</option>
-                            <option value="self_pickup">Recipient Collects</option>
-                        </select>
-                    </div>
-                    <div x-show="form.delivery_preference === 'deliver'">
-                        <label class="block text-[10px] font-semibold text-slate-400 mb-1">Routing (Admin)</label>
-                        <select x-model="form.fulfillment_type" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                            <option value="warehouse">Warehouse</option>
-                            <option value="direct">Direct Delivery</option>
-                        </select>
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-white/10 text-white/80 border border-white/20 backdrop-blur-sm" x-text="shipment.status ? shipment.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : ''"></span>
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold border backdrop-blur-sm"
+                              :class="destinationMode === 'per_item' ? 'bg-violet-500/20 text-violet-200 border-violet-500/30' : 'bg-blue-500/20 text-blue-200 border-blue-500/30'"
+                              x-text="destinationMode === 'per_item' ? 'Multiple Drop-offs' : 'One Drop-off'"></span>
+                        <button @@click="duplicateShipment()" :disabled="duplicating"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-500/20 hover:bg-slate-500/30 text-slate-300 text-[10px] font-semibold rounded-lg border border-slate-500/30 transition-all backdrop-blur-sm disabled:opacity-50">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <span x-text="duplicating ? 'Duplicating...' : 'Duplicate'"></span>
+                        </button>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient Name</label>
-                        <input type="text" x-model="form.delivery.recipient_name" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+
+                {{-- Main hero row --}}
+                <div class="flex items-start gap-5">
+                    {{-- Icon --}}
+                    <div class="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white text-2xl font-bold shadow-xl shadow-blue-500/30 ring-4 ring-white/10 flex-shrink-0">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                     </div>
-                    <div>
-                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient Phone</label>
-                        <input type="text" x-model="form.delivery.recipient_phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                    {{-- Info --}}
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-[10px] font-semibold text-blue-400 uppercase tracking-widest">Editing Record</span>
+                        </div>
+                        <h1 class="text-2xl lg:text-3xl font-black text-white tracking-tight font-mono" x-text="shipment.shipment_number || '{{ $shipment->shipment_number }}'"></h1>
+                        <p class="text-sm text-slate-400 mt-1">{{ $shipment->vendor?->name ?? 'Unknown Vendor' }} &nbsp;·&nbsp; Fill in missing details, manage packages &amp; assign driver</p>
                     </div>
-                    <div>
-                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Region</label>
-                        <select x-model="form.delivery.region_id" @@change="loadDistricts('delivery')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                            <option value="">Select Region</option>
-                            <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">District</label>
-                        <select x-model="form.delivery.district_id" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                            <option value="">Select District</option>
-                            <template x-for="d in deliveryDistricts" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Town / Area</label>
-                        <input type="text" x-model="form.delivery.town" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Landmark</label>
-                        <input type="text" x-model="form.delivery.landmark" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                    </div>
-                    <div class="col-span-2">
-                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Delivery Instructions</label>
-                        <textarea x-model="form.delivery.instructions" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
-                    </div>
-                </div>
-                {{-- Save button --}}
-                <div class="mt-5 flex items-center justify-end gap-3">
-                    <span x-show="deliverySaved" x-transition.opacity class="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                        Saved ✓
-                    </span>
-                    <button @@click="saveDelivery()" :disabled="savingDelivery" class="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-60">
-                        <svg x-show="savingDelivery" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span x-text="savingDelivery ? 'Saving...' : 'Save Delivery Details'"></span>
-                    </button>
                 </div>
             </div>
         </div>
-    </template>
+    </div>
 
-    {{-- Step 3 (per_item): Packages --}}
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-[10px] font-bold text-orange-600 uppercase tracking-wide">Step 3</span>
-                        <h2 class="text-sm font-bold text-slate-900">Packages</h2>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600" x-text="packages.length + ' package' + (packages.length !== 1 ? 's' : '')"></span>
-                    </div>
-                    <p class="text-xs text-slate-500 mt-0.5">Describe each package. Upload photos for reference. Save each card individually.</p>
-                </div>
-            </div>
-            <button @@click="addPackage()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-xl hover:bg-slate-800 transition-all">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                Add Package
-            </button>
-        </div>
-        <div class="p-6 space-y-6">
-            <template x-if="packages.length === 0">
-                <div class="text-center py-12 text-slate-400">
-                    <svg class="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                    <p class="text-sm font-medium">No packages yet</p>
-                    <p class="text-xs mt-1">Add a package to get started</p>
-                </div>
-            </template>
-            <template x-for="(pkg, pkgIndex) in packages" :key="pkg.id">
-                <div class="border border-slate-200 rounded-2xl overflow-hidden">
-                    {{-- Package Header --}}
-                    <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span class="w-6 h-6 rounded-lg bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center" x-text="pkgIndex + 1"></span>
-                            <span class="text-xs font-bold text-slate-700">Package <span x-text="pkgIndex + 1"></span></span>
-                            <span x-show="pkg.tracking_code" class="text-[10px] font-mono text-slate-400" x-text="pkg.tracking_code"></span>
-                        </div>
-                        <div class="flex items-center gap-1">
-                            <button @@click="splitPackageModal(pkg)" x-show="pkg.photos.length > 1" class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Split Package">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-                            </button>
-                            <button @@click="deletePackage(pkg)" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Delete Package">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                            </button>
+    {{-- ═══════════════════════════════════════════════════════════ --}}
+    {{-- TWO-COLUMN LAYOUT                                          --}}
+    {{-- ═══════════════════════════════════════════════════════════ --}}
+    <div class="max-w-7xl mx-auto pb-28">
+        <div class="flex flex-col lg:flex-row gap-6 items-start">
+
+            {{-- ─── LEFT COLUMN (60%) ─────────────────────────────── --}}
+            <div class="w-full lg:w-[60%] space-y-5">
+
+                {{-- ─── SECTION: Drop-off Type ─────────────────────── --}}
+                <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100 overflow-hidden"
+                     style="animation: fadeSlideUp 0.35s ease both; animation-delay: 0.05s">
+                    {{-- Section header --}}
+                    <div class="flex items-center gap-0 border-b border-slate-100/80">
+                        <div class="w-1.5 self-stretch bg-blue-500 rounded-l-3xl flex-shrink-0"></div>
+                        <div class="flex items-center justify-between flex-1 px-5 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-[11px] font-black flex items-center justify-center flex-shrink-0">2</div>
+                                <div>
+                                    <h2 class="text-sm font-bold text-slate-900 leading-tight">Drop-off Type</h2>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">One shared address or per-package addresses</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    {{-- Photos --}}
-                    <div class="px-5 py-4 border-b border-slate-100">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-[10px] font-semibold text-slate-400 uppercase">Photos (<span x-text="pkg.photos.length"></span>)</span>
-                            <label class="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                Upload
-                                <input type="file" multiple accept="image/jpeg,image/png,image/webp" class="hidden" @@change="uploadPhotos(pkg, $event)">
-                            </label>
-                        </div>
-                        <div class="flex flex-wrap gap-2" x-show="pkg.photos.length > 0">
-                            <template x-for="photo in pkg.photos" :key="photo.id">
-                                <div class="relative group w-20 h-20 rounded-xl overflow-hidden border border-slate-200 bg-slate-100" x-data="{ moveOpen: false }">
-                                    <img :src="photo.url" class="w-full h-full object-cover cursor-pointer" @@click="openLightbox(photo.url)">
-                                    <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
-                                        <button x-show="packages.length > 1" @@click.stop="moveOpen = !moveOpen" class="w-6 h-6 rounded-full bg-white/90 text-blue-600 flex items-center justify-center" title="Move to another package">
-                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-                                        </button>
-                                        <button @@click="deletePhoto(pkg, photo)" class="w-6 h-6 rounded-full bg-white/90 text-rose-600 flex items-center justify-center" title="Delete">
-                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                        </button>
+                    <div class="p-5">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div @@click="if (destinationMode !== 'single') switchDestinationMode('single')"
+                                 class="cursor-pointer p-4 rounded-2xl border-2 transition-all duration-200"
+                                 :class="destinationMode === 'single' ? 'border-blue-500 bg-blue-50 shadow-sm shadow-blue-200/60' : 'border-slate-200 hover:border-blue-200 hover:bg-blue-50/40'">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors"
+                                         :class="destinationMode === 'single' ? 'border-blue-500 bg-blue-500' : 'border-slate-300'">
+                                        <div x-show="destinationMode === 'single'" class="w-2 h-2 rounded-full bg-white"></div>
                                     </div>
-                                    {{-- Move dropdown --}}
-                                    <div x-show="moveOpen" @@click.away="moveOpen = false" x-transition
-                                         class="absolute top-full left-0 mt-1 w-36 bg-white rounded-xl border border-slate-200 shadow-xl z-30 py-1" style="display:none">
-                                        <p class="px-3 py-1 text-[9px] font-semibold text-slate-400 uppercase">Move to</p>
-                                        <template x-for="(targetPkg, tIdx) in packages.filter(p => p.id !== pkg.id)" :key="targetPkg.id">
-                                            <button @@click="movePhoto(pkg, photo, targetPkg); moveOpen = false"
-                                                    class="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2">
-                                                <span class="w-4 h-4 rounded bg-orange-500 text-white text-[8px] font-bold flex items-center justify-center" x-text="packages.indexOf(targetPkg) + 1"></span>
-                                                <span x-text="'Package ' + (packages.indexOf(targetPkg) + 1)"></span>
-                                            </button>
-                                        </template>
+                                    <p class="text-sm font-bold text-slate-900">One Drop-off</p>
+                                </div>
+                                <p class="text-[11px] text-slate-500 ml-7">All packages go to one address</p>
+                            </div>
+                            <div @@click="if (destinationMode !== 'per_item') switchDestinationMode('per_item')"
+                                 class="cursor-pointer p-4 rounded-2xl border-2 transition-all duration-200"
+                                 :class="destinationMode === 'per_item' ? 'border-violet-500 bg-violet-50 shadow-sm shadow-violet-200/60' : 'border-slate-200 hover:border-violet-200 hover:bg-violet-50/40'">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors"
+                                         :class="destinationMode === 'per_item' ? 'border-violet-500 bg-violet-500' : 'border-slate-300'">
+                                        <div x-show="destinationMode === 'per_item'" class="w-2 h-2 rounded-full bg-white"></div>
+                                    </div>
+                                    <p class="text-sm font-bold text-slate-900">Multiple Drop-offs</p>
+                                </div>
+                                <p class="text-[11px] text-slate-500 ml-7">Each package has its own delivery address</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- ─── SECTION: Pickup Details ─────────────────────── --}}
+                <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100 overflow-hidden"
+                     style="animation: fadeSlideUp 0.35s ease both; animation-delay: 0.1s">
+                    <div class="flex items-center gap-0 border-b border-slate-100/80">
+                        <div class="w-1.5 self-stretch bg-violet-500 rounded-l-3xl flex-shrink-0"></div>
+                        <div class="flex items-center justify-between flex-1 px-5 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-7 h-7 rounded-full bg-violet-100 text-violet-700 text-[11px] font-black flex items-center justify-center flex-shrink-0">1</div>
+                                <div>
+                                    <h2 class="text-sm font-bold text-slate-900 leading-tight">Pickup Details</h2>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">Pickup location the driver will use to find the sender</p>
+                                </div>
+                            </div>
+                            {{-- Inline save area --}}
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                <span x-show="pickupSaved"
+                                      x-transition:enter="transition ease-out duration-200"
+                                      x-transition:enter-start="opacity-0 translate-x-2"
+                                      x-transition:enter-end="opacity-100 translate-x-0"
+                                      x-transition:leave="transition ease-in duration-150"
+                                      x-transition:leave-start="opacity-100"
+                                      x-transition:leave-end="opacity-0"
+                                      class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    Saved
+                                </span>
+                                <button @@click="savePickup()" :disabled="savingPickup"
+                                        class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-slate-700 text-white text-[11px] font-semibold rounded-xl transition-all disabled:opacity-60 shadow-sm">
+                                    <svg x-show="savingPickup" class="w-3 h-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                    <span x-text="savingPickup ? 'Saving…' : 'Save Pickup'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-5 space-y-4">
+                        {{-- Contact group --}}
+                        <div class="bg-slate-50/60 border border-slate-100 rounded-2xl p-4">
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                Contact
+                            </p>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Contact Name</label>
+                                    <input type="text" x-model="form.pickup.contact_name"
+                                           class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Contact Phone</label>
+                                    <input type="text" x-model="form.pickup.contact_phone"
+                                           class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Location group --}}
+                        <div class="bg-slate-50/60 border border-slate-100 rounded-2xl p-4">
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                Location
+                            </p>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Region</label>
+                                    <select x-model="form.pickup.region_id" @@change="loadDistricts('pickup')"
+                                            class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                        <option value="">Select Region</option>
+                                        <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">District</label>
+                                    <select x-model="form.pickup.district_id"
+                                            class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                        <option value="">Select District</option>
+                                        <template x-for="d in pickupDistricts" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Town / Area</label>
+                                    <input type="text" x-model="form.pickup.town"
+                                           class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Landmark</label>
+                                    <input type="text" x-model="form.pickup.landmark"
+                                           class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Instructions</label>
+                                    <textarea x-model="form.pickup.instructions" rows="2"
+                                              class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all resize-none"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- ─── SECTION: Delivery Details (single mode) ─────── --}}
+                <template x-if="shipment.destination_mode === 'single'">
+                    <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100 overflow-hidden"
+                         style="animation: fadeSlideUp 0.35s ease both; animation-delay: 0.15s">
+                        <div class="flex items-center gap-0 border-b border-slate-100/80">
+                            <div class="w-1.5 self-stretch bg-emerald-500 rounded-l-3xl flex-shrink-0"></div>
+                            <div class="flex items-center justify-between flex-1 px-5 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-black flex items-center justify-center flex-shrink-0">3</div>
+                                    <div>
+                                        <h2 class="text-sm font-bold text-slate-900 leading-tight">Delivery Details</h2>
+                                        <p class="text-[11px] text-slate-500 mt-0.5">Recipient and address for all packages</p>
                                     </div>
                                 </div>
-                            </template>
-                        </div>
-                        <p x-show="pkg.photos.length === 0" class="text-xs text-slate-400 italic">No photos uploaded</p>
-                    </div>
-
-                    {{-- Package Fields --}}
-                    <div class="px-5 py-4">
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Description (what's inside)</label>
-                                <textarea x-model="pkg.description" rows="2" placeholder="e.g. 2x Nike shoes, 1x phone case" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <span x-show="deliverySaved"
+                                          x-transition:enter="transition ease-out duration-200"
+                                          x-transition:enter-start="opacity-0 translate-x-2"
+                                          x-transition:enter-end="opacity-100 translate-x-0"
+                                          x-transition:leave="transition ease-in duration-150"
+                                          x-transition:leave-start="opacity-100"
+                                          x-transition:leave-end="opacity-0"
+                                          class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                        Saved
+                                    </span>
+                                    <button @@click="saveDelivery()" :disabled="savingDelivery"
+                                            class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-slate-700 text-white text-[11px] font-semibold rounded-xl transition-all disabled:opacity-60 shadow-sm">
+                                        <svg x-show="savingDelivery" class="w-3 h-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                        <span x-text="savingDelivery ? 'Saving…' : 'Save Delivery'"></span>
+                                    </button>
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-slate-400 mb-1">Qty <span class="text-slate-300 font-normal">(skip if sealed)</span></label>
-                                <input type="number" x-model.number="pkg.quantity" min="1" placeholder="—" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
-                            </div>
                         </div>
 
-                        {{-- Per-item delivery fields --}}
-                        <template x-if="shipment.destination_mode === 'per_item'">
-                            <div class="mt-4 pt-4 border-t border-slate-100">
-                                <h4 class="text-[10px] font-semibold text-slate-400 uppercase mb-3">Delivery Details for this Package</h4>
-                                <div class="grid grid-cols-3 gap-3 mb-3">
+                        <div class="p-5 space-y-4">
+                            {{-- Routing preferences --}}
+                            <div class="bg-slate-50/60 border border-slate-100 rounded-2xl p-4">
+                                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                    Routing
+                                </p>
+                                <div class="grid grid-cols-3 gap-3">
                                     <div>
-                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Delivery Preference</label>
-                                        <select x-model="pkg.delivery_preference" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Delivery Preference</label>
+                                        <select x-model="form.delivery_preference"
+                                                class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                             <option value="deliver">Deliver to Recipient</option>
                                             <option value="self_pickup">Recipient Collects</option>
                                         </select>
                                     </div>
-                                    <div x-show="pkg.delivery_preference === 'deliver'">
-                                        <label class="block text-[10px] font-semibold text-slate-400 mb-1">Routing</label>
-                                        <select x-model="pkg.fulfillment_type" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                    <div x-show="form.delivery_preference === 'deliver'">
+                                        <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Routing (Admin)</label>
+                                        <select x-model="form.fulfillment_type"
+                                                class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                             <option value="warehouse">Warehouse</option>
-                                            <option value="direct">Direct</option>
+                                            <option value="direct">Direct Delivery</option>
                                         </select>
                                     </div>
                                 </div>
+                            </div>
+
+                            {{-- Recipient group --}}
+                            <div class="bg-slate-50/60 border border-slate-100 rounded-2xl p-4">
+                                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                    Recipient
+                                </p>
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient Name</label>
-                                        <input type="text" x-model="pkg.delivery_recipient_name" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Recipient Name</label>
+                                        <input type="text" x-model="form.delivery.recipient_name"
+                                               class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient Phone</label>
-                                        <input type="text" x-model="pkg.delivery_recipient_phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Recipient Phone</label>
+                                        <input type="text" x-model="form.delivery.recipient_phone"
+                                               class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Location group --}}
+                            <div class="bg-slate-50/60 border border-slate-100 rounded-2xl p-4">
+                                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    Delivery Location
+                                </p>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Region</label>
+                                        <select x-model="form.delivery.region_id" @@change="loadDistricts('delivery')"
+                                                class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                            <option value="">Select Region</option>
+                                            <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
+                                        </select>
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Town / Area</label>
-                                        <input type="text" x-model="pkg.delivery_town" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">District</label>
+                                        <select x-model="form.delivery.district_id"
+                                                class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                            <option value="">Select District</option>
+                                            <template x-for="d in deliveryDistricts" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
+                                        </select>
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Landmark</label>
-                                        <input type="text" x-model="pkg.delivery_landmark" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Town / Area</label>
+                                        <input type="text" x-model="form.delivery.town"
+                                               class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Landmark</label>
+                                        <input type="text" x-model="form.delivery.landmark"
+                                               class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                    </div>
+                                    <div class="col-span-2">
+                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Delivery Instructions</label>
+                                        <textarea x-model="form.delivery.instructions" rows="2"
+                                                  class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all resize-none"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                {{-- ─── SECTION: Packages ───────────────────────────── --}}
+                <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100 overflow-hidden"
+                     style="animation: fadeSlideUp 0.35s ease both; animation-delay: 0.2s">
+                    <div class="flex items-center gap-0 border-b border-slate-100/80">
+                        <div class="w-1.5 self-stretch bg-orange-500 rounded-l-3xl flex-shrink-0"></div>
+                        <div class="flex items-center justify-between flex-1 px-5 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-7 h-7 rounded-full bg-orange-100 text-orange-700 text-[11px] font-black flex items-center justify-center flex-shrink-0">4</div>
+                                <div>
+                                    <h2 class="text-sm font-bold text-slate-900 leading-tight">
+                                        Packages
+                                        <span class="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700" x-text="packages.length"></span>
+                                    </h2>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">Describe each package, upload photos, save individually</p>
+                                </div>
+                            </div>
+                            <button @@click="addPackage()"
+                                    class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 text-white text-[11px] font-semibold rounded-xl hover:bg-slate-700 transition-all shadow-sm">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Add Package
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-5 space-y-4">
+                        {{-- Empty state --}}
+                        <template x-if="packages.length === 0">
+                            <div class="text-center py-14">
+                                <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-orange-50 border-2 border-dashed border-orange-200 flex items-center justify-center">
+                                    <svg class="w-8 h-8 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                </div>
+                                <p class="text-sm font-semibold text-slate-500">No packages yet</p>
+                                <p class="text-xs text-slate-400 mt-1">Click "Add Package" to get started</p>
+                            </div>
+                        </template>
+
+                        {{-- Package cards --}}
+                        <template x-for="(pkg, pkgIndex) in packages" :key="pkg.id">
+                            <div class="border border-slate-200/80 rounded-2xl overflow-hidden bg-white shadow-sm"
+                                 x-data="{ expanded: true }">
+                                {{-- Package card header --}}
+                                <div class="px-4 py-3 bg-gradient-to-r from-slate-50 to-orange-50/40 border-b border-slate-200/60 flex items-center justify-between cursor-pointer select-none"
+                                     @@click="expanded = !expanded">
+                                    <div class="flex items-center gap-2.5">
+                                        <div class="w-6 h-6 rounded-lg bg-orange-500 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0" x-text="pkgIndex + 1"></div>
+                                        <span class="text-xs font-bold text-slate-800">Package <span x-text="pkgIndex + 1"></span></span>
+                                        <span x-show="pkg.tracking_code" class="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded" x-text="pkg.tracking_code"></span>
+                                        <span x-show="pkg.description" class="text-[11px] text-slate-400 truncate max-w-32" x-text="pkg.description"></span>
+                                    </div>
+                                    <div class="flex items-center gap-1" @@click.stop>
+                                        <button @@click="splitPackageModal(pkg)" x-show="pkg.photos.length > 1"
+                                                class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Split Package">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                        </button>
+                                        <button @@click="deletePackage(pkg)"
+                                                class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Delete Package">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        </button>
+                                        <button @@click="expanded = !expanded"
+                                                class="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors ml-1">
+                                            <svg class="w-4 h-4 transition-transform" :class="expanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div x-show="expanded" x-collapse>
+                                    {{-- Photos section --}}
+                                    <div class="px-4 py-3.5 border-b border-slate-100/80 bg-slate-50/30">
+                                        <div class="flex items-center justify-between mb-2.5">
+                                            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Photos (<span x-text="pkg.photos.length"></span>)</span>
+                                            <label class="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors border border-blue-100">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                                Upload Photos
+                                                <input type="file" multiple accept="image/jpeg,image/png,image/webp" class="hidden" @@change="uploadPhotos(pkg, $event)">
+                                            </label>
+                                        </div>
+                                        <div class="flex flex-wrap gap-2" x-show="pkg.photos.length > 0">
+                                            <template x-for="photo in pkg.photos" :key="photo.id">
+                                                <div class="relative group w-20 h-20 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm" x-data="{ moveOpen: false }">
+                                                    <img :src="photo.url" class="w-full h-full object-cover cursor-pointer" @@click="openLightbox(photo.url)">
+                                                    <div class="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100">
+                                                        <button x-show="packages.length > 1" @@click.stop="moveOpen = !moveOpen"
+                                                                class="w-7 h-7 rounded-full bg-white/90 text-blue-600 flex items-center justify-center shadow" title="Move photo">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                                        </button>
+                                                        <button @@click="deletePhoto(pkg, photo)"
+                                                                class="w-7 h-7 rounded-full bg-white/90 text-rose-600 flex items-center justify-center shadow" title="Delete photo">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                        </button>
+                                                    </div>
+                                                    {{-- Move dropdown --}}
+                                                    <div x-show="moveOpen" @@click.away="moveOpen = false" x-transition
+                                                         class="absolute top-full left-0 mt-1 w-36 bg-white rounded-xl border border-slate-200 shadow-xl z-30 py-1" style="display:none">
+                                                        <p class="px-3 py-1 text-[9px] font-semibold text-slate-400 uppercase">Move to</p>
+                                                        <template x-for="(targetPkg, tIdx) in packages.filter(p => p.id !== pkg.id)" :key="targetPkg.id">
+                                                            <button @@click="movePhoto(pkg, photo, targetPkg); moveOpen = false"
+                                                                    class="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2">
+                                                                <span class="w-4 h-4 rounded bg-orange-500 text-white text-[8px] font-bold flex items-center justify-center" x-text="packages.indexOf(targetPkg) + 1"></span>
+                                                                <span x-text="'Package ' + (packages.indexOf(targetPkg) + 1)"></span>
+                                                            </button>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                        <p x-show="pkg.photos.length === 0" class="text-xs text-slate-400 italic">No photos uploaded yet</p>
+                                    </div>
+
+                                    {{-- Package fields --}}
+                                    <div class="px-4 py-4">
+                                        <div class="grid grid-cols-2 gap-3 mb-4">
+                                            <div>
+                                                <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Description <span class="text-slate-300 font-normal normal-case">(what's inside)</span></label>
+                                                <textarea x-model="pkg.description" rows="2" placeholder="e.g. 2x Nike shoes, 1x phone case"
+                                                          class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none transition-all resize-none"></textarea>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Quantity <span class="text-slate-300 font-normal normal-case">(skip if sealed)</span></label>
+                                                <input type="number" x-model.number="pkg.quantity" min="1" placeholder="—"
+                                                       class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none transition-all">
+                                            </div>
+                                        </div>
+
+                                        {{-- Per-item delivery fields --}}
+                                        <template x-if="shipment.destination_mode === 'per_item'">
+                                            <div class="mt-1 bg-slate-50/70 border border-slate-100 rounded-2xl p-4">
+                                                <h4 class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                                    <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                                                    Delivery details for this package
+                                                </h4>
+                                                <div class="grid grid-cols-3 gap-3 mb-3">
+                                                    <div>
+                                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Delivery Preference</label>
+                                                        <select x-model="pkg.delivery_preference"
+                                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                            <option value="deliver">Deliver to Recipient</option>
+                                                            <option value="self_pickup">Recipient Collects</option>
+                                                        </select>
+                                                    </div>
+                                                    <div x-show="pkg.delivery_preference === 'deliver'">
+                                                        <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Routing</label>
+                                                        <select x-model="pkg.fulfillment_type"
+                                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                            <option value="warehouse">Warehouse</option>
+                                                            <option value="direct">Direct</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Recipient Name</label>
+                                                        <input type="text" x-model="pkg.delivery_recipient_name"
+                                                               class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Recipient Phone</label>
+                                                        <input type="text" x-model="pkg.delivery_recipient_phone"
+                                                               class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Town / Area</label>
+                                                        <input type="text" x-model="pkg.delivery_town"
+                                                               class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Landmark</label>
+                                                        <input type="text" x-model="pkg.delivery_landmark"
+                                                               class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        {{-- Package save footer --}}
+                                        <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                                            <span x-show="pkg._saved"
+                                                  x-transition:enter="transition ease-out duration-200"
+                                                  x-transition:enter-start="opacity-0 translate-x-2"
+                                                  x-transition:enter-end="opacity-100 translate-x-0"
+                                                  x-transition:leave="transition ease-in duration-150"
+                                                  x-transition:leave-start="opacity-100"
+                                                  x-transition:leave-end="opacity-0"
+                                                  class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                Saved
+                                            </span>
+                                            <button @@click="savePackage(pkg)" :disabled="pkg._saving"
+                                                    class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-slate-700 text-white text-[11px] font-semibold rounded-xl transition-all disabled:opacity-60 shadow-sm">
+                                                <svg x-show="pkg._saving" class="w-3 h-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                                <span x-text="pkg._saving ? 'Saving…' : 'Save Package'"></span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </template>
+                    </div>
+                </div>
 
-                        {{-- Package Save button --}}
-                        <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-                            <span x-show="pkg._saved" x-transition.opacity class="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Saved ✓
-                            </span>
-                            <button @@click="savePackage(pkg)" :disabled="pkg._saving" class="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-60">
-                                <svg x-show="pkg._saving" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                                <span x-text="pkg._saving ? 'Saving...' : 'Save Package'"></span>
-                            </button>
+            </div>{{-- end left column --}}
+
+            {{-- ─── RIGHT COLUMN (40%) ─────────────────────────────── --}}
+            <div class="w-full lg:w-[40%] space-y-5 lg:sticky lg:top-6">
+
+                {{-- ─── Progress Stepper ───────────────────────────── --}}
+                <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100 overflow-hidden"
+                     style="animation: fadeSlideUp 0.35s ease both; animation-delay: 0.08s">
+                    <div class="px-5 py-4 border-b border-slate-100/80 flex items-center gap-3">
+                        <div class="w-7 h-7 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-bold text-slate-800">Completion Checklist</h3>
+                            <p class="text-[11px] text-slate-400">Track your progress filling this record</p>
+                        </div>
+                    </div>
+                    <div class="p-5">
+                        <div class="space-y-2">
+                            {{-- Step: Sender notes --}}
+                            <div class="flex items-center gap-3 py-2">
+                                <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all"
+                                     :class="shipment.sender_notes ? 'bg-emerald-500' : 'bg-slate-100 border-2 border-slate-200'">
+                                    <svg x-show="shipment.sender_notes" class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    <span x-show="!shipment.sender_notes" class="text-[10px] font-bold text-slate-400">1</span>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-semibold text-slate-700">Review Sender Notes</p>
+                                    <p class="text-[11px] text-slate-400">Check vendor's instructions</p>
+                                </div>
+                                <div class="text-[10px] font-semibold"
+                                     :class="shipment.sender_notes ? 'text-emerald-600' : 'text-slate-300'">
+                                    <span x-text="shipment.sender_notes ? 'Done' : 'N/A'"></span>
+                                </div>
+                            </div>
+                            <div class="h-px bg-slate-100 ml-9"></div>
+                            {{-- Step: Drop-off type --}}
+                            <div class="flex items-center gap-3 py-2">
+                                <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all"
+                                     :class="destinationMode ? 'bg-emerald-500' : 'bg-blue-500 animate-pulse'">
+                                    <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-semibold text-slate-700">Set Drop-off Type</p>
+                                    <p class="text-[11px] text-slate-400" x-text="destinationMode === 'per_item' ? 'Multiple Drop-offs selected' : 'One Drop-off selected'"></p>
+                                </div>
+                                <span class="text-[10px] font-semibold text-emerald-600">Done</span>
+                            </div>
+                            <div class="h-px bg-slate-100 ml-9"></div>
+                            {{-- Step: Pickup details --}}
+                            <div class="flex items-center gap-3 py-2">
+                                <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all"
+                                     :class="(form.pickup.contact_name && form.pickup.town) ? 'bg-emerald-500' : 'bg-slate-100 border-2 border-slate-200'">
+                                    <svg x-show="form.pickup.contact_name && form.pickup.town" class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    <span x-show="!(form.pickup.contact_name && form.pickup.town)" class="text-[10px] font-bold text-slate-400">3</span>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-semibold text-slate-700">Fill Pickup Details</p>
+                                    <p class="text-[11px] text-slate-400">Contact name + town required</p>
+                                </div>
+                                <span class="text-[10px] font-semibold"
+                                      :class="(form.pickup.contact_name && form.pickup.town) ? 'text-emerald-600' : 'text-amber-500'"
+                                      x-text="(form.pickup.contact_name && form.pickup.town) ? 'Done' : 'Pending'"></span>
+                            </div>
+                            <div class="h-px bg-slate-100 ml-9"></div>
+                            {{-- Step: Delivery details --}}
+                            <div class="flex items-center gap-3 py-2">
+                                <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all"
+                                     :class="((shipment.destination_mode === 'single' && form.delivery.recipient_name) || (shipment.destination_mode === 'per_item' && packages.some(p => p.delivery_recipient_name))) ? 'bg-emerald-500' : 'bg-slate-100 border-2 border-slate-200'">
+                                    <svg x-show="(shipment.destination_mode === 'single' && form.delivery.recipient_name) || (shipment.destination_mode === 'per_item' && packages.some(p => p.delivery_recipient_name))" class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    <span x-show="!((shipment.destination_mode === 'single' && form.delivery.recipient_name) || (shipment.destination_mode === 'per_item' && packages.some(p => p.delivery_recipient_name)))" class="text-[10px] font-bold text-slate-400">4</span>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-semibold text-slate-700">Fill Delivery Details</p>
+                                    <p class="text-[11px] text-slate-400" x-text="shipment.destination_mode === 'per_item' ? 'Set per-package delivery' : 'Recipient name required'"></p>
+                                </div>
+                                <span class="text-[10px] font-semibold"
+                                      :class="((shipment.destination_mode === 'single' && form.delivery.recipient_name) || (shipment.destination_mode === 'per_item' && packages.some(p => p.delivery_recipient_name))) ? 'text-emerald-600' : 'text-amber-500'"
+                                      x-text="((shipment.destination_mode === 'single' && form.delivery.recipient_name) || (shipment.destination_mode === 'per_item' && packages.some(p => p.delivery_recipient_name))) ? 'Done' : 'Pending'"></span>
+                            </div>
+                            <div class="h-px bg-slate-100 ml-9"></div>
+                            {{-- Step: Packages described --}}
+                            <div class="flex items-center gap-3 py-2">
+                                <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all"
+                                     :class="packages.length > 0 && packages.some(p => p.description) ? 'bg-emerald-500' : 'bg-slate-100 border-2 border-slate-200'">
+                                    <svg x-show="packages.length > 0 && packages.some(p => p.description)" class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    <span x-show="!(packages.length > 0 && packages.some(p => p.description))" class="text-[10px] font-bold text-slate-400">5</span>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-semibold text-slate-700">Review Packages</p>
+                                    <p class="text-[11px] text-slate-400">At least 1 package described</p>
+                                </div>
+                                <span class="text-[10px] font-semibold"
+                                      :class="packages.length > 0 && packages.some(p => p.description) ? 'text-emerald-600' : 'text-amber-500'"
+                                      x-text="packages.length > 0 && packages.some(p => p.description) ? 'Done' : 'Pending'"></span>
+                            </div>
+                            <div class="h-px bg-slate-100 ml-9"></div>
+                            {{-- Step: Driver assigned --}}
+                            <div class="flex items-center gap-3 py-2">
+                                <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all"
+                                     :class="currentAssignment ? 'bg-emerald-500' : 'bg-slate-100 border-2 border-slate-200'">
+                                    <svg x-show="currentAssignment" class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    <span x-show="!currentAssignment" class="text-[10px] font-bold text-slate-400">6</span>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-semibold text-slate-700">Assign Driver</p>
+                                    <p class="text-[11px] text-slate-400">Assign pickup driver & warehouse</p>
+                                </div>
+                                <span class="text-[10px] font-semibold"
+                                      :class="currentAssignment ? 'text-emerald-600' : 'text-amber-500'"
+                                      x-text="currentAssignment ? 'Done' : 'Pending'"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </template>
-        </div>
+
+                {{-- ─── Sender Notes Card ──────────────────────────── --}}
+                <template x-if="shipment.sender_notes">
+                    <div class="rounded-3xl overflow-hidden shadow-md shadow-amber-200/40 border border-amber-200/60"
+                         style="animation: fadeSlideUp 0.35s ease both; animation-delay: 0.12s">
+                        <div class="flex">
+                            <div class="w-1.5 bg-amber-400 flex-shrink-0"></div>
+                            <div class="flex-1 bg-gradient-to-br from-amber-50 to-orange-50/60 p-5">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="text-xs font-bold text-amber-900 mb-1.5">Sender's Notes</h3>
+                                        <p class="text-sm text-amber-800 leading-relaxed" x-text="shipment.sender_notes"></p>
+                                        <p class="text-[11px] text-amber-600/70 mt-3 font-medium">{{ $shipment->vendor?->name ?? '' }}{{ $shipment->vendor?->phone ? ' · ' . $shipment->vendor->phone : '' }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                {{-- ─── Assignment / Driver Card ───────────────────── --}}
+                <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100 overflow-hidden"
+                     x-show="['submitted', 'invoice_accepted', 'pickup_assigned'].includes(shipment.status)"
+                     style="animation: fadeSlideUp 0.35s ease both; animation-delay: 0.16s">
+                    <div class="flex items-center gap-0 border-b border-slate-100/80">
+                        <div class="w-1.5 self-stretch bg-indigo-500 rounded-l-3xl flex-shrink-0"></div>
+                        <div class="flex items-center justify-between flex-1 px-5 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-[11px] font-black flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-xs font-bold text-slate-800">Pickup Assignment</h3>
+                                    <p class="text-[11px] text-slate-400" x-text="currentAssignment ? 'Driver assigned' : 'No driver assigned yet'"></p>
+                                </div>
+                            </div>
+                            {{-- Assign / change buttons --}}
+                            <div>
+                                <template x-if="!currentAssignment">
+                                    <button @@click="openAssignModal()"
+                                            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white text-[11px] font-bold rounded-xl shadow-md shadow-indigo-400/30 transition-all">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                        Assign Driver
+                                    </button>
+                                </template>
+                                <template x-if="currentAssignment && currentAssignment.status === 'assigned' && !currentAssignment.picked_up_at">
+                                    <button @@click="openAssignModal(true)"
+                                            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-indigo-200 text-indigo-700 text-[11px] font-semibold rounded-xl hover:bg-indigo-50 transition-all">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                        Change Driver
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Not assigned state --}}
+                    <template x-if="!currentAssignment">
+                        <div class="px-5 py-8 text-center">
+                            <div class="w-12 h-12 mx-auto mb-3 rounded-2xl bg-indigo-50 border-2 border-dashed border-indigo-200 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                            </div>
+                            <p class="text-sm font-semibold text-slate-500">No driver assigned</p>
+                            <p class="text-xs text-slate-400 mt-1">Assign a driver to begin the pickup process</p>
+                        </div>
+                    </template>
+
+                    {{-- Assigned driver info --}}
+                    <template x-if="currentAssignment">
+                        <div class="px-5 py-4">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-indigo-300/40 flex-shrink-0"
+                                     x-text="(currentAssignment.driver_name || '?').charAt(0).toUpperCase()"></div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-bold text-slate-900" x-text="currentAssignment.driver_name"></p>
+                                    <p class="text-xs text-slate-500" x-text="currentAssignment.driver_phone"></p>
+                                    <p class="text-[11px] text-slate-400 mt-0.5" x-text="currentAssignment.warehouse_name"></p>
+                                </div>
+                                <div class="flex-shrink-0">
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold"
+                                          :class="currentAssignment.status === 'assigned' ? 'bg-blue-100 text-blue-700' : currentAssignment.status === 'en_route' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'"
+                                          x-text="currentAssignment.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+            </div>{{-- end right column --}}
+
+        </div>{{-- end two-column flex --}}
     </div>
 
-    {{-- Assign Driver --}}
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6" x-show="['submitted', 'invoice_accepted', 'pickup_assigned'].includes(shipment.status)">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                </div>
-                <div>
-                    <h2 class="text-sm font-bold text-slate-900">Pickup Assignment</h2>
-                    <p class="text-xs text-slate-500" x-text="currentAssignment ? 'Driver assigned — change before pickup starts' : 'Assign a driver to pick up this shipment'"></p>
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
-                <template x-if="!currentAssignment">
-                    <button @@click="openAssignModal()" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-lg shadow-violet-500/25 transition-all">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        Assign Driver
-                    </button>
-                </template>
-                <template x-if="currentAssignment && currentAssignment.status === 'assigned' && !currentAssignment.picked_up_at">
-                    <button @@click="openAssignModal(true)" class="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-violet-200 text-violet-700 text-xs font-semibold rounded-xl hover:bg-violet-50 transition-all">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                        Change Driver
-                    </button>
-                </template>
-            </div>
-        </div>
-        {{-- Current assignment info --}}
-        <template x-if="currentAssignment">
-            <div class="px-6 py-4 flex items-center gap-4">
-                <div class="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm" x-text="(currentAssignment.driver_name || '?').charAt(0).toUpperCase()"></div>
-                <div class="flex-1">
-                    <p class="text-sm font-bold text-slate-900" x-text="currentAssignment.driver_name"></p>
-                    <p class="text-xs text-slate-500" x-text="currentAssignment.driver_phone"></p>
-                </div>
-                <div class="text-right">
-                    <p class="text-xs text-slate-500" x-text="currentAssignment.warehouse_name"></p>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                          :class="currentAssignment.status === 'assigned' ? 'bg-blue-100 text-blue-700' : currentAssignment.status === 'en_route' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'"
-                          x-text="currentAssignment.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())"></span>
-                </div>
-            </div>
-        </template>
-    </div>
+    {{-- ═══════════════════════════════════════════════════════════ --}}
+    {{-- MODALS                                                     --}}
+    {{-- ═══════════════════════════════════════════════════════════ --}}
 
     {{-- Assign Driver Modal --}}
-    <div x-show="assignModal.open" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display:none">
-        <div @@click.stop class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md">
-            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                    <h3 class="text-sm font-bold text-slate-900" x-text="assignModal.isEdit ? 'Change Driver' : 'Assign Driver'"></h3>
-                    <p class="text-xs text-slate-500" x-text="assignModal.isEdit ? 'Select a new driver or warehouse' : 'Select driver and target warehouse'"></p>
+    <div x-show="assignModal.open" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" style="display:none">
+        <div @@click.stop class="bg-white rounded-3xl shadow-2xl border border-slate-200/80 w-full max-w-md overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-indigo-50/40">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900" x-text="assignModal.isEdit ? 'Change Driver' : 'Assign Driver'"></h3>
+                        <p class="text-xs text-slate-500" x-text="assignModal.isEdit ? 'Select a new driver or warehouse' : 'Select driver and target warehouse'"></p>
+                    </div>
                 </div>
-                <button @@click="assignModal.open = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600">
+                <button @@click="assignModal.open = false" class="w-8 h-8 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div class="px-6 py-5">
-                <div class="mb-4">
-                    <label class="block text-sm font-semibold text-slate-700 mb-2">Driver <span class="text-rose-500">*</span></label>
-                    <select x-model="assignModal.driver_id" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none">
+            <div class="px-6 py-5 space-y-4">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Driver <span class="text-rose-500">*</span></label>
+                    <select x-model="assignModal.driver_id"
+                            class="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all">
                         <option value="">Choose a driver...</option>
                         <template x-for="d in assignModal.drivers" :key="d.id">
                             <option :value="d.id" x-text="d.name + ' (' + d.phone + ')'"></option>
                         </template>
                     </select>
-                    <p x-show="assignModal.drivers.length === 0 && !assignModal.loading" class="mt-1 text-xs text-amber-600">No available drivers</p>
+                    <p x-show="assignModal.drivers.length === 0 && !assignModal.loading" class="mt-1.5 text-xs text-amber-600 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        No available drivers
+                    </p>
                 </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-semibold text-slate-700 mb-2">Target Warehouse <span class="text-rose-500">*</span></label>
-                    <select x-model="assignModal.warehouse_id" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Target Warehouse <span class="text-rose-500">*</span></label>
+                    <select x-model="assignModal.warehouse_id"
+                            class="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all">
                         <option value="">Choose warehouse...</option>
                         <template x-for="w in assignModal.warehouses" :key="w.id">
                             <option :value="w.id" x-text="w.name + (w.code ? ' (' + w.code + ')' : '')"></option>
                         </template>
                     </select>
                 </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-semibold text-slate-700 mb-2">Notes <span class="text-slate-400 font-normal">(optional)</span></label>
-                    <textarea x-model="assignModal.notes" rows="2" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none resize-none" placeholder="Pickup notes for the driver..."></textarea>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Notes <span class="text-slate-300 font-normal normal-case">(optional)</span></label>
+                    <textarea x-model="assignModal.notes" rows="2"
+                              class="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all resize-none"
+                              placeholder="Pickup notes for the driver..."></textarea>
                 </div>
-                <div class="flex justify-end gap-2">
-                    <button @@click="assignModal.open = false" class="px-4 py-2 text-xs font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50">Cancel</button>
-                    <button @@click="submitAssignment()" :disabled="assignModal.submitting || !assignModal.driver_id || !assignModal.warehouse_id" class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-violet-500/25 disabled:opacity-50 transition-all">
+                <div class="flex justify-end gap-2 pt-1">
+                    <button @@click="assignModal.open = false"
+                            class="px-4 py-2 text-xs font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">Cancel</button>
+                    <button @@click="submitAssignment()"
+                            :disabled="assignModal.submitting || !assignModal.driver_id || !assignModal.warehouse_id"
+                            class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-400/30 disabled:opacity-50 transition-all hover:opacity-90">
                         <svg x-show="assignModal.submitting" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                         <span x-text="assignModal.submitting ? (assignModal.isEdit ? 'Updating...' : 'Assigning...') : (assignModal.isEdit ? 'Update Assignment' : 'Assign Driver')"></span>
                     </button>
@@ -474,52 +823,74 @@
         </div>
     </div>
 
-    {{-- Bottom Bar --}}
-    <div class="fixed bottom-0 left-0 right-0 z-20 bg-white/90 backdrop-blur-xl border-t border-slate-200 shadow-lg px-6 py-3 flex items-center justify-between">
-        <a :href="config.showUrl" class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors font-medium">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-            Back to Shipment
-        </a>
-        <span class="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600" x-text="shipment.status ? shipment.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : ''"></span>
-    </div>
-
-    </div>
-
     {{-- Lightbox --}}
-    <div x-show="lightboxUrl" @@click="lightboxUrl = null" x-transition.opacity class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-8 cursor-pointer" style="display:none">
-        <img :src="lightboxUrl" class="max-w-full max-h-full rounded-xl shadow-2xl">
+    <div x-show="lightboxUrl" @@click="lightboxUrl = null" x-transition.opacity
+         class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-8 cursor-zoom-out" style="display:none">
+        <img :src="lightboxUrl" class="max-w-full max-h-full rounded-2xl shadow-2xl ring-1 ring-white/10">
     </div>
 
     {{-- Split Package Modal --}}
-    <div x-show="splitModal.open" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display:none">
-        <div @@click.stop class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md">
-            <div class="px-5 py-4 border-b border-slate-100">
+    <div x-show="splitModal.open" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" style="display:none">
+        <div @@click.stop class="bg-white rounded-3xl shadow-2xl border border-slate-200/80 w-full max-w-md overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/30">
                 <h3 class="text-sm font-bold text-slate-900">Split Package</h3>
-                <p class="text-xs text-slate-500 mt-1">Select photos to move to a new package</p>
+                <p class="text-xs text-slate-500 mt-0.5">Select photos to move into a new package</p>
             </div>
             <div class="p-5">
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap gap-2.5">
                     <template x-for="photo in splitModal.photos" :key="photo.id">
-                        <div @@click="toggleSplitPhoto(photo.id)" class="relative w-16 h-16 rounded-xl overflow-hidden border-2 cursor-pointer transition-all"
-                             :class="splitModal.selectedIds.includes(photo.id) ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-slate-200'">
-                            <img :src="photo.url" class="w-full h-full object-cover">
-                            <div x-show="splitModal.selectedIds.includes(photo.id)" class="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
-                                <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                        <div @@click="toggleSplitPhoto(photo.id)"
+                             class="relative w-18 h-18 rounded-xl overflow-hidden border-2 cursor-pointer transition-all"
+                             :class="splitModal.selectedIds.includes(photo.id) ? 'border-indigo-500 ring-2 ring-indigo-500/30 scale-95' : 'border-slate-200 hover:border-indigo-300'">
+                            <img :src="photo.url" class="w-full h-full object-cover" style="width:4.5rem;height:4.5rem">
+                            <div x-show="splitModal.selectedIds.includes(photo.id)"
+                                 class="absolute inset-0 bg-indigo-500/25 flex items-center justify-center">
+                                <div class="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center shadow">
+                                    <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                </div>
                             </div>
                         </div>
                     </template>
                 </div>
             </div>
-            <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                <button @@click="splitModal.open = false" class="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-xl">Cancel</button>
-                <button @@click="executeSplit()" :disabled="splitModal.selectedIds.length === 0" class="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl disabled:opacity-50">
+            <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button @@click="splitModal.open = false"
+                        class="px-4 py-2 text-xs font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">Cancel</button>
+                <button @@click="executeSplit()" :disabled="splitModal.selectedIds.length === 0"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 rounded-xl disabled:opacity-50 shadow-md shadow-indigo-300/30 transition-all">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                     Split (<span x-text="splitModal.selectedIds.length"></span> photos)
                 </button>
             </div>
         </div>
     </div>
 
+    {{-- ═══════════════════════════════════════════════════════════ --}}
+    {{-- BOTTOM FIXED BAR                                           --}}
+    {{-- ═══════════════════════════════════════════════════════════ --}}
+    <div class="fixed bottom-0 left-0 right-0 z-20 bg-white/80 backdrop-blur-xl border-t border-slate-200/80 shadow-xl shadow-slate-900/10">
+        <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+            <a :href="config.showUrl"
+               class="group inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors font-medium">
+                <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                Back to Shipment
+            </a>
+            <div class="flex items-center gap-3">
+                <span class="text-[11px] text-slate-400 font-mono" x-text="shipment.shipment_number"></span>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200"
+                      x-text="shipment.status ? shipment.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : ''"></span>
+            </div>
+        </div>
+    </div>
+
 </div>
+
+<style>
+@keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+</style>
 @endsection
 
 @push('scripts')
