@@ -351,10 +351,30 @@ class PickupAssignmentService
         array $removePhotoIds = []
     ): array
     {
-        if (!in_array($assignment->status, [PickupAssignmentStatus::ARRIVED, PickupAssignmentStatus::PICKING_UP])) {
+        // Auto-advance through skipped statuses so driver can confirm directly
+        $now = now();
+        if ($assignment->status === PickupAssignmentStatus::ASSIGNED) {
+            $assignment->update([
+                'status' => PickupAssignmentStatus::EN_ROUTE,
+                'en_route_at' => $now,
+            ]);
+        }
+        if ($assignment->status === PickupAssignmentStatus::EN_ROUTE) {
+            $assignment->update([
+                'status' => PickupAssignmentStatus::ARRIVED,
+                'arrived_at' => $now,
+            ]);
+        }
+        if ($assignment->status === PickupAssignmentStatus::ARRIVED) {
+            $assignment->update([
+                'status' => PickupAssignmentStatus::PICKING_UP,
+            ]);
+        }
+
+        if ($assignment->status !== PickupAssignmentStatus::PICKING_UP) {
             return [
                 'success' => false,
-                'message' => 'Driver must have arrived to confirm an item.',
+                'message' => 'Cannot confirm items in current status.',
             ];
         }
 
