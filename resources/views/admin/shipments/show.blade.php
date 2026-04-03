@@ -432,6 +432,22 @@ $shipmentConfig = [
             <!-- OVERVIEW TAB                            -->
             <!-- ═══════════════════════════════════════ -->
             <div x-show="activeTab === 'overview'" x-cloak>
+                {{-- Sender Notes Banner --}}
+                <template x-if="shipment.sender_notes">
+                    <div class="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-amber-900">Sender's Notes</h3>
+                                <p class="text-sm text-amber-800 mt-1 leading-relaxed" x-text="shipment.sender_notes"></p>
+                                <p class="text-[10px] text-amber-600 mt-2">From: <span x-text="shipment.vendor_name"></span> <span x-show="shipment.vendor_phone">(<span x-text="shipment.vendor_phone"></span>)</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
                 <div class="grid grid-cols-1 xl:grid-cols-5 gap-5">
 
                     <!-- Left Column: Shipment Info + Packages -->

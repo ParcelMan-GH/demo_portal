@@ -100,6 +100,8 @@ class ShipmentController extends Controller
                     'shipment_number' => $shipment->shipment_number,
                     'vendor_name' => $shipment->vendor?->name,
                     'vendor_business' => $shipment->vendor?->business_name,
+                    'vendor_phone' => $shipment->vendor?->phone,
+                    'sender_notes' => $shipment->sender_notes,
                     'destination_mode' => $shipment->destination_mode?->value,
                     'destination_mode_label' => $shipment->destination_mode?->label() ?? 'Single Destination',
                     'delivery_preference' => $shipment->delivery_preference ?? 'deliver',
