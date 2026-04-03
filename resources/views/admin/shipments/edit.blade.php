@@ -70,11 +70,11 @@
     {{-- ═══════════════════════════════════════════════════════════ --}}
     {{-- TWO-COLUMN LAYOUT                                          --}}
     {{-- ═══════════════════════════════════════════════════════════ --}}
-    <div class="max-w-7xl mx-auto pb-28">
-        <div class="flex flex-col lg:flex-row gap-6 items-start">
+    <div class="max-w-[1600px] mx-auto pb-12 text-[13px]">
+        <div class="flex flex-col lg:flex-row gap-4 items-start">
 
             {{-- ─── LEFT COLUMN (60%) ─────────────────────────────── --}}
-            <div class="w-full lg:w-[60%] space-y-5">
+            <div class="w-full lg:w-[62%] space-y-3">
 
                 {{-- ─── SECTION: Drop-off Type ─────────────────────── --}}
                 <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100 overflow-hidden"
@@ -135,31 +135,12 @@
                                     <p class="text-[11px] text-slate-500 mt-0.5">Pickup location the driver will use to find the sender</p>
                                 </div>
                             </div>
-                            {{-- Inline save area --}}
-                            <div class="flex items-center gap-2 flex-shrink-0">
-                                <span x-show="pickupSaved"
-                                      x-transition:enter="transition ease-out duration-200"
-                                      x-transition:enter-start="opacity-0 translate-x-2"
-                                      x-transition:enter-end="opacity-100 translate-x-0"
-                                      x-transition:leave="transition ease-in duration-150"
-                                      x-transition:leave-start="opacity-100"
-                                      x-transition:leave-end="opacity-0"
-                                      class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                    Saved
-                                </span>
-                                <button @@click="savePickup()" :disabled="savingPickup"
-                                        class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-slate-700 text-white text-[11px] font-semibold rounded-xl transition-all disabled:opacity-60 shadow-sm">
-                                    <svg x-show="savingPickup" class="w-3 h-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                                    <span x-text="savingPickup ? 'Saving…' : 'Save Pickup'"></span>
-                                </button>
-                            </div>
                         </div>
                     </div>
 
-                    <div class="p-5 space-y-4">
+                    <div class="p-4 space-y-3">
                         {{-- Contact group --}}
-                        <div class="bg-slate-50/60 border border-slate-100 rounded-2xl p-4">
+                        <div class="bg-slate-50/60 border border-slate-100 rounded-xl p-3">
                             <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                 Contact
@@ -168,18 +149,18 @@
                                 <div>
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Contact Name</label>
                                     <input type="text" x-model="form.pickup.contact_name"
-                                           class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                           class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                 </div>
                                 <div>
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Contact Phone</label>
                                     <input type="text" x-model="form.pickup.contact_phone"
-                                           class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                           class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                 </div>
                             </div>
                         </div>
 
                         {{-- Location group --}}
-                        <div class="bg-slate-50/60 border border-slate-100 rounded-2xl p-4">
+                        <div class="bg-slate-50/60 border border-slate-100 rounded-xl p-3">
                             <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                 Location
@@ -188,7 +169,7 @@
                                 <div>
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Region</label>
                                     <select x-model="form.pickup.region_id" @@change="loadDistricts('pickup')"
-                                            class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                            class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                         <option value="">Select Region</option>
                                         <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
                                     </select>
@@ -196,7 +177,7 @@
                                 <div>
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">District</label>
                                     <select x-model="form.pickup.district_id"
-                                            class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                            class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                         <option value="">Select District</option>
                                         <template x-for="d in pickupDistricts" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
                                     </select>
@@ -204,20 +185,32 @@
                                 <div>
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Town / Area</label>
                                     <input type="text" x-model="form.pickup.town"
-                                           class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                           class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                 </div>
                                 <div>
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Landmark</label>
                                     <input type="text" x-model="form.pickup.landmark"
-                                           class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                           class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
                                 </div>
                                 <div class="col-span-2">
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Instructions</label>
                                     <textarea x-model="form.pickup.instructions" rows="2"
-                                              class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all resize-none"></textarea>
+                                              class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all resize-none"></textarea>
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    {{-- Footer --}}
+                    <div class="px-5 py-3 border-t border-slate-100/80 bg-slate-50/30 rounded-b-3xl flex items-center justify-end gap-2">
+                        <span x-show="pickupSaved" x-transition.opacity class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            Saved
+                        </span>
+                        <button @@click="savePickup()" :disabled="savingPickup"
+                                class="inline-flex items-center gap-1.5 px-5 py-2 bg-slate-900 hover:bg-slate-700 text-white text-[11px] font-semibold rounded-xl transition-all disabled:opacity-60 shadow-sm">
+                            <svg x-show="savingPickup" class="w-3 h-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                            <span x-text="savingPickup ? 'Saving…' : 'Save Pickup Details'"></span>
+                        </button>
                     </div>
                 </div>
 
@@ -235,30 +228,12 @@
                                         <p class="text-[11px] text-slate-500 mt-0.5">Recipient and address for all packages</p>
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-2 flex-shrink-0">
-                                    <span x-show="deliverySaved"
-                                          x-transition:enter="transition ease-out duration-200"
-                                          x-transition:enter-start="opacity-0 translate-x-2"
-                                          x-transition:enter-end="opacity-100 translate-x-0"
-                                          x-transition:leave="transition ease-in duration-150"
-                                          x-transition:leave-start="opacity-100"
-                                          x-transition:leave-end="opacity-0"
-                                          class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                        Saved
-                                    </span>
-                                    <button @@click="saveDelivery()" :disabled="savingDelivery"
-                                            class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-slate-700 text-white text-[11px] font-semibold rounded-xl transition-all disabled:opacity-60 shadow-sm">
-                                        <svg x-show="savingDelivery" class="w-3 h-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                                        <span x-text="savingDelivery ? 'Saving…' : 'Save Delivery'"></span>
-                                    </button>
-                                </div>
                             </div>
                         </div>
 
-                        <div class="p-5 space-y-4">
+                        <div class="p-4 space-y-3">
                             {{-- Routing preferences --}}
-                            <div class="bg-slate-50/60 border border-slate-100 rounded-2xl p-4">
+                            <div class="bg-slate-50/60 border border-slate-100 rounded-xl p-3">
                                 <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                     Routing
@@ -267,7 +242,7 @@
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Delivery Preference</label>
                                         <select x-model="form.delivery_preference"
-                                                class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                             <option value="deliver">Deliver to Recipient</option>
                                             <option value="self_pickup">Recipient Collects</option>
                                         </select>
@@ -275,7 +250,7 @@
                                     <div x-show="form.delivery_preference === 'deliver'">
                                         <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Routing (Admin)</label>
                                         <select x-model="form.fulfillment_type"
-                                                class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                             <option value="warehouse">Warehouse</option>
                                             <option value="direct">Direct Delivery</option>
                                         </select>
@@ -284,7 +259,7 @@
                             </div>
 
                             {{-- Recipient group --}}
-                            <div class="bg-slate-50/60 border border-slate-100 rounded-2xl p-4">
+                            <div class="bg-slate-50/60 border border-slate-100 rounded-xl p-3">
                                 <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                     Recipient
@@ -293,18 +268,18 @@
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Recipient Name</label>
                                         <input type="text" x-model="form.delivery.recipient_name"
-                                               class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                               class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                     </div>
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Recipient Phone</label>
                                         <input type="text" x-model="form.delivery.recipient_phone"
-                                               class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                               class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                     </div>
                                 </div>
                             </div>
 
                             {{-- Location group --}}
-                            <div class="bg-slate-50/60 border border-slate-100 rounded-2xl p-4">
+                            <div class="bg-slate-50/60 border border-slate-100 rounded-xl p-3">
                                 <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                     Delivery Location
@@ -313,7 +288,7 @@
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Region</label>
                                         <select x-model="form.delivery.region_id" @@change="loadDistricts('delivery')"
-                                                class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                             <option value="">Select Region</option>
                                             <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" x-text="r.name"></option></template>
                                         </select>
@@ -321,7 +296,7 @@
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">District</label>
                                         <select x-model="form.delivery.district_id"
-                                                class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                             <option value="">Select District</option>
                                             <template x-for="d in deliveryDistricts" :key="d.id"><option :value="String(d.id)" x-text="d.name"></option></template>
                                         </select>
@@ -329,20 +304,32 @@
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Town / Area</label>
                                         <input type="text" x-model="form.delivery.town"
-                                               class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                               class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                     </div>
                                     <div>
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Landmark</label>
                                         <input type="text" x-model="form.delivery.landmark"
-                                               class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                               class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                     </div>
                                     <div class="col-span-2">
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Delivery Instructions</label>
                                         <textarea x-model="form.delivery.instructions" rows="2"
-                                                  class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all resize-none"></textarea>
+                                                  class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all resize-none"></textarea>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                        {{-- Footer --}}
+                        <div class="px-5 py-3 border-t border-slate-100/80 bg-slate-50/30 rounded-b-3xl flex items-center justify-end gap-2">
+                            <span x-show="deliverySaved" x-transition.opacity class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                Saved
+                            </span>
+                            <button @@click="saveDelivery()" :disabled="savingDelivery"
+                                    class="inline-flex items-center gap-1.5 px-5 py-2 bg-slate-900 hover:bg-slate-700 text-white text-[11px] font-semibold rounded-xl transition-all disabled:opacity-60 shadow-sm">
+                                <svg x-show="savingDelivery" class="w-3 h-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                <span x-text="savingDelivery ? 'Saving…' : 'Save Delivery Details'"></span>
+                            </button>
                         </div>
                     </div>
                 </template>
@@ -371,7 +358,7 @@
                         </div>
                     </div>
 
-                    <div class="p-5 space-y-4">
+                    <div class="p-4 space-y-3">
                         {{-- Empty state --}}
                         <template x-if="packages.length === 0">
                             <div class="text-center py-14">
@@ -461,18 +448,18 @@
                                             <div>
                                                 <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Description <span class="text-slate-300 font-normal normal-case">(what's inside)</span></label>
                                                 <textarea x-model="pkg.description" rows="2" placeholder="e.g. 2x Nike shoes, 1x phone case"
-                                                          class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none transition-all resize-none"></textarea>
+                                                          class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none transition-all resize-none"></textarea>
                                             </div>
                                             <div>
                                                 <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Quantity <span class="text-slate-300 font-normal normal-case">(skip if sealed)</span></label>
                                                 <input type="number" x-model.number="pkg.quantity" min="1" placeholder="—"
-                                                       class="w-full px-3 py-2.5 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none transition-all">
+                                                       class="w-full px-2.5 py-1.5 text-xs border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none transition-all">
                                             </div>
                                         </div>
 
                                         {{-- Per-item delivery fields --}}
                                         <template x-if="shipment.destination_mode === 'per_item'">
-                                            <div class="mt-1 bg-slate-50/70 border border-slate-100 rounded-2xl p-4">
+                                            <div class="mt-1 bg-slate-50/70 border border-slate-100 rounded-xl p-3">
                                                 <h4 class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                                                     <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                                                     Delivery details for this package
@@ -549,7 +536,7 @@
             </div>{{-- end left column --}}
 
             {{-- ─── RIGHT COLUMN (40%) ─────────────────────────────── --}}
-            <div class="w-full lg:w-[40%] space-y-5 lg:sticky lg:top-6">
+            <div class="w-full lg:w-[38%] space-y-3 lg:sticky lg:top-4">
 
                 {{-- ─── Progress Stepper ───────────────────────────── --}}
                 <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100 overflow-hidden"
@@ -778,7 +765,7 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div class="px-6 py-5 space-y-4">
+            <div class="px-6 py-5 space-y-3">
                 <div>
                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Driver <span class="text-rose-500">*</span></label>
                     <select x-model="assignModal.driver_id"
@@ -867,21 +854,6 @@
 
     {{-- ═══════════════════════════════════════════════════════════ --}}
     {{-- BOTTOM FIXED BAR                                           --}}
-    {{-- ═══════════════════════════════════════════════════════════ --}}
-    <div class="fixed bottom-0 left-0 right-0 z-20 bg-white/80 backdrop-blur-xl border-t border-slate-200/80 shadow-xl shadow-slate-900/10">
-        <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-            <a :href="config.showUrl"
-               class="group inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors font-medium">
-                <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                Back to Shipment
-            </a>
-            <div class="flex items-center gap-3">
-                <span class="text-[11px] text-slate-400 font-mono" x-text="shipment.shipment_number"></span>
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200"
-                      x-text="shipment.status ? shipment.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : ''"></span>
-            </div>
-        </div>
-    </div>
 
 </div>
 
@@ -941,11 +913,17 @@ function shipmentEditor() {
         async loadDistricts(type) {
             const regionId = type === 'pickup' ? this.form.pickup.region_id : this.form.delivery.region_id;
             if (!regionId) { if (type === 'pickup') this.pickupDistricts = []; else this.deliveryDistricts = []; return; }
+            // Save current district_id before loading (will re-apply after)
+            const savedDistrictId = type === 'pickup' ? this.form.pickup.district_id : this.form.delivery.district_id;
             const url = this.config.districtsByRegionUrlTemplate.replace('__REGION__', regionId);
             const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
             const data = await res.json();
             if (type === 'pickup') this.pickupDistricts = data.data?.districts || [];
             else this.deliveryDistricts = data.data?.districts || [];
+            // Re-apply district_id after options are available
+            await this.$nextTick();
+            if (type === 'pickup') this.form.pickup.district_id = savedDistrictId;
+            else this.form.delivery.district_id = savedDistrictId;
         },
 
         async savePickup() {
