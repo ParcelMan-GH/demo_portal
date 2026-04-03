@@ -1415,7 +1415,7 @@ class ShipmentController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
-    public function printPackageLabel(Shipment $shipment, ShipmentItem $item): JsonResponse
+    public function printPackageLabel(Request $request, Shipment $shipment, ShipmentItem $item): JsonResponse
     {
         $this->authorizePermission('shipments.edit');
 
@@ -1433,12 +1433,17 @@ class ShipmentController extends Controller
             return response()->json(['success' => false, 'message' => 'No target warehouse found.'], 422);
         }
 
+        $labelCount = max(1, min(500, (int) ($request->input('label_count', 1))));
+        $labelType = $labelCount === 1 ? 'sealed' : 'unit';
+
         $receivingService = app(WarehouseReceivingService::class);
-        $result = $receivingService->printItemLabel(
+        $result = $receivingService->generateLabels(
             assignment: $assignment,
             shipmentItem: $item,
             warehouse: $warehouse,
-            user: Auth::guard('admin')->user()
+            user: Auth::guard('admin')->user(),
+            labelCount: $labelCount,
+            labelType: $labelType
         );
 
         return response()->json($result, $result['success'] ? 200 : 422);

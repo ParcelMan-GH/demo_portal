@@ -283,6 +283,125 @@ class WarehouseReceivingService
         });
     }
 
+    public function generateLabels(
+        PickupAssignment $assignment,
+        ShipmentItem $shipmentItem,
+        Warehouse $warehouse,
+        User $user,
+        int $labelCount = 1,
+        string $labelType = 'sealed'
+    ): array {
+        if ($shipmentItem->shipment_id !== $assignment->shipment_id) {
+            return ['success' => false, 'message' => 'Item does not belong to this pickup.'];
+        }
+
+        if ($labelCount < 1 || $labelCount > 500) {
+            return ['success' => false, 'message' => 'Label count must be between 1 and 500.'];
+        }
+
+        return DB::transaction(function () use ($assignment, $shipmentItem, $warehouse, $user, $labelCount, $labelType) {
+            $lockedAssignment = PickupAssignment::query()->lockForUpdate()->findOrFail($assignment->id);
+
+            $receipt = WarehouseReceipt::query()
+                ->where('pickup_assignment_id', $lockedAssignment->id)
+                ->where('warehouse_id', $warehouse->id)
+                ->first();
+
+            if (!$receipt) {
+                if ($error = $this->validateReceivingPreconditions($lockedAssignment, $warehouse)) {
+                    return $error;
+                }
+                $receipt = $this->getOrCreateReceipt($lockedAssignment, $warehouse, $user);
+            }
+
+            $receiptItem = WarehouseReceiptItem::query()
+                ->where('warehouse_receipt_id', $receipt->id)
+                ->where('shipment_item_id', $shipmentItem->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$receiptItem) {
+                return ['success' => false, 'message' => 'Save this package first before printing labels.'];
+            }
+
+            // Ensure tracking code exists
+            if (empty($shipmentItem->tracking_code)) {
+                $shipmentItem->update(['tracking_code' => ShipmentItem::generateTrackingCode()]);
+                $shipmentItem->refresh();
+            }
+
+            $parentBarcode = $shipmentItem->tracking_code;
+
+            // Update parent receipt item barcode
+            $receiptItem->update([
+                'barcode_value' => $parentBarcode,
+                'barcode_format' => 'code128',
+                'barcode_printed_at' => now(),
+                'barcode_print_count' => (int) $receiptItem->barcode_print_count + 1,
+            ]);
+
+            // Delete existing labels and regenerate
+            $receiptItem->labels()->delete();
+
+            $labels = [];
+            for ($i = 1; $i <= $labelCount; $i++) {
+                $barcodeValue = $labelCount === 1
+                    ? $parentBarcode
+                    : $parentBarcode . '-' . str_pad($i, 3, '0', STR_PAD_LEFT);
+
+                $label = $receiptItem->labels()->create([
+                    'barcode_value' => $barcodeValue,
+                    'label_index' => $labelCount === 1 ? null : $i,
+                    'labels_total' => $labelCount,
+                    'label_type' => $labelType,
+                    'printed_at' => now(),
+                    'print_count' => 1,
+                ]);
+                $labels[] = $label;
+            }
+
+            // Generate HTML for all labels
+            $shipment = $lockedAssignment->shipment()->with([
+                'vendor:id,name,business_name',
+                'deliveryRegion:id,name',
+                'deliveryDistrict:id,name',
+            ])->first();
+
+            $labelsHtml = '';
+            foreach ($labels as $label) {
+                $barcodeSvg = $this->barcodeService->renderCode128Svg($label->barcode_value);
+                $labelsHtml .= View::make('warehouse.receipts.partials.item-label', [
+                    'assignment' => $lockedAssignment,
+                    'shipment' => $shipment,
+                    'shipmentItem' => $shipmentItem,
+                    'receiptItem' => $receiptItem,
+                    'barcodeSvg' => $barcodeSvg,
+                    'labelIndex' => $label->label_index,
+                    'labelsTotal' => $label->labels_total,
+                    'labelBarcode' => $label->barcode_value,
+                ])->render();
+            }
+
+            return [
+                'success' => true,
+                'message' => $labelCount . ' label(s) generated.',
+                'data' => [
+                    'barcode_value' => $parentBarcode,
+                    'label_count' => $labelCount,
+                    'label_type' => $labelType,
+                    'print_count' => (int) $receiptItem->fresh()->barcode_print_count,
+                    'labels' => collect($labels)->map(fn ($l) => [
+                        'id' => $l->id,
+                        'barcode_value' => $l->barcode_value,
+                        'label_index' => $l->label_index,
+                        'labels_total' => $l->labels_total,
+                    ])->values(),
+                    'label_html' => $labelsHtml,
+                ],
+            ];
+        });
+    }
+
     public function finalizeReceipt(
         PickupAssignment $assignment,
         Warehouse $warehouse,

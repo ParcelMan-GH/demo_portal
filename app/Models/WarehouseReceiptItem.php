@@ -57,6 +57,11 @@ class WarehouseReceiptItem extends Model
         return $this->hasMany(WarehouseReceiptItemPhoto::class);
     }
 
+    public function labels(): HasMany
+    {
+        return $this->hasMany(WarehouseReceiptItemLabel::class);
+    }
+
     public function sortBatchItems(): HasMany
     {
         return $this->hasMany(SortBatchItem::class);

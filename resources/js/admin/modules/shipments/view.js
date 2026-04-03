@@ -385,7 +385,7 @@ function shipmentShow() {
             this.receiving.saving = false;
         },
 
-        async printLabel(pkg) {
+        async printLabel(pkg, labelCount = 1) {
             const url = this.config.receivePrintLabelEndpoint.replace('__ITEM__', pkg.shipment_item_id);
             try {
                 const response = await fetch(url, {
@@ -395,6 +395,7 @@ function shipmentShow() {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                         'Accept': 'application/json',
                     },
+                    body: JSON.stringify({ label_count: labelCount }),
                 });
                 const result = await response.json();
                 if (result.success) {

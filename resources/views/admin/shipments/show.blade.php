@@ -2677,11 +2677,31 @@ $shipmentConfig = [
                                                 <svg x-show="receiving.saving" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                                 <span x-text="pkg.received_quantity > 0 ? 'Update' : 'Receive'"></span>
                                             </button>
-                                            <button @@click="printLabel(pkg)" :disabled="pkg.received_quantity === 0" class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white text-slate-700 text-[11px] font-semibold rounded-lg hover:bg-slate-50 transition-all disabled:opacity-50">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                                                <span x-text="pkg.barcode_value ? 'Reprint Label' : 'Print Label'"></span>
-                                            </button>
-                                            <span x-show="pkg.barcode_value" class="text-[10px] font-mono text-slate-400" x-text="pkg.barcode_value"></span>
+                                            <div x-data="{ showLabelOpts: false, labelCount: 1 }" class="relative inline-flex items-center gap-2">
+                                                <button @@click="showLabelOpts = !showLabelOpts" :disabled="pkg.received_quantity === 0" class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white text-slate-700 text-[11px] font-semibold rounded-lg hover:bg-slate-50 transition-all disabled:opacity-50">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                                    Print Labels
+                                                </button>
+                                                <div x-show="showLabelOpts" @@click.away="showLabelOpts = false" x-transition
+                                                     class="absolute bottom-full mb-2 left-0 w-64 bg-white rounded-xl border border-slate-200 shadow-xl p-3 z-30" style="display:none">
+                                                    <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">How many labels?</p>
+                                                    <div class="flex gap-2 mb-2">
+                                                        <button @@click="labelCount = 1; printLabel(pkg, 1); showLabelOpts = false" class="flex-1 px-2 py-1.5 text-[11px] font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors text-center">
+                                                            1 Label<br><span class="text-[9px] font-normal text-slate-400">Sealed pkg</span>
+                                                        </button>
+                                                        <button x-show="pkg.received_quantity > 1" @@click="labelCount = pkg.received_quantity; printLabel(pkg, pkg.received_quantity); showLabelOpts = false" class="flex-1 px-2 py-1.5 text-[11px] font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors text-center">
+                                                            <span x-text="pkg.received_quantity"></span> Labels<br><span class="text-[9px] font-normal text-slate-400">Per unit</span>
+                                                        </button>
+                                                    </div>
+                                                    <div class="flex items-center gap-2">
+                                                        <input type="number" x-model.number="labelCount" min="1" max="500" class="w-20 px-2 py-1 text-xs border border-slate-200 rounded-lg text-center">
+                                                        <button @@click="printLabel(pkg, labelCount); showLabelOpts = false" class="flex-1 px-2 py-1.5 text-[11px] font-semibold text-white bg-slate-900 hover:bg-slate-700 rounded-lg transition-colors">
+                                                            Print
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <span x-show="pkg.barcode_value" class="text-[10px] font-mono text-slate-400" x-text="pkg.barcode_value"></span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
