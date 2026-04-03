@@ -165,6 +165,38 @@ class PickupAssignmentController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
+        // Validate shipment readiness
+        $errors = [];
+        if (blank($shipment->pickup_contact_name)) $errors[] = 'Pickup contact name is required.';
+        if (blank($shipment->pickup_contact_phone)) $errors[] = 'Pickup contact phone is required.';
+        if (blank($shipment->pickup_town) && blank($shipment->pickup_region_id)) $errors[] = 'Pickup location is required.';
+        if ($shipment->items()->count() === 0) $errors[] = 'At least one package is required.';
+
+        // Direct delivery requires delivery details
+        if ($shipment->fulfillment_type?->value === 'direct') {
+            if ($shipment->destination_mode->value === 'single') {
+                if (blank($shipment->delivery_recipient_name)) $errors[] = 'Delivery recipient name is required for direct delivery.';
+                if (blank($shipment->delivery_recipient_phone)) $errors[] = 'Delivery recipient phone is required for direct delivery.';
+                if (blank($shipment->delivery_town) && blank($shipment->delivery_region_id)) $errors[] = 'Delivery location is required for direct delivery.';
+            } else {
+                $shipment->items->each(function ($item, $i) use (&$errors) {
+                    if ($item->fulfillment_type?->value === 'direct') {
+                        if (blank($item->delivery_recipient_name)) $errors[] = 'Package ' . ($i + 1) . ': recipient name required for direct delivery.';
+                        if (blank($item->delivery_recipient_phone)) $errors[] = 'Package ' . ($i + 1) . ': recipient phone required for direct delivery.';
+                        if (blank($item->delivery_town) && blank($item->delivery_region_id)) $errors[] = 'Package ' . ($i + 1) . ': delivery location required for direct delivery.';
+                    }
+                });
+            }
+        }
+
+        if (!empty($errors)) {
+            return response()->json([
+                'success' => false,
+                'message' => $errors[0],
+                'errors' => $errors,
+            ], 422);
+        }
+
         $driver = Driver::findOrFail($validated['driver_id']);
         $admin = Auth::guard('admin')->user();
 

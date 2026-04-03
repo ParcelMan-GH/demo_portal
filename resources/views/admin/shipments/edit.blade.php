@@ -1144,7 +1144,47 @@ function shipmentEditor() {
             }
         },
 
+        validateBeforeAssign() {
+            const errors = [];
+
+            // Always required
+            if (!this.form.pickup.contact_name?.trim()) errors.push('Pickup contact name is required.');
+            if (!this.form.pickup.contact_phone?.trim()) errors.push('Pickup contact phone is required.');
+            if (!this.form.pickup.town?.trim() && !this.form.pickup.region_id) errors.push('Pickup location is required (at least a town or region).');
+            if (this.packages.length === 0) errors.push('At least one package is required.');
+
+            // Direct delivery — need delivery details
+            const isDirect = this.form.fulfillment_type === 'direct';
+
+            if (isDirect && this.destinationMode === 'single') {
+                if (!this.form.delivery.recipient_name?.trim()) errors.push('Delivery recipient name is required for direct delivery.');
+                if (!this.form.delivery.recipient_phone?.trim()) errors.push('Delivery recipient phone is required for direct delivery.');
+                if (!this.form.delivery.town?.trim() && !this.form.delivery.region_id) errors.push('Delivery location is required for direct delivery (at least a town or region).');
+            }
+
+            if (isDirect && this.destinationMode === 'per_item') {
+                this.packages.forEach((pkg, i) => {
+                    const ft = pkg.fulfillment_type || 'warehouse';
+                    if (ft === 'direct') {
+                        if (!pkg.delivery_recipient_name?.trim()) errors.push(`Package ${i + 1}: recipient name required for direct delivery.`);
+                        if (!pkg.delivery_recipient_phone?.trim()) errors.push(`Package ${i + 1}: recipient phone required for direct delivery.`);
+                        if (!pkg.delivery_town?.trim() && !pkg.delivery_region_id) errors.push(`Package ${i + 1}: delivery location required for direct delivery.`);
+                    }
+                });
+            }
+
+            return errors;
+        },
+
         async openAssignModal(isEdit = false) {
+            // Validate before opening (skip validation for edit/change driver)
+            if (!isEdit) {
+                const errors = this.validateBeforeAssign();
+                if (errors.length > 0) {
+                    this._toast(errors[0], 'error');
+                    return;
+                }
+            }
             this.assignModal.open = true;
             this.assignModal.isEdit = isEdit;
             this.assignModal.driver_id = isEdit && this.currentAssignment ? String(this.currentAssignment.driver_id) : '';
