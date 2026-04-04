@@ -94,17 +94,27 @@ class DriverPackageController extends Controller
             'offset' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        // Get all labels where the latest custody event is 'claimed' by this driver
-        // Use a subquery to get the latest event per label, then filter for claimed by this driver
-        $latestEventIds = \Illuminate\Support\Facades\DB::table('label_custody_events')
-            ->selectRaw('MAX(id) as id')
-            ->groupBy('warehouse_receipt_item_label_id')
-            ->pluck('id');
+        // Get all labels where this driver's claim is the latest event
+        // Step 1: Get all label IDs this driver has ever claimed
+        $driverClaimedLabelIds = LabelCustodyEvent::query()
+            ->where('driver_id', $driver->id)
+            ->where('event_type', LabelCustodyEvent::TYPE_CLAIMED)
+            ->distinct()
+            ->pluck('warehouse_receipt_item_label_id');
+
+        // Step 2: For each of those labels, check if the latest event is still a claim by this driver
+        $activeLabelIds = [];
+        foreach ($driverClaimedLabelIds as $labelId) {
+            $latest = LabelCustodyEvent::where('warehouse_receipt_item_label_id', $labelId)
+                ->latest('id')
+                ->first();
+            if ($latest && $latest->event_type === LabelCustodyEvent::TYPE_CLAIMED && $latest->driver_id === $driver->id) {
+                $activeLabelIds[] = $latest->id;
+            }
+        }
 
         $eventsQuery = LabelCustodyEvent::query()
-            ->whereIn('id', $latestEventIds)
-            ->where('driver_id', $driver->id)
-            ->where('event_type', LabelCustodyEvent::TYPE_CLAIMED);
+            ->whereIn('id', $activeLabelIds);
 
         if (!empty($validated['from_date'])) {
             $eventsQuery->whereDate('created_at', '>=', $validated['from_date']);
