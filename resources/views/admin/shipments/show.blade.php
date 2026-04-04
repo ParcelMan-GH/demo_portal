@@ -2762,19 +2762,19 @@ $shipmentConfig = [
                 {{-- Stats --}}
                 <div x-show="!custody.loading" class="grid grid-cols-4 gap-3 mb-6">
                     <div class="bg-white rounded-xl border border-slate-200 p-3">
-                        <p class="text-lg font-bold text-slate-900" x-text="custody.labels.length"></p>
+                        <p class="text-lg font-bold text-slate-900" x-text="custodyLabels().length"></p>
                         <p class="text-[10px] text-slate-500 font-semibold uppercase">Total Labels</p>
                     </div>
                     <div class="bg-white rounded-xl border border-emerald-200 p-3">
-                        <p class="text-lg font-bold text-emerald-700" x-text="custody.labels.filter(l => l.current_driver).length"></p>
+                        <p class="text-lg font-bold text-emerald-700" x-text="custodyLabels().filter(l => l && l.current_driver).length"></p>
                         <p class="text-[10px] text-emerald-600 font-semibold uppercase">Claimed</p>
                     </div>
                     <div class="bg-white rounded-xl border border-slate-200 p-3">
-                        <p class="text-lg font-bold text-slate-400" x-text="custody.labels.filter(l => !l.current_driver && l.status !== 'delivered').length"></p>
+                        <p class="text-lg font-bold text-slate-400" x-text="custodyLabels().filter(l => !l?.current_driver && l?.status !== 'delivered').length"></p>
                         <p class="text-[10px] text-slate-500 font-semibold uppercase">Unclaimed</p>
                     </div>
                     <div class="bg-white rounded-xl border border-blue-200 p-3">
-                        <p class="text-lg font-bold text-blue-700" x-text="custody.labels.filter(l => l.status === 'delivered').length"></p>
+                        <p class="text-lg font-bold text-blue-700" x-text="custodyLabels().filter(l => l?.status === 'delivered').length"></p>
                         <p class="text-[10px] text-blue-600 font-semibold uppercase">Delivered</p>
                     </div>
                 </div>
@@ -2782,9 +2782,9 @@ $shipmentConfig = [
                 {{-- Drivers with claims --}}
                 <template x-for="driverGroup in custodyDriverGroups()" :key="driverGroup.driver_id">
                     <div class="inline-flex items-center gap-2 px-3 py-2 mb-3 mr-2 bg-white border border-slate-200 rounded-xl">
-                        <div class="w-7 h-7 rounded-full bg-cyan-100 text-cyan-700 text-[10px] font-bold flex items-center justify-center" x-text="driverGroup.name.charAt(0).toUpperCase()"></div>
+                        <div class="w-7 h-7 rounded-full bg-cyan-100 text-cyan-700 text-[10px] font-bold flex items-center justify-center" x-text="(driverGroup.name || 'U').charAt(0).toUpperCase()"></div>
                         <div>
-                            <p class="text-xs font-semibold text-slate-800" x-text="driverGroup.name"></p>
+                            <p class="text-xs font-semibold text-slate-800" x-text="driverGroup.name || 'Unknown driver'"></p>
                             <p class="text-[10px] text-slate-400" x-text="driverGroup.count + ' package(s)'"></p>
                         </div>
                         <button @@click="createRunFromClaims(driverGroup.driver_id)" :disabled="custody.creatingRun"
@@ -2802,13 +2802,13 @@ $shipmentConfig = [
                     </div>
 
                     {{-- Empty --}}
-                    <div x-show="custody.labels.length === 0" class="px-4 py-12 text-center text-slate-400">
+                    <div x-show="custodyLabels().length === 0" class="px-4 py-12 text-center text-slate-400">
                         <p class="text-sm font-medium">No labels generated yet</p>
                         <p class="text-xs mt-1">Print labels from the Receiving tab first</p>
                     </div>
 
                     {{-- List --}}
-                    <template x-for="label in custody.labels" :key="label.id">
+                    <template x-for="label in custodyLabels()" :key="label.id">
                         <div class="px-4 py-3 flex items-center gap-4 hover:bg-slate-50/50 border-b border-slate-100 last:border-0">
                             <div class="w-40 flex-shrink-0">
                                 <p class="text-xs font-mono font-bold text-slate-900" x-text="label.barcode"></p>
@@ -3316,5 +3316,3 @@ $shipmentConfig = [
 </div>
 
 @endsection
-
-

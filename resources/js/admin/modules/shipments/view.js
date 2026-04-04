@@ -352,19 +352,28 @@ function shipmentShow() {
                 if (!response.ok) { console.error('Custody data fetch failed:', response.status); this.custody.loading = false; return; }
                 const result = await response.json();
                 if (result.success) {
-                    this.custody.labels = result.data.labels || [];
+                    this.custody.labels = Array.isArray(result.data?.labels) ? result.data.labels : [];
                 }
             } catch (e) { console.error('Failed to load custody data', e); }
             this.custody.loading = false;
         },
 
+        custodyLabels() {
+            return Array.isArray(this.custody.labels) ? this.custody.labels : [];
+        },
+
         custodyDriverGroups() {
             const drivers = {};
-            this.custody.labels.forEach(l => {
-                if (l.current_driver) {
+            this.custodyLabels().forEach(l => {
+                if (l && l.current_driver && l.current_driver.id) {
                     const id = l.current_driver.id;
                     if (!drivers[id]) {
-                        drivers[id] = { driver_id: id, name: l.current_driver.name, phone: l.current_driver.phone, count: 0 };
+                        drivers[id] = {
+                            driver_id: id,
+                            name: l.current_driver.name || 'Unknown driver',
+                            phone: l.current_driver.phone || '',
+                            count: 0,
+                        };
                     }
                     drivers[id].count++;
                 }
