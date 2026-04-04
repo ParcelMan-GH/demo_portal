@@ -140,6 +140,25 @@ class DriverPackageController extends Controller
             return response()->json(['success' => false, 'message' => 'You do not currently hold this package.'], 400);
         }
 
+        // Block release if package is in an active delivery run
+        $shipmentItemId = $label->receiptItem?->shipment_item_id;
+        if ($shipmentItemId) {
+            $inActiveRun = \App\Models\DeliveryRunItem::query()
+                ->where('shipment_item_id', $shipmentItemId)
+                ->whereHas('deliveryRun', function ($q) use ($driver) {
+                    $q->where('assigned_driver_id', $driver->id)
+                      ->whereNotIn('status', ['completed', 'cancelled']);
+                })
+                ->exists();
+
+            if ($inActiveRun) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot release — this package is in an active delivery run. Use "Failed Delivery" at the stop if you cannot deliver.',
+                ], 400);
+            }
+        }
+
         LabelCustodyEvent::create([
             'warehouse_receipt_item_label_id' => $label->id,
             'event_type' => LabelCustodyEvent::TYPE_RELEASED,
