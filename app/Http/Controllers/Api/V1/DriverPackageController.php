@@ -126,10 +126,24 @@ class DriverPackageController extends Controller
             ])
             ->get();
 
-        $packages = $labels->map(function ($label) use ($claimedAtMap) {
+        // Check which items are already in active delivery runs
+        $activeRunItemIds = \App\Models\DeliveryRunItem::query()
+            ->whereHas('deliveryRun', fn ($q) => $q->whereNotIn('status', ['completed', 'cancelled']))
+            ->pluck('shipment_item_id');
+
+        // Check if driver has an active run
+        $activeRun = \App\Models\DeliveryRun::query()
+            ->where('assigned_driver_id', $driver->id)
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->latest()
+            ->first();
+
+        $packages = $labels->map(function ($label) use ($claimedAtMap, $activeRunItemIds) {
             $data = $this->transformLabel($label);
             $event = $claimedAtMap->get($label->id);
             $data['claimed_at'] = $event?->created_at?->toIso8601String();
+            $itemId = $label->receiptItem?->shipment_item_id;
+            $data['in_delivery_run'] = $itemId ? $activeRunItemIds->contains($itemId) : false;
             return $data;
         })->values();
 
@@ -142,6 +156,11 @@ class DriverPackageController extends Controller
                 'limit' => $limit,
                 'offset' => $offset,
                 'has_more' => ($offset + $limit) < $total,
+                'active_delivery_run' => $activeRun ? [
+                    'id' => $activeRun->id,
+                    'run_number' => $activeRun->run_number,
+                    'status' => $activeRun->status,
+                ] : null,
             ],
         ]);
     }

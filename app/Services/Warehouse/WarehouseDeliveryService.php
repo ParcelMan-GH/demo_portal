@@ -125,6 +125,27 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Driver has no claimed packages.'];
         }
 
+        // Check if driver already has an active delivery run
+        $existingRun = DeliveryRun::query()
+            ->where('assigned_driver_id', $driver->id)
+            ->whereNotIn('status', [DeliveryRun::STATUS_COMPLETED, DeliveryRun::STATUS_CANCELLED])
+            ->latest()
+            ->first();
+
+        if ($existingRun) {
+            return [
+                'success' => true,
+                'message' => 'You already have an active delivery run.',
+                'data' => [
+                    'delivery_run_id' => $existingRun->id,
+                    'run_number' => $existingRun->run_number,
+                    'stops_count' => $existingRun->stops()->count(),
+                    'packages_count' => $existingRun->items()->count(),
+                    'existing' => true,
+                ],
+            ];
+        }
+
         $labels = WarehouseReceiptItemLabel::whereIn('id', $claimedLabelIds)
             ->with(['receiptItem.shipmentItem.shipment'])
             ->get();
@@ -132,8 +153,15 @@ class WarehouseDeliveryService
         // Collect unique shipment items (a package may have multiple labels)
         $shipmentItems = $labels->map(fn ($l) => $l->receiptItem?->shipmentItem)->filter()->unique('id');
 
+        // Filter out items already in an active delivery run
+        $activeRunItemIds = \App\Models\DeliveryRunItem::query()
+            ->whereHas('deliveryRun', fn ($q) => $q->whereNotIn('status', [DeliveryRun::STATUS_COMPLETED, DeliveryRun::STATUS_CANCELLED]))
+            ->pluck('shipment_item_id');
+
+        $shipmentItems = $shipmentItems->reject(fn ($item) => $activeRunItemIds->contains($item->id));
+
         if ($shipmentItems->isEmpty()) {
-            return ['success' => false, 'message' => 'No valid packages found.'];
+            return ['success' => false, 'message' => 'All claimed packages are already in delivery runs.'];
         }
 
         return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems) {
