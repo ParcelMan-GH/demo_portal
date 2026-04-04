@@ -1364,6 +1364,37 @@ class ShipmentController extends Controller
         return response()->json(['success' => true, 'data' => ['labels' => $labels]]);
     }
 
+    public function adminCompletePickup(Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $assignment = $shipment->pickupAssignment;
+        if (!$assignment) {
+            return response()->json(['success' => false, 'message' => 'No pickup assignment found.'], 422);
+        }
+
+        if ($assignment->status->value === 'completed') {
+            return response()->json(['success' => false, 'message' => 'Pickup already completed.'], 422);
+        }
+
+        $now = now();
+        $updates = ['status' => 'completed', 'completed_at' => $now];
+
+        if (!$assignment->en_route_at) $updates['en_route_at'] = $now;
+        if (!$assignment->arrived_at) $updates['arrived_at'] = $now;
+        if (!$assignment->picked_up_at) $updates['picked_up_at'] = $now;
+
+        $assignment->update($updates);
+
+        // Update shipment status
+        $shipment->update(['status' => 'picked_up']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pickup marked as completed by admin.',
+        ]);
+    }
+
     public function receivingData(Shipment $shipment): JsonResponse
     {
         $this->authorizePermission('shipments.view');

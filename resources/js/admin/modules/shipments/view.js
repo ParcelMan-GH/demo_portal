@@ -25,7 +25,7 @@ function shipmentShow() {
         // Receiving
         receivingLoaded: false,
         receivingLightbox: null,
-        receiving: { loading: false, saving: false, canReceive: false, packages: [], receipt: null, assignmentId: null },
+        receiving: { loading: false, saving: false, completingPickup: false, canReceive: false, packages: [], receipt: null, assignmentId: null },
 
         // Fulfillment type
         ftLoading: false,
@@ -397,6 +397,29 @@ function shipmentShow() {
                 }
             } catch (e) { window.showToast?.('Error creating run.', 'error'); }
             this.custody.creatingRun = false;
+        },
+
+        async adminCompletePickup() {
+            this.receiving.completingPickup = true;
+            try {
+                const response = await fetch(this.config.adminCompletePickupEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                });
+                const result = await response.json();
+                if (result.success) {
+                    window.showToast?.('Pickup marked as completed. You can now receive packages.', 'success');
+                    this.receiving.canReceive = true;
+                    this.loadReceiving();
+                } else {
+                    window.showToast?.(result.message || 'Failed to complete pickup.', 'error');
+                }
+            } catch (e) { window.showToast?.('Error completing pickup.', 'error'); }
+            this.receiving.completingPickup = false;
         },
 
         async loadReceiving() {

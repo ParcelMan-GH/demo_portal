@@ -23,6 +23,7 @@ $shipmentConfig = [
     'duplicateEndpoint' => route('admin.shipments.duplicate', $shipment),
     'custodyDataEndpoint' => route('admin.shipments.custody-data', $shipment),
     'createRunFromClaimsEndpoint' => route('admin.shipments.create-run-from-claims'),
+    'adminCompletePickupEndpoint' => route('admin.shipments.admin-complete-pickup', $shipment),
     'receivingDataEndpoint' => route('admin.shipments.receiving-data', $shipment),
     'receiveSaveEndpoint' => route('admin.shipments.receiving.save', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
     'receivePrintLabelEndpoint' => route('admin.shipments.receiving.print-label', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
@@ -2584,7 +2585,13 @@ $shipmentConfig = [
                             <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                         </div>
                         <p class="text-sm font-bold text-slate-800">Waiting for Pickup</p>
-                        <p class="text-xs text-slate-500 mt-1">Packages can be received once the driver completes pickup.</p>
+                        <p class="text-xs text-slate-500 mt-1">The driver hasn't confirmed pickup yet. If the packages have arrived, you can mark it as picked up manually.</p>
+                        <button @@click="adminCompletePickup()" :disabled="receiving.completingPickup"
+                                class="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-50 shadow-sm">
+                            <svg x-show="receiving.completingPickup" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                            <svg x-show="!receiving.completingPickup" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span x-text="receiving.completingPickup ? 'Completing...' : 'Mark as Picked Up'"></span>
+                        </button>
                     </div>
                 </template>
 

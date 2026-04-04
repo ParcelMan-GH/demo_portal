@@ -217,6 +217,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('shipments/{shipment}/receiving/{item}/save', [ShipmentController::class, 'receivePackage'])->name('shipments.receiving.save');
         Route::post('shipments/{shipment}/receiving/{item}/print-label', [ShipmentController::class, 'printPackageLabel'])->name('shipments.receiving.print-label');
         Route::post('shipments/{shipment}/receiving/finalize', [ShipmentController::class, 'finalizeReceiving'])->name('shipments.receiving.finalize');
+        Route::post('shipments/{shipment}/admin-complete-pickup', [ShipmentController::class, 'adminCompletePickup'])->name('shipments.admin-complete-pickup');
         Route::get('shipments/{shipment}/custody-data', [ShipmentController::class, 'custodyData'])->name('shipments.custody-data');
         Route::post('shipments/create-run-from-claims', [ShipmentController::class, 'createRunFromClaims'])->name('shipments.create-run-from-claims');
         Route::post('shipments/{shipment}/fulfillment-type', [ShipmentController::class, 'updateFulfillmentType'])->name('shipments.update-fulfillment-type');
