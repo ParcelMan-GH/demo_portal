@@ -896,7 +896,7 @@ class ShipmentController extends Controller
                 : null,
             'availableDriversEndpoint' => route('admin.assignments.available-drivers'),
             'availableWarehousesEndpoint' => route('admin.assignments.available-warehouses'),
-            'canEditShipmentFields' => in_array($shipment->status->value, ['draft', 'submitted']),
+            'canEditShipmentFields' => true,
             'duplicateUrl' => route('admin.shipments.duplicate', $shipment),
             'showUrl' => route('admin.shipments.show', $shipment),
             'currentAssignment' => $shipment->pickupAssignment ? [
