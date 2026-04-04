@@ -262,13 +262,27 @@ class WarehouseReceivingService
                 'deliveryDistrict:id,name',
             ])->first();
 
-            $labelHtml = View::make('warehouse.receipts.partials.item-label', [
+            $labelCard = View::make('warehouse.receipts.partials.item-label', [
                 'assignment' => $lockedAssignment,
                 'shipment' => $shipment,
                 'shipmentItem' => $shipmentItem,
                 'receiptItem' => $receiptItem->fresh(),
                 'barcodeSvg' => $barcodeSvg,
+                'labelBarcode' => $barcodeValue,
             ])->render();
+
+            $labelHtml = '<!doctype html><html><head><meta charset="utf-8"><title>Label - ' . $barcodeValue . '</title><style>'
+                . 'body{font-family:Arial,sans-serif;margin:0;padding:24px;background:#f8fafc}'
+                . '.label{width:430px;margin:0 auto;border:1px solid #d1d5db;border-radius:10px;background:#fff;padding:14px;box-shadow:0 6px 20px rgba(15,23,42,.12)}'
+                . '.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}'
+                . '.title{font-size:14px;font-weight:700;color:#0f172a}'
+                . '.meta{font-size:11px;color:#64748b}'
+                . '.line{display:flex;justify-content:space-between;margin:6px 0;font-size:12px;color:#1e293b}'
+                . '.line span:first-child{color:#64748b}'
+                . '.barcode{margin-top:10px;text-align:center}'
+                . '.barcode svg{max-width:100%;height:auto}'
+                . '@media print{body{padding:0;background:#fff}.label{box-shadow:none;border:1px solid #ccc}}'
+                . '</style></head><body>' . $labelCard . '</body></html>';
 
             return [
                 'success' => true,
@@ -367,10 +381,10 @@ class WarehouseReceivingService
                 'deliveryDistrict:id,name',
             ])->first();
 
-            $labelsHtml = '';
+            $labelCards = '';
             foreach ($labels as $label) {
                 $barcodeSvg = $this->barcodeService->renderCode128Svg($label->barcode_value);
-                $labelsHtml .= View::make('warehouse.receipts.partials.item-label', [
+                $labelCards .= View::make('warehouse.receipts.partials.item-label', [
                     'assignment' => $lockedAssignment,
                     'shipment' => $shipment,
                     'shipmentItem' => $shipmentItem,
@@ -381,6 +395,19 @@ class WarehouseReceivingService
                     'labelBarcode' => $label->barcode_value,
                 ])->render();
             }
+
+            $labelsHtml = '<!doctype html><html><head><meta charset="utf-8"><title>Labels - ' . $parentBarcode . '</title><style>'
+                . 'body{font-family:Arial,sans-serif;margin:0;padding:24px;background:#f8fafc}'
+                . '.label{width:430px;margin:0 auto 24px;border:1px solid #d1d5db;border-radius:10px;background:#fff;padding:14px;box-shadow:0 6px 20px rgba(15,23,42,.12)}'
+                . '.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}'
+                . '.title{font-size:14px;font-weight:700;color:#0f172a}'
+                . '.meta{font-size:11px;color:#64748b}'
+                . '.line{display:flex;justify-content:space-between;margin:6px 0;font-size:12px;color:#1e293b}'
+                . '.line span:first-child{color:#64748b}'
+                . '.barcode{margin-top:10px;text-align:center}'
+                . '.barcode svg{max-width:100%;height:auto}'
+                . '@media print{body{padding:0;background:#fff}.label{box-shadow:none;border:1px solid #ccc;margin:0 auto;page-break-after:always}}'
+                . '</style></head><body>' . $labelCards . '</body></html>';
 
             return [
                 'success' => true,
