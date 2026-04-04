@@ -127,6 +127,22 @@
                 </a>
                 @endhasPermission
 
+                @hasPermission('shipments.view')
+                <a href="{{ route('admin.delivery-runs.index') }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.delivery-runs.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                        </svg>
+                    </div>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Delivery Runs</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Delivery Runs</span>
+                    </template>
+                </a>
+                @endhasPermission
+
                 <!-- FINANCE Section -->
                 <div class="mt-3 mb-1 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
                     <div class="section-label flex items-center gap-3">

@@ -136,10 +136,20 @@ class WarehouseDeliveryService
             ->get();
 
         // Collect unique shipment items (a package may have multiple labels)
-        $shipmentItems = $labels->map(fn ($l) => $l->receiptItem?->shipmentItem)->filter()->unique('id');
+        $allItems = $labels->map(fn ($l) => $l->receiptItem?->shipmentItem)->filter();
+        $shipmentItems = $allItems->unique('id');
 
         if ($shipmentItems->isEmpty()) {
-            return ['success' => false, 'message' => 'No valid packages found.'];
+            return [
+                'success' => false,
+                'message' => 'No valid packages found.',
+                'debug' => [
+                    'claimed_label_ids' => $claimedLabelIds->values(),
+                    'labels_found' => $labels->count(),
+                    'labels_with_receipt_item' => $labels->filter(fn ($l) => $l->receiptItem)->count(),
+                    'labels_with_shipment_item' => $labels->filter(fn ($l) => $l->receiptItem?->shipmentItem)->count(),
+                ],
+            ];
         }
 
         return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems) {
@@ -212,6 +222,8 @@ class WarehouseDeliveryService
                     'run_number' => $run->run_number,
                     'stops_count' => count($grouped),
                     'packages_count' => $shipmentItems->count(),
+                    'claimed_labels_count' => $claimedLabelIds->count(),
+                    'unique_items_count' => $shipmentItems->count(),
                 ],
             ];
         });
