@@ -257,11 +257,11 @@ class DriverPackageController extends Controller
                 ->whereIn('id', function ($q) {
                     $q->selectRaw('MAX(id)')->from('label_custody_events')->groupBy('warehouse_receipt_item_label_id');
                 })
-                ->with('label.receiptItem.warehouseReceipt')
+                ->with('label.receiptItem.receipt')
                 ->latest()
                 ->first();
 
-            $warehouseId = $claimedLabel?->label?->receiptItem?->warehouseReceipt?->warehouse_id;
+            $warehouseId = $claimedLabel?->label?->receiptItem?->receipt?->warehouse_id;
         }
 
         if (!$warehouseId) {

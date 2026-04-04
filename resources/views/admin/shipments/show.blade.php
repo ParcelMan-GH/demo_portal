@@ -2751,8 +2751,7 @@ $shipmentConfig = [
                     </div>
                 </div>
 
-                <template x-if="!custody.loading">
-                    <div>
+                <div x-show="!custody.loading" x-cloak>
                         {{-- Stats --}}
                         <div class="grid grid-cols-4 gap-3 mb-6">
                             <div class="bg-white rounded-xl border border-slate-200 p-3">
@@ -2842,7 +2841,7 @@ $shipmentConfig = [
                             </div>
                         </div>
                     </div>
-                </template>
+                </div>
             </div>
 
                 {{-- Finalize Confirm Modal --}}

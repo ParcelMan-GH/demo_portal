@@ -158,6 +158,7 @@ function packageTracking() {
             const setup = () => {
                 if (!window.$ || !window.moment || !window.$.fn.daterangepicker) return;
                 const $input = window.$(this.$refs.dateRange);
+                if (!$input.length) return;
                 $input.daterangepicker({
                     autoUpdateInput: false,
                     alwaysShowCalendars: true,
@@ -187,8 +188,30 @@ function packageTracking() {
                     this.loadData();
                 });
             };
-            if (window.$ && window.moment && window.$.fn.daterangepicker) setup();
-            else setTimeout(setup, 500);
+            if (window.$ && window.moment && window.$.fn.daterangepicker) { setup(); return; }
+
+            // Load from CDN
+            const cssId = 'daterangepicker-css';
+            if (!document.getElementById(cssId)) {
+                const link = document.createElement('link');
+                link.id = cssId; link.rel = 'stylesheet';
+                link.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
+                document.head.appendChild(link);
+            }
+            const loadScript = (id, src) => new Promise(resolve => {
+                if (document.getElementById(id)) return resolve();
+                const s = document.createElement('script');
+                s.id = id; s.src = src; s.onload = resolve;
+                document.body.appendChild(s);
+            });
+            loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
+                .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
+                .then(() => {
+                    window.$ = window.jQuery = window.jQuery || window.$;
+                    window.moment = window.moment || moment;
+                    return loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js');
+                })
+                .then(() => setup());
         },
 
         async loadData() {
