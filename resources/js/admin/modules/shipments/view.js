@@ -344,9 +344,12 @@ function shipmentShow() {
             this.custody.loading = true;
             this.custodyLoaded = true;
             try {
-                const response = await fetch(this.config.custodyDataEndpoint, {
+                const url = this.config.custodyDataEndpoint;
+                if (!url) { console.error('custodyDataEndpoint not configured'); this.custody.loading = false; return; }
+                const response = await fetch(url, {
                     headers: { 'Accept': 'application/json' },
                 });
+                if (!response.ok) { console.error('Custody data fetch failed:', response.status); this.custody.loading = false; return; }
                 const result = await response.json();
                 if (result.success) {
                     this.custody.labels = result.data.labels || [];

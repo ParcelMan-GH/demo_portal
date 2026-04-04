@@ -1325,8 +1325,7 @@ class ShipmentController extends Controller
         }
 
         $receipt->load([
-            'items.labels.custodyEvents' => fn ($q) => $q->latest()->limit(1),
-            'items.labels.custodyEvents.driver:id,name,phone',
+            'items.labels',
             'items.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
         ]);
 
@@ -1334,7 +1333,10 @@ class ShipmentController extends Controller
         foreach ($receipt->items as $receiptItem) {
             $item = $receiptItem->shipmentItem;
             foreach ($receiptItem->labels as $label) {
-                $latestEvent = $label->custodyEvents->first();
+                $latestEvent = \App\Models\LabelCustodyEvent::where('warehouse_receipt_item_label_id', $label->id)
+                    ->with('driver:id,name,phone')
+                    ->latest('id')
+                    ->first();
                 $isClaimed = $latestEvent && $latestEvent->event_type === 'claimed';
                 $isDelivered = $latestEvent && $latestEvent->event_type === 'delivered';
 
