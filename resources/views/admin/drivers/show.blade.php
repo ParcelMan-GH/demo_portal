@@ -179,6 +179,16 @@ $driverConfig = [
                                     <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Deliveries</p>
                                 </div>
                             </div>
+                            <!-- Packages -->
+                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2 flex items-center gap-2.5 transition-colors flex-1">
+                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500/30 to-cyan-600/20 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                </div>
+                                <div>
+                                    <p class="text-lg font-bold text-cyan-400 leading-none">{{ number_format($currentPackagesCount) }}</p>
+                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Packages</p>
+                                </div>
+                            </div>
                             <!-- Last Login -->
                             <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2 flex items-center gap-2.5 transition-colors flex-1">
                                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500/30 to-amber-600/20 flex items-center justify-center flex-shrink-0">

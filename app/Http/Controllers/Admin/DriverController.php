@@ -111,6 +111,13 @@ class DriverController extends Controller
         $completedCount = $driver->pickupAssignments()->where('status', 'completed')->count();
         $transportManifestsCount = $driver->transportManifests()->count();
         $deliveryRunsCount = $driver->deliveryRuns()->count();
+        $currentPackagesCount = \App\Models\LabelCustodyEvent::query()
+            ->where('driver_id', $driver->id)
+            ->where('event_type', 'claimed')
+            ->whereIn('id', function ($q) {
+                $q->selectRaw('MAX(id)')->from('label_custody_events')->groupBy('warehouse_receipt_item_label_id');
+            })
+            ->count();
         $activeAssignment = $driver->activeAssignment;
         $lastLogin = $driver->activityLogs()->where('action', 'driver_login')->latest('created_at')->first();
         $activityLogsCount = $driver->activityLogs()->count();
@@ -124,6 +131,7 @@ class DriverController extends Controller
             'completedCount' => $completedCount,
             'transportManifestsCount' => $transportManifestsCount,
             'deliveryRunsCount' => $deliveryRunsCount,
+            'currentPackagesCount' => $currentPackagesCount,
             'activityLogsCount' => $activityLogsCount,
             'activeAssignment' => $activeAssignment,
             'lastLogin' => $lastLogin,

@@ -42,6 +42,10 @@
                                class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400 transition-colors">
                         <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     </div>
+                    <div class="relative w-full sm:w-56">
+                        <input x-ref="dateRange" type="text" readonly placeholder="Date range..."
+                               class="w-full px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 cursor-pointer">
+                    </div>
                     <div class="flex gap-1 bg-slate-100/80 p-1 rounded-xl">
                         <button @@click="statusFilter = ''; loadData()" :class="statusFilter === '' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all">All</button>
                         <button @@click="statusFilter = 'claimed'; loadData()" :class="statusFilter === 'claimed' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all">With Drivers</button>
@@ -140,16 +144,60 @@ function packageTracking() {
         loading: false,
         search: '',
         statusFilter: '',
+        fromDate: '',
+        toDate: '',
         page: 1,
         meta: { total: 0, per_page: 25, current_page: 1, last_page: 1 },
 
-        init() { this.loadData(); },
+        init() {
+            this.loadData();
+            this.initDateRange();
+        },
+
+        initDateRange() {
+            const setup = () => {
+                if (!window.$ || !window.moment || !window.$.fn.daterangepicker) return;
+                const $input = window.$(this.$refs.dateRange);
+                $input.daterangepicker({
+                    autoUpdateInput: false,
+                    alwaysShowCalendars: true,
+                    opens: 'right',
+                    locale: { format: 'YYYY-MM-DD', cancelLabel: 'Clear' },
+                    ranges: {
+                        'Today': [window.moment(), window.moment()],
+                        'Yesterday': [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
+                        'Last 7 Days': [window.moment().subtract(6, 'days'), window.moment()],
+                        'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
+                        'This Month': [window.moment().startOf('month'), window.moment().endOf('month')],
+                        'Last Month': [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
+                    },
+                });
+                $input.on('apply.daterangepicker', (ev, picker) => {
+                    this.fromDate = picker.startDate.format('YYYY-MM-DD');
+                    this.toDate = picker.endDate.format('YYYY-MM-DD');
+                    $input.val(this.fromDate + ' - ' + this.toDate);
+                    this.page = 1;
+                    this.loadData();
+                });
+                $input.on('cancel.daterangepicker', () => {
+                    this.fromDate = '';
+                    this.toDate = '';
+                    $input.val('');
+                    this.page = 1;
+                    this.loadData();
+                });
+            };
+            if (window.$ && window.moment && window.$.fn.daterangepicker) setup();
+            else setTimeout(setup, 500);
+        },
 
         async loadData() {
             this.loading = true;
             const params = new URLSearchParams();
             if (this.search) params.set('search', this.search);
             if (this.statusFilter) params.set('status', this.statusFilter);
+            if (this.fromDate) params.set('from_date', this.fromDate);
+            if (this.toDate) params.set('to_date', this.toDate);
             params.set('page', this.page);
             params.set('per_page', this.meta.per_page);
 

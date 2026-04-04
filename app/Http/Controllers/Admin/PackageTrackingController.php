@@ -72,6 +72,14 @@ class PackageTrackingController extends Controller
             });
         }
 
+        // Date range filter
+        if ($fromDate = $request->input('from_date')) {
+            $query->whereDate('created_at', '>=', $fromDate);
+        }
+        if ($toDate = $request->input('to_date')) {
+            $query->whereDate('created_at', '<=', $toDate);
+        }
+
         // Filter by status
         $status = $request->input('status');
         if ($status === 'claimed') {
@@ -126,6 +134,7 @@ class PackageTrackingController extends Controller
                 'barcode' => $label->barcode_value,
                 'label_index' => $label->label_index,
                 'labels_total' => $label->labels_total,
+                'shipment_id' => $shipment?->id,
                 'shipment_number' => $shipment?->shipment_number,
                 'description' => $item?->description,
                 'tracking_code' => $item?->tracking_code,
