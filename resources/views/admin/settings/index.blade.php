@@ -111,6 +111,31 @@
                         @endforeach
                     </div>
                 </div>
+
+                {{-- Data Management --}}
+                <div>
+                    <div class="px-3 mb-2">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Data Management</span>
+                    </div>
+                    <div class="space-y-1">
+                        <a href="{{ route('admin.warehouses.index') }}"
+                           class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 text-slate-600 hover:bg-slate-100/80 hover:text-slate-900">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 group-hover:bg-slate-200 transition-all">
+                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
+                            </div>
+                            <span class="truncate">Warehouses</span>
+                            <svg class="w-4 h-4 ml-auto text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                        </a>
+                        <a href="{{ route('admin.locations.index') }}"
+                           class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 text-slate-600 hover:bg-slate-100/80 hover:text-slate-900">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 group-hover:bg-slate-200 transition-all">
+                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            </div>
+                            <span class="truncate">Locations</span>
+                            <svg class="w-4 h-4 ml-auto text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                        </a>
+                    </div>
+                </div>
             </nav>
 
             <!-- Footer with version info -->

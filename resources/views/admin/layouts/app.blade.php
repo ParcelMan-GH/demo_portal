@@ -160,64 +160,13 @@
                 </div>
 
                 @php
-                    $canSeeWarehouses = Auth::guard('admin')->user()->hasPermission('warehouses.view');
                     $canSeeRoles = Auth::guard('admin')->user()->hasPermission('roles.view');
                     $isWarehouseRoleContext = request()->routeIs('admin.roles.warehouse.*')
                         || (request()->routeIs('admin.roles.*') && request()->query('scope') === 'warehouse');
-                    $warehouseMgmtActive = request()->routeIs('admin.warehouses.*') || $isWarehouseRoleContext;
                     $canSeeUsers = Auth::guard('admin')->user()->hasPermission('users.view');
                     $systemRolesActive = request()->routeIs('admin.roles.*') && !$isWarehouseRoleContext;
                     $userMgmtActive = request()->routeIs('admin.admins.*') || $systemRolesActive;
                 @endphp
-                @if($canSeeWarehouses || $canSeeRoles)
-                <div x-data="{ expanded: {{ $warehouseMgmtActive ? 'true' : 'false' }} }" class="relative">
-                    <button @click="expanded = !expanded"
-                            class="summary-item nav-item relative w-full flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ $warehouseMgmtActive ? 'active text-white' : '' }} cursor-pointer"
-                            :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
-                        <div class="nav-icon-wrap">
-                            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
-                            </svg>
-                        </div>
-                        <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300"
-                              :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Warehouse Management</span>
-                        <span x-show="!sidebarCollapsed"
-                              class="ml-auto flex items-center justify-center w-5 h-5 rounded-md text-slate-400 transition-all duration-200">
-                            <svg class="w-4 h-4 transition-transform duration-200" :class="expanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                            </svg>
-                        </span>
-                        <template x-if="sidebarCollapsed">
-                            <span class="sidebar-tooltip">Warehouse Management</span>
-                        </template>
-                    </button>
-
-                    <div x-show="expanded && !sidebarCollapsed"
-                         x-cloak
-                         x-transition:enter="transition ease-out duration-200"
-                         x-transition:enter-start="opacity-0 -translate-y-2"
-                         x-transition:enter-end="opacity-100 translate-y-0"
-                         x-transition:leave="transition ease-in duration-150"
-                         x-transition:leave-start="opacity-100 translate-y-0"
-                         x-transition:leave-end="opacity-0 -translate-y-2"
-                         class="mt-1 ml-5 pl-4 border-l border-white/10 space-y-1">
-                        @if($canSeeWarehouses)
-                        <a href="{{ route('admin.warehouses.index') }}"
-                           class="flex items-center gap-2 py-1.5 px-3 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-all {{ request()->routeIs('admin.warehouses.*') ? 'text-white bg-white/5' : '' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->routeIs('admin.warehouses.*') ? 'bg-primary-400' : 'bg-slate-500' }}"></span>
-                            <span class="text-[12px] font-medium">Warehouses</span>
-                        </a>
-                        @endif
-                        @if($canSeeRoles)
-                        <a href="{{ route('admin.roles.warehouse.index') }}"
-                           class="flex items-center gap-2 py-1.5 px-3 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-all {{ $isWarehouseRoleContext ? 'text-white bg-white/5' : '' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $isWarehouseRoleContext ? 'bg-primary-400' : 'bg-slate-500' }}"></span>
-                            <span class="text-[12px] font-medium">Warehouse Roles</span>
-                        </a>
-                        @endif
-                    </div>
-                </div>
-                @endif
 
                 @if($canSeeUsers || $canSeeRoles)
                 <div x-data="{ expanded: {{ $userMgmtActive ? 'true' : 'false' }} }" class="relative">
@@ -268,22 +217,6 @@
                     </div>
                 </div>
                 @endif
-
-                @hasPermission('settings.view')
-                <a href="{{ route('admin.locations.index') }}"
-                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.locations.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-                        </svg>
-                    </div>
-                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Locations</span>
-                    <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Locations</span>
-                    </template>
-                </a>
-                @endhasPermission
 
                 @hasPermission('settings.view')
                 <a href="{{ route('admin.marketing.index') }}"

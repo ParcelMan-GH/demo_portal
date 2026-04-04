@@ -141,7 +141,7 @@ class WarehouseDeliveryService
                 'run_number' => $this->generateRunNumber($warehouse),
                 'warehouse_id' => $warehouse->id,
                 'assigned_driver_id' => $driver->id,
-                'status' => DeliveryRun::STATUS_DISPATCHED,
+                'status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY,
                 'dispatched_at' => now(),
                 'created_by_user_id' => $admin?->id,
             ]);
