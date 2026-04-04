@@ -2750,6 +2750,7 @@ $shipmentConfig = [
             <!-- ═══════════════════════════════════════ -->
             <div x-show="activeTab === 'custody'" x-cloak>
 
+                {{-- Loading --}}
                 <div x-show="custody.loading" class="flex items-center justify-center py-20">
                     <div class="flex gap-1.5">
                         <div class="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style="animation-delay:0ms"></div>
@@ -2758,95 +2759,74 @@ $shipmentConfig = [
                     </div>
                 </div>
 
-                <div x-show="!custody.loading" x-cloak>
-                        {{-- Stats --}}
-                        <div class="grid grid-cols-4 gap-3 mb-6">
-                            <div class="bg-white rounded-xl border border-slate-200 p-3">
-                                <p class="text-lg font-bold text-slate-900" x-text="custody.labels.length"></p>
-                                <p class="text-[10px] text-slate-500 font-semibold uppercase">Total Labels</p>
-                            </div>
-                            <div class="bg-white rounded-xl border border-emerald-200 p-3">
-                                <p class="text-lg font-bold text-emerald-700" x-text="custody.labels.filter(l => l.current_driver).length"></p>
-                                <p class="text-[10px] text-emerald-600 font-semibold uppercase">Claimed</p>
-                            </div>
-                            <div class="bg-white rounded-xl border border-slate-200 p-3">
-                                <p class="text-lg font-bold text-slate-400" x-text="custody.labels.filter(l => !l.current_driver).length"></p>
-                                <p class="text-[10px] text-slate-500 font-semibold uppercase">Unclaimed</p>
-                            </div>
-                            <div class="bg-white rounded-xl border border-blue-200 p-3">
-                                <p class="text-lg font-bold text-blue-700" x-text="custody.labels.filter(l => l.status === 'delivered').length"></p>
-                                <p class="text-[10px] text-blue-600 font-semibold uppercase">Delivered</p>
-                            </div>
-                        </div>
-
-                        {{-- Drivers with claims — create run buttons --}}
-                        <div x-show="custody.labels.filter(l => l.current_driver).length > 0">
-                            <div class="mb-6">
-                                <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Drivers Holding Packages</h4>
-                                <div class="flex flex-wrap gap-2">
-                                    <template x-for="driverGroup in custodyDriverGroups()" :key="driverGroup.driver_id">
-                                        <div class="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl">
-                                            <div class="w-7 h-7 rounded-full bg-cyan-100 text-cyan-700 text-[10px] font-bold flex items-center justify-center" x-text="driverGroup.name.charAt(0).toUpperCase()"></div>
-                                            <div>
-                                                <p class="text-xs font-semibold text-slate-800" x-text="driverGroup.name"></p>
-                                                <p class="text-[10px] text-slate-400" x-text="driverGroup.count + ' package(s)'"></p>
-                                            </div>
-                                            <button @@click="createRunFromClaims(driverGroup.driver_id)" :disabled="custody.creatingRun"
-                                                    class="ml-2 px-2.5 py-1 text-[10px] font-semibold text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors disabled:opacity-50">
-                                                <span x-text="custody.creatingRun ? '...' : 'Create Run'"></span>
-                                            </button>
-                                        </div>
-                                    </template>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Labels table --}}
-                        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                            <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                                <h3 class="text-sm font-bold text-slate-900">Package Labels</h3>
-                                <button @@click="loadCustody()" class="text-[10px] font-semibold text-slate-500 hover:text-slate-700">Refresh</button>
-                            </div>
-
-                            <div x-show="custody.labels.length === 0" class="px-4 py-12 text-center text-slate-400">
-                                <p class="text-sm font-medium">No labels generated yet</p>
-                                <p class="text-xs mt-1">Print labels from the Receiving tab first</p>
-                            </div>
-
-                            <div class="divide-y divide-slate-100" x-show="custody.labels.length > 0">
-                                <template x-for="label in custody.labels" :key="label.id">
-                                    <div class="px-4 py-3 flex items-center gap-4 hover:bg-slate-50/50">
-                                        {{-- Barcode --}}
-                                        <div class="w-40 flex-shrink-0">
-                                            <p class="text-xs font-mono font-bold text-slate-900" x-text="label.barcode"></p>
-                                            <p class="text-[10px] text-slate-400" x-show="label.labels_total > 1" x-text="'Label ' + label.label_index + ' of ' + label.labels_total"></p>
-                                        </div>
-                                        {{-- Description --}}
-                                        <div class="flex-1 min-w-0">
-                                            <p class="text-xs font-semibold text-slate-700 truncate" x-text="label.description || 'No description'"></p>
-                                            <p class="text-[10px] text-slate-400 truncate" x-text="label.recipient_name ? ('→ ' + label.recipient_name + (label.delivery_town ? ', ' + label.delivery_town : '')) : 'No destination set'"></p>
-                                        </div>
-                                        {{-- Driver / Status --}}
-                                        <div class="flex-shrink-0 text-right">
-                                            <template x-if="label.current_driver">
-                                                <div>
-                                                    <p class="text-xs font-semibold text-emerald-700" x-text="label.current_driver.name"></p>
-                                                    <p class="text-[10px] text-slate-400" x-text="label.claimed_at"></p>
-                                                </div>
-                                            </template>
-                                            <template x-if="!label.current_driver && label.status === 'delivered'">
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">Delivered</span>
-                                            </template>
-                                            <template x-if="!label.current_driver && label.status !== 'delivered'">
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">At Warehouse</span>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
+                {{-- Stats --}}
+                <div x-show="!custody.loading" class="grid grid-cols-4 gap-3 mb-6">
+                    <div class="bg-white rounded-xl border border-slate-200 p-3">
+                        <p class="text-lg font-bold text-slate-900" x-text="custody.labels.length"></p>
+                        <p class="text-[10px] text-slate-500 font-semibold uppercase">Total Labels</p>
+                    </div>
+                    <div class="bg-white rounded-xl border border-emerald-200 p-3">
+                        <p class="text-lg font-bold text-emerald-700" x-text="custody.labels.filter(l => l.current_driver).length"></p>
+                        <p class="text-[10px] text-emerald-600 font-semibold uppercase">Claimed</p>
+                    </div>
+                    <div class="bg-white rounded-xl border border-slate-200 p-3">
+                        <p class="text-lg font-bold text-slate-400" x-text="custody.labels.filter(l => !l.current_driver && l.status !== 'delivered').length"></p>
+                        <p class="text-[10px] text-slate-500 font-semibold uppercase">Unclaimed</p>
+                    </div>
+                    <div class="bg-white rounded-xl border border-blue-200 p-3">
+                        <p class="text-lg font-bold text-blue-700" x-text="custody.labels.filter(l => l.status === 'delivered').length"></p>
+                        <p class="text-[10px] text-blue-600 font-semibold uppercase">Delivered</p>
                     </div>
                 </div>
+
+                {{-- Drivers with claims --}}
+                <template x-for="driverGroup in custodyDriverGroups()" :key="driverGroup.driver_id">
+                    <div class="inline-flex items-center gap-2 px-3 py-2 mb-3 mr-2 bg-white border border-slate-200 rounded-xl">
+                        <div class="w-7 h-7 rounded-full bg-cyan-100 text-cyan-700 text-[10px] font-bold flex items-center justify-center" x-text="driverGroup.name.charAt(0).toUpperCase()"></div>
+                        <div>
+                            <p class="text-xs font-semibold text-slate-800" x-text="driverGroup.name"></p>
+                            <p class="text-[10px] text-slate-400" x-text="driverGroup.count + ' package(s)'"></p>
+                        </div>
+                        <button @@click="createRunFromClaims(driverGroup.driver_id)" :disabled="custody.creatingRun"
+                                class="ml-2 px-2.5 py-1 text-[10px] font-semibold text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors disabled:opacity-50">
+                            <span x-text="custody.creatingRun ? '...' : 'Create Run'"></span>
+                        </button>
+                    </div>
+                </template>
+
+                {{-- Labels table --}}
+                <div x-show="!custody.loading" class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-slate-900">Package Labels</h3>
+                        <button @@click="loadCustody()" class="text-[10px] font-semibold text-slate-500 hover:text-slate-700">Refresh</button>
+                    </div>
+
+                    {{-- Empty --}}
+                    <div x-show="custody.labels.length === 0" class="px-4 py-12 text-center text-slate-400">
+                        <p class="text-sm font-medium">No labels generated yet</p>
+                        <p class="text-xs mt-1">Print labels from the Receiving tab first</p>
+                    </div>
+
+                    {{-- List --}}
+                    <template x-for="label in custody.labels" :key="label.id">
+                        <div class="px-4 py-3 flex items-center gap-4 hover:bg-slate-50/50 border-b border-slate-100 last:border-0">
+                            <div class="w-40 flex-shrink-0">
+                                <p class="text-xs font-mono font-bold text-slate-900" x-text="label.barcode"></p>
+                                <p x-show="label.labels_total > 1" class="text-[10px] text-slate-400" x-text="'Label ' + label.label_index + ' of ' + label.labels_total"></p>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-xs font-semibold text-slate-700 truncate" x-text="label.description || 'No description'"></p>
+                                <p class="text-[10px] text-slate-400 truncate" x-text="label.recipient_name ? ('→ ' + label.recipient_name + (label.delivery_town ? ', ' + label.delivery_town : '')) : 'No destination set'"></p>
+                            </div>
+                            <div class="flex-shrink-0 text-right">
+                                <span x-show="label.current_driver" class="text-xs font-semibold text-emerald-700" x-text="label.current_driver ? label.current_driver.name : ''"></span>
+                                <span x-show="!label.current_driver && label.status === 'delivered'" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">Delivered</span>
+                                <span x-show="!label.current_driver && label.status !== 'delivered'" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">At Warehouse</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
 
                 {{-- Finalize Confirm Modal --}}
                 <div x-show="finalizeConfirmOpen" x-transition.opacity class="fixed inset-0 z-[190] flex items-center justify-center bg-black/50 p-4" style="display:none">
