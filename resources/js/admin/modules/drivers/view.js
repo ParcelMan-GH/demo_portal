@@ -97,6 +97,14 @@ function driverShow() {
             },
         },
 
+        // Packages state
+        packagesLoaded: false,
+        packages: {
+            rows: [],
+            loading: false,
+            filter: 'current',
+        },
+
         // Activity logs state
         activity: {
             data: [],
@@ -299,6 +307,20 @@ function driverShow() {
             } finally {
                 this.deliveries.loading = false;
             }
+        },
+
+        async loadPackages() {
+            this.packages.loading = true;
+            this.packagesLoaded = true;
+            try {
+                const params = new URLSearchParams();
+                params.set('filter', this.packages.filter);
+                params.set('per_page', 50);
+                const res = await fetch(this.config.packagesDataUrl + '?' + params, { headers: { 'Accept': 'application/json' } });
+                const json = await res.json();
+                this.packages.rows = json.data || [];
+            } catch (e) { console.error('Failed to load packages', e); }
+            this.packages.loading = false;
         },
 
         async loadActivityLogs() {

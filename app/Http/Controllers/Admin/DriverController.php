@@ -643,4 +643,60 @@ class DriverController extends Controller
             ? $normalized
             : [Driver::CAPABILITY_PICKUP];
     }
+
+    public function packagesData(Request $request, Driver $driver): \Illuminate\Http\JsonResponse
+    {
+        $this->authorizePermission('drivers.view');
+
+        // Get all custody events for this driver
+        $query = \App\Models\LabelCustodyEvent::query()
+            ->where('driver_id', $driver->id)
+            ->with([
+                'label.receiptItem.shipmentItem.shipment:id,shipment_number,delivery_recipient_name,delivery_town',
+                'label.receiptItem.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_town',
+            ]);
+
+        // Filter: current (latest event is 'claimed') or all
+        $filter = $request->input('filter', 'current');
+
+        if ($filter === 'current') {
+            $query->where('event_type', 'claimed')
+                ->whereIn('id', function ($q) {
+                    $q->selectRaw('MAX(id)')->from('label_custody_events')->groupBy('warehouse_receipt_item_label_id');
+                });
+        }
+
+        $total = $query->count();
+        $perPage = min(max((int) $request->input('per_page', 25), 1), 100);
+        $page = max((int) $request->input('page', 1), 1);
+
+        $events = $query->latest('created_at')->skip(($page - 1) * $perPage)->take($perPage)->get();
+
+        $rows = $events->map(function ($event) {
+            $label = $event->label;
+            $item = $label?->receiptItem?->shipmentItem;
+            $shipment = $item?->shipment;
+
+            return [
+                'barcode' => $label?->barcode_value,
+                'event_type' => $event->event_type,
+                'shipment_number' => $shipment?->shipment_number,
+                'description' => $item?->description,
+                'recipient_name' => $item?->delivery_recipient_name ?: $shipment?->delivery_recipient_name,
+                'delivery_town' => $item?->delivery_town ?: $shipment?->delivery_town,
+                'notes' => $event->notes,
+                'created_at' => $event->created_at->format('M d, Y H:i'),
+            ];
+        });
+
+        return response()->json([
+            'data' => $rows,
+            'meta' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+            ],
+        ]);
+    }
 }

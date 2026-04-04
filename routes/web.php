@@ -259,6 +259,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('drivers', [DriverController::class, 'store'])->name('drivers.store');
         Route::get('drivers/{driver}', [DriverController::class, 'showPage'])->name('drivers.show');
         Route::get('drivers/{driver}/json', [DriverController::class, 'show'])->name('drivers.show.json');
+        Route::get('drivers/{driver}/packages-data', [DriverController::class, 'packagesData'])->name('drivers.packages-data');
         Route::put('drivers/{driver}', [DriverController::class, 'update'])->name('drivers.update');
         Route::delete('drivers/{driver}', [DriverController::class, 'destroy'])->name('drivers.destroy');
         Route::patch('drivers/{driver}/toggle-active', [DriverController::class, 'toggleActive'])->name('drivers.toggle-active');
@@ -314,6 +315,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('transport-manifests/{manifest}', [AdminTransportManifestController::class, 'show'])->name('transport-manifests.show');
 
         // Sort Batches (admin read visibility)
+        Route::get('package-tracking', [\App\Http\Controllers\Admin\PackageTrackingController::class, 'index'])->name('package-tracking.index');
+        Route::get('package-tracking-data', [\App\Http\Controllers\Admin\PackageTrackingController::class, 'data'])->name('package-tracking.data');
+
         Route::get('sort-batches', [AdminSortBatchController::class, 'index'])->name('sort-batches.index');
         Route::get('sort-batches-data', [AdminSortBatchController::class, 'data'])->name('sort-batches.data');
         Route::get('sort-batches-export', [AdminSortBatchController::class, 'export'])->name('sort-batches.export');

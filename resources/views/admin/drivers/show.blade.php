@@ -13,6 +13,7 @@ $driverConfig = [
     'activityLogsEndpoint' => route('admin.drivers.activity-logs', $driver),
     'updateEndpoint' => route('admin.drivers.update', $driver),
     'toggleActiveEndpoint' => route('admin.drivers.toggle-active', $driver),
+    'packagesDataUrl' => route('admin.drivers.packages-data', $driver),
     'canManage' => $canManage,
 ];
 @endphp
@@ -261,6 +262,17 @@ $driverConfig = [
                 <span class="flex-1 text-sm transition-colors" :class="activeTab === 'activity' ? 'font-bold text-violet-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Activity Logs</span>
                 <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-[10px] font-bold rounded-full transition-all"
                     :class="activeTab === 'activity' ? 'bg-violet-500 text-white shadow-sm' : 'bg-slate-100 text-slate-500'">{{ $activityLogsCount }}</span>
+            </button>
+
+            <!-- Packages -->
+            <button @@click="activeTab = 'packages'; if (!packagesLoaded) loadPackages()"
+                class="group flex items-center gap-3 w-full px-2.5 py-2 rounded-xl mb-0.5 transition-all duration-150 text-left"
+                :class="activeTab === 'packages' ? 'bg-cyan-50 ring-1 ring-cyan-100 shadow-sm' : 'hover:bg-slate-50'">
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'packages' ? 'bg-cyan-500 shadow-md shadow-cyan-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3.5 h-3.5 transition-colors" :class="activeTab === 'packages' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                </div>
+                <span class="flex-1 text-sm transition-colors" :class="activeTab === 'packages' ? 'font-bold text-cyan-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Packages</span>
             </button>
         </aside>
 
@@ -704,6 +716,62 @@ $driverConfig = [
                     </div>
                 </div>
             </div>
+
+            {{-- ═══════════ PACKAGES TAB ═══════════ --}}
+            <div x-show="activeTab === 'packages'" x-cloak>
+                <div x-show="packages.loading" class="flex items-center justify-center py-20">
+                    <div class="flex gap-1.5">
+                        <div class="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style="animation-delay:0ms"></div>
+                        <div class="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style="animation-delay:150ms"></div>
+                        <div class="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style="animation-delay:300ms"></div>
+                    </div>
+                </div>
+
+                <template x-if="!packages.loading">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-base font-bold text-slate-800">Packages</h3>
+                            <div class="flex gap-1 bg-slate-100/80 p-1 rounded-xl">
+                                <button @@click="packages.filter = 'current'; loadPackages()" :class="packages.filter === 'current' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'" class="px-3 py-1 text-xs font-semibold rounded-lg transition-all">Current</button>
+                                <button @@click="packages.filter = 'all'; loadPackages()" :class="packages.filter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'" class="px-3 py-1 text-xs font-semibold rounded-lg transition-all">All History</button>
+                            </div>
+                        </div>
+
+                        <template x-if="packages.rows.length === 0">
+                            <div class="text-center py-12 text-slate-400">
+                                <svg class="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                <p class="text-sm font-medium">No packages</p>
+                                <p class="text-xs mt-1" x-text="packages.filter === 'current' ? 'Driver has no packages currently' : 'No package history'"></p>
+                            </div>
+                        </template>
+
+                        <div class="space-y-2" x-show="packages.rows.length > 0">
+                            <template x-for="pkg in packages.rows" :key="pkg.barcode + pkg.created_at">
+                                <div class="flex items-center gap-4 p-3 bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
+                                    <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                                         :class="pkg.event_type === 'claimed' ? 'bg-emerald-100 text-emerald-600' : pkg.event_type === 'delivered' ? 'bg-blue-100 text-blue-600' : pkg.event_type === 'released' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-mono font-bold text-slate-900" x-text="pkg.barcode"></span>
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold"
+                                                  :class="pkg.event_type === 'claimed' ? 'bg-emerald-100 text-emerald-700' : pkg.event_type === 'delivered' ? 'bg-blue-100 text-blue-700' : pkg.event_type === 'released' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'"
+                                                  x-text="pkg.event_type.charAt(0).toUpperCase() + pkg.event_type.slice(1)"></span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-500 truncate" x-text="(pkg.description || '') + (pkg.recipient_name ? ' → ' + pkg.recipient_name : '') + (pkg.delivery_town ? ', ' + pkg.delivery_town : '')"></p>
+                                    </div>
+                                    <div class="text-right flex-shrink-0">
+                                        <p class="text-[10px] text-slate-400" x-text="pkg.created_at"></p>
+                                        <a x-show="pkg.shipment_number" class="text-[10px] text-blue-600 hover:underline" x-text="pkg.shipment_number"></a>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
         </div>
     </div>
 
