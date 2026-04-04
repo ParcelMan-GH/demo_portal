@@ -258,9 +258,13 @@ class WarehouseReceivingService
 
             $shipment = $lockedAssignment->shipment()->with([
                 'vendor:id,name,business_name',
+                'pickupRegion:id,name',
+                'pickupDistrict:id,name',
                 'deliveryRegion:id,name',
                 'deliveryDistrict:id,name',
             ])->first();
+
+            $shipmentItem->load(['deliveryRegion:id,name', 'deliveryDistrict:id,name']);
 
             $labelCard = View::make('warehouse.receipts.partials.item-label', [
                 'assignment' => $lockedAssignment,
@@ -271,18 +275,7 @@ class WarehouseReceivingService
                 'labelBarcode' => $barcodeValue,
             ])->render();
 
-            $labelHtml = '<!doctype html><html><head><meta charset="utf-8"><title>Label - ' . $barcodeValue . '</title><style>'
-                . 'body{font-family:Arial,sans-serif;margin:0;padding:24px;background:#f8fafc}'
-                . '.label{width:430px;margin:0 auto;border:1px solid #d1d5db;border-radius:10px;background:#fff;padding:14px;box-shadow:0 6px 20px rgba(15,23,42,.12)}'
-                . '.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}'
-                . '.title{font-size:14px;font-weight:700;color:#0f172a}'
-                . '.meta{font-size:11px;color:#64748b}'
-                . '.line{display:flex;justify-content:space-between;margin:6px 0;font-size:12px;color:#1e293b}'
-                . '.line span:first-child{color:#64748b}'
-                . '.barcode{margin-top:10px;text-align:center}'
-                . '.barcode svg{max-width:100%;height:auto}'
-                . '@media print{body{padding:0;background:#fff}.label{box-shadow:none;border:1px solid #ccc}}'
-                . '</style></head><body>' . $labelCard . '</body></html>';
+            $labelHtml = $this->buildLabelPageHtml($labelCard, $barcodeValue);
 
             return [
                 'success' => true,
@@ -377,9 +370,13 @@ class WarehouseReceivingService
             // Generate HTML for all labels
             $shipment = $lockedAssignment->shipment()->with([
                 'vendor:id,name,business_name',
+                'pickupRegion:id,name',
+                'pickupDistrict:id,name',
                 'deliveryRegion:id,name',
                 'deliveryDistrict:id,name',
             ])->first();
+
+            $shipmentItem->load(['deliveryRegion:id,name', 'deliveryDistrict:id,name']);
 
             $labelCards = '';
             foreach ($labels as $label) {
@@ -396,18 +393,7 @@ class WarehouseReceivingService
                 ])->render();
             }
 
-            $labelsHtml = '<!doctype html><html><head><meta charset="utf-8"><title>Labels - ' . $parentBarcode . '</title><style>'
-                . 'body{font-family:Arial,sans-serif;margin:0;padding:24px;background:#f8fafc}'
-                . '.label{width:430px;margin:0 auto 24px;border:1px solid #d1d5db;border-radius:10px;background:#fff;padding:14px;box-shadow:0 6px 20px rgba(15,23,42,.12)}'
-                . '.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}'
-                . '.title{font-size:14px;font-weight:700;color:#0f172a}'
-                . '.meta{font-size:11px;color:#64748b}'
-                . '.line{display:flex;justify-content:space-between;margin:6px 0;font-size:12px;color:#1e293b}'
-                . '.line span:first-child{color:#64748b}'
-                . '.barcode{margin-top:10px;text-align:center}'
-                . '.barcode svg{max-width:100%;height:auto}'
-                . '@media print{body{padding:0;background:#fff}.label{box-shadow:none;border:1px solid #ccc;margin:0 auto;page-break-after:always}}'
-                . '</style></head><body>' . $labelCards . '</body></html>';
+            $labelsHtml = $this->buildLabelPageHtml($labelCards, $parentBarcode);
 
             return [
                 'success' => true,
@@ -680,5 +666,54 @@ class WarehouseReceivingService
         }
 
         return null;
+    }
+
+    private function buildLabelPageHtml(string $labelCards, string $title): string
+    {
+        $css = <<<'CSS'
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; background: #f1f5f9; }
+.label {
+    width: 420px; margin: 0 auto 20px; border: 2px solid #1e293b; border-radius: 8px;
+    background: #fff; padding: 0; overflow: hidden;
+}
+.label-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; background: #0f172a; color: #fff;
+}
+.brand-name { font-size: 16px; font-weight: 800; letter-spacing: 2px; }
+.brand-sub { font-size: 9px; font-weight: 600; letter-spacing: 3px; color: #94a3b8; margin-top: 1px; }
+.qr-container { background: #fff; padding: 4px; border-radius: 4px; }
+.qr-code { width: 72px; height: 72px; }
+.qr-code img { width: 72px !important; height: 72px !important; }
+.qr-code canvas { width: 72px !important; height: 72px !important; }
+.divider { height: 1px; background: #e2e8f0; }
+.addresses { padding: 10px 16px; }
+.address-block { margin: 6px 0; }
+.address-label { font-size: 9px; font-weight: 700; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 2px; }
+.address-name { font-size: 15px; font-weight: 700; color: #0f172a; }
+.address-detail { font-size: 11px; color: #475569; margin-top: 1px; }
+.address-phone { font-size: 11px; color: #64748b; margin-top: 1px; }
+.address-divider { height: 1px; background: #f1f5f9; margin: 8px 0; }
+.pkg-info { padding: 8px 16px; }
+.pkg-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 11px; }
+.pkg-label { color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; }
+.pkg-value { color: #1e293b; font-weight: 600; }
+.pkg-bold { font-size: 13px; font-weight: 800; color: #0f172a; }
+.barcode-section { padding: 12px 16px 16px; text-align: center; background: #fafafa; border-top: 1px solid #e2e8f0; }
+.barcode-svg { margin: 0 auto; }
+.barcode-svg svg { max-width: 100%; height: 60px; }
+.barcode-text { font-size: 13px; font-weight: 700; font-family: 'Courier New', monospace; color: #0f172a; margin-top: 4px; letter-spacing: 2px; }
+@media print {
+    body { padding: 0; background: #fff; }
+    .label { box-shadow: none; border: 2px solid #000; margin: 0 auto; page-break-after: always; }
+}
+CSS;
+
+        return '<!doctype html><html><head><meta charset="utf-8">'
+            . '<title>Labels - ' . e($title) . '</title>'
+            . '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>'
+            . '<style>' . $css . '</style>'
+            . '</head><body>' . $labelCards . '</body></html>';
     }
 }
