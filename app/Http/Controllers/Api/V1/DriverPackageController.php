@@ -128,7 +128,7 @@ class DriverPackageController extends Controller
 
         // Check which items are already in active delivery runs
         $activeRunItemIds = \App\Models\DeliveryRunItem::query()
-            ->whereHas('deliveryRun', fn ($q) => $q->whereNotIn('status', ['completed', 'cancelled']))
+            ->whereHas('run', fn ($q) => $q->whereNotIn('status', ['completed', 'cancelled']))
             ->pluck('shipment_item_id');
 
         // Check if driver has an active run
@@ -195,7 +195,7 @@ class DriverPackageController extends Controller
         if ($shipmentItemId) {
             $inActiveRun = \App\Models\DeliveryRunItem::query()
                 ->where('shipment_item_id', $shipmentItemId)
-                ->whereHas('deliveryRun', function ($q) use ($driver) {
+                ->whereHas('run', function ($q) use ($driver) {
                     $q->where('assigned_driver_id', $driver->id)
                       ->whereNotIn('status', ['completed', 'cancelled']);
                 })

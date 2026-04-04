@@ -155,7 +155,7 @@ class WarehouseDeliveryService
 
         // Filter out items already in an active delivery run
         $activeRunItemIds = \App\Models\DeliveryRunItem::query()
-            ->whereHas('deliveryRun', fn ($q) => $q->whereNotIn('status', [DeliveryRun::STATUS_COMPLETED, DeliveryRun::STATUS_CANCELLED]))
+            ->whereHas('run', fn ($q) => $q->whereNotIn('status', [DeliveryRun::STATUS_COMPLETED, DeliveryRun::STATUS_CANCELLED]))
             ->pluck('shipment_item_id');
 
         $shipmentItems = $shipmentItems->reject(fn ($item) => $activeRunItemIds->contains($item->id));
