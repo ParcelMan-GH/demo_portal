@@ -135,7 +135,7 @@ class DeliveryVerificationService
 
     private function generateCode(): string
     {
-        return (string) random_int(100000, 999999);
+        return (string) random_int(1000, 9999);
     }
 
     private function maskCode(string $code): string

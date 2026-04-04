@@ -48,7 +48,7 @@ class DriverDeliveryController extends Controller
         $skipVerification = filter_var($request->input('skip_verification', false), FILTER_VALIDATE_BOOLEAN);
 
         $validated = $request->validate([
-            'verification_code' => [$skipVerification ? 'nullable' : 'required', 'digits:6'],
+            'verification_code' => [$skipVerification ? 'nullable' : 'required', 'digits:4'],
             'skip_verification' => ['nullable', 'in:true,false,1,0'],
             'skip_reason' => [$skipVerification ? 'required' : 'nullable', 'string', 'max:500'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
@@ -85,7 +85,7 @@ class DriverDeliveryController extends Controller
         $skipVerification = filter_var($request->input('skip_verification', false), FILTER_VALIDATE_BOOLEAN);
 
         $validated = $request->validate([
-            'verification_code' => [$skipVerification ? 'nullable' : 'required', 'digits:6'],
+            'verification_code' => [$skipVerification ? 'nullable' : 'required', 'digits:4'],
             'skip_verification' => ['nullable', 'in:true,false,1,0'],
             'skip_reason' => [$skipVerification ? 'required' : 'nullable', 'string', 'max:500'],
             'packages_delivered' => ['required', 'integer', 'min:0'],
