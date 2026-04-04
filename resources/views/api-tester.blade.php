@@ -172,6 +172,16 @@
                             <div id="group-driver-notifications">
                                 <!-- Endpoints will be populated by JS -->
                             </div>
+
+                            <!-- Driver Packages Group -->
+                            <div class="group-header nested" onclick="toggleGroup('driver-packages')">
+                                <span class="folder-chevron open" id="chevron-driver-packages">▶</span>
+                                <span>Package Custody</span>
+                            </div>
+
+                            <div id="group-driver-packages">
+                                <!-- Endpoints will be populated by JS -->
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3949,6 +3959,103 @@ If the recipient did not receive the SMS code, send <code>skip_verification=true
                         }
                     },
                     '401': { success: false, message: 'Unauthenticated.' }
+                }
+            },
+
+            // ─── PACKAGE CUSTODY ────────────────────────────────────
+
+            {
+                method: 'POST',
+                url: '/api/v1/driver/scan-claim',
+                name: 'Scan & Claim Package',
+                description: 'Driver scans a package barcode/QR to claim custody. Blocked if already claimed by another driver.',
+                auth: true,
+                group: 'driver-packages',
+                userType: 'driver',
+                useFormInputs: true,
+                fields: [
+                    { name: 'barcode', type: 'string', required: true, description: 'The barcode value from the package label', example: 'TRKRNDOBJCW-001' },
+                    { name: 'latitude', type: 'number', required: false, description: 'GPS latitude', example: '5.6037' },
+                    { name: 'longitude', type: 'number', required: false, description: 'GPS longitude', example: '-0.1870' },
+                    { name: 'notes', type: 'string', required: false, description: 'Optional notes', example: 'Picked from shelf A2' },
+                ],
+                exampleResponses: {
+                    '200': { success: true, message: 'Package claimed successfully.', data: { label: { barcode: 'TRKRNDOBJCW-001', label_index: 1, labels_total: 10, label_type: 'unit', shipment_number: 'PCM-2026-00045', description: 'Fridge', tracking_code: 'TRKRNDOBJCW', recipient_name: 'Mark Asante', recipient_phone: '+233241234567', delivery_town: 'Madina' } } },
+                    '409': { success: false, message: 'This package is already claimed by John Mensah.' },
+                    '404': { success: false, message: 'Label not found. Check the barcode and try again.' },
+                }
+            },
+            {
+                method: 'GET',
+                url: '/api/v1/driver/my-packages',
+                name: 'My Packages',
+                description: 'Get all packages currently held by the driver. Supports date range filtering and pagination.',
+                auth: true,
+                group: 'driver-packages',
+                userType: 'driver',
+                useFormInputs: true,
+                fields: [
+                    { name: 'from_date', type: 'string', required: false, description: 'Filter from date (YYYY-MM-DD)', example: '2026-04-01' },
+                    { name: 'to_date', type: 'string', required: false, description: 'Filter to date (YYYY-MM-DD)', example: '2026-04-04' },
+                    { name: 'limit', type: 'number', required: false, description: 'Per page (default 50, max 100)', example: '25' },
+                    { name: 'offset', type: 'number', required: false, description: 'Pagination offset', example: '0' },
+                ],
+                exampleResponses: {
+                    '200': { success: true, message: 'Your packages retrieved.', data: { packages: [{ barcode: 'TRKRNDOBJCW-001', label_index: 1, labels_total: 10, shipment_number: 'PCM-2026-00045', description: 'Fridge', recipient_name: 'Mark', delivery_town: 'Madina', claimed_at: '2026-04-04T08:30:00+00:00' }], total: 5, limit: 50, offset: 0, has_more: false } },
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/release-package',
+                name: 'Release Package',
+                description: 'Release a claimed package (put back). Blocked if package is in an active delivery run — use "Fail Delivery" instead.',
+                auth: true,
+                group: 'driver-packages',
+                userType: 'driver',
+                useFormInputs: true,
+                fields: [
+                    { name: 'barcode', type: 'string', required: true, description: 'Barcode of package to release', example: 'TRKRNDOBJCW-001' },
+                    { name: 'notes', type: 'string', required: false, description: 'Reason for releasing', example: 'Wrong route' },
+                ],
+                exampleResponses: {
+                    '200': { success: true, message: 'Package released.' },
+                    '400 (not holding)': { success: false, message: 'You do not currently hold this package.' },
+                    '400 (in run)': { success: false, message: 'Cannot release — this package is in an active delivery run. Use "Failed Delivery" at the stop if you cannot deliver.' },
+                }
+            },
+            {
+                method: 'POST',
+                url: '/api/v1/driver/start-deliveries',
+                name: 'Start Deliveries',
+                description: 'Auto-create a delivery run from all claimed packages. Groups packages into stops by recipient phone or town. The driver then uses the standard delivery flow (arrive → OTP → confirm).',
+                auth: true,
+                group: 'driver-packages',
+                userType: 'driver',
+                useFormInputs: true,
+                fields: [
+                    { name: 'warehouse_id', type: 'number', required: false, description: 'Warehouse ID (auto-detected if not sent)', example: '2' },
+                ],
+                exampleResponses: {
+                    '200': { success: true, message: 'Delivery run created with 3 stop(s).', data: { delivery_run_id: 15, run_number: 'DR-2026-WH002-0012', stops_count: 3, packages_count: 8 } },
+                    '422': { success: false, message: 'Driver has no claimed packages.' },
+                }
+            },
+            {
+                method: 'GET',
+                url: '/api/v1/driver/package-history/{barcode}',
+                name: 'Package History',
+                description: 'Get the full custody history for a specific package label.',
+                auth: true,
+                group: 'driver-packages',
+                userType: 'driver',
+                useFormInputs: true,
+                urlParams: [
+                    { name: 'barcode', type: 'string', required: true, description: 'The barcode value', example: 'TRKRNDOBJCW-001' },
+                ],
+                fields: [],
+                exampleResponses: {
+                    '200': { success: true, data: { barcode: 'TRKRNDOBJCW-001', label: { barcode: 'TRKRNDOBJCW-001', shipment_number: 'PCM-2026-00045', description: 'Fridge', recipient_name: 'Mark', delivery_town: 'Madina' }, history: [{ event_type: 'claimed', driver_name: 'Kofi Mensah', driver_phone: '+233...', notes: null, created_at: '2026-04-04T08:30:00+00:00' }] } },
+                    '404': { success: false, message: 'Label not found.' },
                 }
             }
         ];

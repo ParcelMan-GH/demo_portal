@@ -70,9 +70,9 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                         </svg>
                     </div>
-                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Vendors</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Senders</span>
                     <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Vendors</span>
+                        <span class="sidebar-tooltip">Senders</span>
                     </template>
                 </a>
                 @endhasPermission
@@ -103,12 +103,37 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                         </svg>
                     </div>
-                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Shipments</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Parcels</span>
                     <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Shipments</span>
+                        <span class="sidebar-tooltip">Parcels</span>
                     </template>
                 </a>
                 @endhasPermission
+
+                @hasPermission('shipments.view')
+                <a href="{{ route('admin.package-tracking.index') }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.package-tracking.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </div>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Package Tracking</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Package Tracking</span>
+                    </template>
+                </a>
+                @endhasPermission
+
+                <!-- FINANCE Section -->
+                <div class="mt-3 mb-1 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
+                    <div class="section-label flex items-center gap-3">
+                        <span x-show="!sidebarCollapsed" class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.12em] whitespace-nowrap">Finance</span>
+                        <span x-show="sidebarCollapsed" x-cloak class="block w-8 h-[2px] bg-gradient-to-r from-slate-600 to-transparent mx-auto rounded-full"></span>
+                    </div>
+                </div>
 
                 @hasPermission('invoices.view')
                 <a href="{{ route('admin.invoices.index') }}"
@@ -122,94 +147,6 @@
                     <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Invoices</span>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Invoices</span>
-                    </template>
-                </a>
-                @endhasPermission
-
-                <!-- LOGISTICS Section -->
-                <div class="mt-3 mb-1 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
-                    <div class="section-label flex items-center gap-3">
-                        <span x-show="!sidebarCollapsed" class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.12em] whitespace-nowrap">Logistics</span>
-                        <span x-show="sidebarCollapsed" x-cloak class="block w-8 h-[2px] bg-gradient-to-r from-slate-600 to-transparent mx-auto rounded-full"></span>
-                    </div>
-                </div>
-
-                @hasPermission('shipments.view')
-                <a href="{{ route('admin.pickups.index') }}"
-                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.pickups.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
-                        </svg>
-                    </div>
-                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Pickup Assignments</span>
-                    <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Pickup Assignments</span>
-                    </template>
-                </a>
-                @endhasPermission
-
-                @hasPermission('shipments.view')
-                <a href="{{ route('admin.delivery-runs.index') }}"
-                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.delivery-runs.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-                        </svg>
-                    </div>
-                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Delivery Runs</span>
-                    <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Delivery Runs</span>
-                    </template>
-                </a>
-                @endhasPermission
-
-                @hasPermission('shipments.view')
-                <a href="{{ route('admin.transport-manifests.index') }}"
-                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.transport-manifests.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-                        </svg>
-                    </div>
-                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Transports</span>
-                    <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Transport Manifests</span>
-                    </template>
-                </a>
-                @endhasPermission
-
-                @hasPermission('shipments.view')
-                <a href="{{ route('admin.sort-batches.index') }}"
-                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.sort-batches.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                        </svg>
-                    </div>
-                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Sort Batches</span>
-                    <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Sort Batches</span>
-                    </template>
-                </a>
-                @endhasPermission
-
-                @hasPermission('shipments.view')
-                <a href="{{ route('admin.package-tracking.index') }}"
-                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.package-tracking.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
-                        </svg>
-                    </div>
-                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Package Tracking</span>
-                    <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Package Tracking</span>
                     </template>
                 </a>
                 @endhasPermission
