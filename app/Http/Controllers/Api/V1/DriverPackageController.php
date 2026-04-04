@@ -95,14 +95,16 @@ class DriverPackageController extends Controller
         ]);
 
         // Get all labels where the latest custody event is 'claimed' by this driver
+        // Use a subquery to get the latest event per label, then filter for claimed by this driver
+        $latestEventIds = \Illuminate\Support\Facades\DB::table('label_custody_events')
+            ->selectRaw('MAX(id) as id')
+            ->groupBy('warehouse_receipt_item_label_id')
+            ->pluck('id');
+
         $eventsQuery = LabelCustodyEvent::query()
+            ->whereIn('id', $latestEventIds)
             ->where('driver_id', $driver->id)
-            ->where('event_type', LabelCustodyEvent::TYPE_CLAIMED)
-            ->whereIn('id', function ($query) {
-                $query->selectRaw('MAX(id)')
-                    ->from('label_custody_events')
-                    ->groupBy('warehouse_receipt_item_label_id');
-            });
+            ->where('event_type', LabelCustodyEvent::TYPE_CLAIMED);
 
         if (!empty($validated['from_date'])) {
             $eventsQuery->whereDate('created_at', '>=', $validated['from_date']);
