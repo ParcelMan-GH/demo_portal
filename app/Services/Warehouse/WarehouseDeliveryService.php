@@ -162,28 +162,19 @@ class WarehouseDeliveryService
                 'created_by_user_id' => $admin?->id,
             ]);
 
-            // Group by destination
-            $grouped = [];
-            foreach ($shipmentItems as $shipmentItem) {
-                $destination = $this->resolveDeliveryDestination($shipmentItem);
-
-                // Group key: phone first, then town fallback
+            // Sort items so same-phone recipients are adjacent, then by town
+            $sortedItems = $shipmentItems->sortBy(function ($item) {
+                $destination = $this->resolveDeliveryDestination($item);
                 $phone = preg_replace('/\D/', '', (string) ($destination['recipient_phone'] ?? ''));
                 $town = mb_strtolower(trim((string) ($destination['town'] ?? '')));
+                return $phone . '|' . $town;
+            })->values();
 
-                $key = $phone ?: ($town ?: 'unknown');
-
-                if (!isset($grouped[$key])) {
-                    $grouped[$key] = [
-                        'destination' => $destination,
-                        'items' => [],
-                    ];
-                }
-                $grouped[$key]['items'][] = $shipmentItem;
-            }
-
-            foreach ($grouped as $group) {
-                $destination = $group['destination'];
+            // One stop per package — each shipment item has its own destination
+            $sortPosition = 0;
+            foreach ($sortedItems as $shipmentItem) {
+                $sortPosition++;
+                $destination = $this->resolveDeliveryDestination($shipmentItem);
 
                 $stop = DeliveryRunStop::query()->create([
                     'delivery_run_id' => $run->id,
@@ -196,31 +187,30 @@ class WarehouseDeliveryService
                     'longitude' => $destination['longitude'] ?? null,
                     'gh_post_address' => $destination['gh_post_address'] ?? null,
                     'landmark' => $destination['landmark'] ?? null,
-                    'total_packages' => count($group['items']),
+                    'total_packages' => 1,
                     'status' => DeliveryRunStop::STATUS_PENDING,
                 ]);
 
-                foreach ($group['items'] as $item) {
-                    DeliveryRunItem::query()->create([
-                        'delivery_run_id' => $run->id,
-                        'delivery_run_stop_id' => $stop->id,
-                        'shipment_item_id' => $item->id,
-                        'expected_quantity' => (int) ($item->quantity ?: 1),
-                        'status' => DeliveryRunItem::STATUS_PENDING,
-                    ]);
+                DeliveryRunItem::query()->create([
+                    'delivery_run_id' => $run->id,
+                    'delivery_run_stop_id' => $stop->id,
+                    'shipment_item_id' => $shipmentItem->id,
+                    'expected_quantity' => (int) ($shipmentItem->quantity ?: 1),
+                    'status' => DeliveryRunItem::STATUS_PENDING,
+                ]);
 
-                    // Update shipment item status to out_for_delivery
-                    $item->update(['status' => 'out_for_delivery']);
-                }
+                $shipmentItem->update(['status' => 'out_for_delivery']);
             }
+
+            $stopsCount = $sortedItems->count();
 
             return [
                 'success' => true,
-                'message' => 'Delivery run created with ' . count($grouped) . ' stop(s).',
+                'message' => 'Delivery run created with ' . $stopsCount . ' stop(s).',
                 'data' => [
                     'delivery_run_id' => $run->id,
                     'run_number' => $run->run_number,
-                    'stops_count' => count($grouped),
+                    'stops_count' => $stopsCount,
                     'packages_count' => $shipmentItems->count(),
                     'claimed_labels_count' => $claimedLabelIds->count(),
                     'unique_items_count' => $shipmentItems->count(),
