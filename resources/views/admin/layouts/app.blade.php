@@ -70,9 +70,9 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                         </svg>
                     </div>
-                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Senders</span>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Vendors</span>
                     <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Senders</span>
+                        <span class="sidebar-tooltip">Vendors</span>
                     </template>
                 </a>
                 @endhasPermission
@@ -252,23 +252,6 @@
                 @endhasPermission
             </nav>
 
-            <!-- User Profile Section at Bottom -->
-            <div class="p-3">
-                <div class="mx-0 mb-2 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent"></div>
-                <div class="sidebar-user-card flex items-center cursor-pointer"
-                     :class="sidebarCollapsed ? 'justify-center !p-2' : ''">
-                    <div class="relative flex-shrink-0">
-                        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-sm font-semibold shadow-lg shadow-primary-500/20 ring-1 ring-white/10">
-                            {{ substr(Auth::guard('admin')->user()->name, 0, 1) }}
-                        </div>
-                        <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 border-2 border-[#1e293b] rounded-full"></span>
-                    </div>
-                    <div class="ml-3 overflow-hidden transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'">
-                        <p class="text-[13px] font-semibold text-white truncate">{{ Auth::guard('admin')->user()->name }}</p>
-                        <p class="text-[11px] text-slate-400 truncate">{{ Auth::guard('admin')->user()->roles->first()?->name ?? 'Admin' }}</p>
-                    </div>
-                </div>
-            </div>
         </aside>
 
         <!-- Overlay for mobile -->
