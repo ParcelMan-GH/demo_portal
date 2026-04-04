@@ -2847,7 +2847,6 @@ $shipmentConfig = [
                         </div>
                     </div>
                 </div>
-            </div>
 
                 {{-- Finalize Confirm Modal --}}
                 <div x-show="finalizeConfirmOpen" x-transition.opacity class="fixed inset-0 z-[190] flex items-center justify-center bg-black/50 p-4" style="display:none">
