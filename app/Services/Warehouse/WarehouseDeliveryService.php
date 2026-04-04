@@ -152,7 +152,7 @@ class WarehouseDeliveryService
             ];
         }
 
-        return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems) {
+        return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems, $claimedLabelIds) {
             $run = DeliveryRun::query()->create([
                 'run_number' => $this->generateRunNumber($warehouse),
                 'warehouse_id' => $warehouse->id,
