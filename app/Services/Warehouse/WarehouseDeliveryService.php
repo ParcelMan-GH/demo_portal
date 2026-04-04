@@ -110,16 +110,22 @@ class WarehouseDeliveryService
         Warehouse $warehouse,
         ?User $admin = null
     ): array {
-        // Get all labels currently claimed by this driver
-        $claimedLabelIds = LabelCustodyEvent::query()
+        // Get all labels currently claimed by this driver (reliable per-label check)
+        $driverClaimedLabelIds = LabelCustodyEvent::query()
             ->where('driver_id', $driver->id)
             ->where('event_type', LabelCustodyEvent::TYPE_CLAIMED)
-            ->whereIn('id', function ($query) {
-                $query->selectRaw('MAX(id)')
-                    ->from('label_custody_events')
-                    ->groupBy('warehouse_receipt_item_label_id');
-            })
+            ->distinct()
             ->pluck('warehouse_receipt_item_label_id');
+
+        $claimedLabelIds = collect();
+        foreach ($driverClaimedLabelIds as $labelId) {
+            $latest = LabelCustodyEvent::where('warehouse_receipt_item_label_id', $labelId)
+                ->latest('id')
+                ->first();
+            if ($latest && $latest->event_type === LabelCustodyEvent::TYPE_CLAIMED && $latest->driver_id === $driver->id) {
+                $claimedLabelIds->push($labelId);
+            }
+        }
 
         if ($claimedLabelIds->isEmpty()) {
             return ['success' => false, 'message' => 'Driver has no claimed packages.'];
@@ -132,15 +138,8 @@ class WarehouseDeliveryService
         // Collect unique shipment items (a package may have multiple labels)
         $shipmentItems = $labels->map(fn ($l) => $l->receiptItem?->shipmentItem)->filter()->unique('id');
 
-        // Filter out items already in an active delivery run
-        $activeRunItemIds = \App\Models\DeliveryRunItem::query()
-            ->whereHas('run', fn ($q) => $q->whereNotIn('status', [DeliveryRun::STATUS_COMPLETED, DeliveryRun::STATUS_CANCELLED]))
-            ->pluck('shipment_item_id');
-
-        $shipmentItems = $shipmentItems->reject(fn ($item) => $activeRunItemIds->contains($item->id));
-
         if ($shipmentItems->isEmpty()) {
-            return ['success' => false, 'message' => 'All claimed packages are already in delivery runs.'];
+            return ['success' => false, 'message' => 'No valid packages found.'];
         }
 
         return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems) {
