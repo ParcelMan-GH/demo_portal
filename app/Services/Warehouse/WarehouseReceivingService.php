@@ -671,42 +671,43 @@ class WarehouseReceivingService
     private function buildLabelPageHtml(string $labelCards, string $title): string
     {
         $css = <<<'CSS'
+@page { size: 4in 6in; margin: 0; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; background: #f1f5f9; }
+body { font-family: 'Segoe UI', Arial, sans-serif; padding: 10px; background: #fff; }
 .label {
-    width: 420px; margin: 0 auto 20px; border: 2px solid #1e293b; border-radius: 8px;
+    width: 4in; height: 5.8in; margin: 0 auto 10px; border: 1.5px solid #333; border-radius: 4px;
     background: #fff; padding: 0; overflow: hidden;
 }
 .label-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px; background: #0f172a; color: #fff;
+    padding: 10px 14px; border-bottom: 1.5px solid #333;
 }
-.brand-name { font-size: 16px; font-weight: 800; letter-spacing: 2px; }
-.brand-sub { font-size: 9px; font-weight: 600; letter-spacing: 3px; color: #94a3b8; margin-top: 1px; }
-.qr-container { background: #fff; padding: 4px; border-radius: 4px; }
-.qr-code { width: 72px; height: 72px; }
-.qr-code img { width: 72px !important; height: 72px !important; }
-.qr-code canvas { width: 72px !important; height: 72px !important; }
-.divider { height: 1px; background: #e2e8f0; }
-.addresses { padding: 10px 16px; }
-.address-block { margin: 6px 0; }
-.address-label { font-size: 9px; font-weight: 700; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 2px; }
-.address-name { font-size: 15px; font-weight: 700; color: #0f172a; }
-.address-detail { font-size: 11px; color: #475569; margin-top: 1px; }
-.address-phone { font-size: 11px; color: #64748b; margin-top: 1px; }
-.address-divider { height: 1px; background: #f1f5f9; margin: 8px 0; }
-.pkg-info { padding: 8px 16px; }
-.pkg-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 11px; }
-.pkg-label { color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; }
-.pkg-value { color: #1e293b; font-weight: 600; }
-.pkg-bold { font-size: 13px; font-weight: 800; color: #0f172a; }
-.barcode-section { padding: 12px 16px 16px; text-align: center; background: #fafafa; border-top: 1px solid #e2e8f0; }
+.brand-name { font-size: 15px; font-weight: 900; letter-spacing: 2px; color: #000; }
+.brand-sub { font-size: 8px; font-weight: 700; letter-spacing: 3px; color: #666; margin-top: 1px; }
+.qr-container { padding: 0; }
+.qr-code { width: 64px; height: 64px; }
+.qr-code img { width: 64px !important; height: 64px !important; }
+.qr-code canvas { width: 64px !important; height: 64px !important; }
+.divider { height: 1px; background: #ccc; }
+.addresses { padding: 8px 14px; }
+.address-block { margin: 4px 0; }
+.address-label { font-size: 8px; font-weight: 800; color: #666; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 1px; }
+.address-name { font-size: 14px; font-weight: 800; color: #000; }
+.address-detail { font-size: 10px; color: #333; margin-top: 1px; }
+.address-phone { font-size: 10px; color: #555; margin-top: 1px; }
+.address-divider { height: 1px; background: #ddd; margin: 6px 0; }
+.pkg-info { padding: 6px 14px; border-top: 1px solid #ccc; }
+.pkg-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 10px; }
+.pkg-label { color: #888; font-weight: 700; text-transform: uppercase; font-size: 8px; letter-spacing: 0.5px; }
+.pkg-value { color: #000; font-weight: 700; }
+.pkg-bold { font-size: 12px; font-weight: 900; color: #000; }
+.barcode-section { padding: 10px 14px 12px; text-align: center; border-top: 1.5px solid #333; }
 .barcode-svg { margin: 0 auto; }
-.barcode-svg svg { max-width: 100%; height: 60px; }
-.barcode-text { font-size: 13px; font-weight: 700; font-family: 'Courier New', monospace; color: #0f172a; margin-top: 4px; letter-spacing: 2px; }
+.barcode-svg svg { max-width: 100%; height: 50px; }
+.barcode-text { font-size: 12px; font-weight: 800; font-family: 'Courier New', monospace; color: #000; margin-top: 3px; letter-spacing: 2px; }
 @media print {
-    body { padding: 0; background: #fff; }
-    .label { box-shadow: none; border: 2px solid #000; margin: 0 auto; page-break-after: always; }
+    body { padding: 0; }
+    .label { border: 1.5px solid #000; margin: 0; page-break-after: always; }
 }
 CSS;
 
