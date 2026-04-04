@@ -314,11 +314,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('delivery-runs/{run}/stops/{stop}/resend-code', [AdminDeliveryRunController::class, 'resendCode'])->name('delivery-runs.stops.resend-code');
         Route::get('delivery-runs/{run}', [AdminDeliveryRunController::class, 'show'])->name('delivery-runs.show');
 
-        // Transport Manifests (admin read visibility)
+        // Transport Manifests (admin read + action capabilities)
         Route::get('transport-manifests', [AdminTransportManifestController::class, 'index'])->name('transport-manifests.index');
         Route::get('transport-manifests-data', [AdminTransportManifestController::class, 'data'])->name('transport-manifests.data');
         Route::get('transport-manifests-export', [AdminTransportManifestController::class, 'export'])->name('transport-manifests.export');
         Route::get('transport-manifests/{manifest}', [AdminTransportManifestController::class, 'show'])->name('transport-manifests.show');
+        Route::post('transport-manifests/{manifest}/assign-driver', [AdminTransportManifestController::class, 'assignDriver'])->name('transport-manifests.assign-driver');
+        Route::post('transport-manifests/{manifest}/unassign-driver', [AdminTransportManifestController::class, 'unassignDriver'])->name('transport-manifests.unassign-driver');
+        Route::post('transport-manifests/{manifest}/dispatch', [AdminTransportManifestController::class, 'dispatch'])->name('transport-manifests.dispatch');
 
         // Sort Batches (admin read visibility)
         Route::get('package-tracking', [\App\Http\Controllers\Admin\PackageTrackingController::class, 'index'])->name('package-tracking.index');
@@ -327,8 +330,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('sort-batches', [AdminSortBatchController::class, 'index'])->name('sort-batches.index');
         Route::get('sort-batches-data', [AdminSortBatchController::class, 'data'])->name('sort-batches.data');
         Route::get('sort-batches-export', [AdminSortBatchController::class, 'export'])->name('sort-batches.export');
+        Route::post('sort-batches', [AdminSortBatchController::class, 'store'])->name('sort-batches.store');
         Route::get('sort-batches/{batch}', [AdminSortBatchController::class, 'show'])->name('sort-batches.show');
         Route::get('sort-batches/{batch}/items-data', [AdminSortBatchController::class, 'itemsData'])->name('sort-batches.items-data');
+        Route::get('sort-batches/{batch}/eligible-items', [AdminSortBatchController::class, 'eligibleItemsData'])->name('sort-batches.eligible-items');
+        Route::post('sort-batches/{batch}/add-items', [AdminSortBatchController::class, 'addItems'])->name('sort-batches.add-items');
+        Route::delete('sort-batches/{batch}/items/{shipmentItem}', [AdminSortBatchController::class, 'removeItem'])->name('sort-batches.remove-item');
+        Route::post('sort-batches/{batch}/seal', [AdminSortBatchController::class, 'seal'])->name('sort-batches.seal');
+        Route::post('sort-batches/{batch}/reopen', [AdminSortBatchController::class, 'reopen'])->name('sort-batches.reopen');
+        Route::post('sort-batches/{batch}/create-delivery-run', [AdminSortBatchController::class, 'createDeliveryRun'])->name('sort-batches.create-delivery-run');
 
         // Invoice List (all invoices across all shipments)
         Route::get('invoices', [AdminInvoiceListController::class, 'index'])->name('invoices.index');

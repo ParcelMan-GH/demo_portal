@@ -5,6 +5,13 @@
 @section('breadcrumb-current', $run->run_number)
 
 @php
+use App\Models\Driver;
+$deliveryDrivers = Driver::where('is_active', true)->orderBy('name')->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']);
+
+$canAssignDriver = in_array($run->status, ['draft', 'assigned']);
+$canDispatch     = $run->status === 'assigned' && $run->assignedDriver !== null;
+$isDispatched    = in_array($run->status, ['out_for_delivery', 'partially_delivered', 'completed']);
+
 $statusColors = match($run->status) {
     'draft'               => 'bg-slate-500/20 text-slate-300',
     'assigned'            => 'bg-blue-500/20 text-blue-300',
@@ -38,7 +45,7 @@ $itemStatusColors = [
 @endphp
 
 @section('content')
-<div class="space-y-6">
+<div class="space-y-6" x-data="adminDeliveryRunPage">
 
     <!-- Hero / Header Card -->
     <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30">
@@ -121,6 +128,36 @@ $itemStatusColors = [
             </div>
         </div>
     </div>
+
+    <!-- Action Bar -->
+    @if($canAssignDriver || $canDispatch)
+    <div class="flex flex-wrap items-center gap-3 px-1">
+        @if($canAssignDriver)
+        <button @@click="showAssignModal = true"
+            class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-purple-500/25 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+            {{ $run->assignedDriver ? 'Reassign Driver' : 'Assign Driver' }}
+        </button>
+        @endif
+
+        @if($canDispatch)
+        <button @@click="confirmDispatch()"
+            :disabled="actionLoading"
+            class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+            <svg x-show="actionLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <svg x-show="!actionLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+            <span x-text="actionLoading ? 'Dispatching...' : 'Dispatch Run'"></span>
+        </button>
+        @endif
+    </div>
+    @endif
 
     <!-- Info Cards Row -->
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -498,11 +535,247 @@ $itemStatusColors = [
                             </div>
                         </div>
                     @endif
+
+                    <!-- Resend OTP Button (shown when run is dispatched and stop is pending/arrived) -->
+                    @if($isDispatched && in_array($stop->status, ['pending', 'arrived']))
+                    <div class="flex justify-end mt-3">
+                        <button @@click="resendCode({{ $stop->id }})"
+                            :disabled="actionLoading"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg x-show="actionLoading" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            </svg>
+                            <svg x-show="!actionLoading" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Resend OTP
+                        </button>
+                    </div>
+                    @endif
                 </div>
                 @endforeach
             </div>
         @endif
     </div>
 
+    <!-- Assign Driver Modal -->
+    <div x-show="showAssignModal" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         @@keydown.escape.window="showAssignModal = false">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @@click="showAssignModal = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden" @@click.stop>
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-sm">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">{{ $run->assignedDriver ? 'Reassign Driver' : 'Assign Driver' }}</h3>
+                        <p class="text-xs text-slate-500">Select a delivery driver for this run</p>
+                    </div>
+                </div>
+                <button @@click="showAssignModal = false"
+                    class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <!-- Modal Body -->
+            <div class="px-6 py-5">
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                        Select Driver <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <select x-model="selectedDriverId"
+                            class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm text-slate-900 transition-all cursor-pointer appearance-none">
+                            <option value="">Choose a driver...</option>
+                            @foreach($deliveryDrivers as $driver)
+                                <option value="{{ $driver->id }}">
+                                    {{ $driver->name }}
+                                    @if($driver->phone) &mdash; {{ $driver->phone }}@endif
+                                    @if($driver->vehicle_type) ({{ $driver->vehicle_type }}@if($driver->vehicle_number) {{ $driver->vehicle_number }}@endif)@endif
+                                </option>
+                            @endforeach
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Modal Footer -->
+            <div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+                <button @@click="showAssignModal = false"
+                    class="px-4 py-2 text-sm font-semibold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
+                    Cancel
+                </button>
+                <button @@click="assignDriver()"
+                    :disabled="actionLoading || !selectedDriverId"
+                    class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg x-show="actionLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <span x-text="actionLoading ? 'Assigning...' : '{{ $run->assignedDriver ? "Reassign Driver" : "Assign Driver" }}'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dispatch Confirmation Modal -->
+    <div x-show="showDispatchConfirm" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         @@keydown.escape.window="showDispatchConfirm = false">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @@click="showDispatchConfirm = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden" @@click.stop>
+            <div class="px-6 py-6 text-center">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-200">
+                    <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 mb-1">Dispatch Delivery Run?</h3>
+                <p class="text-sm text-slate-500 mb-6">
+                    This will dispatch <span class="font-semibold text-slate-700">{{ $run->run_number }}</span> and the assigned driver will be notified to begin deliveries.
+                </p>
+                <div class="flex items-center justify-center gap-3">
+                    <button @@click="showDispatchConfirm = false"
+                        class="px-5 py-2 text-sm font-semibold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
+                        Cancel
+                    </button>
+                    <button @@click="dispatchRun()"
+                        :disabled="actionLoading"
+                        class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg x-show="actionLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <span x-text="actionLoading ? 'Dispatching...' : 'Yes, Dispatch'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('adminDeliveryRunPage', () => {
+        const csrfToken = () =>
+            document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        const endpoints = {
+            assignDriver: '{{ route('admin.delivery-runs.assign-driver', $run) }}',
+            dispatch:     '{{ route('admin.delivery-runs.dispatch', $run) }}',
+            resendCode:   '{{ route('admin.delivery-runs.stops.resend-code', ['run' => $run->id, 'stop' => '__STOP__']) }}',
+        };
+
+        return {
+            actionLoading:       false,
+            showAssignModal:     false,
+            showDispatchConfirm: false,
+            selectedDriverId:    '',
+
+            confirmDispatch() {
+                this.showDispatchConfirm = true;
+            },
+
+            async assignDriver() {
+                if (!this.selectedDriverId) {
+                    window.showToast?.('Please select a driver first.', 'warning');
+                    return;
+                }
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(endpoints.assignDriver, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ driver_id: Number(this.selectedDriverId) }),
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to assign driver.');
+                    }
+                    window.showToast?.(result.message || 'Driver assigned successfully.', 'success');
+                    this.showAssignModal = false;
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to assign driver.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
+            },
+
+            async dispatchRun() {
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(endpoints.dispatch, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                        },
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to dispatch run.');
+                    }
+                    window.showToast?.(result.message || 'Delivery run dispatched successfully.', 'success');
+                    this.showDispatchConfirm = false;
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to dispatch delivery run.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
+            },
+
+            async resendCode(stopId) {
+                this.actionLoading = true;
+                try {
+                    const url = endpoints.resendCode.replace('__STOP__', stopId);
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                        },
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to resend OTP.');
+                    }
+                    window.showToast?.(result.message || 'OTP code resent successfully.', 'success');
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to resend OTP.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
+            },
+        };
+    });
+});
+</script>
+@endpush

@@ -7,14 +7,20 @@ use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\TransportManifest;
 use App\Models\Warehouse;
+use App\Services\Warehouse\WarehouseTransportService;
 use App\Support\GenericPdfExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 
 class AdminTransportManifestController extends Controller
 {
+    public function __construct(private WarehouseTransportService $transportService)
+    {
+    }
+
     /**
      * Display the transport manifests index page.
      */
@@ -160,7 +166,78 @@ class AdminTransportManifestController extends Controller
 
         $statusLabel = $this->formatStatusLabel($manifest->status);
 
-        return view('admin.transport-manifests.show', compact('manifest', 'statusLabel'));
+        $transportDrivers = Driver::where('is_active', true)
+            ->whereJsonContains('task_capabilities', Driver::CAPABILITY_TRANSPORT)
+            ->orderBy('name')
+            ->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']);
+
+        $manifestConfig = [
+            'assign_driver_endpoint'   => route('admin.transport-manifests.assign-driver', $manifest),
+            'unassign_driver_endpoint' => route('admin.transport-manifests.unassign-driver', $manifest),
+            'dispatch_endpoint'        => route('admin.transport-manifests.dispatch', $manifest),
+        ];
+
+        return view('admin.transport-manifests.show', compact('manifest', 'statusLabel', 'transportDrivers', 'manifestConfig'));
+    }
+
+    /**
+     * Assign a driver to the transport manifest.
+     */
+    public function assignDriver(Request $request, TransportManifest $manifest): JsonResponse
+    {
+        $validated = $request->validate([
+            'driver_id' => ['required', 'integer', 'exists:drivers,id'],
+        ]);
+
+        // For admin, use the manifest's own origin warehouse (no warehouse-scoped auth needed)
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $driver = Driver::findOrFail((int) $validated['driver_id']);
+        $result = $this->transportService->assignDriver($manifest, $driver, $warehouse, Auth::guard('admin')->user());
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    /**
+     * Unassign the driver from the transport manifest.
+     */
+    public function unassignDriver(Request $request, TransportManifest $manifest): JsonResponse
+    {
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $result = $this->transportService->unassignDriver(
+            $manifest,
+            $warehouse,
+            Auth::guard('admin')->user(),
+            $validated['reason'] ?? null
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    /**
+     * Dispatch the transport manifest.
+     */
+    public function dispatch(TransportManifest $manifest): JsonResponse
+    {
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $result = $this->transportService->dispatch($manifest, $warehouse, Auth::guard('admin')->user());
+
+        return response()->json($result, $result['success'] ? 200 : 422);
     }
 
     /**

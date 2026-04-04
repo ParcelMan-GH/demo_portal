@@ -24,7 +24,7 @@
             </div>
 
             <div class="relative px-6 lg:px-8 py-6">
-                <!-- Top Row: Back Button -->
+                <!-- Top Row: Back Button + Actions -->
                 <div class="flex items-center justify-between mb-6">
                     <a href="{{ route('admin.sort-batches.index') }}" class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium transition-all backdrop-blur-sm hover:shadow-md">
                         <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -32,6 +32,42 @@
                         </svg>
                         <span class="text-xs">Back to Sort Batches</span>
                     </a>
+
+                    <!-- Action Buttons -->
+                    <div class="flex items-center gap-2 flex-wrap justify-end">
+                        @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                        <!-- Add Items -->
+                        <button type="button" @@click="openAddItemsModal()"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/30 text-blue-200 text-xs font-semibold transition-all backdrop-blur-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Add Items
+                        </button>
+                        <!-- Seal Batch -->
+                        <button type="button" @@click="sealBatch()" :disabled="actionLoading"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold transition-all backdrop-blur-sm disabled:opacity-50">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            Seal Batch
+                        </button>
+                        @endif
+
+                        @if($batch->status === \App\Models\SortBatch::STATUS_SEALED)
+                        <!-- Reopen Batch -->
+                        <button type="button" @@click="reopenBatch()" :disabled="actionLoading"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/30 text-amber-200 text-xs font-semibold transition-all backdrop-blur-sm disabled:opacity-50">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            Reopen
+                        </button>
+
+                        @if($batch->dispatch_mode === \App\Models\SortBatch::DISPATCH_LOCAL_DELIVERY && !$batch->deliveryRun)
+                        <!-- Create Delivery Run -->
+                        <button type="button" @@click="createDeliveryRun()" :disabled="actionLoading"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-200 text-xs font-semibold transition-all backdrop-blur-sm disabled:opacity-50">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            Create Delivery Run
+                        </button>
+                        @endif
+                        @endif
+                    </div>
                 </div>
 
                 <!-- Main Row: Profile LEFT, Summary RIGHT -->
@@ -141,6 +177,18 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Action Feedback -->
+    <div x-show="actionMessage" x-cloak x-transition
+         class="flex items-center gap-3 px-5 py-3 rounded-2xl border text-sm font-medium"
+         :class="actionSuccess ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'">
+        <svg x-show="actionSuccess" class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <svg x-show="!actionSuccess" class="w-4 h-4 text-rose-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span x-text="actionMessage"></span>
+        <button type="button" @@click="actionMessage = ''" class="ml-auto text-current opacity-50 hover:opacity-100">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
     </div>
 
     <!-- Tabs Section -->
@@ -417,12 +465,21 @@
                                 </p>
                             </div>
                         </div>
-                        <div class="relative">
-                            <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                            </svg>
-                            <input type="text" x-model="itemsSearch" @@input="onItemsSearch()" placeholder="Search items..."
-                                   class="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none w-52 bg-slate-50/50">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                            <button type="button" @@click="openAddItemsModal()"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shadow-sm">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Add Items
+                            </button>
+                            @endif
+                            <div class="relative">
+                                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                </svg>
+                                <input type="text" x-model="itemsSearch" @@input="onItemsSearch()" placeholder="Search items..."
+                                       class="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none w-52 bg-slate-50/50">
+                            </div>
                         </div>
                     </div>
 
@@ -456,11 +513,14 @@
                                     <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Recipient</th>
                                     <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Destination</th>
                                     <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Added By</th>
+                                    @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                                    <th class="px-4 py-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider w-12"></th>
+                                    @endif
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100/70">
                                 <template x-for="item in items" :key="item.id">
-                                    <tr class="hover:bg-slate-50/70">
+                                    <tr class="hover:bg-slate-50/70 group">
                                         <td class="px-4 py-2.5 whitespace-nowrap text-slate-400 font-medium" x-text="item.row_number"></td>
                                         <td class="px-4 py-2.5 whitespace-nowrap">
                                             <template x-if="item.shipment_id">
@@ -491,6 +551,15 @@
                                         </td>
                                         <td class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="item.delivery_town || '—'"></td>
                                         <td class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="item.added_by || '—'"></td>
+                                        @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                                        <td class="px-4 py-2.5 whitespace-nowrap text-center">
+                                            <button type="button" @@click="removeItem(item)"
+                                                    :disabled="actionLoading"
+                                                    class="w-6 h-6 rounded-lg flex items-center justify-center text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-30">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            </button>
+                                        </td>
+                                        @endif
                                     </tr>
                                 </template>
                             </tbody>
@@ -659,7 +728,16 @@
                             </svg>
                         </div>
                         <p class="text-sm font-medium text-slate-500">No Delivery Run</p>
+                        @if($batch->status === \App\Models\SortBatch::STATUS_SEALED && $batch->dispatch_mode === \App\Models\SortBatch::DISPATCH_LOCAL_DELIVERY)
+                        <p class="text-xs text-slate-400 mt-1 mb-4">This sealed local-delivery batch is ready for a delivery run.</p>
+                        <button type="button" @@click="createDeliveryRun()" :disabled="actionLoading"
+                                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold transition-colors shadow-sm disabled:opacity-50">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            Create Delivery Run
+                        </button>
+                        @else
                         <p class="text-xs text-slate-400 mt-1">This batch has not been assigned to a delivery run yet.</p>
+                        @endif
                     </div>
                 </div>
                 @endif
@@ -670,6 +748,133 @@
 
 </div>
 
+{{-- ════════════════════════════════════════════════════════════════════════ --}}
+{{-- MODAL: Add Items                                                          --}}
+{{-- ════════════════════════════════════════════════════════════════════════ --}}
+<div x-show="addItemsModalOpen"
+     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+     @@keydown.escape.window="addItemsModalOpen = false"
+     class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="addItemsModalOpen = false"></div>
+    <div x-show="addItemsModalOpen"
+         x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95 translate-y-2" x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100 translate-y-0" x-transition:leave-end="opacity-0 scale-95 translate-y-2"
+         class="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl shadow-slate-900/30 overflow-hidden flex flex-col max-h-[90vh]">
+
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                </div>
+                <div class="min-w-0">
+                    <h3 class="text-base font-bold text-white">Add Items to Batch</h3>
+                    <p class="text-blue-200 text-xs mt-0.5">Select eligible items to sort into this batch</p>
+                </div>
+            </div>
+            <button type="button" @@click="addItemsModalOpen = false" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white flex-shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <!-- Loading overlay -->
+        <div x-show="addItemsModalLoading" x-cloak x-transition.opacity.duration.100ms
+             class="absolute inset-0 bg-white/70 backdrop-blur-[2px] z-20 flex items-center justify-center">
+            <svg class="w-6 h-6 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+            </svg>
+        </div>
+
+        <!-- Search bar -->
+        <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex-shrink-0">
+            <div class="flex items-center justify-between gap-3">
+                <div class="relative flex-1 max-w-sm">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input type="text" x-model.debounce.400ms="eligibleSearch" @@input="loadEligibleItems()"
+                           placeholder="Search shipment, tracking, recipient…"
+                           class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-300 transition-colors">
+                </div>
+                <span x-show="selectedEligibleIds.length > 0"
+                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 ring-1 ring-blue-200">
+                    <span x-text="selectedEligibleIds.length + ' selected'"></span>
+                    <button type="button" @@click="selectedEligibleIds = []" class="hover:text-blue-900">
+                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </span>
+            </div>
+        </div>
+
+        <!-- Items table -->
+        <div class="flex-1 overflow-y-auto">
+            <table class="min-w-full divide-y divide-slate-100 text-xs">
+                <thead class="bg-slate-50/80 sticky top-0 z-10">
+                    <tr>
+                        <th class="px-3 py-2 w-10"><span class="sr-only">Select</span></th>
+                        <th class="px-3 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">Shipment / Item</th>
+                        <th class="px-3 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">Destination</th>
+                        <th class="px-3 py-2 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500">Qty</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    <template x-for="item in eligibleItems" :key="item.warehouse_receipt_item_id">
+                        <tr class="group hover:bg-blue-50/40 transition-colors cursor-pointer"
+                            :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'bg-blue-50/60' : ''"
+                            @@click="selectedEligibleIds.includes(item.warehouse_receipt_item_id)
+                                ? selectedEligibleIds = selectedEligibleIds.filter(id => id !== item.warehouse_receipt_item_id)
+                                : selectedEligibleIds.push(item.warehouse_receipt_item_id)">
+                            <td class="px-3 py-2.5">
+                                <div class="w-4 h-4 rounded border-2 flex items-center justify-center transition-all"
+                                     :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'bg-blue-600 border-blue-600' : 'border-slate-300 group-hover:border-blue-400'">
+                                    <svg x-show="selectedEligibleIds.includes(item.warehouse_receipt_item_id)" class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </div>
+                            </td>
+                            <td class="px-3 py-2.5">
+                                <p class="font-bold text-slate-900" x-text="item.shipment_number"></p>
+                                <p class="text-slate-500 mt-0.5" x-text="item.item_description"></p>
+                                <span class="text-[10px] text-slate-400 font-mono" x-text="item.tracking_code || '—'"></span>
+                            </td>
+                            <td class="px-3 py-2.5">
+                                <p class="font-medium text-slate-700 truncate" x-text="item.destination?.recipient_name || '—'"></p>
+                                <p class="text-[10px] text-slate-400 truncate" x-text="item.destination?.town || ''"></p>
+                            </td>
+                            <td class="px-3 py-2.5 text-center">
+                                <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 font-bold text-slate-700" x-text="item.received_quantity"></span>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="!addItemsModalLoading && eligibleItems.length === 0">
+                        <td colspan="4" class="px-4 py-10 text-center">
+                            <p class="text-xs font-medium text-slate-400">No eligible items available</p>
+                            <p class="text-[10px] text-slate-300 mt-0.5">All warehouse receipt items may already be sorted</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-5 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between flex-shrink-0">
+            <p class="text-[10px] text-slate-400">
+                <span x-text="eligibleItems.length + ' item(s) available'"></span>
+            </p>
+            <div class="flex items-center gap-2">
+                <button type="button" @@click="addItemsModalOpen = false" class="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
+                <button type="button"
+                        @@click="addSelectedItems()"
+                        :disabled="selectedEligibleIds.length === 0 || addItemsModalLoading"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Add <span x-text="selectedEligibleIds.length > 0 ? selectedEligibleIds.length + ' Item(s)' : 'Selected'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -677,6 +882,11 @@
 function sortBatchShow() {
     return {
         activeTab: 'overview',
+
+        // Action state
+        actionLoading: false,
+        actionMessage: '',
+        actionSuccess: true,
 
         // Items tab state
         items: [],
@@ -686,13 +896,29 @@ function sortBatchShow() {
         itemsLoaded: false,
         _searchTimeout: null,
         _itemsDataUrl: @json(route('admin.sort-batches.items-data', $batch->id)),
+        _eligibleItemsUrl: @json(route('admin.sort-batches.eligible-items', $batch->id)),
+        _addItemsUrl: @json(route('admin.sort-batches.add-items', $batch->id)),
+        _removeItemUrl: @json(route('admin.sort-batches.remove-item', ['batch' => $batch->id, 'shipmentItem' => '__ITEM__'])),
+        _sealUrl: @json(route('admin.sort-batches.seal', $batch->id)),
+        _reopenUrl: @json(route('admin.sort-batches.reopen', $batch->id)),
+        _createRunUrl: @json(route('admin.sort-batches.create-delivery-run', $batch->id)),
         _shipmentShowUrl: @json(route('admin.shipments.show', '__ID__')),
+        _deliveryRunShowUrl: @json(route('admin.delivery-runs.show', '__ID__')),
+
+        // Add Items modal state
+        addItemsModalOpen: false,
+        addItemsModalLoading: false,
+        eligibleItems: [],
+        eligibleSearch: '',
+        selectedEligibleIds: [],
 
         init() {
             this.$watch('activeTab', (val) => {
                 if (val === 'items' && !this.itemsLoaded) this.fetchItems(1);
             });
         },
+
+        // ─── Items Tab ────────────────────────────────────────────────────────
 
         fetchItems(page) {
             this.itemsLoading = true;
@@ -725,6 +951,176 @@ function sortBatchShow() {
 
         shipmentUrl(id) {
             return this._shipmentShowUrl.replace('__ID__', id);
+        },
+
+        // ─── Add Items Modal ──────────────────────────────────────────────────
+
+        openAddItemsModal() {
+            this.eligibleSearch = '';
+            this.selectedEligibleIds = [];
+            this.eligibleItems = [];
+            this.addItemsModalOpen = true;
+            this.loadEligibleItems();
+        },
+
+        loadEligibleItems() {
+            this.addItemsModalLoading = true;
+            const params = new URLSearchParams({ per_page: 100 });
+            if (this.eligibleSearch) params.set('search', this.eligibleSearch);
+            fetch(this._eligibleItemsUrl + '?' + params.toString())
+                .then(r => r.json())
+                .then(json => {
+                    this.eligibleItems = json.data || [];
+                    this.addItemsModalLoading = false;
+                })
+                .catch(() => { this.addItemsModalLoading = false; });
+        },
+
+        async addSelectedItems() {
+            if (!this.selectedEligibleIds.length) return;
+            this.addItemsModalLoading = true;
+            try {
+                const resp = await fetch(this._addItemsUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                    body: JSON.stringify({ warehouse_receipt_item_ids: this.selectedEligibleIds }),
+                });
+                const json = await resp.json();
+                if (json.success) {
+                    this.addItemsModalOpen = false;
+                    this.selectedEligibleIds = [];
+                    this.showAction(true, json.message || 'Items added successfully.');
+                    // Reload the items tab
+                    this.itemsLoaded = false;
+                    if (this.activeTab === 'items') this.fetchItems(1);
+                    else { this.activeTab = 'items'; }
+                    // Reload the page after a short delay so counts/status update
+                    setTimeout(() => window.location.reload(), 1200);
+                } else {
+                    this.showAction(false, json.message || 'Failed to add items.');
+                    this.addItemsModalLoading = false;
+                }
+            } catch (e) {
+                this.showAction(false, 'An unexpected error occurred.');
+                this.addItemsModalLoading = false;
+            }
+        },
+
+        // ─── Remove Item ──────────────────────────────────────────────────────
+
+        async removeItem(item) {
+            if (!confirm(`Remove "${item.description || item.tracking_code || 'this item'}" from the batch?`)) return;
+            this.actionLoading = true;
+            const removeUrl = this._removeItemUrl.replace('__ITEM__', item.shipment_item_id);
+            try {
+                const resp = await fetch(removeUrl, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                });
+                const json = await resp.json();
+                this.showAction(json.success, json.message || (json.success ? 'Item removed.' : 'Failed to remove item.'));
+                if (json.success) {
+                    setTimeout(() => window.location.reload(), 800);
+                }
+            } catch (e) {
+                this.showAction(false, 'An unexpected error occurred.');
+            } finally {
+                this.actionLoading = false;
+            }
+        },
+
+        // ─── Seal / Reopen ────────────────────────────────────────────────────
+
+        async sealBatch() {
+            if (!confirm('Seal this sort batch? No more items can be added after sealing.')) return;
+            this.actionLoading = true;
+            try {
+                const resp = await fetch(this._sealUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                });
+                const json = await resp.json();
+                this.showAction(json.success, json.message || (json.success ? 'Batch sealed.' : 'Failed to seal batch.'));
+                if (json.success) setTimeout(() => window.location.reload(), 800);
+            } catch (e) {
+                this.showAction(false, 'An unexpected error occurred.');
+            } finally {
+                this.actionLoading = false;
+            }
+        },
+
+        async reopenBatch() {
+            if (!confirm('Reopen this sort batch? Items can be added or removed again.')) return;
+            this.actionLoading = true;
+            try {
+                const resp = await fetch(this._reopenUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                });
+                const json = await resp.json();
+                this.showAction(json.success, json.message || (json.success ? 'Batch reopened.' : 'Failed to reopen.'));
+                if (json.success) setTimeout(() => window.location.reload(), 800);
+            } catch (e) {
+                this.showAction(false, 'An unexpected error occurred.');
+            } finally {
+                this.actionLoading = false;
+            }
+        },
+
+        // ─── Create Delivery Run ──────────────────────────────────────────────
+
+        async createDeliveryRun() {
+            if (!confirm('Create a delivery run from this sealed batch? This cannot be undone.')) return;
+            this.actionLoading = true;
+            try {
+                const resp = await fetch(this._createRunUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                });
+                const json = await resp.json();
+                this.showAction(json.success, json.message || (json.success ? 'Delivery run created.' : 'Failed to create delivery run.'));
+                if (json.success) {
+                    // Navigate to the delivery run if we have an id
+                    const runId = json.data?.run?.id;
+                    if (runId) {
+                        setTimeout(() => {
+                            window.location.href = this._deliveryRunShowUrl.replace('__ID__', runId);
+                        }, 800);
+                    } else {
+                        setTimeout(() => window.location.reload(), 800);
+                    }
+                }
+            } catch (e) {
+                this.showAction(false, 'An unexpected error occurred.');
+            } finally {
+                this.actionLoading = false;
+            }
+        },
+
+        // ─── Helpers ──────────────────────────────────────────────────────────
+
+        showAction(success, message) {
+            this.actionSuccess = success;
+            this.actionMessage = message;
+            if (success) {
+                setTimeout(() => { this.actionMessage = ''; }, 5000);
+            }
         },
     };
 }

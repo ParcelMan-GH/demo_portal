@@ -4,16 +4,27 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\DriversExport;
 use App\Http\Controllers\Controller;
+use App\Models\ShipmentItem;
 use App\Models\SortBatch;
 use App\Models\Warehouse;
+use App\Services\Warehouse\WarehouseDeliveryService;
+use App\Services\Warehouse\WarehouseSortingService;
 use App\Support\GenericPdfExporter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 
 class AdminSortBatchController extends Controller
 {
+    public function __construct(
+        private WarehouseSortingService $sortingService,
+        private WarehouseDeliveryService $deliveryService,
+    ) {
+    }
+
     public function index(): View
     {
         $warehouses = Warehouse::orderBy('name')->get(['id', 'name', 'code']);
@@ -199,6 +210,7 @@ class AdminSortBatchController extends Controller
                 return [
                     'row_number'               => (($page - 1) * $perPage) + $index + 1,
                     'id'                       => $item->id,
+                    'shipment_item_id'         => $item->shipment_item_id,
                     'shipment_id'              => $si?->shipment?->id,
                     'shipment_number'          => $si?->shipment?->shipment_number,
                     'vendor_name'              => $si?->shipment?->vendor?->name,
@@ -221,5 +233,145 @@ class AdminSortBatchController extends Controller
                 'to'           => min($page * $perPage, $total),
             ],
         ]);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'origin_warehouse_id'      => ['required', 'integer', 'exists:warehouses,id'],
+            'destination_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
+            'dispatch_mode'            => ['required', 'in:transfer,local_delivery'],
+            'notes'                    => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $originWarehouse      = Warehouse::findOrFail((int) $validated['origin_warehouse_id']);
+        $destinationWarehouse = !empty($validated['destination_warehouse_id'])
+            ? Warehouse::findOrFail((int) $validated['destination_warehouse_id'])
+            : null;
+
+        $user   = Auth::guard('admin')->user();
+        $result = $this->sortingService->createBatch(
+            originWarehouse:      $originWarehouse,
+            destinationWarehouse: $destinationWarehouse,
+            user:                 $user,
+            dispatchMode:         (string) $validated['dispatch_mode'],
+            notes:                $validated['notes'] ?? null,
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function eligibleItemsData(Request $request, SortBatch $batch): JsonResponse
+    {
+        $warehouse = Warehouse::findOrFail((int) $batch->origin_warehouse_id);
+        $query     = $this->sortingService->eligibleItemsQuery($warehouse);
+
+        if ($search = trim((string) $request->input('search'))) {
+            $query->where(function (Builder $builder) use ($search) {
+                $builder->whereHas('shipmentItem.shipment', fn (Builder $q) => $q->where('shipment_number', 'like', "%{$search}%"))
+                    ->orWhereHas('shipmentItem', fn (Builder $q) => $q
+                        ->where('description', 'like', "%{$search}%")
+                        ->orWhere('tracking_code', 'like', "%{$search}%")
+                        ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                        ->orWhere('delivery_town', 'like', "%{$search}%")
+                    );
+            });
+        }
+
+        $query->latest('id');
+
+        $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
+        $page    = max((int) $request->input('page', 1), 1);
+        $total   = $query->count();
+        $rows    = $query->skip(($page - 1) * $perPage)->take($perPage)->get();
+
+        return response()->json([
+            'data' => $this->sortingService->mapEligibleItems($rows),
+            'meta' => [
+                'total'        => $total,
+                'per_page'     => $perPage,
+                'current_page' => $page,
+                'last_page'    => (int) ceil($total / $perPage) ?: 1,
+                'from'         => $total > 0 ? ($page - 1) * $perPage + 1 : 0,
+                'to'           => min($page * $perPage, $total),
+            ],
+        ]);
+    }
+
+    public function addItems(Request $request, SortBatch $batch): JsonResponse
+    {
+        $validated = $request->validate([
+            'warehouse_receipt_item_ids'   => ['required', 'array', 'min:1'],
+            'warehouse_receipt_item_ids.*' => ['integer', 'exists:warehouse_receipt_items,id'],
+        ]);
+
+        $warehouse = Warehouse::findOrFail((int) $batch->origin_warehouse_id);
+        $user      = Auth::guard('admin')->user();
+
+        $result = $this->sortingService->addItems(
+            batch:                   $batch,
+            warehouse:               $warehouse,
+            user:                    $user,
+            warehouseReceiptItemIds: $validated['warehouse_receipt_item_ids'],
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function removeItem(SortBatch $batch, ShipmentItem $shipmentItem): JsonResponse
+    {
+        $warehouse = Warehouse::findOrFail((int) $batch->origin_warehouse_id);
+        $user      = Auth::guard('admin')->user();
+
+        $result = $this->sortingService->removeItem(
+            batch:        $batch,
+            shipmentItem: $shipmentItem,
+            warehouse:    $warehouse,
+            user:         $user,
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function seal(SortBatch $batch): JsonResponse
+    {
+        $warehouse = Warehouse::findOrFail((int) $batch->origin_warehouse_id);
+        $user      = Auth::guard('admin')->user();
+
+        $result = $this->sortingService->sealBatch(
+            batch:     $batch,
+            warehouse: $warehouse,
+            user:      $user,
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function reopen(SortBatch $batch): JsonResponse
+    {
+        $warehouse = Warehouse::findOrFail((int) $batch->origin_warehouse_id);
+        $user      = Auth::guard('admin')->user();
+
+        $result = $this->sortingService->reopenBatch(
+            batch:     $batch,
+            warehouse: $warehouse,
+            user:      $user,
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function createDeliveryRun(SortBatch $batch): JsonResponse
+    {
+        $warehouse = Warehouse::findOrFail((int) $batch->origin_warehouse_id);
+        $user      = Auth::guard('admin')->user();
+
+        $result = $this->deliveryService->createRun(
+            batch:     $batch,
+            warehouse: $warehouse,
+            user:      $user,
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
     }
 }

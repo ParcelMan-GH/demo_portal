@@ -27,7 +27,11 @@ $lineStatusColors = [
 @endphp
 
 @section('content')
-<div class="space-y-6">
+<div class="space-y-6"
+     x-data="adminTransportManifestShow"
+     data-manifest-config="{{ json_encode($manifestConfig, JSON_INVALID_UTF8_SUBSTITUTE) }}"
+     data-manifest-status="{{ $manifest->status }}"
+     data-manifest-driver="{{ $manifest->assigned_driver_id }}">
 
     <!-- Hero Section -->
     <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30">
@@ -184,6 +188,66 @@ $lineStatusColors = [
             </div>
         </div>
     </div>
+
+    <!-- Actions Panel (shown only when actions are available) -->
+    @if(in_array($manifest->status, ['draft', 'assigned']))
+    <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100 px-6 py-4">
+        <div class="flex flex-wrap items-center gap-3">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-2">Actions</span>
+
+            {{-- Assign Driver button: shown when draft or assigned (to reassign) --}}
+            @if(in_array($manifest->status, ['draft', 'assigned']))
+            <button
+                type="button"
+                @@click="openAssignDriverModal()"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm transition-colors"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                {{ $manifest->assigned_driver_id ? 'Reassign Driver' : 'Assign Driver' }}
+            </button>
+            @endif
+
+            {{-- Unassign Driver button: only when assigned and there's a driver --}}
+            @if($manifest->status === 'assigned' && $manifest->assigned_driver_id)
+            <button
+                type="button"
+                @@click="openUnassignDriverModal()"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold shadow-sm transition-colors"
+            >
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                </svg>
+                Unassign Driver
+            </button>
+            @endif
+
+            {{-- Dispatch button: only when assigned and has a driver --}}
+            @if($manifest->status === 'assigned' && $manifest->assigned_driver_id)
+            <button
+                type="button"
+                @@click="openDispatchModal()"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold shadow-sm transition-colors"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                </svg>
+                Dispatch
+            </button>
+            @endif
+
+            <!-- Spinner -->
+            <div x-show="actionLoading" x-transition.opacity.duration.150ms class="flex items-center gap-2 text-xs text-slate-500" style="display:none;">
+                <svg class="animate-spin w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+                Processing…
+            </div>
+        </div>
+    </div>
+    @endif
 
     <!-- Two-column info section -->
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -606,5 +670,256 @@ $lineStatusColors = [
     </div>
     @endif
 
+    {{-- ── Assign Driver Modal ──────────────────────────────────────── --}}
+    <div
+        x-show="assignDriverModalOpen"
+        x-transition.opacity.duration.200ms
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style="display: none;"
+        @@keydown.escape.window="assignDriverModalOpen = false"
+    >
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="assignDriverModalOpen = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md" @@click.stop>
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-sm font-bold text-slate-900">Assign Driver</h3>
+                </div>
+                <button type="button" @@click="assignDriverModalOpen = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="px-6 py-5 space-y-4">
+                <p class="text-xs text-slate-500">Select a transport-capable driver to assign to this manifest.</p>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Driver</label>
+                    <select
+                        x-model="selectedDriverId"
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm text-slate-900 focus:ring-2 focus:ring-blue-400/50 focus:border-blue-300 transition-colors"
+                    >
+                        <option value="">— Select a driver —</option>
+                        @foreach($transportDrivers as $driver)
+                        <option value="{{ $driver->id }}">
+                            {{ $driver->name }}{{ $driver->phone ? ' · ' . $driver->phone : '' }}{{ $driver->vehicle_type ? ' (' . $driver->vehicle_type . ')' : '' }}
+                        </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button type="button" @@click="assignDriverModalOpen = false" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">Cancel</button>
+                <button
+                    type="button"
+                    @@click="submitAssignDriver()"
+                    :disabled="!selectedDriverId || actionLoading"
+                    class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
+                >
+                    Assign Driver
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- ── Unassign Driver Modal ─────────────────────────────────────── --}}
+    <div
+        x-show="unassignDriverModalOpen"
+        x-transition.opacity.duration.200ms
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style="display: none;"
+        @@keydown.escape.window="unassignDriverModalOpen = false"
+    >
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="unassignDriverModalOpen = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md" @@click.stop>
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-sm font-bold text-slate-900">Unassign Driver</h3>
+                </div>
+                <button type="button" @@click="unassignDriverModalOpen = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="px-6 py-5 space-y-4">
+                <p class="text-xs text-slate-500">Remove the currently assigned driver from this manifest. The manifest will revert to Draft status.</p>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Reason <span class="font-normal text-slate-400">(optional)</span></label>
+                    <textarea
+                        x-model="unassignReason"
+                        rows="3"
+                        placeholder="Enter reason for unassigning..."
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors resize-none"
+                    ></textarea>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button type="button" @@click="unassignDriverModalOpen = false" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">Cancel</button>
+                <button
+                    type="button"
+                    @@click="submitUnassignDriver()"
+                    :disabled="actionLoading"
+                    class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
+                >
+                    Unassign Driver
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- ── Dispatch Modal ────────────────────────────────────────────── --}}
+    <div
+        x-show="dispatchModalOpen"
+        x-transition.opacity.duration.200ms
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style="display: none;"
+        @@keydown.escape.window="dispatchModalOpen = false"
+    >
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="dispatchModalOpen = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md" @@click.stop>
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-sm font-bold text-slate-900">Dispatch Manifest</h3>
+                </div>
+                <button type="button" @@click="dispatchModalOpen = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="px-6 py-5">
+                <div class="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100 mb-4">
+                    <svg class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <p class="text-xs text-amber-700">Dispatching will set manifest status to <strong>Loading</strong>, mark all items as <strong>In Transit</strong>, and record the dispatch timestamp.</p>
+                </div>
+                <p class="text-xs text-slate-600">Are you sure you want to dispatch manifest <strong>{{ $manifest->manifest_number }}</strong>?</p>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button type="button" @@click="dispatchModalOpen = false" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">Cancel</button>
+                <button
+                    type="button"
+                    @@click="submitDispatch()"
+                    :disabled="actionLoading"
+                    class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
+                >
+                    Yes, Dispatch
+                </button>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('adminTransportManifestShow', () => {
+        const el = document.querySelector('[data-manifest-config]');
+        const config = (() => {
+            try { return JSON.parse(el?.getAttribute('data-manifest-config') || '{}'); }
+            catch { return {}; }
+        })();
+
+        function csrfToken() {
+            return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        }
+
+        return {
+            // Modal state
+            assignDriverModalOpen: false,
+            unassignDriverModalOpen: false,
+            dispatchModalOpen: false,
+            actionLoading: false,
+
+            // Form values
+            selectedDriverId: '',
+            unassignReason: '',
+
+            openAssignDriverModal() {
+                this.selectedDriverId = '';
+                this.assignDriverModalOpen = true;
+            },
+
+            openUnassignDriverModal() {
+                this.unassignReason = '';
+                this.unassignDriverModalOpen = true;
+            },
+
+            openDispatchModal() {
+                this.dispatchModalOpen = true;
+            },
+
+            async submitAssignDriver() {
+                if (!this.selectedDriverId) {
+                    window.showToast?.('Please select a driver.', 'warning');
+                    return;
+                }
+                await this._postAction(config.assign_driver_endpoint, { driver_id: Number(this.selectedDriverId) }, () => {
+                    this.assignDriverModalOpen = false;
+                });
+            },
+
+            async submitUnassignDriver() {
+                await this._postAction(config.unassign_driver_endpoint, { reason: this.unassignReason || null }, () => {
+                    this.unassignDriverModalOpen = false;
+                });
+            },
+
+            async submitDispatch() {
+                await this._postAction(config.dispatch_endpoint, {}, () => {
+                    this.dispatchModalOpen = false;
+                });
+            },
+
+            async _postAction(endpoint, body, onSuccess) {
+                if (this.actionLoading) return;
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                        },
+                        body: JSON.stringify(body),
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Action failed.');
+                    }
+                    window.showToast?.(result.message || 'Done.', 'success');
+                    onSuccess?.();
+                    // Reload the page so updated status/driver is reflected
+                    setTimeout(() => window.location.reload(), 800);
+                } catch (err) {
+                    console.error(err);
+                    window.showToast?.(err.message || 'An error occurred.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
+            },
+        };
+    });
+});
+</script>
+@endpush
