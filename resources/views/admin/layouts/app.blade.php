@@ -199,6 +199,22 @@
                 </a>
                 @endhasPermission
 
+                @hasPermission('shipments.view')
+                <a href="{{ route('admin.collection-center.index') }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.collection-center.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+                        </svg>
+                    </div>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Collections</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Collection Center</span>
+                    </template>
+                </a>
+                @endhasPermission
+
                 <!-- FINANCE Section -->
                 <div class="mt-3 mb-1 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
                     <div class="section-label flex items-center gap-3">

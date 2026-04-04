@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminDeliveryRunController;
+use App\Http\Controllers\Admin\CollectionCenterController;
 use App\Http\Controllers\Admin\AdminInvoiceListController;
 use App\Http\Controllers\Admin\AdminLocationController;
 use App\Http\Controllers\Admin\AdminProfileController;
@@ -339,6 +340,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('sort-batches/{batch}/seal', [AdminSortBatchController::class, 'seal'])->name('sort-batches.seal');
         Route::post('sort-batches/{batch}/reopen', [AdminSortBatchController::class, 'reopen'])->name('sort-batches.reopen');
         Route::post('sort-batches/{batch}/create-delivery-run', [AdminSortBatchController::class, 'createDeliveryRun'])->name('sort-batches.create-delivery-run');
+
+        // Collection Center (self-pickup)
+        Route::get('collection-center', [CollectionCenterController::class, 'index'])->name('collection-center.index');
+        Route::get('collection-center-data', [CollectionCenterController::class, 'data'])->name('collection-center.data');
+        Route::post('collection-center/{shipment}/handover', [CollectionCenterController::class, 'handover'])->name('collection-center.handover');
 
         // Invoice List (all invoices across all shipments)
         Route::get('invoices', [AdminInvoiceListController::class, 'index'])->name('invoices.index');
