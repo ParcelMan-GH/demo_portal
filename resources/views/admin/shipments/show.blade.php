@@ -2714,13 +2714,37 @@ $shipmentConfig = [
                                 <p class="text-sm font-bold text-slate-800">Finalize Receiving</p>
                                 <p class="text-xs text-slate-500">Mark all packages as received and move shipment to warehouse status</p>
                             </div>
-                            <button @@click="finalizeReceiving()" :disabled="receiving.saving || receiving.packages.every(p => p.received_quantity === 0)"
+                            <button @@click="openFinalizeConfirm()" :disabled="receiving.saving || receiving.packages.every(p => p.received_quantity === 0)"
                                     class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all disabled:opacity-50 shadow-sm">
                                 Finalize
                             </button>
                         </div>
                     </div>
                 </template>
+
+                {{-- Finalize Confirm Modal --}}
+                <div x-show="finalizeConfirmOpen" x-transition.opacity class="fixed inset-0 z-[190] flex items-center justify-center bg-black/50 p-4" style="display:none">
+                    <div @@click.stop class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden">
+                        <div class="px-6 py-5">
+                            <div class="flex items-start gap-4">
+                                <div class="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-bold text-slate-900">Finalize Receiving</h3>
+                                    <p class="text-sm text-slate-500 mt-1.5 leading-relaxed">This will mark all packages as received and update the shipment status to <strong class="text-slate-700">At Warehouse</strong>. This action cannot be undone.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
+                            <button @@click="finalizeConfirmOpen = false" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-xl hover:bg-white transition-colors">Cancel</button>
+                            <button @@click="finalizeReceiving()" :disabled="receiving.saving" class="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2">
+                                <svg x-show="receiving.saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                <span x-text="receiving.saving ? 'Finalizing...' : 'Finalize'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
                 {{-- Receiving Lightbox --}}
                 <div x-show="receivingLightbox" @@click="receivingLightbox = null" @@keydown.escape.window="receivingLightbox = null"

@@ -412,8 +412,14 @@ function shipmentShow() {
             } catch (e) { window.showToast?.('Error printing label.', 'error'); }
         },
 
+        finalizeConfirmOpen: false,
+
+        openFinalizeConfirm() {
+            this.finalizeConfirmOpen = true;
+        },
+
         async finalizeReceiving() {
-            if (!confirm('Finalize receiving? This will update the shipment status to "at warehouse".')) return;
+            this.finalizeConfirmOpen = false;
             this.receiving.saving = true;
             try {
                 const response = await fetch(this.config.receiveFinalizeEndpoint, {
