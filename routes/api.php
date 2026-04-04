@@ -124,6 +124,7 @@ Route::prefix('v1/driver')->group(function () {
         Route::post('scan-claim', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'scanClaim']);
         Route::get('my-packages', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'myPackages']);
         Route::post('release-package', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'releasePackage']);
+        Route::post('start-deliveries', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'startDeliveries']);
         Route::get('package-history/{barcode}', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'packageHistory']);
     });
 });

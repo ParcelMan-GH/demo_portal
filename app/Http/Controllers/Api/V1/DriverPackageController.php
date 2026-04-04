@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
+use App\Models\Warehouse;
+use App\Services\Warehouse\WarehouseDeliveryService;
 use App\Models\WarehouseReceiptItemLabel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -212,5 +214,47 @@ class DriverPackageController extends Controller
             'recipient_phone' => $recipientPhone,
             'delivery_town' => $deliveryTown,
         ];
+    }
+
+    /**
+     * Start deliveries — auto-create a delivery run from claimed packages.
+     * POST /api/v1/driver/start-deliveries
+     */
+    public function startDeliveries(Request $request): JsonResponse
+    {
+        $driver = $request->user();
+
+        $validated = $request->validate([
+            'warehouse_id' => ['nullable', 'exists:warehouses,id'],
+        ]);
+
+        // Resolve warehouse — try from the driver's last pickup assignment, or from request
+        $warehouseId = $validated['warehouse_id'] ?? null;
+        if (!$warehouseId) {
+            // Find the warehouse from one of the claimed labels
+            $claimedLabel = LabelCustodyEvent::query()
+                ->where('driver_id', $driver->id)
+                ->where('event_type', LabelCustodyEvent::TYPE_CLAIMED)
+                ->whereIn('id', function ($q) {
+                    $q->selectRaw('MAX(id)')->from('label_custody_events')->groupBy('warehouse_receipt_item_label_id');
+                })
+                ->with('label.receiptItem.warehouseReceipt')
+                ->latest()
+                ->first();
+
+            $warehouseId = $claimedLabel?->label?->receiptItem?->warehouseReceipt?->warehouse_id;
+        }
+
+        if (!$warehouseId) {
+            return response()->json(['success' => false, 'message' => 'Could not determine warehouse. Please try again.'], 422);
+        }
+
+        $warehouse = Warehouse::findOrFail($warehouseId);
+
+        $deliveryService = app(WarehouseDeliveryService::class);
+        $result = $deliveryService->createRunFromClaims($driver, $warehouse);
+
+        $statusCode = $result['success'] ? 200 : 422;
+        return response()->json($result, $statusCode);
     }
 }

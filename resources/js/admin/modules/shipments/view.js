@@ -20,7 +20,7 @@ function shipmentShow() {
 
         // Custody
         custodyLoaded: false,
-        custody: { loading: false, labels: [] },
+        custody: { loading: false, labels: [], creatingRun: false },
 
         // Receiving
         receivingLoaded: false,
@@ -353,6 +353,47 @@ function shipmentShow() {
                 }
             } catch (e) { console.error('Failed to load custody data', e); }
             this.custody.loading = false;
+        },
+
+        custodyDriverGroups() {
+            const drivers = {};
+            this.custody.labels.forEach(l => {
+                if (l.current_driver) {
+                    const id = l.current_driver.id;
+                    if (!drivers[id]) {
+                        drivers[id] = { driver_id: id, name: l.current_driver.name, phone: l.current_driver.phone, count: 0 };
+                    }
+                    drivers[id].count++;
+                }
+            });
+            return Object.values(drivers);
+        },
+
+        async createRunFromClaims(driverId) {
+            if (!confirm('Create a delivery run from this driver\'s claimed packages?')) return;
+            this.custody.creatingRun = true;
+            try {
+                const response = await fetch(this.config.createRunFromClaimsEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        driver_id: driverId,
+                        warehouse_id: this.shipment.pickup_assignment?.target_warehouse?.id || this.config.shipment?.pickup_assignment?.target_warehouse?.id,
+                    }),
+                });
+                const result = await response.json();
+                if (result.success) {
+                    window.showToast?.('Delivery run created: ' + result.data.run_number + ' with ' + result.data.stops_count + ' stop(s).', 'success');
+                    this.loadCustody();
+                } else {
+                    window.showToast?.(result.message || 'Failed to create run.', 'error');
+                }
+            } catch (e) { window.showToast?.('Error creating run.', 'error'); }
+            this.custody.creatingRun = false;
         },
 
         async loadReceiving() {

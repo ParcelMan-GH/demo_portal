@@ -9,6 +9,8 @@ use App\Models\DeliveryRun;
 use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
 use App\Models\Driver;
+use App\Models\LabelCustodyEvent;
+use App\Models\WarehouseReceiptItemLabel;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemTracking;
@@ -96,6 +98,116 @@ class WarehouseDeliveryService
             }
 
             return $this->createRun($batch->fresh(), $warehouse, $user);
+        });
+    }
+
+    /**
+     * Create a delivery run from a driver's claimed package labels.
+     * Groups packages into stops by recipient phone → town.
+     */
+    public function createRunFromClaims(
+        Driver $driver,
+        Warehouse $warehouse,
+        ?User $admin = null
+    ): array {
+        // Get all labels currently claimed by this driver
+        $claimedLabelIds = LabelCustodyEvent::query()
+            ->where('driver_id', $driver->id)
+            ->where('event_type', LabelCustodyEvent::TYPE_CLAIMED)
+            ->whereIn('id', function ($query) {
+                $query->selectRaw('MAX(id)')
+                    ->from('label_custody_events')
+                    ->groupBy('warehouse_receipt_item_label_id');
+            })
+            ->pluck('warehouse_receipt_item_label_id');
+
+        if ($claimedLabelIds->isEmpty()) {
+            return ['success' => false, 'message' => 'Driver has no claimed packages.'];
+        }
+
+        $labels = WarehouseReceiptItemLabel::whereIn('id', $claimedLabelIds)
+            ->with(['receiptItem.shipmentItem.shipment'])
+            ->get();
+
+        // Collect unique shipment items (a package may have multiple labels)
+        $shipmentItems = $labels->map(fn ($l) => $l->receiptItem?->shipmentItem)->filter()->unique('id');
+
+        if ($shipmentItems->isEmpty()) {
+            return ['success' => false, 'message' => 'No valid packages found.'];
+        }
+
+        return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems) {
+            $run = DeliveryRun::query()->create([
+                'run_number' => $this->generateRunNumber($warehouse),
+                'warehouse_id' => $warehouse->id,
+                'assigned_driver_id' => $driver->id,
+                'status' => DeliveryRun::STATUS_DISPATCHED,
+                'dispatched_at' => now(),
+                'created_by_user_id' => $admin?->id,
+            ]);
+
+            // Group by destination
+            $grouped = [];
+            foreach ($shipmentItems as $shipmentItem) {
+                $destination = $this->resolveDeliveryDestination($shipmentItem);
+
+                // Group key: phone first, then town fallback
+                $phone = preg_replace('/\D/', '', (string) ($destination['recipient_phone'] ?? ''));
+                $town = mb_strtolower(trim((string) ($destination['town'] ?? '')));
+
+                $key = $phone ?: ($town ?: 'unknown');
+
+                if (!isset($grouped[$key])) {
+                    $grouped[$key] = [
+                        'destination' => $destination,
+                        'items' => [],
+                    ];
+                }
+                $grouped[$key]['items'][] = $shipmentItem;
+            }
+
+            foreach ($grouped as $group) {
+                $destination = $group['destination'];
+
+                $stop = DeliveryRunStop::query()->create([
+                    'delivery_run_id' => $run->id,
+                    'recipient_name' => (string) ($destination['recipient_name'] ?? 'Unknown Recipient'),
+                    'recipient_phone' => (string) ($destination['recipient_phone'] ?? ''),
+                    'region_id' => $destination['region_id'] ?? null,
+                    'district_id' => $destination['district_id'] ?? null,
+                    'town' => $destination['town'] ?? null,
+                    'latitude' => $destination['latitude'] ?? null,
+                    'longitude' => $destination['longitude'] ?? null,
+                    'gh_post_address' => $destination['gh_post_address'] ?? null,
+                    'landmark' => $destination['landmark'] ?? null,
+                    'total_packages' => count($group['items']),
+                    'status' => DeliveryRunStop::STATUS_PENDING,
+                ]);
+
+                foreach ($group['items'] as $item) {
+                    DeliveryRunItem::query()->create([
+                        'delivery_run_id' => $run->id,
+                        'delivery_run_stop_id' => $stop->id,
+                        'shipment_item_id' => $item->id,
+                        'expected_quantity' => (int) ($item->quantity ?: 1),
+                        'status' => DeliveryRunItem::STATUS_PENDING,
+                    ]);
+
+                    // Update shipment item status to out_for_delivery
+                    $item->update(['status' => 'out_for_delivery']);
+                }
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Delivery run created with ' . count($grouped) . ' stop(s).',
+                'data' => [
+                    'delivery_run_id' => $run->id,
+                    'run_number' => $run->run_number,
+                    'stops_count' => count($grouped),
+                    'packages_count' => $shipmentItems->count(),
+                ],
+            ];
         });
     }
 

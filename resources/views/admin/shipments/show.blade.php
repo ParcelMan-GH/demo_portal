@@ -22,6 +22,7 @@ $shipmentConfig = [
     'updateFulfillmentTypeEndpoint' => route('admin.shipments.update-fulfillment-type', $shipment),
     'duplicateEndpoint' => route('admin.shipments.duplicate', $shipment),
     'custodyDataEndpoint' => route('admin.shipments.custody-data', $shipment),
+    'createRunFromClaimsEndpoint' => route('admin.shipments.create-run-from-claims'),
     'receivingDataEndpoint' => route('admin.shipments.receiving-data', $shipment),
     'receiveSaveEndpoint' => route('admin.shipments.receiving.save', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
     'receivePrintLabelEndpoint' => route('admin.shipments.receiving.print-label', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
@@ -2771,6 +2772,28 @@ $shipmentConfig = [
                                 <p class="text-[10px] text-blue-600 font-semibold uppercase">Delivered</p>
                             </div>
                         </div>
+
+                        {{-- Drivers with claims — create run buttons --}}
+                        <template x-if="custody.labels.filter(l => l.current_driver).length > 0">
+                            <div class="mb-6">
+                                <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Drivers Holding Packages</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="driverGroup in custodyDriverGroups()" :key="driverGroup.driver_id">
+                                        <div class="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl">
+                                            <div class="w-7 h-7 rounded-full bg-cyan-100 text-cyan-700 text-[10px] font-bold flex items-center justify-center" x-text="driverGroup.name.charAt(0).toUpperCase()"></div>
+                                            <div>
+                                                <p class="text-xs font-semibold text-slate-800" x-text="driverGroup.name"></p>
+                                                <p class="text-[10px] text-slate-400" x-text="driverGroup.count + ' package(s)'"></p>
+                                            </div>
+                                            <button @@click="createRunFromClaims(driverGroup.driver_id)" :disabled="custody.creatingRun"
+                                                    class="ml-2 px-2.5 py-1 text-[10px] font-semibold text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors disabled:opacity-50">
+                                                <span x-text="custody.creatingRun ? '...' : 'Create Run'"></span>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
 
                         {{-- Labels table --}}
                         <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">

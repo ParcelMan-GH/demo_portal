@@ -1288,6 +1288,25 @@ class ShipmentController extends Controller
 
     // ─── RECEIVING (Super Admin) ───────────────────────────────────────────────
 
+    public function createRunFromClaims(Request $request): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $validated = $request->validate([
+            'driver_id' => ['required', 'exists:drivers,id'],
+            'warehouse_id' => ['required', 'exists:warehouses,id'],
+        ]);
+
+        $driver = \App\Models\Driver::findOrFail($validated['driver_id']);
+        $warehouse = Warehouse::findOrFail($validated['warehouse_id']);
+        $admin = Auth::guard('admin')->user();
+
+        $deliveryService = app(\App\Services\Warehouse\WarehouseDeliveryService::class);
+        $result = $deliveryService->createRunFromClaims($driver, $warehouse, $admin);
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
     public function custodyData(Shipment $shipment): JsonResponse
     {
         $this->authorizePermission('shipments.view');
