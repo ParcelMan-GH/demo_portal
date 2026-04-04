@@ -5,8 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Exports\DriversExport;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryRun;
+use App\Models\DeliveryRunStop;
 use App\Models\Driver;
+use App\Models\SortBatch;
 use App\Models\Warehouse;
+use App\Services\Warehouse\WarehouseDeliveryService;
+use App\Services\Warehouse\WarehouseSortingService;
 use App\Support\GenericPdfExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -221,5 +225,103 @@ class AdminDeliveryRunController extends Controller
             DeliveryRun::STATUS_CANCELLED           => 'Cancelled',
             default                                 => ucwords(str_replace('_', ' ', $status)),
         };
+    }
+
+    // ─── ACTIONS (same as warehouse portal) ──────────────────────────────
+
+    public function store(Request $request): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $validated = $request->validate([
+            'sort_batch_id' => ['required', 'integer', 'exists:sort_batches,id'],
+            'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+        ]);
+
+        $batch = SortBatch::findOrFail((int) $validated['sort_batch_id']);
+        $warehouse = Warehouse::findOrFail((int) $validated['warehouse_id']);
+        $deliveryService = app(WarehouseDeliveryService::class);
+        $result = $deliveryService->createRun($batch, $warehouse, Auth::guard('admin')->user());
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function storeFromItems(Request $request): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $validated = $request->validate([
+            'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+            'warehouse_receipt_item_ids' => ['required', 'array', 'min:1'],
+            'warehouse_receipt_item_ids.*' => ['integer'],
+        ]);
+
+        $warehouse = Warehouse::findOrFail((int) $validated['warehouse_id']);
+        $deliveryService = app(WarehouseDeliveryService::class);
+        $sortingService = app(WarehouseSortingService::class);
+        $result = $deliveryService->createRunFromItems($warehouse, Auth::guard('admin')->user(), $validated['warehouse_receipt_item_ids'], $sortingService);
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function assignDriver(Request $request, DeliveryRun $run): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $validated = $request->validate([
+            'driver_id' => ['required', 'exists:drivers,id'],
+        ]);
+
+        $run->update([
+            'assigned_driver_id' => (int) $validated['driver_id'],
+            'status' => DeliveryRun::STATUS_ASSIGNED,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Driver assigned to delivery run.',
+            'data' => ['run' => $run->fresh()],
+        ]);
+    }
+
+    public function dispatch(DeliveryRun $run): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $deliveryService = app(WarehouseDeliveryService::class);
+        $admin = Auth::guard('admin')->user();
+        $warehouse = $run->warehouse;
+
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'No warehouse found for this run.'], 422);
+        }
+
+        $result = $deliveryService->dispatch($run, $warehouse, $admin);
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function resendCode(DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $deliveryService = app(WarehouseDeliveryService::class);
+        $warehouse = $run->warehouse;
+
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'No warehouse found.'], 422);
+        }
+
+        $result = $deliveryService->resendStopCode($run, $stop, $warehouse);
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    private function authorizePermission(string $permission): void
+    {
+        $user = Auth::guard('admin')->user();
+        if (!$user || !$user->hasPermission($permission)) {
+            abort(403, 'Unauthorized action.');
+        }
     }
 }

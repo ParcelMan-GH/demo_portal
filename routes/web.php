@@ -307,6 +307,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('delivery-runs', [AdminDeliveryRunController::class, 'index'])->name('delivery-runs.index');
         Route::get('delivery-runs-data', [AdminDeliveryRunController::class, 'data'])->name('delivery-runs.data');
         Route::get('delivery-runs-export', [AdminDeliveryRunController::class, 'export'])->name('delivery-runs.export');
+        Route::post('delivery-runs', [AdminDeliveryRunController::class, 'store'])->name('delivery-runs.store');
+        Route::post('delivery-runs/from-items', [AdminDeliveryRunController::class, 'storeFromItems'])->name('delivery-runs.store-from-items');
+        Route::post('delivery-runs/{run}/assign-driver', [AdminDeliveryRunController::class, 'assignDriver'])->name('delivery-runs.assign-driver');
+        Route::post('delivery-runs/{run}/dispatch', [AdminDeliveryRunController::class, 'dispatch'])->name('delivery-runs.dispatch');
+        Route::post('delivery-runs/{run}/stops/{stop}/resend-code', [AdminDeliveryRunController::class, 'resendCode'])->name('delivery-runs.stops.resend-code');
         Route::get('delivery-runs/{run}', [AdminDeliveryRunController::class, 'show'])->name('delivery-runs.show');
 
         // Transport Manifests (admin read visibility)

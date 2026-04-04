@@ -143,6 +143,62 @@
                 </a>
                 @endhasPermission
 
+                <!-- WAREHOUSE Section -->
+                <div class="mt-3 mb-1 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
+                    <div class="section-label flex items-center gap-3">
+                        <span x-show="!sidebarCollapsed" class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.12em] whitespace-nowrap">Warehouse</span>
+                        <span x-show="sidebarCollapsed" x-cloak class="block w-8 h-[2px] bg-gradient-to-r from-slate-600 to-transparent mx-auto rounded-full"></span>
+                    </div>
+                </div>
+
+                @hasPermission('shipments.view')
+                <a href="{{ route('admin.sort-batches.index') }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.sort-batches.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                        </svg>
+                    </div>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Sorting</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Sorting</span>
+                    </template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('shipments.view')
+                <a href="{{ route('admin.transport-manifests.index') }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.transport-manifests.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                        </svg>
+                    </div>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Transports</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Transport Manifests</span>
+                    </template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('shipments.view')
+                <a href="{{ route('admin.pickups.index') }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.pickups.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                        </svg>
+                    </div>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Pickups</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Pickup Assignments</span>
+                    </template>
+                </a>
+                @endhasPermission
+
                 <!-- FINANCE Section -->
                 <div class="mt-3 mb-1 transition-all duration-300" :class="sidebarCollapsed ? 'px-0' : 'px-3'">
                     <div class="section-label flex items-center gap-3">
