@@ -87,16 +87,37 @@ class DriverPackageController extends Controller
     {
         $driver = $request->user();
 
+        $validated = $request->validate([
+            'from_date' => ['nullable', 'date'],
+            'to_date' => ['nullable', 'date'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'offset' => ['nullable', 'integer', 'min:0'],
+        ]);
+
         // Get all labels where the latest custody event is 'claimed' by this driver
-        $claimedLabelIds = LabelCustodyEvent::query()
+        $eventsQuery = LabelCustodyEvent::query()
             ->where('driver_id', $driver->id)
             ->where('event_type', LabelCustodyEvent::TYPE_CLAIMED)
             ->whereIn('id', function ($query) {
                 $query->selectRaw('MAX(id)')
                     ->from('label_custody_events')
                     ->groupBy('warehouse_receipt_item_label_id');
-            })
-            ->pluck('warehouse_receipt_item_label_id');
+            });
+
+        if (!empty($validated['from_date'])) {
+            $eventsQuery->whereDate('created_at', '>=', $validated['from_date']);
+        }
+        if (!empty($validated['to_date'])) {
+            $eventsQuery->whereDate('created_at', '<=', $validated['to_date']);
+        }
+
+        $total = $eventsQuery->count();
+        $limit = (int) ($validated['limit'] ?? 50);
+        $offset = (int) ($validated['offset'] ?? 0);
+
+        $claimedEvents = $eventsQuery->latest('created_at')->skip($offset)->take($limit)->get();
+        $claimedLabelIds = $claimedEvents->pluck('warehouse_receipt_item_label_id');
+        $claimedAtMap = $claimedEvents->keyBy('warehouse_receipt_item_label_id');
 
         $labels = WarehouseReceiptItemLabel::whereIn('id', $claimedLabelIds)
             ->with([
@@ -105,12 +126,22 @@ class DriverPackageController extends Controller
             ])
             ->get();
 
+        $packages = $labels->map(function ($label) use ($claimedAtMap) {
+            $data = $this->transformLabel($label);
+            $event = $claimedAtMap->get($label->id);
+            $data['claimed_at'] = $event?->created_at?->toIso8601String();
+            return $data;
+        })->values();
+
         return response()->json([
             'success' => true,
             'message' => 'Your packages retrieved.',
             'data' => [
-                'packages' => $labels->map(fn ($label) => $this->transformLabel($label))->values(),
-                'total' => $labels->count(),
+                'packages' => $packages,
+                'total' => $total,
+                'limit' => $limit,
+                'offset' => $offset,
+                'has_more' => ($offset + $limit) < $total,
             ],
         ]);
     }
