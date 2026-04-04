@@ -2780,7 +2780,7 @@ $shipmentConfig = [
                         </div>
 
                         {{-- Drivers with claims — create run buttons --}}
-                        <template x-if="custody.labels.filter(l => l.current_driver).length > 0">
+                        <div x-show="custody.labels.filter(l => l.current_driver).length > 0">
                             <div class="mb-6">
                                 <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Drivers Holding Packages</h4>
                                 <div class="flex flex-wrap gap-2">
@@ -2799,7 +2799,7 @@ $shipmentConfig = [
                                     </template>
                                 </div>
                             </div>
-                        </template>
+                        </div>
 
                         {{-- Labels table --}}
                         <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -2808,12 +2808,10 @@ $shipmentConfig = [
                                 <button @@click="loadCustody()" class="text-[10px] font-semibold text-slate-500 hover:text-slate-700">Refresh</button>
                             </div>
 
-                            <template x-if="custody.labels.length === 0">
-                                <div class="px-4 py-12 text-center text-slate-400">
-                                    <p class="text-sm font-medium">No labels generated yet</p>
-                                    <p class="text-xs mt-1">Print labels from the Receiving tab first</p>
-                                </div>
-                            </template>
+                            <div x-show="custody.labels.length === 0" class="px-4 py-12 text-center text-slate-400">
+                                <p class="text-sm font-medium">No labels generated yet</p>
+                                <p class="text-xs mt-1">Print labels from the Receiving tab first</p>
+                            </div>
 
                             <div class="divide-y divide-slate-100" x-show="custody.labels.length > 0">
                                 <template x-for="label in custody.labels" :key="label.id">

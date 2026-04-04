@@ -107,7 +107,8 @@ class DriverDeliveryService
             'stops.district:id,name',
             'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status,notes,delivered_at',
             'items.shipmentItem:id,shipment_id,description,tracking_code',
-            'items.shipmentItem.shipment:id,shipment_number',
+            'items.shipmentItem.shipment:id,shipment_number,vendor_id',
+            'items.shipmentItem.shipment.vendor:id,name,phone,business_name',
         ]);
 
         return [
@@ -180,6 +181,7 @@ class DriverDeliveryService
                     'failure_notes' => $stop->failure_notes,
                     'delivery_notes' => $stop->delivery_notes,
                     'items' => $items->map(function ($item) {
+                        $vendor = $item->shipmentItem?->shipment?->vendor;
                         return [
                             'shipment_item_id' => $item->shipment_item_id,
                             'shipment_number' => $item->shipmentItem?->shipment?->shipment_number,
@@ -190,6 +192,11 @@ class DriverDeliveryService
                             'status' => $item->status,
                             'notes' => $item->notes,
                             'delivered_at' => $item->delivered_at,
+                            'vendor' => $vendor ? [
+                                'name' => $vendor->name,
+                                'phone' => $vendor->phone,
+                                'business_name' => $vendor->business_name,
+                            ] : null,
                         ];
                     })->values(),
                 ];
