@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryRun;
+use App\Models\Driver;
 use App\Models\Invoice;
+use App\Models\LabelCustodyEvent;
 use App\Models\Shipment;
 use App\Models\TransportManifest;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Models\WarehouseReceiptItemLabel;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -31,6 +34,33 @@ class DashboardController extends Controller
                                     ->count();
         $pendingInvoices      = Invoice::where('status', 'sent')->count();
 
+        // ── Pipeline counts ───────────────────────────────────────────────
+        $submitted            = Shipment::where('status', 'submitted')->count();
+        $pickedUp             = Shipment::where('status', 'picked_up')->count();
+        $sorted               = Shipment::where('status', 'sorted')->count();
+        $inTransit            = Shipment::where('status', 'in_transit')->count();
+
+        // ── Package Custody ───────────────────────────────────────────────
+        $totalLabels          = WarehouseReceiptItemLabel::count();
+        $claimedLabels        = LabelCustodyEvent::where('event_type', 'claimed')
+                                    ->whereIn('id', function ($q) {
+                                        $q->selectRaw('MAX(id)')
+                                          ->from('label_custody_events')
+                                          ->groupBy('warehouse_receipt_item_label_id');
+                                    })
+                                    ->count();
+
+        // ── Driver stats ──────────────────────────────────────────────────
+        $totalDrivers         = Driver::where('is_active', true)->count();
+        $driversWithPackages  = LabelCustodyEvent::where('event_type', 'claimed')
+                                    ->whereIn('id', function ($q) {
+                                        $q->selectRaw('MAX(id)')
+                                          ->from('label_custody_events')
+                                          ->groupBy('warehouse_receipt_item_label_id');
+                                    })
+                                    ->distinct('driver_id')
+                                    ->count('driver_id');
+
         // ── Financial Summary (this month) ────────────────────────────────
         $totalInvoicedMonth   = Invoice::where('status', 'accepted')
                                     ->where('created_at', '>=', $monthStart)
@@ -39,6 +69,7 @@ class DashboardController extends Controller
                                     $q->where('created_at', '>=', $monthStart);
                                 })->count();
         $totalShipmentsMonth  = Shipment::where('created_at', '>=', $monthStart)->count();
+        $totalVendors         = Vendor::count();
 
         // ── Recent Activity ───────────────────────────────────────────────
         $recentShipments      = Shipment::with('vendor:id,name,business_name')
@@ -81,9 +112,18 @@ class DashboardController extends Controller
             'outForDelivery',
             'deliveredToday',
             'pendingInvoices',
+            'submitted',
+            'pickedUp',
+            'sorted',
+            'inTransit',
+            'totalLabels',
+            'claimedLabels',
+            'totalDrivers',
+            'driversWithPackages',
             'totalInvoicedMonth',
             'activeVendorsMonth',
             'totalShipmentsMonth',
+            'totalVendors',
             'recentShipments',
             'activeDeliveryRuns',
             'activeManifests',

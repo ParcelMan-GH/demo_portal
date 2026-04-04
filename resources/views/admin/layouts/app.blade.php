@@ -24,9 +24,7 @@
         >
             <!-- Logo -->
             <div class="flex items-center h-[60px] transition-all duration-300" :class="sidebarCollapsed ? 'px-4 justify-center' : 'px-5'">
-                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/25 ring-1 ring-white/10">
-                    <img src="{{ asset('logo.png') }}" alt="Parcelman" class="h-6 w-6 object-contain">
-                </div>
+                <img src="{{ asset('favicon.jpg') }}" alt="Parcelman" class="flex-shrink-0 w-9 h-9 rounded-lg object-cover">
                 <div class="ml-3 overflow-hidden transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'">
                     <span class="text-white text-[15px] font-bold tracking-tight whitespace-nowrap">Parcelman</span>
                     <span class="block text-primary-400/70 text-[10px] font-semibold uppercase tracking-[0.15em] whitespace-nowrap">Admin Portal</span>
