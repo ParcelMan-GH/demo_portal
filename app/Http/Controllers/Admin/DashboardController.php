@@ -71,10 +71,19 @@ class DashboardController extends Controller
         $totalShipmentsMonth  = Shipment::where('created_at', '>=', $monthStart)->count();
         $totalVendors         = Vendor::count();
 
+        // ── Needs Attention ───────────────────────────────────────────────
+        $needsAttention       = Shipment::with('vendor:id,name,business_name')
+                                    ->where('status', 'submitted')
+                                    ->latest()
+                                    ->limit(5)
+                                    ->get(['id', 'shipment_number', 'status', 'vendor_id', 'created_at', 'sender_notes']);
+
+        $totalNeedsAttention  = Shipment::where('status', 'submitted')->count();
+
         // ── Recent Activity ───────────────────────────────────────────────
         $recentShipments      = Shipment::with('vendor:id,name,business_name')
                                     ->latest()
-                                    ->limit(10)
+                                    ->limit(8)
                                     ->get(['id', 'shipment_number', 'status', 'vendor_id', 'created_at']);
 
         $activeDeliveryRuns   = DeliveryRun::where('status', 'out_for_delivery')
@@ -106,6 +115,8 @@ class DashboardController extends Controller
 
         return view('admin.dashboard.index', compact(
             'admin',
+            'needsAttention',
+            'totalNeedsAttention',
             'todayShipments',
             'pendingPickups',
             'atWarehouse',
