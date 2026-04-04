@@ -119,5 +119,11 @@ Route::prefix('v1/driver')->group(function () {
         Route::get('notifications', [DriverNotificationController::class, 'index']);
         Route::post('notifications/read-all', [DriverNotificationController::class, 'markAllAsRead']);
         Route::post('notifications/{notification}/read', [DriverNotificationController::class, 'markAsRead']);
+
+        // Package custody (scan & claim)
+        Route::post('scan-claim', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'scanClaim']);
+        Route::get('my-packages', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'myPackages']);
+        Route::post('release-package', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'releasePackage']);
+        Route::get('package-history/{barcode}', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'packageHistory']);
     });
 });

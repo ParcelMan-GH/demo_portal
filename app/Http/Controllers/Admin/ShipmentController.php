@@ -1288,6 +1288,61 @@ class ShipmentController extends Controller
 
     // ─── RECEIVING (Super Admin) ───────────────────────────────────────────────
 
+    public function custodyData(Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.view');
+
+        $shipment->load(['items.shipment:id,shipment_number,delivery_recipient_name,delivery_town']);
+
+        // Get all labels for this shipment's items via receipt items
+        $assignment = $shipment->pickupAssignment;
+        if (!$assignment) {
+            return response()->json(['success' => true, 'data' => ['labels' => []]]);
+        }
+
+        $receipt = $assignment->warehouseReceipt;
+        if (!$receipt) {
+            return response()->json(['success' => true, 'data' => ['labels' => []]]);
+        }
+
+        $receipt->load([
+            'items.labels.custodyEvents' => fn ($q) => $q->latest()->limit(1),
+            'items.labels.custodyEvents.driver:id,name,phone',
+            'items.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
+        ]);
+
+        $labels = [];
+        foreach ($receipt->items as $receiptItem) {
+            $item = $receiptItem->shipmentItem;
+            foreach ($receiptItem->labels as $label) {
+                $latestEvent = $label->custodyEvents->first();
+                $isClaimed = $latestEvent && $latestEvent->event_type === 'claimed';
+                $isDelivered = $latestEvent && $latestEvent->event_type === 'delivered';
+
+                $labels[] = [
+                    'id' => $label->id,
+                    'barcode' => $label->barcode_value,
+                    'label_index' => $label->label_index,
+                    'labels_total' => $label->labels_total,
+                    'label_type' => $label->label_type,
+                    'description' => $item?->description,
+                    'tracking_code' => $item?->tracking_code,
+                    'recipient_name' => $item?->delivery_recipient_name ?: $shipment->delivery_recipient_name,
+                    'delivery_town' => $item?->delivery_town ?: $shipment->delivery_town,
+                    'status' => $isDelivered ? 'delivered' : ($isClaimed ? 'claimed' : 'at_warehouse'),
+                    'current_driver' => $isClaimed ? [
+                        'id' => $latestEvent->driver_id,
+                        'name' => $latestEvent->driver?->name,
+                        'phone' => $latestEvent->driver?->phone,
+                    ] : null,
+                    'claimed_at' => $isClaimed ? $latestEvent->created_at->format('M d, H:i') : null,
+                ];
+            }
+        }
+
+        return response()->json(['success' => true, 'data' => ['labels' => $labels]]);
+    }
+
     public function receivingData(Shipment $shipment): JsonResponse
     {
         $this->authorizePermission('shipments.view');

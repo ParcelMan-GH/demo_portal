@@ -21,6 +21,7 @@ $shipmentConfig = [
     'receiveAssignmentEndpointTemplate' => route('admin.assignments.receive', ['pickupAssignment' => '__ASSIGNMENT__']),
     'updateFulfillmentTypeEndpoint' => route('admin.shipments.update-fulfillment-type', $shipment),
     'duplicateEndpoint' => route('admin.shipments.duplicate', $shipment),
+    'custodyDataEndpoint' => route('admin.shipments.custody-data', $shipment),
     'receivingDataEndpoint' => route('admin.shipments.receiving-data', $shipment),
     'receiveSaveEndpoint' => route('admin.shipments.receiving.save', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
     'receivePrintLabelEndpoint' => route('admin.shipments.receiving.print-label', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
@@ -428,6 +429,20 @@ $shipmentConfig = [
                     </svg>
                 </div>
                 <span class="text-xs transition-colors" :class="activeTab === 'receiving' ? 'font-bold text-orange-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Receiving</span>
+            </button>
+
+            <!-- Package Tracking -->
+            <button @@click="activeTab = 'custody'; if (!custodyLoaded) loadCustody()"
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg transition-all duration-150 text-left"
+                :class="activeTab === 'custody' ? 'bg-cyan-50 ring-1 ring-cyan-100 shadow-sm' : 'hover:bg-slate-50'"
+                x-show="['picked_up','at_warehouse','sorted','in_transit','at_destination','out_for_delivery','delivered'].includes(shipment.status)">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'custody' ? 'bg-cyan-500 shadow-sm shadow-cyan-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'custody' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                </div>
+                <span class="text-xs transition-colors" :class="activeTab === 'custody' ? 'font-bold text-cyan-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Custody</span>
             </button>
 
         </aside>
@@ -2721,6 +2736,91 @@ $shipmentConfig = [
                         </div>
                     </div>
                 </template>
+
+            <!-- ═══════════════════════════════════════ -->
+            <!-- CUSTODY TAB                             -->
+            <!-- ═══════════════════════════════════════ -->
+            <div x-show="activeTab === 'custody'" x-cloak>
+
+                <div x-show="custody.loading" class="flex items-center justify-center py-20">
+                    <div class="flex gap-1.5">
+                        <div class="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style="animation-delay:0ms"></div>
+                        <div class="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style="animation-delay:150ms"></div>
+                        <div class="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style="animation-delay:300ms"></div>
+                    </div>
+                </div>
+
+                <template x-if="!custody.loading">
+                    <div>
+                        {{-- Stats --}}
+                        <div class="grid grid-cols-4 gap-3 mb-6">
+                            <div class="bg-white rounded-xl border border-slate-200 p-3">
+                                <p class="text-lg font-bold text-slate-900" x-text="custody.labels.length"></p>
+                                <p class="text-[10px] text-slate-500 font-semibold uppercase">Total Labels</p>
+                            </div>
+                            <div class="bg-white rounded-xl border border-emerald-200 p-3">
+                                <p class="text-lg font-bold text-emerald-700" x-text="custody.labels.filter(l => l.current_driver).length"></p>
+                                <p class="text-[10px] text-emerald-600 font-semibold uppercase">Claimed</p>
+                            </div>
+                            <div class="bg-white rounded-xl border border-slate-200 p-3">
+                                <p class="text-lg font-bold text-slate-400" x-text="custody.labels.filter(l => !l.current_driver).length"></p>
+                                <p class="text-[10px] text-slate-500 font-semibold uppercase">Unclaimed</p>
+                            </div>
+                            <div class="bg-white rounded-xl border border-blue-200 p-3">
+                                <p class="text-lg font-bold text-blue-700" x-text="custody.labels.filter(l => l.status === 'delivered').length"></p>
+                                <p class="text-[10px] text-blue-600 font-semibold uppercase">Delivered</p>
+                            </div>
+                        </div>
+
+                        {{-- Labels table --}}
+                        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                            <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                                <h3 class="text-sm font-bold text-slate-900">Package Labels</h3>
+                                <button @@click="loadCustody()" class="text-[10px] font-semibold text-slate-500 hover:text-slate-700">Refresh</button>
+                            </div>
+
+                            <template x-if="custody.labels.length === 0">
+                                <div class="px-4 py-12 text-center text-slate-400">
+                                    <p class="text-sm font-medium">No labels generated yet</p>
+                                    <p class="text-xs mt-1">Print labels from the Receiving tab first</p>
+                                </div>
+                            </template>
+
+                            <div class="divide-y divide-slate-100" x-show="custody.labels.length > 0">
+                                <template x-for="label in custody.labels" :key="label.id">
+                                    <div class="px-4 py-3 flex items-center gap-4 hover:bg-slate-50/50">
+                                        {{-- Barcode --}}
+                                        <div class="w-40 flex-shrink-0">
+                                            <p class="text-xs font-mono font-bold text-slate-900" x-text="label.barcode"></p>
+                                            <p class="text-[10px] text-slate-400" x-show="label.labels_total > 1" x-text="'Label ' + label.label_index + ' of ' + label.labels_total"></p>
+                                        </div>
+                                        {{-- Description --}}
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-xs font-semibold text-slate-700 truncate" x-text="label.description || 'No description'"></p>
+                                            <p class="text-[10px] text-slate-400 truncate" x-text="label.recipient_name ? ('→ ' + label.recipient_name + (label.delivery_town ? ', ' + label.delivery_town : '')) : 'No destination set'"></p>
+                                        </div>
+                                        {{-- Driver / Status --}}
+                                        <div class="flex-shrink-0 text-right">
+                                            <template x-if="label.current_driver">
+                                                <div>
+                                                    <p class="text-xs font-semibold text-emerald-700" x-text="label.current_driver.name"></p>
+                                                    <p class="text-[10px] text-slate-400" x-text="label.claimed_at"></p>
+                                                </div>
+                                            </template>
+                                            <template x-if="!label.current_driver && label.status === 'delivered'">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">Delivered</span>
+                                            </template>
+                                            <template x-if="!label.current_driver && label.status !== 'delivered'">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">At Warehouse</span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
 
                 {{-- Finalize Confirm Modal --}}
                 <div x-show="finalizeConfirmOpen" x-transition.opacity class="fixed inset-0 z-[190] flex items-center justify-center bg-black/50 p-4" style="display:none">

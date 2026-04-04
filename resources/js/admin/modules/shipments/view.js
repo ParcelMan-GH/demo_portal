@@ -18,6 +18,10 @@ function shipmentShow() {
         // Duplicate
         duplicating: false,
 
+        // Custody
+        custodyLoaded: false,
+        custody: { loading: false, labels: [] },
+
         // Receiving
         receivingLoaded: false,
         receivingLightbox: null,
@@ -334,6 +338,21 @@ function shipmentShow() {
                 alert('An error occurred.');
             }
             this.duplicating = false;
+        },
+
+        async loadCustody() {
+            this.custody.loading = true;
+            this.custodyLoaded = true;
+            try {
+                const response = await fetch(this.config.custodyDataEndpoint, {
+                    headers: { 'Accept': 'application/json' },
+                });
+                const result = await response.json();
+                if (result.success) {
+                    this.custody.labels = result.data.labels || [];
+                }
+            } catch (e) { console.error('Failed to load custody data', e); }
+            this.custody.loading = false;
         },
 
         async loadReceiving() {
