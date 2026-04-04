@@ -143,12 +143,6 @@ class DriverPackageController extends Controller
             ->whereHas('run', fn ($q) => $q->whereNotIn('status', ['completed', 'cancelled']))
             ->pluck('shipment_item_id');
 
-        // Check if driver has an active run
-        $activeRun = \App\Models\DeliveryRun::query()
-            ->where('assigned_driver_id', $driver->id)
-            ->whereNotIn('status', ['completed', 'cancelled'])
-            ->latest()
-            ->first();
 
         $packages = $labels->map(function ($label) use ($claimedAtMap, $activeRunItemIds) {
             $data = $this->transformLabel($label);
@@ -168,11 +162,6 @@ class DriverPackageController extends Controller
                 'limit' => $limit,
                 'offset' => $offset,
                 'has_more' => ($offset + $limit) < $total,
-                'active_delivery_run' => $activeRun ? [
-                    'id' => $activeRun->id,
-                    'run_number' => $activeRun->run_number,
-                    'status' => $activeRun->status,
-                ] : null,
             ],
         ]);
     }

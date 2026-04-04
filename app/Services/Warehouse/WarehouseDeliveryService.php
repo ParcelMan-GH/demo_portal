@@ -125,27 +125,6 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Driver has no claimed packages.'];
         }
 
-        // Check if driver already has an active delivery run
-        $existingRun = DeliveryRun::query()
-            ->where('assigned_driver_id', $driver->id)
-            ->whereNotIn('status', [DeliveryRun::STATUS_COMPLETED, DeliveryRun::STATUS_CANCELLED])
-            ->latest()
-            ->first();
-
-        if ($existingRun) {
-            return [
-                'success' => true,
-                'message' => 'You already have an active delivery run.',
-                'data' => [
-                    'delivery_run_id' => $existingRun->id,
-                    'run_number' => $existingRun->run_number,
-                    'stops_count' => $existingRun->stops()->count(),
-                    'packages_count' => $existingRun->items()->count(),
-                    'existing' => true,
-                ],
-            ];
-        }
-
         $labels = WarehouseReceiptItemLabel::whereIn('id', $claimedLabelIds)
             ->with(['receiptItem.shipmentItem.shipment'])
             ->get();
