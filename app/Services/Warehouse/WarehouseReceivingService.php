@@ -675,7 +675,7 @@ class WarehouseReceivingService
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Arial, sans-serif; padding: 10px; background: #fff; }
 .label {
-    width: 4in; height: 5.8in; margin: 0 auto 10px; border: 1.5px solid #333; border-radius: 4px;
+    width: 4in; margin: 0 auto 10px; border: 1.5px solid #333; border-radius: 4px;
     background: #fff; padding: 0; overflow: hidden;
 }
 .label-header {
