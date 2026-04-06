@@ -31,23 +31,23 @@
          x-transition:leave-end="opacity-0"
          class="fixed inset-0 z-50 overflow-y-auto"
          style="display: none;">
-        <div class="flex min-h-screen items-start justify-center p-4 pt-16">
+        <div class="fixed inset-0">
             {{-- Backdrop --}}
             <div @@click="quickActionsOpen = false" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
 
-            {{-- Modal --}}
+            {{-- Fullscreen Modal --}}
             <div x-show="quickActionsOpen"
                  x-transition:enter="transition ease-out duration-200 delay-75"
-                 x-transition:enter-start="opacity-0 scale-95 translate-y-4"
-                 x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-                 class="relative bg-gradient-to-br from-white to-orange-50/30 rounded-3xl shadow-2xl max-w-5xl w-full overflow-hidden border border-orange-100">
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 class="relative flex flex-col h-full w-full bg-gradient-to-br from-white to-orange-50/30">
 
                 {{-- Modal Header --}}
-                <div class="relative px-8 py-6 bg-gradient-to-r from-orange-500 to-orange-600 text-white overflow-hidden">
+                <div class="relative px-8 py-6 bg-gradient-to-r from-orange-500 to-orange-600 text-white overflow-hidden flex-shrink-0">
                     <div class="absolute -right-6 -top-6 w-40 h-40 opacity-20">
                         <img src="{{ asset('images/undraw/quick-action.svg') }}" class="w-full h-full object-contain" alt="" onerror="this.style.display='none'">
                     </div>
-                    <div class="relative flex items-center justify-between">
+                    <div class="relative flex items-center justify-between max-w-[1400px] mx-auto">
                         <div>
                             <h2 class="text-2xl font-bold">Quick Actions</h2>
                             <p class="text-sm text-orange-100 mt-1">What do you want to do?</p>
@@ -59,7 +59,8 @@
                 </div>
 
                 {{-- Modal Body --}}
-                <div class="p-8 max-h-[calc(100vh-200px)] overflow-y-auto">
+                <div class="flex-1 overflow-y-auto p-8">
+                <div class="max-w-[1400px] mx-auto">
 
                     {{-- RECEIVING --}}
                     <div class="mb-8">
@@ -145,6 +146,7 @@
                         </div>
                     </div>
 
+                </div>
                 </div>
             </div>
         </div>
