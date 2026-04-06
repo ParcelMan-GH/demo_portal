@@ -3,16 +3,150 @@
 @section('title', 'Dashboard')
 
 @section('content')
-<div class="max-w-[1400px] mx-auto">
+<div class="max-w-[1400px] mx-auto" x-data="{ quickActionsOpen: false }">
 
     {{-- Header --}}
-    <div class="flex items-end justify-between mb-8">
+    <div class="flex items-end justify-between mb-8 gap-4">
         <div>
             <h1 class="text-2xl font-bold text-slate-900">
                 @php $hour = now()->hour; @endphp
                 {{ $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good evening') }}, {{ $admin->name }}
             </h1>
             <p class="text-sm text-slate-500 mt-1">{{ now()->format('l, F j, Y') }}</p>
+        </div>
+        <button type="button" @@click="quickActionsOpen = true"
+            class="group relative inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold text-sm shadow-lg shadow-orange-500/30 hover:shadow-xl hover:shadow-orange-500/40 hover:-translate-y-0.5 transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <span>Quick Actions</span>
+        </button>
+    </div>
+
+    {{-- ═══ QUICK ACTIONS MODAL ═══ --}}
+    <div x-show="quickActionsOpen" x-cloak
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-50 overflow-y-auto"
+         style="display: none;">
+        <div class="flex min-h-screen items-start justify-center p-4 pt-16">
+            {{-- Backdrop --}}
+            <div @@click="quickActionsOpen = false" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
+
+            {{-- Modal --}}
+            <div x-show="quickActionsOpen"
+                 x-transition:enter="transition ease-out duration-200 delay-75"
+                 x-transition:enter-start="opacity-0 scale-95 translate-y-4"
+                 x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                 class="relative bg-gradient-to-br from-white to-orange-50/30 rounded-3xl shadow-2xl max-w-5xl w-full overflow-hidden border border-orange-100">
+
+                {{-- Modal Header --}}
+                <div class="relative px-8 py-6 bg-gradient-to-r from-orange-500 to-orange-600 text-white overflow-hidden">
+                    <div class="absolute -right-6 -top-6 w-40 h-40 opacity-20">
+                        <img src="{{ asset('images/undraw/quick-action.svg') }}" class="w-full h-full object-contain" alt="" onerror="this.style.display='none'">
+                    </div>
+                    <div class="relative flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold">Quick Actions</h2>
+                            <p class="text-sm text-orange-100 mt-1">What do you want to do?</p>
+                        </div>
+                        <button type="button" @@click="quickActionsOpen = false" class="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Modal Body --}}
+                <div class="p-8 max-h-[calc(100vh-200px)] overflow-y-auto">
+
+                    {{-- RECEIVING --}}
+                    <div class="mb-8">
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="text-xs font-bold text-orange-600 uppercase tracking-wider">Receiving</span>
+                            <div class="flex-1 h-px bg-gradient-to-r from-orange-200 to-transparent"></div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            @php
+                                $receiving = [
+                                    ['title' => 'New Parcel', 'desc' => 'Create shipment', 'img' => 'new-parcel.svg', 'route' => route('admin.shipments.create')],
+                                    ['title' => 'Receive Packages', 'desc' => 'In pickup queue', 'img' => 'receive-package.svg', 'route' => route('admin.pickups.index')],
+                                    ['title' => 'Package Tracking', 'desc' => 'Custody history', 'img' => 'print-labels.svg', 'route' => route('admin.package-tracking.index')],
+                                    ['title' => 'Mark Picked Up', 'desc' => 'Pickup list', 'img' => 'pickup-confirm.svg', 'route' => route('admin.pickups.index')],
+                                ];
+                            @endphp
+                            @foreach($receiving as $action)
+                                @include('admin.dashboard.partials.quick-action-tile', $action)
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- DISPATCH --}}
+                    <div class="mb-8">
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="text-xs font-bold text-orange-600 uppercase tracking-wider">Dispatch</span>
+                            <div class="flex-1 h-px bg-gradient-to-r from-orange-200 to-transparent"></div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            @php
+                                $dispatch = [
+                                    ['title' => 'Assign Pickup Driver', 'desc' => 'Pickup assignments', 'img' => 'assign-driver.svg', 'route' => route('admin.pickups.index')],
+                                    ['title' => 'Sort Batch', 'desc' => 'Sort parcels', 'img' => 'sort-batch.svg', 'route' => route('admin.sort-batches.index')],
+                                    ['title' => 'Delivery Run', 'desc' => 'Outbound runs', 'img' => 'delivery-run.svg', 'route' => route('admin.delivery-runs.index')],
+                                    ['title' => 'Transport Manifest', 'desc' => 'Inter-warehouse', 'img' => 'transport-manifest.svg', 'route' => route('admin.transport-manifests.index')],
+                                ];
+                            @endphp
+                            @foreach($dispatch as $action)
+                                @include('admin.dashboard.partials.quick-action-tile', $action)
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- FINANCE --}}
+                    <div class="mb-8">
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="text-xs font-bold text-orange-600 uppercase tracking-wider">Finance</span>
+                            <div class="flex-1 h-px bg-gradient-to-r from-orange-200 to-transparent"></div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            @php
+                                $finance = [
+                                    ['title' => 'All Invoices', 'desc' => 'Invoice list', 'img' => 'create-invoice.svg', 'route' => route('admin.invoices.index')],
+                                    ['title' => 'Record Payment', 'desc' => 'Per shipment', 'img' => 'record-payment.svg', 'route' => route('admin.shipments.index')],
+                                    ['title' => 'Pending Invoices', 'desc' => 'Awaiting response', 'img' => 'pending-invoices.svg', 'route' => route('admin.invoices.index') . '?status=sent'],
+                                    ['title' => 'Accepted Invoices', 'desc' => 'Paid / confirmed', 'img' => 'create-invoice.svg', 'route' => route('admin.invoices.index') . '?status=accepted'],
+                                ];
+                            @endphp
+                            @foreach($finance as $action)
+                                @include('admin.dashboard.partials.quick-action-tile', $action)
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- OPERATIONS --}}
+                    <div class="mb-2">
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="text-xs font-bold text-orange-600 uppercase tracking-wider">Operations</span>
+                            <div class="flex-1 h-px bg-gradient-to-r from-orange-200 to-transparent"></div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            @php
+                                $operations = [
+                                    ['title' => 'Package Tracking', 'desc' => 'Custody history', 'img' => 'package-tracking.svg', 'route' => route('admin.package-tracking.index')],
+                                    ['title' => 'Collection Center', 'desc' => 'Self-pickup', 'img' => 'collection-center.svg', 'route' => route('admin.collection-center.index')],
+                                    ['title' => 'Active Deliveries', 'desc' => 'On the road', 'img' => 'active-deliveries.svg', 'route' => route('admin.delivery-runs.index')],
+                                    ['title' => 'Send Broadcast', 'desc' => 'Push notification', 'img' => 'send-broadcast.svg', 'route' => route('admin.marketing.index')],
+                                ];
+                            @endphp
+                            @foreach($operations as $action)
+                                @include('admin.dashboard.partials.quick-action-tile', $action)
+                            @endforeach
+                        </div>
+                    </div>
+
+                </div>
+            </div>
         </div>
     </div>
 

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160" fill="none">
+  <ellipse cx="100" cy="150" rx="75" ry="5" fill="#fed7aa" opacity="0.5"/>
+  <rect x="25" y="90" width="45" height="50" rx="3" fill="#fff7ed" stroke="#ea580c" stroke-width="3"/>
+  <rect x="77" y="70" width="45" height="70" rx="3" fill="#fed7aa" stroke="#ea580c" stroke-width="3"/>
+  <rect x="130" y="95" width="45" height="45" rx="3" fill="#fff7ed" stroke="#ea580c" stroke-width="3"/>
+  <line x1="25" y1="110" x2="70" y2="110" stroke="#ea580c" stroke-width="2"/>
+  <line x1="77" y1="95" x2="122" y2="95" stroke="#ea580c" stroke-width="2"/>
+  <line x1="130" y1="115" x2="175" y2="115" stroke="#ea580c" stroke-width="2"/>
+  <circle cx="47" cy="50" r="8" fill="#f97316"/>
+  <circle cx="99" cy="35" r="10" fill="#ea580c"/>
+  <circle cx="152" cy="55" r="7" fill="#fdba74"/>
+  <path d="M47 58 L47 85" stroke="#ea580c" stroke-width="2" stroke-dasharray="2 2"/>
+  <path d="M99 45 L99 65" stroke="#ea580c" stroke-width="2" stroke-dasharray="2 2"/>
+  <path d="M152 62 L152 90" stroke="#ea580c" stroke-width="2" stroke-dasharray="2 2"/>
+</svg>
