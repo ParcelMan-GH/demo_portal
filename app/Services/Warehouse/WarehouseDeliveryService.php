@@ -241,6 +241,12 @@ class WarehouseDeliveryService
                 $stopsCount++;
             }
 
+            // Update shipment statuses to out_for_delivery
+            $shipmentIds = $shipmentItems->pluck('shipment_id')->unique();
+            Shipment::whereIn('id', $shipmentIds)
+                ->whereNotIn('status', ['out_for_delivery', 'delivered', 'cancelled'])
+                ->update(['status' => ShipmentStatus::OUT_FOR_DELIVERY]);
+
             return [
                 'success' => true,
                 'message' => 'Delivery run created with ' . $stopsCount . ' stop(s).',
