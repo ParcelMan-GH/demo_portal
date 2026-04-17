@@ -317,6 +317,23 @@ class AdminDeliveryRunController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
+    public function updateStopDeliveryMethod(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $validated = $request->validate([
+            'delivery_method' => ['required', 'string', 'in:direct,bus_handoff'],
+        ]);
+
+        if ($stop->delivery_run_id !== $run->id) {
+            return response()->json(['success' => false, 'message' => 'Stop not found.'], 404);
+        }
+
+        $stop->update(['delivery_method' => $validated['delivery_method']]);
+
+        return response()->json(['success' => true, 'message' => 'Delivery method updated.', 'delivery_method' => $stop->delivery_method]);
+    }
+
     private function authorizePermission(string $permission): void
     {
         $user = Auth::guard('admin')->user();

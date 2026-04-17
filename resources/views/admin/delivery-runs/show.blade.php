@@ -373,6 +373,28 @@ $itemStatusColors = [
                                         <span class="w-1.5 h-1.5 rounded-full {{ $stopDotClass }}"></span>
                                         {{ $stopStatusLabel }}
                                     </span>
+                                    {{-- Delivery Method Badge + Toggle --}}
+                                    <div x-data="{ method: '{{ $stop->delivery_method ?? 'direct' }}', changing: false }" class="inline-flex">
+                                        <button @@click="
+                                            if (changing) return;
+                                            const newMethod = method === 'direct' ? 'bus_handoff' : 'direct';
+                                            changing = true;
+                                            fetch('{{ route('admin.delivery-runs.stops.update-delivery-method', ['run' => $run->id, 'stop' => $stop->id]) }}', {
+                                                method: 'PATCH',
+                                                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' },
+                                                body: JSON.stringify({ delivery_method: newMethod })
+                                            }).then(r => r.json()).then(j => {
+                                                if (j.success) { method = newMethod; window.showToast?.(j.message, 'success'); }
+                                                else window.showToast?.(j.message || 'Failed', 'error');
+                                            }).catch(() => window.showToast?.('Error', 'error')).finally(() => changing = false);
+                                        "
+                                        :class="method === 'bus_handoff' ? 'bg-violet-50 text-violet-700 ring-violet-200' : 'bg-slate-50 text-slate-500 ring-slate-200'"
+                                        class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 cursor-pointer hover:opacity-80 transition-all"
+                                        :title="method === 'bus_handoff' ? 'Click to change to Direct Delivery' : 'Click to change to Bus Handoff'">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                            <span x-text="method === 'bus_handoff' ? 'Bus Handoff' : 'Direct'"></span>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                                     @if($stop->recipient_phone)

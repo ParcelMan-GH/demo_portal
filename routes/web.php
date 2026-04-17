@@ -334,6 +334,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('delivery-runs/{run}/assign-driver', [AdminDeliveryRunController::class, 'assignDriver'])->name('delivery-runs.assign-driver');
         Route::post('delivery-runs/{run}/dispatch', [AdminDeliveryRunController::class, 'dispatch'])->name('delivery-runs.dispatch');
         Route::post('delivery-runs/{run}/stops/{stop}/resend-code', [AdminDeliveryRunController::class, 'resendCode'])->name('delivery-runs.stops.resend-code');
+        Route::patch('delivery-runs/{run}/stops/{stop}/delivery-method', [AdminDeliveryRunController::class, 'updateStopDeliveryMethod'])->name('delivery-runs.stops.update-delivery-method');
         Route::get('delivery-runs/{run}', [AdminDeliveryRunController::class, 'show'])->name('delivery-runs.show');
 
         // Transport Manifests (admin read + action capabilities)
