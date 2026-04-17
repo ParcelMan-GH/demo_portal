@@ -5,8 +5,82 @@
 @section('breadcrumb-current', 'Vendor Payouts')
 
 @section('content')
+
 <div
-    x-data="vendorPayoutsComponent()"
+    x-data="{
+        config: {},
+        vendors: [],
+        meta: {},
+        stats: {},
+        loading: false,
+        search: '',
+        page: 1,
+        createModalOpen: false,
+        selectedVendor: null,
+        submitting: false,
+        payoutForm: { amount: '', payment_method: 'momo', payment_phone: '', notes: '' },
+        historyModalOpen: false,
+        historyVendor: null,
+        historyLoading: false,
+        payoutHistory: [],
+        markSentModalOpen: false,
+        markSentPayout: null,
+        markSentReference: '',
+
+        init() {
+            this.config = JSON.parse(this.$el.getAttribute('data-payout-config'));
+            this.loadData();
+        },
+        csrfToken() { return document.querySelector('meta[name=csrf-token]').content; },
+        async loadData() {
+            this.loading = true;
+            try {
+                const params = new URLSearchParams({ page: this.page, search: this.search });
+                const resp = await fetch(this.config.dataUrl + '?' + params.toString());
+                const json = await resp.json();
+                this.vendors = json.data || [];
+                this.meta = json.meta || {};
+                if (json.stats) this.stats = json.stats;
+            } catch (e) { console.error(e); }
+            this.loading = false;
+        },
+        openCreate(vendor) { this.selectedVendor = vendor; this.payoutForm = { amount: vendor.available_balance, payment_method: 'momo', payment_phone: vendor.phone, notes: '' }; this.createModalOpen = true; },
+        async submitPayout() {
+            this.submitting = true;
+            try {
+                const url = this.config.createPayoutUrl.replace('__VENDOR__', this.selectedVendor.id);
+                const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken(), 'Accept': 'application/json' }, body: JSON.stringify(this.payoutForm) });
+                const j = await r.json();
+                if (j.success) { window.showToast?.(j.message, 'success'); this.createModalOpen = false; this.loadData(); }
+                else window.showToast?.(j.message || 'Failed', 'error');
+            } catch (e) { window.showToast?.('Error', 'error'); }
+            this.submitting = false;
+        },
+        async openHistory(vendor) { this.historyVendor = vendor; this.historyModalOpen = true; this.historyLoading = true; this.payoutHistory = [];
+            try { const url = this.config.vendorPayoutsUrl.replace('__VENDOR__', vendor.id); const r = await fetch(url); const j = await r.json(); this.payoutHistory = j.data || []; } catch (e) {} this.historyLoading = false; },
+        promptMarkSent(payout) { this.markSentPayout = payout; this.markSentReference = ''; this.markSentModalOpen = true; },
+        async submitMarkSent() {
+            if (!this.markSentReference.trim()) { window.showToast?.('Reference required', 'error'); return; }
+            this.submitting = true;
+            try {
+                const url = this.config.markSentUrl.replace('__PAYOUT__', this.markSentPayout.id);
+                const r = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken(), 'Accept': 'application/json' }, body: JSON.stringify({ payment_reference: this.markSentReference.trim() }) });
+                const j = await r.json();
+                if (j.success) { window.showToast?.(j.message, 'success'); this.markSentModalOpen = false; this.openHistory(this.historyVendor); this.loadData(); }
+                else window.showToast?.(j.message || 'Failed', 'error');
+            } catch (e) { window.showToast?.('Error', 'error'); }
+            this.submitting = false;
+        },
+        async confirmPayout(payout) {
+            try {
+                const url = this.config.confirmUrl.replace('__PAYOUT__', payout.id);
+                const r = await fetch(url, { method: 'PATCH', headers: { 'X-CSRF-TOKEN': this.csrfToken(), 'Accept': 'application/json' } });
+                const j = await r.json();
+                if (j.success) { window.showToast?.(j.message, 'success'); this.openHistory(this.historyVendor); this.loadData(); }
+                else window.showToast?.(j.message || 'Failed', 'error');
+            } catch (e) { window.showToast?.('Error', 'error'); }
+        },
+    }"
     x-init="init()"
     data-payout-config='@json($payoutConfig)'
     class="space-y-6"
@@ -425,9 +499,10 @@
         </div>
 </div>
 
-@push('head-scripts')
+@push('scripts')
 <script>
-window.vendorPayoutsComponent = () => ({
+// Component logic is inline in x-data attribute
+
         config: {},
         vendors: [],
         meta: {},
@@ -617,7 +692,6 @@ window.vendorPayoutsComponent = () => ({
                 this.submitting = false;
             }
         },
-});
 </script>
 @endpush
 @endsection
