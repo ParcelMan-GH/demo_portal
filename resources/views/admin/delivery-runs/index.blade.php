@@ -6,13 +6,16 @@
 
 @section('content')
 
-<div class="space-y-6" x-data="deliveryRunsTable" data-delivery-runs-config='@json([
-    "endpoint" => route("admin.delivery-runs.data"),
-    "exportEndpoint" => route("admin.delivery-runs.export"),
-    "storeUrl" => route("admin.delivery-runs.store"),
-    "storeFromItemsUrl" => route("admin.delivery-runs.store-from-items"),
-    "warehousesUrl" => route("admin.assignments.available-warehouses"),
-])'>
+@php
+$drConfig = [
+    'endpoint' => route('admin.delivery-runs.data'),
+    'exportEndpoint' => route('admin.delivery-runs.export'),
+    'storeUrl' => route('admin.delivery-runs.store'),
+    'storeFromItemsUrl' => route('admin.delivery-runs.store-from-items'),
+    'warehousesUrl' => route('admin.assignments.available-warehouses'),
+];
+@endphp
+<div class="space-y-6" x-data="deliveryRunsTable" data-delivery-runs-config='@json($drConfig)'>
     <!-- Delivery Runs Datatable -->
     <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">
         <!-- Card Header -->
