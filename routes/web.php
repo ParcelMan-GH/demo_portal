@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\ShipmentController;
 use App\Http\Controllers\Admin\ShipmentPaymentController;
 use App\Http\Controllers\Admin\AdminMarketingController;
 use App\Http\Controllers\Admin\VendorController;
+use App\Http\Controllers\Admin\BusStationController;
 use App\Http\Controllers\Admin\VendorPayoutController;
 use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
@@ -314,6 +315,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::put('locations/towns/{town}', [AdminLocationController::class, 'updateTown'])->name('locations.towns.update');
         Route::patch('locations/towns/{town}/toggle', [AdminLocationController::class, 'toggleTown'])->name('locations.towns.toggle');
         Route::delete('locations/towns/{town}', [AdminLocationController::class, 'destroyTown'])->name('locations.towns.destroy');
+
+        // Bus Stations
+        Route::get('bus-stations', [BusStationController::class, 'index'])->name('bus-stations.index');
+        Route::get('bus-stations-data', [BusStationController::class, 'data'])->name('bus-stations.data');
+        Route::get('bus-stations-list', [BusStationController::class, 'list'])->name('bus-stations.list');
+        Route::post('bus-stations', [BusStationController::class, 'store'])->name('bus-stations.store');
+        Route::put('bus-stations/{busStation}', [BusStationController::class, 'update'])->name('bus-stations.update');
+        Route::patch('bus-stations/{busStation}/toggle', [BusStationController::class, 'toggleActive'])->name('bus-stations.toggle');
+        Route::delete('bus-stations/{busStation}', [BusStationController::class, 'destroy'])->name('bus-stations.destroy');
 
         // Delivery Runs (admin read visibility)
         Route::get('delivery-runs', [AdminDeliveryRunController::class, 'index'])->name('delivery-runs.index');

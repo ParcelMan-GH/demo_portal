@@ -4,20 +4,17 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\InvoiceStatus;
 use App\Enums\PickupAssignmentStatus;
+use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentStatus;
 use App\Exports\ShipmentsExport;
+use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
-use App\Enums\FulfillmentType;
-use App\Enums\ShipmentDestinationMode;
-use App\Models\District;
 use App\Models\Location;
 use App\Models\Region;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemImage;
 use App\Models\Warehouse;
-use App\Models\PickupAssignment;
-use App\Models\WarehouseReceipt;
 use App\Services\StorageService;
 use App\Services\WalkinShipmentService;
 use App\Services\Warehouse\WarehouseReceivingService;
@@ -160,7 +157,7 @@ class ShipmentController extends Controller
         }
 
         $currentInvoice = $shipment->invoice;
-        if (!$currentInvoice) {
+        if (! $currentInvoice) {
             $currentInvoice = $shipment->invoices
                 ->first(fn ($invoice) => $invoice->status->isActive())
                 ?? $shipment->invoices->first();
@@ -264,7 +261,7 @@ class ShipmentController extends Controller
                     ])->filter()->implode(', '));
                 } elseif ($item->delivery_latitude && $item->delivery_longitude) {
                     $deliveryLocationTitle = 'GPS Coordinates';
-                    $deliveryLocationSubtitle = $item->delivery_latitude . ', ' . $item->delivery_longitude;
+                    $deliveryLocationSubtitle = $item->delivery_latitude.', '.$item->delivery_longitude;
                 } elseif ($item->delivery_gh_post_address) {
                     $deliveryLocationTitle = 'Ghana Post';
                     $deliveryLocationSubtitle = $item->delivery_gh_post_address;
@@ -366,7 +363,7 @@ class ShipmentController extends Controller
         foreach ($shipment->pickupAssignments->sortBy('id') as $assignment) {
             if ($assignment->assigned_at) {
                 $ts = $assignment->assigned_at->format('Y-m-d H:i:s');
-                $label = 'Pickup Driver Assigned: ' . ($assignment->driver?->name ?? 'Unknown');
+                $label = 'Pickup Driver Assigned: '.($assignment->driver?->name ?? 'Unknown');
                 $timeline[] = ['status' => 'pickup_assigned', 'label' => $label, 'status_label' => 'Driver Assigned', 'timestamp' => $ts, 'created_at' => $ts];
             }
             if ($assignment->en_route_at) {
@@ -392,16 +389,16 @@ class ShipmentController extends Controller
                 $timeline[] = [
                     'status' => 'at_warehouse', 'label' => 'Received at Warehouse', 'status_label' => 'At Warehouse',
                     'timestamp' => $ts, 'created_at' => $ts, 'location' => $location,
-                    'description' => $assignment->receive_notes ? 'Notes: ' . $assignment->receive_notes : null,
+                    'description' => $assignment->receive_notes ? 'Notes: '.$assignment->receive_notes : null,
                 ];
             }
         }
 
         // --- Sort batch, manifest, delivery run events ---
         $allSortBatches = $shipment->items
-            ->flatMap(fn($item) => $item->sortBatchItems)
-            ->filter(fn($sbi) => is_null($sbi->removed_at))
-            ->map(fn($sbi) => $sbi->sortBatch)
+            ->flatMap(fn ($item) => $item->sortBatchItems)
+            ->filter(fn ($sbi) => is_null($sbi->removed_at))
+            ->map(fn ($sbi) => $sbi->sortBatch)
             ->filter()
             ->unique('id');
 
@@ -411,27 +408,27 @@ class ShipmentController extends Controller
                 $modeLabel = $batch->dispatch_mode === 'transfer' ? 'Inter-warehouse Transfer' : 'Local Delivery';
                 $timeline[] = [
                     'status' => 'sorted',
-                    'label' => 'Sorted — Batch ' . $batch->batch_number,
+                    'label' => 'Sorted — Batch '.$batch->batch_number,
                     'status_label' => 'Sorted',
                     'timestamp' => $ts, 'created_at' => $ts,
                     'location' => $batch->originWarehouse?->name,
-                    'description' => 'Dispatch mode: ' . $modeLabel,
+                    'description' => 'Dispatch mode: '.$modeLabel,
                     'meta' => ['batch_id' => $batch->id, 'batch_number' => $batch->batch_number],
                 ];
             }
         }
 
-        $allManifests = $allSortBatches->map(fn($b) => $b->transportManifest)->filter()->unique('id');
+        $allManifests = $allSortBatches->map(fn ($b) => $b->transportManifest)->filter()->unique('id');
         foreach ($allManifests as $manifest) {
             if ($manifest->dispatched_at) {
                 $ts = $manifest->dispatched_at->format('Y-m-d H:i:s');
                 $timeline[] = [
                     'status' => 'in_transit',
-                    'label' => 'In Transit — Manifest ' . $manifest->manifest_number,
+                    'label' => 'In Transit — Manifest '.$manifest->manifest_number,
                     'status_label' => 'In Transit',
                     'timestamp' => $ts, 'created_at' => $ts,
-                    'location' => ($manifest->originWarehouse?->name ?? '?') . ' → ' . ($manifest->destinationWarehouse?->name ?? '?'),
-                    'description' => 'Driver: ' . ($manifest->assignedDriver?->name ?? 'Unknown'),
+                    'location' => ($manifest->originWarehouse?->name ?? '?').' → '.($manifest->destinationWarehouse?->name ?? '?'),
+                    'description' => 'Driver: '.($manifest->assignedDriver?->name ?? 'Unknown'),
                     'meta' => ['manifest_id' => $manifest->id, 'manifest_number' => $manifest->manifest_number],
                 ];
             }
@@ -439,7 +436,7 @@ class ShipmentController extends Controller
                 $ts = $manifest->arrived_at->format('Y-m-d H:i:s');
                 $timeline[] = [
                     'status' => 'at_destination',
-                    'label' => 'Arrived at Destination — Manifest ' . $manifest->manifest_number,
+                    'label' => 'Arrived at Destination — Manifest '.$manifest->manifest_number,
                     'status_label' => 'At Destination',
                     'timestamp' => $ts, 'created_at' => $ts,
                     'location' => $manifest->destinationWarehouse?->name,
@@ -459,17 +456,17 @@ class ShipmentController extends Controller
             }
         }
 
-        $allDeliveryRuns = $allSortBatches->map(fn($b) => $b->deliveryRun)->filter()->unique('id');
+        $allDeliveryRuns = $allSortBatches->map(fn ($b) => $b->deliveryRun)->filter()->unique('id');
         foreach ($allDeliveryRuns as $run) {
             if ($run->dispatched_at) {
                 $ts = $run->dispatched_at->format('Y-m-d H:i:s');
                 $timeline[] = [
                     'status' => 'out_for_delivery',
-                    'label' => 'Out for Delivery — Run ' . $run->run_number,
+                    'label' => 'Out for Delivery — Run '.$run->run_number,
                     'status_label' => 'Out for Delivery',
                     'timestamp' => $ts, 'created_at' => $ts,
                     'location' => $run->warehouse?->name,
-                    'description' => 'Driver: ' . ($run->assignedDriver?->name ?? 'Unknown'),
+                    'description' => 'Driver: '.($run->assignedDriver?->name ?? 'Unknown'),
                     'meta' => ['run_id' => $run->id, 'run_number' => $run->run_number],
                 ];
             }
@@ -477,7 +474,7 @@ class ShipmentController extends Controller
                 $ts = $run->completed_at->format('Y-m-d H:i:s');
                 $timeline[] = [
                     'status' => 'delivered',
-                    'label' => 'Delivery Run Completed — Run ' . $run->run_number,
+                    'label' => 'Delivery Run Completed — Run '.$run->run_number,
                     'status_label' => 'Delivered',
                     'timestamp' => $ts, 'created_at' => $ts,
                     'meta' => ['run_id' => $run->id, 'run_number' => $run->run_number],
@@ -485,7 +482,7 @@ class ShipmentController extends Controller
             }
         }
 
-        usort($timeline, fn($a, $b) => strcmp((string) $a['created_at'], (string) $b['created_at']));
+        usort($timeline, fn ($a, $b) => strcmp((string) $a['created_at'], (string) $b['created_at']));
 
         // --- Per-item journey data ---
         $itemsData = $shipment->items->map(function ($item) {
@@ -551,7 +548,7 @@ class ShipmentController extends Controller
                     'arrived_at' => $stop->arrived_at?->format('Y-m-d H:i:s'),
                     'delivered_at' => $stop->delivered_at?->format('Y-m-d H:i:s'),
                     'failure_reason' => $stop->failure_reason,
-                    'has_proof_photo' => !empty($stop->proof_photo_path),
+                    'has_proof_photo' => ! empty($stop->proof_photo_path),
                 ] : null,
 
                 'delivery_outcome' => $deliveryRunItem ? [
@@ -563,18 +560,18 @@ class ShipmentController extends Controller
                 ] : null,
 
                 'quantities' => [
-                    'vendor_declared'      => $item->quantity,
-                    'driver_expected'      => $item->pickupConfirmations->sum('expected_quantity') ?: null,
-                    'driver_confirmed'     => $item->pickupConfirmations->sum('confirmed_quantity') ?: null,
-                    'warehouse_expected'   => $item->warehouseReceiptItems->sum('expected_quantity') ?: null,
-                    'warehouse_received'   => $item->warehouseReceiptItems->sum('received_quantity') ?: null,
-                    'warehouse_damaged'    => $item->warehouseReceiptItems->sum('damaged_quantity') ?: null,
-                    'allocated'            => $activeSortBatchItem?->quantity_allocated,
-                    'manifest_expected'    => $item->transportManifestItems->sum('expected_quantity') ?: null,
-                    'manifest_loaded'      => $item->transportManifestItems->sum('loaded_quantity') ?: null,
-                    'manifest_received'    => $item->transportManifestItems->sum('received_quantity') ?: null,
-                    'delivery_expected'    => $deliveryRunItem?->expected_quantity,
-                    'delivery_actual'      => $deliveryRunItem?->delivered_quantity,
+                    'vendor_declared' => $item->quantity,
+                    'driver_expected' => $item->pickupConfirmations->sum('expected_quantity') ?: null,
+                    'driver_confirmed' => $item->pickupConfirmations->sum('confirmed_quantity') ?: null,
+                    'warehouse_expected' => $item->warehouseReceiptItems->sum('expected_quantity') ?: null,
+                    'warehouse_received' => $item->warehouseReceiptItems->sum('received_quantity') ?: null,
+                    'warehouse_damaged' => $item->warehouseReceiptItems->sum('damaged_quantity') ?: null,
+                    'allocated' => $activeSortBatchItem?->quantity_allocated,
+                    'manifest_expected' => $item->transportManifestItems->sum('expected_quantity') ?: null,
+                    'manifest_loaded' => $item->transportManifestItems->sum('loaded_quantity') ?: null,
+                    'manifest_received' => $item->transportManifestItems->sum('received_quantity') ?: null,
+                    'delivery_expected' => $deliveryRunItem?->expected_quantity,
+                    'delivery_actual' => $deliveryRunItem?->delivered_quantity,
                 ],
             ];
         })->values()->toArray();
@@ -634,11 +631,11 @@ class ShipmentController extends Controller
         $format = $request->input('format', 'json');
 
         if ($format === 'excel') {
-            return Excel::download(new ShipmentsExport($rows), 'shipments_' . date('Y-m-d_His') . '.xlsx');
+            return Excel::download(new ShipmentsExport($rows), 'shipments_'.date('Y-m-d_His').'.xlsx');
         }
 
         if ($format === 'pdf') {
-            $filename = 'shipments_' . date('Y-m-d_His') . '.pdf';
+            $filename = 'shipments_'.date('Y-m-d_His').'.pdf';
 
             return GenericPdfExporter::download($rows, $filename, 'Shipments List');
         }
@@ -660,39 +657,39 @@ class ShipmentController extends Controller
         $this->authorizePermission('shipments.create');
 
         $validated = $request->validate([
-            'vendor_id'                          => 'required|exists:vendors,id',
-            'warehouse_id'                       => 'required|exists:warehouses,id',
-            'fulfillment_type'                   => 'nullable|in:warehouse,self_pickup,direct',
-            'destination_mode'                   => 'required|in:single,per_item',
-            'items'                              => 'required|array|min:1',
-            'items.*.description'                => 'required|string|max:500',
-            'items.*.quantity'                    => 'required|integer|min:1',
+            'vendor_id' => 'required|exists:vendors,id',
+            'warehouse_id' => 'required|exists:warehouses,id',
+            'fulfillment_type' => 'nullable|in:warehouse,self_pickup,direct',
+            'destination_mode' => 'required|in:single,per_item',
+            'items' => 'required|array|min:1',
+            'items.*.description' => 'required|string|max:500',
+            'items.*.quantity' => 'required|integer|min:1',
             // Per-item delivery
-            'items.*.delivery.recipient_name'    => 'required_if:destination_mode,per_item|nullable|string|max:255',
-            'items.*.delivery.recipient_phone'   => 'required_if:destination_mode,per_item|nullable|string|max:20',
-            'items.*.delivery.region_id'         => 'required_if:destination_mode,per_item|nullable|integer',
-            'items.*.delivery.district_id'       => 'required_if:destination_mode,per_item|nullable|integer',
-            'items.*.delivery.town'              => 'nullable|string|max:255',
-            'items.*.delivery.landmark'          => 'nullable|string|max:255',
-            'items.*.delivery.instructions'      => 'nullable|string|max:1000',
+            'items.*.delivery.recipient_name' => 'required_if:destination_mode,per_item|nullable|string|max:255',
+            'items.*.delivery.recipient_phone' => 'required_if:destination_mode,per_item|nullable|string|max:20',
+            'items.*.delivery.region_id' => 'required_if:destination_mode,per_item|nullable|integer',
+            'items.*.delivery.district_id' => 'required_if:destination_mode,per_item|nullable|integer',
+            'items.*.delivery.town' => 'nullable|string|max:255',
+            'items.*.delivery.landmark' => 'nullable|string|max:255',
+            'items.*.delivery.instructions' => 'nullable|string|max:1000',
             // Single delivery
-            'delivery.recipient_name'            => 'required_if:destination_mode,single|nullable|string|max:255',
-            'delivery.recipient_phone'           => 'required_if:destination_mode,single|nullable|string|max:20',
-            'delivery.region_id'                 => 'required_if:destination_mode,single|nullable|integer',
-            'delivery.district_id'               => 'required_if:destination_mode,single|nullable|integer',
-            'delivery.town'                      => 'nullable|string|max:255',
-            'delivery.landmark'                  => 'nullable|string|max:255',
-            'delivery.instructions'              => 'nullable|string|max:1000',
+            'delivery.recipient_name' => 'required_if:destination_mode,single|nullable|string|max:255',
+            'delivery.recipient_phone' => 'required_if:destination_mode,single|nullable|string|max:20',
+            'delivery.region_id' => 'required_if:destination_mode,single|nullable|integer',
+            'delivery.district_id' => 'required_if:destination_mode,single|nullable|integer',
+            'delivery.town' => 'nullable|string|max:255',
+            'delivery.landmark' => 'nullable|string|max:255',
+            'delivery.instructions' => 'nullable|string|max:1000',
         ]);
 
-        $validated['source']             = 'admin_walkin';
+        $validated['source'] = 'admin_walkin';
         $validated['created_by_user_id'] = Auth::guard('admin')->id();
 
         $result = $service->createWalkinShipment($validated);
 
         return response()->json([
-            'success'  => true,
-            'message'  => 'Walk-in shipment created successfully.',
+            'success' => true,
+            'message' => 'Walk-in shipment created successfully.',
             'redirect' => route('admin.shipments.show', $result['shipment']->id),
         ]);
     }
@@ -706,14 +703,14 @@ class ShipmentController extends Controller
         $vendor = $service->lookupVendor($request->get('phone'));
 
         return response()->json([
-            'found'  => $vendor !== null,
+            'found' => $vendor !== null,
             'vendor' => $vendor ? [
-                'id'            => $vendor->id,
-                'name'          => $vendor->name,
+                'id' => $vendor->id,
+                'name' => $vendor->name,
                 'business_name' => $vendor->business_name,
-                'phone'         => $vendor->phone,
-                'email'         => $vendor->email,
-                'is_active'     => $vendor->is_active,
+                'phone' => $vendor->phone,
+                'email' => $vendor->email,
+                'is_active' => $vendor->is_active,
             ] : null,
         ]);
     }
@@ -723,23 +720,23 @@ class ShipmentController extends Controller
         $this->authorizePermission('shipments.create');
 
         $validated = $request->validate([
-            'name'          => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'business_name' => 'nullable|string|max:255',
-            'phone'         => 'required|string|min:9|unique:vendors,phone',
-            'email'         => 'nullable|email|unique:vendors,email',
+            'phone' => 'required|string|min:9|unique:vendors,phone',
+            'email' => 'nullable|email|unique:vendors,email',
         ]);
 
         $vendor = $service->createVendorInline($validated);
 
         return response()->json([
             'success' => true,
-            'vendor'  => [
-                'id'            => $vendor->id,
-                'name'          => $vendor->name,
+            'vendor' => [
+                'id' => $vendor->id,
+                'name' => $vendor->name,
                 'business_name' => $vendor->business_name,
-                'phone'         => $vendor->phone,
-                'email'         => $vendor->email,
-                'is_active'     => $vendor->is_active,
+                'phone' => $vendor->phone,
+                'email' => $vendor->email,
+                'is_active' => $vendor->is_active,
             ],
         ]);
     }
@@ -757,21 +754,21 @@ class ShipmentController extends Controller
         $locations = Location::where('is_active', true)
             ->with(['district:id,name', 'region:id,name'])
             ->where(function ($query) use ($q) {
-                $query->where('name', 'like', $q . '%')
-                      ->orWhere('name', 'like', '% ' . $q . '%');
+                $query->where('name', 'like', $q.'%')
+                    ->orWhere('name', 'like', '% '.$q.'%');
             })
-            ->orderByRaw("CASE WHEN name LIKE ? THEN 0 ELSE 1 END", [$q . '%'])
+            ->orderByRaw('CASE WHEN name LIKE ? THEN 0 ELSE 1 END', [$q.'%'])
             ->orderBy('name')
             ->limit(12)
             ->get();
 
         return response()->json([
             'locations' => $locations->map(fn ($l) => [
-                'id'       => $l->id,
-                'name'     => $l->name,
+                'id' => $l->id,
+                'name' => $l->name,
                 'district' => ['id' => $l->district->id, 'name' => $l->district->name],
-                'region'   => ['id' => $l->region->id, 'name' => $l->region->name],
-                'display'  => "{$l->name}, {$l->district->name}, {$l->region->name}",
+                'region' => ['id' => $l->region->id, 'name' => $l->region->name],
+                'display' => "{$l->name}, {$l->district->name}, {$l->region->name}",
             ]),
         ]);
     }
@@ -804,7 +801,7 @@ class ShipmentController extends Controller
 
     protected function authorizePermission(string $permission): void
     {
-        if (!Auth::guard('admin')->user()->hasPermission($permission)) {
+        if (! Auth::guard('admin')->user()->hasPermission($permission)) {
             abort(403, 'Unauthorized action.');
         }
     }
@@ -814,7 +811,7 @@ class ShipmentController extends Controller
         if ($shipment->isPerItemDestination()) {
             return [
                 'title' => 'Per-item recipients',
-                'subtitle' => $shipment->items_count . ' item(s)',
+                'subtitle' => $shipment->items_count.' item(s)',
             ];
         }
 
@@ -842,14 +839,14 @@ class ShipmentController extends Controller
 
             return [
                 'title' => $title,
-                'subtitle' => !empty($subtitleParts) ? implode(', ', $subtitleParts) : '-',
+                'subtitle' => ! empty($subtitleParts) ? implode(', ', $subtitleParts) : '-',
             ];
         }
 
         if ($shipment->delivery_latitude && $shipment->delivery_longitude) {
             return [
                 'title' => 'GPS Coordinates',
-                'subtitle' => $shipment->delivery_latitude . ', ' . $shipment->delivery_longitude,
+                'subtitle' => $shipment->delivery_latitude.', '.$shipment->delivery_longitude,
             ];
         }
 
@@ -1202,7 +1199,7 @@ class ShipmentController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => count($uploaded) . ' photo(s) uploaded.',
+            'message' => count($uploaded).' photo(s) uploaded.',
             'data' => ['photos' => $uploaded],
         ]);
     }
@@ -1319,12 +1316,12 @@ class ShipmentController extends Controller
 
         // Get all labels for this shipment's items via receipt items
         $assignment = $shipment->pickupAssignment;
-        if (!$assignment) {
+        if (! $assignment) {
             return response()->json(['success' => true, 'data' => ['labels' => []]]);
         }
 
         $receipt = $assignment->warehouseReceipt;
-        if (!$receipt) {
+        if (! $receipt) {
             return response()->json(['success' => true, 'data' => ['labels' => []]]);
         }
 
@@ -1373,7 +1370,7 @@ class ShipmentController extends Controller
         $this->authorizePermission('shipments.edit');
 
         $assignment = $shipment->pickupAssignment;
-        if (!$assignment) {
+        if (! $assignment) {
             return response()->json(['success' => false, 'message' => 'No pickup assignment found.'], 422);
         }
 
@@ -1384,9 +1381,15 @@ class ShipmentController extends Controller
         $now = now();
         $updates = ['status' => 'completed', 'completed_at' => $now];
 
-        if (!$assignment->en_route_at) $updates['en_route_at'] = $now;
-        if (!$assignment->arrived_at) $updates['arrived_at'] = $now;
-        if (!$assignment->picked_up_at) $updates['picked_up_at'] = $now;
+        if (! $assignment->en_route_at) {
+            $updates['en_route_at'] = $now;
+        }
+        if (! $assignment->arrived_at) {
+            $updates['arrived_at'] = $now;
+        }
+        if (! $assignment->picked_up_at) {
+            $updates['picked_up_at'] = $now;
+        }
 
         $assignment->update($updates);
 
@@ -1404,7 +1407,7 @@ class ShipmentController extends Controller
         $this->authorizePermission('shipments.view');
 
         $assignment = $shipment->pickupAssignment;
-        if (!$assignment) {
+        if (! $assignment) {
             return response()->json([
                 'success' => false,
                 'message' => 'No pickup assignment found for this shipment.',
@@ -1418,8 +1421,9 @@ class ShipmentController extends Controller
         $receivingService = app(WarehouseReceivingService::class);
         $storageService = app(StorageService::class);
         $receipt = $assignment->warehouseReceipt;
+        $usesShipmentDeliveryDetails = $shipment->destination_mode === ShipmentDestinationMode::SINGLE;
 
-        $packages = $shipment->items->map(function (ShipmentItem $item) use ($assignment, $receipt, $receivingService, $storageService) {
+        $packages = $shipment->items->map(function (ShipmentItem $item) use ($assignment, $receipt, $receivingService, $storageService, $shipment, $usesShipmentDeliveryDetails) {
             $receiptItem = $receipt?->items?->firstWhere('shipment_item_id', $item->id);
             $driverConfirmation = $assignment->itemConfirmations->firstWhere('shipment_item_id', $item->id);
             $driverPhotos = $assignment->photos
@@ -1433,6 +1437,7 @@ class ShipmentController extends Controller
 
             $vendorQuantity = (int) $item->quantity;
             $driverQuantity = $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : null;
+            $deliverySource = $usesShipmentDeliveryDetails ? $shipment : $item;
 
             return [
                 'shipment_item_id' => $item->id,
@@ -1449,13 +1454,15 @@ class ShipmentController extends Controller
                 'notes' => $receiptItem?->notes,
                 'barcode_value' => $receiptItem?->barcode_value,
                 'barcode_print_count' => (int) ($receiptItem?->barcode_print_count ?? 0),
-                'delivery_recipient_name' => $item->delivery_recipient_name,
-                'delivery_recipient_phone' => $item->delivery_recipient_phone,
-                'delivery_region_id' => $item->delivery_region_id,
-                'delivery_district_id' => $item->delivery_district_id,
-                'delivery_town' => $item->delivery_town,
-                'delivery_landmark' => $item->delivery_landmark,
-                'delivery_instructions' => $item->delivery_instructions,
+                'delivery_recipient_name' => $deliverySource->delivery_recipient_name,
+                'delivery_recipient_phone' => $deliverySource->delivery_recipient_phone,
+                'delivery_region_id' => $deliverySource->delivery_region_id,
+                'delivery_district_id' => $deliverySource->delivery_district_id,
+                'delivery_town' => $deliverySource->delivery_town,
+                'delivery_landmark' => $deliverySource->delivery_landmark,
+                'delivery_instructions' => $deliverySource->delivery_instructions,
+                'bus_station_id' => $item->bus_station_id,
+                'bus_station_name' => $item->busStation?->name,
                 'photos' => $receiptItem
                     ? $receivingService->serializeReceiptItem($receiptItem)['photos']
                     : [],
@@ -1466,7 +1473,7 @@ class ShipmentController extends Controller
             'success' => true,
             'data' => [
                 'packages' => $packages,
-                'can_receive' => !is_null($assignment->picked_up_at),
+                'can_receive' => ! is_null($assignment->picked_up_at),
                 'receipt' => $receipt ? [
                     'id' => $receipt->id,
                     'status' => $receipt->status,
@@ -1485,12 +1492,12 @@ class ShipmentController extends Controller
         }
 
         $assignment = $shipment->pickupAssignment;
-        if (!$assignment || is_null($assignment->picked_up_at)) {
+        if (! $assignment || is_null($assignment->picked_up_at)) {
             return response()->json(['success' => false, 'message' => 'Shipment has not been picked up yet.'], 422);
         }
 
         $warehouse = $assignment->targetWarehouse;
-        if (!$warehouse) {
+        if (! $warehouse) {
             return response()->json(['success' => false, 'message' => 'No target warehouse found.'], 422);
         }
 
@@ -1512,24 +1519,37 @@ class ShipmentController extends Controller
             'delivery_town' => ['nullable', 'string', 'max:255'],
             'delivery_landmark' => ['nullable', 'string', 'max:255'],
             'delivery_instructions' => ['nullable', 'string', 'max:1000'],
+            'bus_station_id' => ['nullable', 'integer', 'exists:bus_stations,id'],
         ]);
 
-        // Update package details + delivery info if provided
-        $packageUpdates = array_filter([
-            'description' => $validated['description'] ?? null,
-            'quantity' => $validated['quantity'] ?? null,
+        $deliveryUpdates = [
             'delivery_recipient_name' => $validated['delivery_recipient_name'] ?? null,
-            'delivery_recipient_phone' => !empty($validated['delivery_recipient_phone'])
-                ? \App\Helpers\PhoneHelper::format($validated['delivery_recipient_phone'])
+            'delivery_recipient_phone' => ! empty($validated['delivery_recipient_phone'])
+                ? PhoneHelper::format($validated['delivery_recipient_phone'])
                 : null,
             'delivery_region_id' => $validated['delivery_region_id'] ?? null,
             'delivery_district_id' => $validated['delivery_district_id'] ?? null,
             'delivery_town' => $validated['delivery_town'] ?? null,
             'delivery_landmark' => $validated['delivery_landmark'] ?? null,
             'delivery_instructions' => $validated['delivery_instructions'] ?? null,
-        ], fn ($v) => !is_null($v));
-        if (!empty($packageUpdates)) {
+            'bus_station_id' => $validated['bus_station_id'] ?? null,
+        ];
+
+        $packageUpdates = [];
+        if (array_key_exists('description', $validated)) {
+            $packageUpdates['description'] = $validated['description'];
+        }
+        if (array_key_exists('quantity', $validated)) {
+            $packageUpdates['quantity'] = $validated['quantity'];
+        }
+
+        $packageUpdates = array_merge($packageUpdates, $deliveryUpdates);
+        if (! empty($packageUpdates)) {
             $item->update($packageUpdates);
+
+            if ($shipment->destination_mode === ShipmentDestinationMode::SINGLE) {
+                $shipment->update($deliveryUpdates);
+            }
         }
 
         $receivingService = app(WarehouseReceivingService::class);
@@ -1558,12 +1578,12 @@ class ShipmentController extends Controller
         }
 
         $assignment = $shipment->pickupAssignment;
-        if (!$assignment) {
+        if (! $assignment) {
             return response()->json(['success' => false, 'message' => 'No pickup assignment found.'], 422);
         }
 
         $warehouse = $assignment->targetWarehouse;
-        if (!$warehouse) {
+        if (! $warehouse) {
             return response()->json(['success' => false, 'message' => 'No target warehouse found.'], 422);
         }
 
@@ -1588,7 +1608,7 @@ class ShipmentController extends Controller
         $this->authorizePermission('shipments.edit');
 
         $assignment = $shipment->pickupAssignment;
-        if (!$assignment) {
+        if (! $assignment) {
             return response()->json(['success' => false, 'message' => 'No pickup assignment found.'], 422);
         }
 
@@ -1597,7 +1617,7 @@ class ShipmentController extends Controller
         }
 
         $warehouse = $assignment->targetWarehouse;
-        if (!$warehouse) {
+        if (! $warehouse) {
             return response()->json(['success' => false, 'message' => 'No target warehouse found.'], 422);
         }
 
@@ -1632,7 +1652,7 @@ class ShipmentController extends Controller
             return response()->json(['success' => false, 'message' => 'No photos to group.'], 400);
         }
 
-        $taggedImages = $allImages->filter(fn ($img) => !empty($img->recipient_phone));
+        $taggedImages = $allImages->filter(fn ($img) => ! empty($img->recipient_phone));
 
         if ($taggedImages->isEmpty()) {
             return response()->json(['success' => false, 'message' => 'No photos have recipient phone tags. Tag photos with phone numbers first.'], 400);
@@ -1697,7 +1717,7 @@ class ShipmentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => count($newItems) . ' package(s) created. Destination mode set to ' . $newMode->value . '.',
+                'message' => count($newItems).' package(s) created. Destination mode set to '.$newMode->value.'.',
                 'data' => [
                     'destination_mode' => $newMode->value,
                     'delivery_recipient_phone' => $shipment->fresh()->delivery_recipient_phone,

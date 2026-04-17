@@ -34,6 +34,7 @@ class ShipmentItem extends Model
         'delivery_landmark',
         'delivery_instructions',
         'fulfillment_type',
+        'bus_station_id',
         'status',
         'tracking_code',
     ];
@@ -116,6 +117,11 @@ class ShipmentItem extends Model
     public function deliveryDistrict(): BelongsTo
     {
         return $this->belongsTo(District::class, 'delivery_district_id');
+    }
+
+    public function busStation(): BelongsTo
+    {
+        return $this->belongsTo(BusStation::class);
     }
 
     /**
