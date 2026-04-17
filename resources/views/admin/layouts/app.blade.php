@@ -78,13 +78,15 @@
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Vendors</span>
                     </template>
-                    <div x-show="vendorOpen && !sidebarCollapsed" x-collapse x-cloak class="ml-4 pl-3 border-l border-slate-700/50 space-y-0.5 mt-0.5">
+                    <div x-show="vendorOpen && !sidebarCollapsed" x-collapse x-cloak class="ml-4 pl-3 border-l border-slate-600/30 space-y-0.5 mt-0.5">
                         <a href="{{ route('admin.vendors.index') }}"
-                           class="flex items-center py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all {{ request()->routeIs('admin.vendors.*') && !request()->routeIs('admin.vendor-payouts.*') ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5' }}">
+                           class="flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all {{ request()->routeIs('admin.vendors.*') && !request()->routeIs('admin.vendor-payouts.*') ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request()->routeIs('admin.vendors.*') && !request()->routeIs('admin.vendor-payouts.*') ? 'bg-white' : 'bg-slate-500' }}"></span>
                             Vendor List
                         </a>
                         <a href="{{ route('admin.vendor-payouts.index') }}"
-                           class="flex items-center py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all {{ request()->routeIs('admin.vendor-payouts.*') ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5' }}">
+                           class="flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all {{ request()->routeIs('admin.vendor-payouts.*') ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request()->routeIs('admin.vendor-payouts.*') ? 'bg-white' : 'bg-slate-500' }}"></span>
                             Vendor Payouts
                         </a>
                     </div>
@@ -159,13 +161,15 @@
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Deliveries</span>
                     </template>
-                    <div x-show="deliveryOpen && !sidebarCollapsed" x-collapse x-cloak class="ml-4 pl-3 border-l border-slate-700/50 space-y-0.5 mt-0.5">
+                    <div x-show="deliveryOpen && !sidebarCollapsed" x-collapse x-cloak class="ml-4 pl-3 border-l border-slate-600/30 space-y-0.5 mt-0.5">
                         <a href="{{ route('admin.delivery-runs.index') }}"
-                           class="flex items-center py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all {{ request()->routeIs('admin.delivery-runs.*') ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5' }}">
+                           class="flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all {{ request()->routeIs('admin.delivery-runs.*') ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request()->routeIs('admin.delivery-runs.*') ? 'bg-white' : 'bg-slate-500' }}"></span>
                             Delivery List
                         </a>
                         <a href="{{ route('admin.contacts.index') }}"
-                           class="flex items-center py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all {{ request()->routeIs('admin.contacts.*') ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5' }}">
+                           class="flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all {{ request()->routeIs('admin.contacts.*') ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request()->routeIs('admin.contacts.*') ? 'bg-white' : 'bg-slate-500' }}"></span>
                             Contact Queue
                         </a>
                     </div>
