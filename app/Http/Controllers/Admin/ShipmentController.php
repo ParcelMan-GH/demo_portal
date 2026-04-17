@@ -25,6 +25,7 @@ use App\Support\GenericPdfExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ShipmentController extends Controller
@@ -898,6 +899,7 @@ class ShipmentController extends Controller
             'availableWarehousesEndpoint' => route('admin.assignments.available-warehouses'),
             'canEditShipmentFields' => true,
             'duplicateUrl' => route('admin.shipments.duplicate', $shipment),
+            'autoGroupByPhoneUrl' => route('admin.shipments.auto-group-by-phone', $shipment),
             'showUrl' => route('admin.shipments.show', $shipment),
             'currentAssignment' => $shipment->pickupAssignment ? [
                 'id' => $shipment->pickupAssignment->id,
@@ -1589,5 +1591,98 @@ class ShipmentController extends Controller
         );
 
         return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    // ─── AUTO-GROUP BY PHONE ──────────────────────────────────────────────────
+
+    public function autoGroupByPhone(Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $shipment->load('items.images');
+
+        $allImages = $shipment->items->flatMap(fn ($item) => $item->images);
+
+        if ($allImages->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No photos to group.'], 400);
+        }
+
+        $taggedImages = $allImages->filter(fn ($img) => !empty($img->recipient_phone));
+
+        if ($taggedImages->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No photos have recipient phone tags. Tag photos with phone numbers first.'], 400);
+        }
+
+        $grouped = $allImages->groupBy(fn ($img) => $img->recipient_phone ?: '__untagged__');
+
+        return DB::transaction(function () use ($shipment, $grouped) {
+            $existingItems = $shipment->items()->with('images')->get();
+            $packages = [];
+
+            foreach ($grouped as $phone => $images) {
+                $isUntagged = $phone === '__untagged__';
+
+                $item = $existingItems->first(function ($existingItem) use ($images) {
+                    return $existingItem->images->pluck('id')->intersect($images->pluck('id'))->isNotEmpty();
+                });
+
+                if (!$item) {
+                    $item = $shipment->items()->create([
+                        'description' => null,
+                        'quantity' => 1,
+                        'status' => 'pending',
+                        'delivery_recipient_phone' => $isUntagged ? null : $phone,
+                    ]);
+                } else {
+                    if (!$isUntagged) {
+                        $item->update(['delivery_recipient_phone' => $phone]);
+                    }
+                }
+
+                ShipmentItemImage::whereIn('id', $images->pluck('id'))
+                    ->update(['shipment_item_id' => $item->id]);
+
+                $packages[] = [
+                    'id' => $item->id,
+                    'phone' => $isUntagged ? null : $phone,
+                    'photos_count' => $images->count(),
+                ];
+            }
+
+            $emptyItems = $shipment->items()->doesntHave('images')->get();
+            foreach ($emptyItems as $empty) {
+                $empty->delete();
+            }
+
+            $multipleGroups = count($packages) > 1 || ($grouped->has('__untagged__') && $grouped->count() > 1);
+            $newMode = $multipleGroups ? ShipmentDestinationMode::PER_ITEM : ShipmentDestinationMode::SINGLE;
+
+            if ($shipment->destination_mode !== $newMode) {
+                $shipment->update(['destination_mode' => $newMode]);
+            }
+
+            $shipment->load('items.images');
+
+            return response()->json([
+                'success' => true,
+                'message' => count($packages) . ' package(s) created. Destination mode set to ' . $newMode->value . '.',
+                'data' => [
+                    'destination_mode' => $newMode->value,
+                    'packages' => $shipment->items->map(fn ($item) => [
+                        'id' => $item->id,
+                        'description' => $item->description,
+                        'quantity' => $item->quantity,
+                        'delivery_recipient_phone' => $item->delivery_recipient_phone,
+                        'delivery_recipient_name' => $item->delivery_recipient_name,
+                        'photos' => $item->images->map(fn ($img) => [
+                            'id' => $img->id,
+                            'url' => app(\App\Services\StorageService::class)->getUrl($img->path),
+                            'original_name' => $img->original_name,
+                            'recipient_phone' => $img->recipient_phone,
+                        ])->values(),
+                    ])->values(),
+                ],
+            ]);
+        });
     }
 }
