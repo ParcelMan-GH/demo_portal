@@ -1169,7 +1169,9 @@ class WarehouseDeliveryService
         $deliveredStops = $run->stops->where('status', DeliveryRunStop::STATUS_DELIVERED)->count();
         $failedStops = $run->stops->where('status', DeliveryRunStop::STATUS_FAILED)->count();
         $handedOffStops = $run->stops->where('status', DeliveryRunStop::STATUS_HANDED_OFF)->count();
-        $completedStops = $deliveredStops + $failedStops + $handedOffStops;
+        // handed_off counts as "driver done" but NOT "delivery complete" — run stays partially_delivered
+        $driverDoneStops = $deliveredStops + $failedStops + $handedOffStops;
+        $completedStops = $deliveredStops + $failedStops;
 
         if ($totalStops > 0 && $completedStops === $totalStops) {
             $run->update([
