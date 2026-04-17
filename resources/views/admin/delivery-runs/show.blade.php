@@ -536,6 +536,28 @@ $itemStatusColors = [
                         </div>
                     @endif
 
+                    {{-- OTP Code Display --}}
+                    @if($stop->verification_code_sent_at && $stop->status !== 'delivered')
+                        @php
+                            $otpCode = \App\Models\OtpCode::where('phone', (string) $stop->recipient_phone)
+                                ->where('purpose', 'delivery_verification')
+                                ->whereNull('verified_at')
+                                ->where('expires_at', '>', now())
+                                ->latest('created_at')
+                                ->value('code');
+                        @endphp
+                        @if($otpCode)
+                        <div class="flex items-center gap-3 mt-3 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-xl">
+                            <svg class="w-4 h-4 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                            <div>
+                                <span class="text-[10px] font-semibold text-indigo-500 uppercase tracking-wider">OTP Code</span>
+                                <span class="ml-2 text-lg font-black text-indigo-700 tracking-[0.3em]">{{ $otpCode }}</span>
+                            </div>
+                            <span class="text-[10px] text-indigo-400 ml-auto">Sent {{ $stop->verification_code_sent_at->diffForHumans() }}</span>
+                        </div>
+                        @endif
+                    @endif
+
                     <!-- Resend OTP Button (shown when run is dispatched and stop is pending/arrived) -->
                     @if($isDispatched && in_array($stop->status, ['pending', 'arrived']))
                     <div class="flex justify-end mt-3">
