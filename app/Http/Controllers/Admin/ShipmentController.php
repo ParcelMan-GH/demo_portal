@@ -1552,6 +1552,17 @@ class ShipmentController extends Controller
             }
         }
 
+        // If already received at warehouse, skip receipt upsert — just save the delivery details
+        if ($assignment->received_at) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Package details updated.',
+                'data' => [
+                    'barcode_value' => $item->tracking_code,
+                ],
+            ]);
+        }
+
         $receivingService = app(WarehouseReceivingService::class);
         $result = $receivingService->upsertReceiptItem(
             assignment: $assignment,
