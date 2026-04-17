@@ -92,6 +92,17 @@
                     </tr>
                 </thead>
                 <tbody>
+                    <tr x-show="loading">
+                        <td colspan="6" class="px-6 py-12 text-center text-slate-400 text-sm">
+                            <svg class="animate-spin h-5 w-5 mx-auto text-slate-400" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            </svg>
+                        </td>
+                    </tr>
+                    <tr x-show="!loading && vendors.length === 0">
+                        <td colspan="6" class="px-6 py-12 text-center text-slate-400 text-sm">No vendors found.</td>
+                    </tr>
                     <template x-for="vendor in vendors" :key="vendor.id">
                         <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                             <td class="px-6 py-4">
@@ -101,47 +112,28 @@
                                     <p class="text-slate-400 text-[10px]" x-text="vendor.phone"></p>
                                 </button>
                             </td>
-                            <td class="px-6 py-4 text-right font-medium text-slate-700" x-text="'GHS ' + parseFloat(vendor.total_earned).toFixed(2)"></td>
+                            <td class="px-6 py-4 text-right font-medium text-slate-700" x-text="'GHS ' + parseFloat(vendor.total_earned || 0).toFixed(2)"></td>
                             <td class="px-6 py-4 text-right">
                                 <span
                                     class="font-semibold"
-                                    :class="parseFloat(vendor.available_balance) >= parseFloat(vendor.min_payout) ? 'text-emerald-600' : 'text-slate-500'"
-                                    x-text="'GHS ' + parseFloat(vendor.available_balance).toFixed(2)"
+                                    :class="vendor.can_payout ? 'text-emerald-600' : 'text-slate-500'"
+                                    x-text="'GHS ' + parseFloat(vendor.available_balance || 0).toFixed(2)"
                                 ></span>
                                 <div class="mt-1">
-                                    <template x-if="parseFloat(vendor.available_balance) >= parseFloat(vendor.min_payout)">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700">Ready</span>
-                                    </template>
-                                    <template x-if="parseFloat(vendor.available_balance) < parseFloat(vendor.min_payout)">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500" x-text="'Below min (GHS ' + parseFloat(vendor.min_payout).toFixed(2) + ')'"></span>
-                                    </template>
+                                    <span x-show="vendor.can_payout" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700">Ready</span>
+                                    <span x-show="!vendor.can_payout" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">Below minimum</span>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-right font-medium text-slate-700" x-text="'GHS ' + parseFloat(vendor.total_paid).toFixed(2)"></td>
-                            <td class="px-6 py-4 text-right font-medium text-amber-600" x-text="'GHS ' + parseFloat(vendor.pending_amount).toFixed(2)"></td>
+                            <td class="px-6 py-4 text-right font-medium text-slate-700" x-text="'GHS ' + parseFloat(vendor.total_paid || 0).toFixed(2)"></td>
+                            <td class="px-6 py-4 text-right font-medium text-amber-600" x-text="'GHS ' + parseFloat(vendor.pending_payouts || 0).toFixed(2)"></td>
                             <td class="px-6 py-4 text-center">
                                 <button
                                     @@click="openCreateModal(vendor)"
-                                    :disabled="parseFloat(vendor.available_balance) < parseFloat(vendor.min_payout)"
+                                    :disabled="!vendor.can_payout"
                                     class="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     Create Payout
                                 </button>
-                            </td>
-                        </tr>
-                    </template>
-                    <template x-if="!loading && vendors.length === 0">
-                        <tr>
-                            <td colspan="6" class="px-6 py-12 text-center text-slate-400 text-sm">No vendors found.</td>
-                        </tr>
-                    </template>
-                    <template x-if="loading">
-                        <tr>
-                            <td colspan="6" class="px-6 py-12 text-center text-slate-400 text-sm">
-                                <svg class="animate-spin h-5 w-5 mx-auto text-slate-400" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                </svg>
                             </td>
                         </tr>
                     </template>
@@ -485,13 +477,15 @@ function vendorPayouts() {
                 });
                 const resp = await fetch(this.config.dataUrl + '?' + params.toString());
                 const json = await resp.json();
-                this.vendors = json.data;
-                this.meta = json.meta;
+                this.vendors = Array.isArray(json.data) ? json.data : [];
+                this.meta = json.meta ?? {};
                 if (json.stats) {
                     this.stats = json.stats;
                 }
             } catch (e) {
                 console.error('Failed to load payout data', e);
+                this.vendors = [];
+                this.meta = {};
             } finally {
                 this.loading = false;
             }
