@@ -966,6 +966,7 @@ class ShipmentController extends Controller
                             'url' => $img->getSignedUrl()['url'] ?? null,
                             'original_name' => $img->original_name,
                             'size_human' => $img->size_human,
+                            'recipient_phone' => $img->recipient_phone,
                         ])->values(),
                     ];
                 })->values(),
@@ -1194,6 +1195,7 @@ class ShipmentController extends Controller
                     'url' => $image->getSignedUrl()['url'] ?? null,
                     'original_name' => $image->original_name,
                     'size_human' => $image->size_human,
+                    'recipient_phone' => $image->recipient_phone,
                 ];
             }
         }
