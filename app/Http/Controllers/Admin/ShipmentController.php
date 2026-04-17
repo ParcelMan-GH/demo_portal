@@ -1618,51 +1618,51 @@ class ShipmentController extends Controller
         $grouped = $allImages->groupBy(fn ($img) => $img->recipient_phone ?: '__untagged__');
 
         return DB::transaction(function () use ($shipment, $grouped) {
-            $existingItems = $shipment->items()->with('images')->get();
-            $packages = [];
+            // Collect all image IDs before deleting items
+            $allImageIds = ShipmentItemImage::whereIn('shipment_item_id', $shipment->items()->pluck('id'))
+                ->pluck('id', 'id');
 
+            // Detach images from items temporarily (set to first item to avoid FK issues)
+            // Then delete all existing items and create fresh ones
+
+            // Step 1: Create new items per phone group
+            $newItems = [];
             foreach ($grouped as $phone => $images) {
                 $isUntagged = $phone === '__untagged__';
 
-                $item = $existingItems->first(function ($existingItem) use ($images) {
-                    return $existingItem->images->pluck('id')->intersect($images->pluck('id'))->isNotEmpty();
-                });
+                $item = $shipment->items()->create([
+                    'description' => null,
+                    'quantity' => $images->count(),
+                    'status' => 'pending',
+                    'delivery_recipient_phone' => $isUntagged ? null : $phone,
+                ]);
 
-                if (!$item) {
-                    $item = $shipment->items()->create([
-                        'description' => null,
-                        'quantity' => 1,
-                        'status' => 'pending',
-                        'delivery_recipient_phone' => $isUntagged ? null : $phone,
-                    ]);
-                } else {
-                    if (!$isUntagged) {
-                        $item->update(['delivery_recipient_phone' => $phone]);
-                    }
-                }
-
+                // Move photos to this new item
                 ShipmentItemImage::whereIn('id', $images->pluck('id'))
                     ->update(['shipment_item_id' => $item->id]);
 
-                $packages[] = [
+                $newItems[] = [
                     'id' => $item->id,
                     'phone' => $isUntagged ? null : $phone,
                     'photos_count' => $images->count(),
                 ];
             }
 
-            $emptyItems = $shipment->items()->doesntHave('images')->get();
-            foreach ($emptyItems as $empty) {
-                $empty->delete();
-            }
+            // Step 2: Delete old items that no longer have photos
+            $newItemIds = collect($newItems)->pluck('id');
+            $shipment->items()->whereNotIn('id', $newItemIds)->each(function ($item) {
+                if ($item->images()->count() === 0) {
+                    $item->delete();
+                }
+            });
 
-            $multipleGroups = count($packages) > 1 || ($grouped->has('__untagged__') && $grouped->count() > 1);
+            $multipleGroups = count($newItems) > 1;
             $newMode = $multipleGroups ? ShipmentDestinationMode::PER_ITEM : ShipmentDestinationMode::SINGLE;
 
             $shipmentUpdate = ['destination_mode' => $newMode];
 
             if ($newMode === ShipmentDestinationMode::SINGLE) {
-                $singlePhone = collect($packages)->pluck('phone')->filter()->first();
+                $singlePhone = collect($newItems)->pluck('phone')->filter()->first();
                 if ($singlePhone) {
                     $shipmentUpdate['delivery_recipient_phone'] = $singlePhone;
                 }
@@ -1674,7 +1674,7 @@ class ShipmentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => count($packages) . ' package(s) created. Destination mode set to ' . $newMode->value . '.',
+                'message' => count($newItems) . ' package(s) created. Destination mode set to ' . $newMode->value . '.',
                 'data' => [
                     'destination_mode' => $newMode->value,
                     'delivery_recipient_phone' => $shipment->fresh()->delivery_recipient_phone,
