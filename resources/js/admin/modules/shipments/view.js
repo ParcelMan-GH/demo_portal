@@ -459,18 +459,14 @@ function shipmentShow() {
         },
 
         async loadPackageDistricts(pkg) {
-            if (!pkg.delivery_region_id) {
-                pkg._districts = [];
-                pkg.delivery_district_id = null;
-                return;
-            }
-            try {
-                const url = this.config.districtsUrl.replace('__REGION__', pkg.delivery_region_id);
-                const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
-                const json = await resp.json();
-                const raw = json.data?.districts || json.data || json || [];
-                pkg._districts = Array.isArray(raw) ? raw : Object.values(raw);
-            } catch (e) { pkg._districts = []; }
+            if (!pkg.delivery_region_id) { pkg._districts = []; return; }
+            const savedDistrictId = pkg.delivery_district_id;
+            const url = this.config.districtsUrl.replace('__REGION__', pkg.delivery_region_id);
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            const data = await res.json();
+            pkg._districts = data.data?.districts || [];
+            await this.$nextTick();
+            pkg.delivery_district_id = savedDistrictId;
         },
 
         async receivePackage(pkg) {
