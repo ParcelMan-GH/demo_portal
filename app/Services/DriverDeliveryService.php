@@ -38,8 +38,8 @@ class DriverDeliveryService
                 'warehouse:id,name,code,address,latitude,longitude,contact_phone',
                 'stops:id,delivery_run_id,recipient_name,recipient_phone,status,delivery_method,total_packages,town,landmark,gh_post_address,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,failure_reason,failure_notes,delivery_notes,handoff_courier_name,handoff_courier_phone,handoff_vehicle_number,handoff_at',
                 'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status',
-                'items.shipmentItem:id,shipment_id,description,tracking_code',
-                'items.shipmentItem.shipment:id,shipment_number',
+                'items.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
+                'items.shipmentItem.shipment:id,shipment_number,delivery_recipient_name,delivery_recipient_phone,delivery_town',
             ]);
 
         if (!empty($validated['status'])) {
@@ -107,8 +107,8 @@ class DriverDeliveryService
             'stops.region:id,name',
             'stops.district:id,name',
             'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status,notes,delivered_at',
-            'items.shipmentItem:id,shipment_id,description,tracking_code',
-            'items.shipmentItem.shipment:id,shipment_number,vendor_id',
+            'items.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
+            'items.shipmentItem.shipment:id,shipment_number,vendor_id,delivery_recipient_name,delivery_recipient_phone,delivery_town',
             'items.shipmentItem.shipment.vendor:id,name,phone,business_name',
         ]);
 
@@ -191,16 +191,21 @@ class DriverDeliveryService
                     ] : null,
                     'items' => $items->map(function ($item) {
                         $vendor = $item->shipmentItem?->shipment?->vendor;
+                        $si = $item->shipmentItem;
+                        $shipment = $si?->shipment;
                         return [
                             'shipment_item_id' => $item->shipment_item_id,
-                            'shipment_number' => $item->shipmentItem?->shipment?->shipment_number,
-                            'description' => $item->shipmentItem?->description,
-                            'tracking_code' => $item->shipmentItem?->tracking_code,
+                            'shipment_number' => $shipment?->shipment_number,
+                            'description' => $si?->description,
+                            'tracking_code' => $si?->tracking_code,
                             'expected_quantity' => (int) $item->expected_quantity,
                             'delivered_quantity' => (int) $item->delivered_quantity,
                             'status' => $item->status,
                             'notes' => $item->notes,
                             'delivered_at' => $item->delivered_at,
+                            'recipient_name' => $si?->delivery_recipient_name ?? $shipment?->delivery_recipient_name,
+                            'recipient_phone' => $si?->delivery_recipient_phone ?? $shipment?->delivery_recipient_phone,
+                            'delivery_town' => $si?->delivery_town ?? $shipment?->delivery_town,
                             'vendor' => $vendor ? [
                                 'name' => $vendor->name,
                                 'phone' => $vendor->phone,
