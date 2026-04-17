@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BusStation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class BusStationController extends Controller
@@ -90,5 +91,12 @@ class BusStationController extends Controller
     {
         $stations = BusStation::where('is_active', true)->orderBy('name')->get(['id', 'name']);
         return response()->json(['data' => $stations]);
+    }
+
+    protected function authorizePermission(string $permission): void
+    {
+        if (!Auth::guard('admin')->user()?->hasPermission($permission)) {
+            abort(403, 'Unauthorized.');
+        }
     }
 }
