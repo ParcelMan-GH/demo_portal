@@ -34,6 +34,8 @@ class UpdateShipmentRequest extends FormRequest
                 'sender_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
                 'new_photos' => ['sometimes', 'array'],
                 'new_photos.*' => ['file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+                'new_photos_phones' => ['nullable', 'array'],
+                'new_photos_phones.*' => ['nullable', 'string', 'max:20'],
                 'remove_photo_ids' => ['sometimes', 'array'],
                 'remove_photo_ids.*' => ['integer'],
             ];

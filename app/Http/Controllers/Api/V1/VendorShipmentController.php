@@ -227,8 +227,9 @@ class VendorShipmentController extends Controller
 
         // Extract photo operations before passing to service
         $newPhotos = $request->file('new_photos', []);
+        $newPhotosPhones = $request->input('new_photos_phones', []);
         $removePhotoIds = $validated['remove_photo_ids'] ?? [];
-        unset($validated['new_photos'], $validated['remove_photo_ids']);
+        unset($validated['new_photos'], $validated['new_photos_phones'], $validated['remove_photo_ids']);
 
         $result = $this->shipmentService->update($shipment, $validated, $request);
 
@@ -251,10 +252,11 @@ class VendorShipmentController extends Controller
                 }
             }
 
-            // Upload new photos
+            // Upload new photos with optional phone tags
             $newPhotos = is_array($newPhotos) ? array_values(array_filter($newPhotos)) : [];
+            $newPhotosPhones = is_array($newPhotosPhones) ? $newPhotosPhones : [];
             if (!empty($newPhotos)) {
-                $this->shipmentItemService->uploadImages($item, $newPhotos, $request);
+                $this->shipmentItemService->uploadImages($item, $newPhotos, $request, $newPhotosPhones);
             }
         }
 
