@@ -440,13 +440,36 @@ function shipmentShow() {
                 });
                 const result = await response.json();
                 if (result.success) {
-                    this.receiving.packages = result.data.packages || [];
+                    this.receiving.packages = (result.data.packages || []).map(pkg => ({
+                        ...pkg,
+                        _districts: [],
+                    }));
                     this.receiving.canReceive = result.data.can_receive;
                     this.receiving.receipt = result.data.receipt;
                     this.receiving.assignmentId = result.data.assignment_id;
+                    // Pre-load districts for packages that already have a region set
+                    for (const pkg of this.receiving.packages) {
+                        if (pkg.delivery_region_id) {
+                            this.loadPackageDistricts(pkg);
+                        }
+                    }
                 }
             } catch (e) { console.error('Failed to load receiving data', e); }
             this.receiving.loading = false;
+        },
+
+        async loadPackageDistricts(pkg) {
+            if (!pkg.delivery_region_id) {
+                pkg._districts = [];
+                pkg.delivery_district_id = null;
+                return;
+            }
+            try {
+                const url = this.config.districtsUrl.replace('__REGION__', pkg.delivery_region_id);
+                const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                const json = await resp.json();
+                pkg._districts = json.data || json || [];
+            } catch (e) { pkg._districts = []; }
         },
 
         async receivePackage(pkg) {

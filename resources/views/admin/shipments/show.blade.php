@@ -28,6 +28,7 @@ $shipmentConfig = [
     'receiveSaveEndpoint' => route('admin.shipments.receiving.save', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
     'receivePrintLabelEndpoint' => route('admin.shipments.receiving.print-label', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
     'receiveFinalizeEndpoint' => route('admin.shipments.receiving.finalize', $shipment),
+    'districtsUrl' => '/admin/locations-data/districts?region_id=__REGION__',
     'canManage' => $canManage,
     'isSuperAdmin' => auth('admin')->user()?->isSuperAdmin() ?? false,
     'paymentsDataEndpoint' => route('admin.shipments.payments.data', $shipment),
@@ -2719,7 +2720,7 @@ $shipmentConfig = [
                                                 <div class="grid grid-cols-2 gap-3">
                                                     <div>
                                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Region</label>
-                                                        <select x-model="pkg.delivery_region_id" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                        <select x-model="pkg.delivery_region_id" @@change="loadPackageDistricts(pkg)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
                                                             <option value="">Select Region</option>
                                                             @foreach(\App\Models\Region::orderBy('name')->get() as $region)
                                                                 <option value="{{ $region->id }}">{{ $region->name }}</option>
@@ -2730,6 +2731,9 @@ $shipmentConfig = [
                                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">District</label>
                                                         <select x-model="pkg.delivery_district_id" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
                                                             <option value="">Select District</option>
+                                                            <template x-for="d in (pkg._districts || [])" :key="d.id">
+                                                                <option :value="d.id" x-text="d.name"></option>
+                                                            </template>
                                                         </select>
                                                     </div>
                                                 </div>
