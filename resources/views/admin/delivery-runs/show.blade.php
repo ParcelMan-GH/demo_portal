@@ -561,6 +561,73 @@ $itemStatusColors = [
                         </div>
                     @endif
 
+                    {{-- Bus Handoff Courier Details --}}
+                    @if(($stop->delivery_method ?? 'direct') === 'bus_handoff' && $stop->handoff_courier_name)
+                        <div class="ml-11 mt-3 p-4 bg-violet-50 rounded-xl border border-violet-200">
+                            <p class="text-[10px] font-bold text-violet-700 uppercase tracking-wider mb-2">Bus Courier Details</p>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <span class="text-[10px] text-violet-400 uppercase tracking-wider">Courier Name</span>
+                                    <p class="text-sm font-semibold text-slate-800">{{ $stop->handoff_courier_name }}</p>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-violet-400 uppercase tracking-wider">Phone</span>
+                                    <p><a href="tel:{{ $stop->handoff_courier_phone }}" class="text-sm font-semibold text-violet-700 hover:underline">{{ $stop->handoff_courier_phone }}</a></p>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-violet-400 uppercase tracking-wider">Vehicle</span>
+                                    <p class="text-sm font-mono font-semibold text-slate-800">{{ $stop->handoff_vehicle_number }}</p>
+                                </div>
+                            </div>
+                            @if($stop->handoff_at)
+                                <p class="text-[10px] text-violet-500 mt-2">Handed off {{ $stop->handoff_at->diffForHumans() }}</p>
+                            @endif
+                        </div>
+                    @endif
+
+                    {{-- Admin Confirm/Fail for Handed Off Stops --}}
+                    @if(($stop->delivery_method ?? 'direct') === 'bus_handoff' && $stop->status === 'handed_off')
+                        <div class="ml-11 mt-3 p-4 bg-amber-50 rounded-xl border border-amber-200" x-data="{ action: null, notes: '', submitting: false }">
+                            <p class="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-2">Awaiting Recipient Confirmation</p>
+                            <p class="text-xs text-slate-600 mb-3">Call the recipient to confirm they received the package, then mark as delivered or failed.</p>
+
+                            <div x-show="!action" class="flex items-center gap-2">
+                                <button @@click="action = 'delivered'" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors">
+                                    Confirm Delivered
+                                </button>
+                                <button @@click="action = 'failed'" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition-colors">
+                                    Mark Failed
+                                </button>
+                            </div>
+
+                            <div x-show="action" x-cloak class="space-y-3">
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Notes (optional)</label>
+                                    <input type="text" x-model="notes" placeholder="e.g. Recipient confirmed via phone call" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none">
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button @@click="
+                                        submitting = true;
+                                        fetch('{{ route('admin.delivery-runs.stops.confirm-handoff', ['run' => $run->id, 'stop' => $stop->id]) }}', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' },
+                                            body: JSON.stringify({ action: action, notes: notes })
+                                        }).then(r => r.json()).then(j => {
+                                            if (j.success) { window.showToast?.(j.message, 'success'); setTimeout(() => window.location.reload(), 500); }
+                                            else { window.showToast?.(j.message || 'Failed', 'error'); submitting = false; }
+                                        }).catch(() => { window.showToast?.('Error', 'error'); submitting = false; });
+                                    " :disabled="submitting"
+                                    :class="action === 'delivered' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'"
+                                    class="px-4 py-2 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50">
+                                        <span x-show="!submitting" x-text="action === 'delivered' ? 'Confirm Delivered' : 'Confirm Failed'"></span>
+                                        <span x-show="submitting">Saving...</span>
+                                    </button>
+                                    <button @@click="action = null; notes = ''" class="px-3 py-2 text-xs text-slate-500 hover:text-slate-700">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- OTP Verification Attempts (if any) — hide for bus handoff -->
                     @if(($stop->delivery_method ?? 'direct') !== 'bus_handoff' && $stop->verificationAttempts->isNotEmpty())
                         <div class="ml-11 mt-3">
