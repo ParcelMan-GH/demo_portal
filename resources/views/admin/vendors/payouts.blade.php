@@ -6,7 +6,7 @@
 
 @section('content')
 <div
-    x-data="vendorPayouts()"
+    x-data="vendorPayouts"
     x-init="init()"
     data-payout-config='@json($payoutConfig)'
     class="space-y-6"
@@ -427,8 +427,8 @@
 
 @push('scripts')
 <script>
-function vendorPayouts() {
-    return {
+document.addEventListener('alpine:init', () => {
+    Alpine.data('vendorPayouts', () => ({
         config: {},
         vendors: [],
         meta: {},
@@ -618,8 +618,8 @@ function vendorPayouts() {
                 this.submitting = false;
             }
         },
-    };
-}
+    }));
+});
 </script>
 @endpush
 @endsection
