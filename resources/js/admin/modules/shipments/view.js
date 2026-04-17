@@ -459,8 +459,21 @@ function shipmentShow() {
         },
 
         async loadPackageDistricts(pkg) {
+            const selId = 'rcv-district-' + pkg.shipment_item_id;
+            const populateSelect = (districts, selectedId) => {
+                const sel = document.getElementById(selId);
+                if (!sel) return;
+                sel.innerHTML = '<option value="">Select District</option>';
+                (districts || []).forEach(d => {
+                    const opt = document.createElement('option');
+                    opt.value = d.id;
+                    opt.textContent = d.name;
+                    if (String(d.id) === String(selectedId)) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            };
             if (!pkg.delivery_region_id) {
-                pkg._districts = [];
+                populateSelect([], null);
                 pkg.delivery_district_id = null;
                 return;
             }
@@ -469,14 +482,11 @@ function shipmentShow() {
                 const url = this.config.districtsUrl.replace('__REGION__', pkg.delivery_region_id);
                 const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
                 const json = await resp.json();
-                pkg._districts = json.data?.districts || [];
+                const districts = json.data?.districts || [];
+                populateSelect(districts, savedId);
             } catch (e) {
-                pkg._districts = [];
+                populateSelect([], null);
             }
-            // Restore saved district after options update
-            this.$nextTick(() => {
-                pkg.delivery_district_id = savedId;
-            });
         },
 
         async receivePackage(pkg) {
