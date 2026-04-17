@@ -607,12 +607,6 @@ $itemStatusColors = [
                     @endif
 
 
-                    {{-- Per-item confirmation info for bus handoff --}}
-                    @if(($stop->delivery_method ?? 'direct') === 'bus_handoff' && $stop->status === 'handed_off')
-                        <div class="ml-11 mt-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
-                            <p class="text-[10px] font-semibold text-amber-700">Call each recipient to confirm delivery, then use the Delivered/Failed buttons per item above.</p>
-                        </div>
-                    @endif
 
                     <!-- OTP Verification Attempts (if any) — hide for bus handoff -->
                     @if(($stop->delivery_method ?? 'direct') !== 'bus_handoff' && $stop->verificationAttempts->isNotEmpty())
