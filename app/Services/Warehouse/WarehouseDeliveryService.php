@@ -134,12 +134,17 @@ class WarehouseDeliveryService
         }
 
         $labels = WarehouseReceiptItemLabel::whereIn('id', $claimedLabelIds)
-            ->with(['receiptItem.shipmentItem.shipment'])
+            ->with(['receiptItem.shipmentItem.shipment.vendor', 'receiptItem.shipmentItem.busStation'])
             ->get();
 
         // Collect unique shipment items (a package may have multiple labels)
         $allItems = $labels->map(fn ($l) => $l->receiptItem?->shipmentItem)->filter();
         $shipmentItems = $allItems->unique('id');
+
+        // Filter out items already in an active delivery run
+        $existingRunItemIds = DeliveryRunItem::whereHas('run', fn ($q) => $q->whereNotIn('status', [DeliveryRun::STATUS_COMPLETED, DeliveryRun::STATUS_CANCELLED]))
+            ->pluck('shipment_item_id');
+        $shipmentItems = $shipmentItems->reject(fn ($item) => $existingRunItemIds->contains($item->id));
 
         if ($shipmentItems->isEmpty()) {
             return [
@@ -164,18 +169,48 @@ class WarehouseDeliveryService
                 'created_by_user_id' => $admin?->id,
             ]);
 
-            // Sort items so same-phone recipients are adjacent, then by town
-            $sortedItems = $shipmentItems->sortBy(function ($item) {
+            // Separate bus station items from direct delivery items
+            $busStationItems = $shipmentItems->filter(fn ($item) => !empty($item->bus_station_id));
+            $directItems = $shipmentItems->reject(fn ($item) => !empty($item->bus_station_id));
+
+            $stopsCount = 0;
+
+            // Create bus station stops — group by bus_station_id
+            $busGroups = $busStationItems->groupBy('bus_station_id');
+            foreach ($busGroups as $stationId => $items) {
+                $station = $items->first()->busStation;
+                $stop = DeliveryRunStop::query()->create([
+                    'delivery_run_id' => $run->id,
+                    'recipient_name' => $station?->name ?? 'Bus Station',
+                    'recipient_phone' => '',
+                    'town' => $station?->name,
+                    'total_packages' => $items->count(),
+                    'status' => DeliveryRunStop::STATUS_PENDING,
+                    'delivery_method' => DeliveryRunStop::METHOD_BUS_HANDOFF,
+                ]);
+
+                foreach ($items as $shipmentItem) {
+                    DeliveryRunItem::query()->create([
+                        'delivery_run_id' => $run->id,
+                        'delivery_run_stop_id' => $stop->id,
+                        'shipment_item_id' => $shipmentItem->id,
+                        'expected_quantity' => (int) ($shipmentItem->quantity ?: 1),
+                        'status' => DeliveryRunItem::STATUS_PENDING,
+                    ]);
+                    $shipmentItem->update(['status' => 'out_for_delivery']);
+                }
+                $stopsCount++;
+            }
+
+            // Create direct delivery stops — one per package
+            $sortedDirect = $directItems->sortBy(function ($item) {
                 $destination = $this->resolveDeliveryDestination($item);
                 $phone = preg_replace('/\D/', '', (string) ($destination['recipient_phone'] ?? ''));
                 $town = mb_strtolower(trim((string) ($destination['town'] ?? '')));
                 return $phone . '|' . $town;
             })->values();
 
-            // One stop per package — each shipment item has its own destination
-            $sortPosition = 0;
-            foreach ($sortedItems as $shipmentItem) {
-                $sortPosition++;
+            foreach ($sortedDirect as $shipmentItem) {
                 $destination = $this->resolveDeliveryDestination($shipmentItem);
 
                 $stop = DeliveryRunStop::query()->create([
@@ -191,6 +226,7 @@ class WarehouseDeliveryService
                     'landmark' => $destination['landmark'] ?? null,
                     'total_packages' => 1,
                     'status' => DeliveryRunStop::STATUS_PENDING,
+                    'delivery_method' => DeliveryRunStop::METHOD_DIRECT,
                 ]);
 
                 DeliveryRunItem::query()->create([
@@ -202,9 +238,8 @@ class WarehouseDeliveryService
                 ]);
 
                 $shipmentItem->update(['status' => 'out_for_delivery']);
+                $stopsCount++;
             }
-
-            $stopsCount = $sortedItems->count();
 
             return [
                 'success' => true,
