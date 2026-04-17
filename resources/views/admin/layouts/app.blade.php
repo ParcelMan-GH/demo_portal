@@ -61,32 +61,34 @@
                 </div>
 
                 @hasPermission('vendors.view')
-                <a href="{{ route('admin.vendors.index') }}"
-                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.vendors.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                        </svg>
-                    </div>
-                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Vendors</span>
+                <div x-data="{ vendorOpen: {{ request()->routeIs('admin.vendors.*') || request()->routeIs('admin.vendor-payouts.*') ? 'true' : 'false' }} }">
+                    <button @@click="vendorOpen = !vendorOpen"
+                            class="nav-item relative flex items-center justify-between w-full py-1.5 rounded-lg text-slate-400 hover:text-white transition-all"
+                            :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                        <div class="flex items-center">
+                            <div class="nav-icon-wrap">
+                                <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                </svg>
+                            </div>
+                            <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Vendors</span>
+                        </div>
+                        <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="[vendorOpen ? 'rotate-180' : '', sidebarCollapsed ? 'hidden' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
                     <template x-if="sidebarCollapsed">
                         <span class="sidebar-tooltip">Vendors</span>
                     </template>
-                </a>
-                <a href="{{ route('admin.vendor-payouts.index') }}"
-                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.vendor-payouts.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3 pl-8'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[16px] h-[16px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-                        </svg>
+                    <div x-show="vendorOpen && !sidebarCollapsed" x-collapse x-cloak class="ml-4 pl-3 border-l border-slate-700/50 space-y-0.5 mt-0.5">
+                        <a href="{{ route('admin.vendors.index') }}"
+                           class="flex items-center py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all {{ request()->routeIs('admin.vendors.*') && !request()->routeIs('admin.vendor-payouts.*') ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5' }}">
+                            Vendor List
+                        </a>
+                        <a href="{{ route('admin.vendor-payouts.index') }}"
+                           class="flex items-center py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all {{ request()->routeIs('admin.vendor-payouts.*') ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5' }}">
+                            Vendor Payouts
+                        </a>
                     </div>
-                    <span class="text-[11px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Vendor Payouts</span>
-                    <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Vendor Payouts</span>
-                    </template>
-                </a>
+                </div>
                 @endhasPermission
 
                 @hasPermission('drivers.view')
@@ -140,32 +142,34 @@
                 @endhasPermission
 
                 @hasPermission('shipments.view')
-                <a href="{{ route('admin.delivery-runs.index') }}"
-                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.delivery-runs.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-                        </svg>
-                    </div>
-                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Delivery Runs</span>
+                <div x-data="{ deliveryOpen: {{ request()->routeIs('admin.delivery-runs.*') || request()->routeIs('admin.contacts.*') ? 'true' : 'false' }} }">
+                    <button @@click="deliveryOpen = !deliveryOpen"
+                            class="nav-item relative flex items-center justify-between w-full py-1.5 rounded-lg text-slate-400 hover:text-white transition-all"
+                            :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                        <div class="flex items-center">
+                            <div class="nav-icon-wrap">
+                                <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/>
+                                </svg>
+                            </div>
+                            <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Deliveries</span>
+                        </div>
+                        <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="[deliveryOpen ? 'rotate-180' : '', sidebarCollapsed ? 'hidden' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
                     <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Delivery Runs</span>
+                        <span class="sidebar-tooltip">Deliveries</span>
                     </template>
-                </a>
-                <a href="{{ route('admin.contacts.index') }}"
-                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.contacts.*') ? 'active text-white' : '' }}"
-                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3 pl-8'">
-                    <div class="nav-icon-wrap">
-                        <svg class="w-[16px] h-[16px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                        </svg>
+                    <div x-show="deliveryOpen && !sidebarCollapsed" x-collapse x-cloak class="ml-4 pl-3 border-l border-slate-700/50 space-y-0.5 mt-0.5">
+                        <a href="{{ route('admin.delivery-runs.index') }}"
+                           class="flex items-center py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all {{ request()->routeIs('admin.delivery-runs.*') ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5' }}">
+                            Delivery List
+                        </a>
+                        <a href="{{ route('admin.contacts.index') }}"
+                           class="flex items-center py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all {{ request()->routeIs('admin.contacts.*') ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5' }}">
+                            Contact Queue
+                        </a>
                     </div>
-                    <span class="text-[11px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Contact Queue</span>
-                    <template x-if="sidebarCollapsed">
-                        <span class="sidebar-tooltip">Contact Queue</span>
-                    </template>
-                </a>
+                </div>
                 @endhasPermission
 
                 <!-- WAREHOUSE Section -->
