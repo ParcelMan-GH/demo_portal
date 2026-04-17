@@ -505,6 +505,33 @@ $itemStatusColors = [
                                                     </span>
                                                 @endif
                                             </div>
+                                            @php
+                                                $recipName = $item->shipmentItem?->delivery_recipient_name ?? $item->shipmentItem?->shipment?->delivery_recipient_name;
+                                                $recipPhone = $item->shipmentItem?->delivery_recipient_phone ?? $item->shipmentItem?->shipment?->delivery_recipient_phone;
+                                                $recipTown = $item->shipmentItem?->delivery_town ?? $item->shipmentItem?->shipment?->delivery_town;
+                                            @endphp
+                                            @if($recipName || $recipPhone || $recipTown)
+                                            <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+                                                @if($recipName)
+                                                    <span class="text-[10px] text-slate-600 font-medium">
+                                                        <svg class="w-3 h-3 inline text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                                        {{ $recipName }}
+                                                    </span>
+                                                @endif
+                                                @if($recipPhone)
+                                                    <a href="tel:{{ $recipPhone }}" class="text-[10px] text-blue-600 hover:underline font-medium">
+                                                        <svg class="w-3 h-3 inline text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                                                        {{ $recipPhone }}
+                                                    </a>
+                                                @endif
+                                                @if($recipTown)
+                                                    <span class="text-[10px] text-slate-500">
+                                                        <svg class="w-3 h-3 inline text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                                                        {{ $recipTown }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            @endif
                                         </div>
                                     </div>
                                     <div class="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
@@ -534,8 +561,8 @@ $itemStatusColors = [
                         </div>
                     @endif
 
-                    <!-- OTP Verification Attempts (if any) -->
-                    @if($stop->verificationAttempts->isNotEmpty())
+                    <!-- OTP Verification Attempts (if any) — hide for bus handoff -->
+                    @if(($stop->delivery_method ?? 'direct') !== 'bus_handoff' && $stop->verificationAttempts->isNotEmpty())
                         <div class="ml-11 mt-3">
                             <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">OTP Verification Attempts ({{ $stop->verificationAttempts->count() }})</p>
                             <div class="rounded-xl border border-amber-100 divide-y divide-amber-50 overflow-hidden">
@@ -558,8 +585,8 @@ $itemStatusColors = [
                         </div>
                     @endif
 
-                    {{-- OTP Code Display --}}
-                    @if($stop->verification_code_sent_at && $stop->status !== 'delivered')
+                    {{-- OTP Code Display — hide for bus handoff --}}
+                    @if(($stop->delivery_method ?? 'direct') !== 'bus_handoff' && $stop->verification_code_sent_at && $stop->status !== 'delivered')
                         @php
                             $otpCode = \App\Models\OtpCode::where('phone', (string) $stop->recipient_phone)
                                 ->where('purpose', 'delivery_verification')
@@ -580,8 +607,8 @@ $itemStatusColors = [
                         @endif
                     @endif
 
-                    <!-- Resend OTP Button (shown when run is dispatched and stop is pending/arrived) -->
-                    @if($isDispatched && in_array($stop->status, ['pending', 'arrived']))
+                    <!-- Resend OTP Button — hide for bus handoff -->
+                    @if(($stop->delivery_method ?? 'direct') !== 'bus_handoff' && $isDispatched && in_array($stop->status, ['pending', 'arrived']))
                     <div class="flex justify-end mt-3">
                         <button @@click="resendCode({{ $stop->id }})"
                             :disabled="actionLoading"
