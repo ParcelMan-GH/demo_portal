@@ -1,0 +1,213 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\PackageContactAttempt;
+use App\Models\PackageContactTask;
+use App\Models\User;
+use App\Models\Warehouse;
+use App\Services\Warehouse\PackageContactService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
+
+class AdminContactQueueController extends Controller
+{
+    public function __construct(
+        private PackageContactService $contactService,
+    ) {}
+
+    public function index(): View
+    {
+        $this->authorizePermission('shipments.view');
+
+        $warehouses = Warehouse::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $workers = User::whereNotNull('warehouse_id')
+            ->where('is_active', true)
+            ->whereHas('roles', fn ($q) => $q->where('is_warehouse_role', true))
+            ->orderBy('name')
+            ->get(['id', 'name', 'warehouse_id']);
+
+        $stats = [
+            'total' => PackageContactTask::count(),
+            'unassigned' => PackageContactTask::where('status', PackageContactTask::STATUS_PENDING)->count(),
+            'assigned' => PackageContactTask::where('status', PackageContactTask::STATUS_ASSIGNED)->count(),
+            'in_progress' => PackageContactTask::where('status', PackageContactTask::STATUS_IN_PROGRESS)->count(),
+            'resolved' => PackageContactTask::where('status', PackageContactTask::STATUS_RESOLVED)->count(),
+            'callbacks_due' => PackageContactTask::where('outcome', PackageContactTask::OUTCOME_CALLBACK)
+                ->where('callback_at', '<=', now())->count(),
+            'resolved_today' => PackageContactTask::where('status', PackageContactTask::STATUS_RESOLVED)
+                ->whereDate('resolved_at', today())->count(),
+        ];
+
+        return view('admin.contacts.index', compact('warehouses', 'workers', 'stats'));
+    }
+
+    public function data(Request $request): JsonResponse
+    {
+        $this->authorizePermission('shipments.view');
+
+        $query = PackageContactTask::with(['assignedTo:id,name', 'shipmentItem:id,tracking_code,description', 'shipment:id,shipment_number', 'warehouse:id,name']);
+
+        if ($status = $request->get('status')) {
+            if ($status === 'callbacks_due') {
+                $query->where('outcome', PackageContactTask::OUTCOME_CALLBACK)->where('callback_at', '<=', now());
+            } else {
+                $query->where('status', $status);
+            }
+        }
+
+        if ($warehouseId = $request->get('warehouse_id')) {
+            $query->where('warehouse_id', $warehouseId);
+        }
+
+        if ($workerId = $request->get('worker_id')) {
+            $query->where('assigned_to_user_id', $workerId);
+        }
+
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('recipient_name', 'like', "%{$search}%")
+                  ->orWhere('recipient_phone', 'like', "%{$search}%")
+                  ->orWhere('delivery_town', 'like', "%{$search}%")
+                  ->orWhereHas('shipment', fn ($sq) => $sq->where('shipment_number', 'like', "%{$search}%"));
+            });
+        }
+
+        $total = $query->count();
+        $perPage = min((int) $request->get('per_page', 20), 100);
+        $page = max((int) $request->get('page', 1), 1);
+
+        $tasks = $query->latest('created_at')->skip(($page - 1) * $perPage)->take($perPage)->get();
+
+        return response()->json([
+            'data' => $tasks->map(fn ($task) => [
+                'id' => $task->id,
+                'shipment_number' => $task->shipment?->shipment_number,
+                'tracking_code' => $task->shipmentItem?->tracking_code,
+                'description' => $task->shipmentItem?->description,
+                'recipient_name' => $task->recipient_name,
+                'recipient_phone' => $task->recipient_phone,
+                'delivery_town' => $task->delivery_town,
+                'warehouse_name' => $task->warehouse?->name,
+                'status' => $task->status,
+                'outcome' => $task->outcome,
+                'assigned_to' => $task->assignedTo?->name,
+                'assigned_at' => $task->assigned_at?->format('M d, H:i'),
+                'callback_at' => $task->callback_at?->format('M d, H:i'),
+                'attempts_count' => $task->attempts_count,
+                'resolved_at' => $task->resolved_at?->format('M d, H:i'),
+                'notes' => $task->notes,
+                'created_at' => $task->created_at?->format('M d, H:i'),
+            ])->values(),
+            'meta' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => max((int) ceil($total / $perPage), 1),
+                'from' => $total ? (($page - 1) * $perPage) + 1 : 0,
+                'to' => min($page * $perPage, $total),
+            ],
+            'stats' => [
+                'total' => PackageContactTask::count(),
+                'unassigned' => PackageContactTask::where('status', PackageContactTask::STATUS_PENDING)->count(),
+                'assigned' => PackageContactTask::where('status', PackageContactTask::STATUS_ASSIGNED)->count(),
+                'in_progress' => PackageContactTask::where('status', PackageContactTask::STATUS_IN_PROGRESS)->count(),
+                'resolved' => PackageContactTask::where('status', PackageContactTask::STATUS_RESOLVED)->count(),
+                'callbacks_due' => PackageContactTask::where('outcome', PackageContactTask::OUTCOME_CALLBACK)
+                    ->where('callback_at', '<=', now())->count(),
+                'resolved_today' => PackageContactTask::where('status', PackageContactTask::STATUS_RESOLVED)
+                    ->whereDate('resolved_at', today())->count(),
+            ],
+        ]);
+    }
+
+    public function assign(Request $request, PackageContactTask $task): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+        $validated = $request->validate(['user_id' => ['required', 'exists:users,id']]);
+        $worker = User::findOrFail($validated['user_id']);
+        $this->contactService->assignToWorker($task, $worker);
+        return response()->json(['success' => true, 'message' => "Assigned to {$worker->name}."]);
+    }
+
+    public function autoAssign(Request $request): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+        $validated = $request->validate(['warehouse_id' => ['required', 'exists:warehouses,id']]);
+        $warehouse = Warehouse::findOrFail($validated['warehouse_id']);
+        $count = $this->contactService->autoAssignRoundRobin($warehouse);
+        if ($count === 0) return response()->json(['success' => false, 'message' => 'No pending tasks or eligible workers.']);
+        return response()->json(['success' => true, 'message' => "{$count} tasks auto-assigned."]);
+    }
+
+    public function logCall(Request $request, PackageContactTask $task): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+        $validated = $request->validate([
+            'call_outcome' => ['required', 'in:answered,no_answer,busy,wrong_number,voicemail'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+        $admin = Auth::guard('admin')->user();
+        $this->contactService->logAttempt($task, $admin, $validated['call_outcome'], $validated['notes']);
+        return response()->json(['success' => true, 'message' => 'Call logged.', 'attempts_count' => $task->fresh()->attempts_count]);
+    }
+
+    public function resolve(Request $request, PackageContactTask $task): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+        $validated = $request->validate([
+            'outcome' => ['required', 'in:deliver,self_pickup,unreachable,wrong_number,callback'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+            'callback_at' => ['nullable', 'required_if:outcome,callback', 'date', 'after:now'],
+        ]);
+        $callbackAt = !empty($validated['callback_at']) ? new \DateTime($validated['callback_at']) : null;
+        $this->contactService->resolveTask($task, $validated['outcome'], $validated['notes'], $callbackAt);
+        return response()->json(['success' => true, 'message' => 'Task resolved.']);
+    }
+
+    public function attempts(PackageContactTask $task): JsonResponse
+    {
+        $this->authorizePermission('shipments.view');
+        $attempts = $task->attempts()->with('attemptedBy:id,name')->get();
+        return response()->json([
+            'data' => $attempts->map(fn ($a) => [
+                'id' => $a->id,
+                'outcome' => $a->outcome,
+                'notes' => $a->notes,
+                'attempted_by' => $a->attemptedBy?->name,
+                'attempted_at' => $a->attempted_at?->format('M d, Y H:i'),
+            ])->values(),
+        ]);
+    }
+
+    public function workerStats(): JsonResponse
+    {
+        $this->authorizePermission('shipments.view');
+        $workers = User::whereNotNull('warehouse_id')
+            ->where('is_active', true)
+            ->whereHas('roles', fn ($q) => $q->where('is_warehouse_role', true))
+            ->get()
+            ->filter(fn ($u) => $u->hasPermission('warehouse.contacts.manage'));
+
+        $stats = $workers->map(function ($worker) {
+            $warehouse = $worker->warehouse;
+            if (!$warehouse) return null;
+            return array_merge(
+                ['id' => $worker->id, 'name' => $worker->name, 'warehouse' => $warehouse->name],
+                $this->contactService->getWorkerStats($worker, $warehouse),
+            );
+        })->filter()->values();
+
+        return response()->json(['data' => $stats]);
+    }
+
+    protected function authorizePermission(string $permission): void
+    {
+        if (!Auth::guard('admin')->user()?->hasPermission($permission)) {
+            abort(403, 'Unauthorized.');
+        }
+    }
+}

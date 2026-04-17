@@ -153,8 +153,8 @@
                         <span class="sidebar-tooltip">Delivery Runs</span>
                     </template>
                 </a>
-                <a href="{{ route('warehouse.contacts.index') }}"
-                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('warehouse.contacts.*') ? 'active text-white' : '' }}"
+                <a href="{{ route('admin.contacts.index') }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.contacts.*') ? 'active text-white' : '' }}"
                    :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3 pl-8'">
                     <div class="nav-icon-wrap">
                         <svg class="w-[16px] h-[16px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">

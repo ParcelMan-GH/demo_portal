@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\ShipmentController;
 use App\Http\Controllers\Admin\ShipmentPaymentController;
 use App\Http\Controllers\Admin\AdminMarketingController;
 use App\Http\Controllers\Admin\VendorController;
+use App\Http\Controllers\Admin\AdminContactQueueController;
 use App\Http\Controllers\Admin\BusStationController;
 use App\Http\Controllers\Admin\VendorPayoutController;
 use App\Http\Controllers\Admin\WarehouseController;
@@ -320,6 +321,16 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('bus-stations', [BusStationController::class, 'index'])->name('bus-stations.index');
         Route::get('bus-stations-data', [BusStationController::class, 'data'])->name('bus-stations.data');
         Route::get('bus-stations-list', [BusStationController::class, 'list'])->name('bus-stations.list');
+
+        // Contact Queue (admin-side)
+        Route::get('contacts', [AdminContactQueueController::class, 'index'])->name('contacts.index');
+        Route::get('contacts-data', [AdminContactQueueController::class, 'data'])->name('contacts.data');
+        Route::post('contacts/{task}/assign', [AdminContactQueueController::class, 'assign'])->name('contacts.assign');
+        Route::post('contacts/auto-assign', [AdminContactQueueController::class, 'autoAssign'])->name('contacts.auto-assign');
+        Route::post('contacts/{task}/log-call', [AdminContactQueueController::class, 'logCall'])->name('contacts.log-call');
+        Route::post('contacts/{task}/resolve', [AdminContactQueueController::class, 'resolve'])->name('contacts.resolve');
+        Route::get('contacts/{task}/attempts', [AdminContactQueueController::class, 'attempts'])->name('contacts.attempts');
+        Route::get('contacts/worker-stats', [AdminContactQueueController::class, 'workerStats'])->name('contacts.worker-stats');
         Route::post('bus-stations', [BusStationController::class, 'store'])->name('bus-stations.store');
         Route::put('bus-stations/{busStation}', [BusStationController::class, 'update'])->name('bus-stations.update');
         Route::patch('bus-stations/{busStation}/toggle', [BusStationController::class, 'toggleActive'])->name('bus-stations.toggle');
