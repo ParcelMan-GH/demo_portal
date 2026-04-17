@@ -111,10 +111,10 @@
                                 <div class="mt-1">
                                     <template x-if="parseFloat(vendor.available_balance) >= parseFloat(vendor.min_payout)">
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700">Ready</span>
-                                    </div>
+                                    </template>
                                     <template x-if="parseFloat(vendor.available_balance) < parseFloat(vendor.min_payout)">
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500" x-text="'Below min (GHS ' + parseFloat(vendor.min_payout).toFixed(2) + ')'"></span>
-                                    </div>
+                                    </template>
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-right font-medium text-slate-700" x-text="'GHS ' + parseFloat(vendor.total_paid).toFixed(2)"></td>
@@ -129,12 +129,12 @@
                                 </button>
                             </td>
                         </tr>
-                    </div>
+                    </template>
                     <template x-if="!loading && vendors.length === 0">
                         <tr>
                             <td colspan="6" class="px-6 py-12 text-center text-slate-400 text-sm">No vendors found.</td>
                         </tr>
-                    </div>
+                    </template>
                     <template x-if="loading">
                         <tr>
                             <td colspan="6" class="px-6 py-12 text-center text-slate-400 text-sm">
@@ -144,7 +144,7 @@
                                 </svg>
                             </td>
                         </tr>
-                    </div>
+                    </template>
                 </tbody>
             </table>
         </div>
@@ -328,10 +328,10 @@
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                             </svg>
                         </div>
-                    </div>
+                    </template>
                     <template x-if="!historyLoading && payoutHistory.length === 0">
                         <div class="py-12 text-center text-sm text-slate-400">No payouts yet.</div>
-                    </div>
+                    </template>
                     <template x-for="payout in payoutHistory" :key="payout.id">
                         <div class="bg-white/60 border border-slate-100 rounded-2xl p-4">
                             <div class="flex items-start justify-between mb-2">
@@ -354,14 +354,14 @@
                             <div class="text-[10px] text-slate-400 space-y-0.5">
                                 <template x-if="payout.reference">
                                     <p>Ref: <span class="text-slate-600" x-text="payout.reference"></span></p>
-                                </div>
+                                </template>
                                 <p>Created: <span class="text-slate-600" x-text="payout.created_at"></span></p>
                                 <template x-if="payout.sent_at">
                                     <p>Sent: <span class="text-slate-600" x-text="payout.sent_at"></span></p>
-                                </div>
+                                </template>
                                 <template x-if="payout.confirmed_at">
                                     <p>Confirmed: <span class="text-slate-600" x-text="payout.confirmed_at"></span></p>
-                                </div>
+                                </template>
                             </div>
 
                             {{-- Payout Actions --}}
@@ -371,16 +371,16 @@
                                         @@click="promptMarkSent(payout)"
                                         class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors"
                                     >Mark as Sent</button>
-                                </div>
+                                </template>
                                 <template x-if="payout.status === 'sent'">
                                     <button
                                         @@click="confirmPayout(payout)"
                                         class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors"
                                     >Confirm</button>
-                                </div>
+                                </template>
                             </div>
                         </div>
-                    </div>
+                    </template>
                 </div>
             </div>
         </div>
