@@ -7,93 +7,18 @@
 @section('content')
 
 <div
-    x-data="{
-        config: {},
-        vendors: [],
-        meta: {},
-        stats: {},
-        loading: false,
-        search: '',
-        page: 1,
-        createModalOpen: false,
-        selectedVendor: null,
-        submitting: false,
-        payoutForm: { amount: '', payment_method: 'momo', payment_phone: '', notes: '' },
-        historyModalOpen: false,
-        historyVendor: null,
-        historyLoading: false,
-        payoutHistory: [],
-        markSentModalOpen: false,
-        markSentPayout: null,
-        markSentReference: '',
-
-        init() {
-            this.config = JSON.parse(this.$el.getAttribute('data-payout-config'));
-            this.loadData();
-        },
-        csrfToken() { return document.querySelector('meta[name=csrf-token]').content; },
-        async loadData() {
-            this.loading = true;
-            try {
-                const params = new URLSearchParams({ page: this.page, search: this.search });
-                const resp = await fetch(this.config.dataUrl + '?' + params.toString());
-                const json = await resp.json();
-                this.vendors = json.data || [];
-                this.meta = json.meta || {};
-                if (json.stats) this.stats = json.stats;
-            } catch (e) { console.error(e); }
-            this.loading = false;
-        },
-        goToPage(p) { if (p < 1 || p > this.meta.last_page) return; this.page = p; this.loadData(); },
-        openCreate(vendor) { this.selectedVendor = vendor; this.payoutForm = { amount: vendor.available_balance, payment_method: 'momo', payment_phone: vendor.phone, notes: '' }; this.createModalOpen = true; },
-        async submitPayout() {
-            this.submitting = true;
-            try {
-                const url = this.config.createPayoutUrl.replace('__VENDOR__', this.selectedVendor.id);
-                const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken(), 'Accept': 'application/json' }, body: JSON.stringify(this.payoutForm) });
-                const j = await r.json();
-                if (j.success) { window.showToast?.(j.message, 'success'); this.createModalOpen = false; this.loadData(); }
-                else window.showToast?.(j.message || 'Failed', 'error');
-            } catch (e) { window.showToast?.('Error', 'error'); }
-            this.submitting = false;
-        },
-        async openHistory(vendor) { this.historyVendor = vendor; this.historyModalOpen = true; this.historyLoading = true; this.payoutHistory = [];
-            try { const url = this.config.vendorPayoutsUrl.replace('__VENDOR__', vendor.id); const r = await fetch(url); const j = await r.json(); this.payoutHistory = j.data || []; } catch (e) {} this.historyLoading = false; },
-        promptMarkSent(payout) { this.markSentPayout = payout; this.markSentReference = ''; this.markSentModalOpen = true; },
-        async submitMarkSent() {
-            if (!this.markSentReference.trim()) { window.showToast?.('Reference required', 'error'); return; }
-            this.submitting = true;
-            try {
-                const url = this.config.markSentUrl.replace('__PAYOUT__', this.markSentPayout.id);
-                const r = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken(), 'Accept': 'application/json' }, body: JSON.stringify({ payment_reference: this.markSentReference.trim() }) });
-                const j = await r.json();
-                if (j.success) { window.showToast?.(j.message, 'success'); this.markSentModalOpen = false; this.openHistory(this.historyVendor); this.loadData(); }
-                else window.showToast?.(j.message || 'Failed', 'error');
-            } catch (e) { window.showToast?.('Error', 'error'); }
-            this.submitting = false;
-        },
-        async confirmPayout(payout) {
-            try {
-                const url = this.config.confirmUrl.replace('__PAYOUT__', payout.id);
-                const r = await fetch(url, { method: 'PATCH', headers: { 'X-CSRF-TOKEN': this.csrfToken(), 'Accept': 'application/json' } });
-                const j = await r.json();
-                if (j.success) { window.showToast?.(j.message, 'success'); this.openHistory(this.historyVendor); this.loadData(); }
-                else window.showToast?.(j.message || 'Failed', 'error');
-            } catch (e) { window.showToast?.('Error', 'error'); }
-        },
-    }"
+    x-data="vendorPayoutsPage()"
     x-init="init()"
     data-payout-config='@json($payoutConfig)'
     class="space-y-6"
 >
     {{-- Stats Row --}}
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {{-- Total Vendors with Balance --}}
         <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg p-6">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Vendors with Balance</p>
-                    <p class="mt-2 text-2xl font-bold text-slate-900" x-text="stats.vendorsWithBalance ?? '—'"></p>
+                    <p class="mt-2 text-2xl font-bold text-slate-900" x-text="stats.vendorsWithBalance != null ? stats.vendorsWithBalance : '—'"></p>
                 </div>
                 <div class="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center">
                     <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -103,7 +28,6 @@
             </div>
         </div>
 
-        {{-- Total Available Balance --}}
         <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg p-6">
             <div class="flex items-center justify-between">
                 <div>
@@ -118,7 +42,6 @@
             </div>
         </div>
 
-        {{-- Pending Payouts --}}
         <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg p-6">
             <div class="flex items-center justify-between">
                 <div>
@@ -136,7 +59,6 @@
 
     {{-- Main Table Card --}}
     <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg">
-        {{-- Header --}}
         <div class="px-6 py-5 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="text-lg font-bold text-slate-900">Vendor Payouts</h2>
             <div class="relative">
@@ -153,7 +75,6 @@
             </div>
         </div>
 
-        {{-- Table --}}
         <div class="overflow-x-auto">
             <table class="w-full text-xs">
                 <thead>
@@ -216,288 +137,305 @@
             </table>
         </div>
 
-        {{-- Pagination --}}
         <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between" x-show="meta.last_page > 1">
             <p class="text-xs text-slate-500">
-                Showing <span x-text="meta.from ?? 0"></span> to <span x-text="meta.to ?? 0"></span> of <span x-text="meta.total ?? 0"></span>
+                Showing <span x-text="meta.from || 0"></span> to <span x-text="meta.to || 0"></span> of <span x-text="meta.total || 0"></span>
             </p>
             <div class="flex items-center gap-1">
-                <button
-                    @@click="goToPage(meta.current_page - 1)"
-                    :disabled="meta.current_page <= 1"
-                    class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                >Prev</button>
-                <button
-                    @@click="goToPage(meta.current_page + 1)"
-                    :disabled="meta.current_page >= meta.last_page"
-                    class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                >Next</button>
+                <button @@click="goToPage(meta.current_page - 1)" :disabled="meta.current_page <= 1" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Prev</button>
+                <button @@click="goToPage(meta.current_page + 1)" :disabled="meta.current_page >= meta.last_page" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
             </div>
         </div>
     </div>
 
     {{-- Create Payout Modal --}}
-        <div
-            x-cloak
-            x-show="createModalOpen"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style="display: none;"
-        >
-            {{-- Backdrop --}}
-            <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @@click="createModalOpen = false"></div>
+    <div x-cloak x-show="createModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @@click="createModalOpen = false"></div>
+        <div class="relative bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md p-6">
+            <h3 class="text-lg font-bold text-slate-900 mb-1">Create Payout</h3>
+            <p class="text-xs text-slate-500 mb-5" x-show="selectedVendor" x-text="'For ' + (selectedVendor ? selectedVendor.name : '')"></p>
 
-            {{-- Modal Content --}}
-            <div
-                x-show="createModalOpen"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 scale-95"
-                x-transition:enter-end="opacity-100 scale-100"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100 scale-100"
-                x-transition:leave-end="opacity-0 scale-95"
-                class="relative bg-white/90 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-2xl w-full max-w-md p-6"
-            >
-                <h3 class="text-lg font-bold text-slate-900 mb-1">Create Payout</h3>
-                <p class="text-xs text-slate-500 mb-5" x-text="'For ' + (selectedVendor?.name ?? '')"></p>
+            <form @@submit.prevent="submitPayout()">
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Amount (GHS)</label>
+                    <input type="number" step="0.01" min="0" x-model="payoutForm.amount" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" required />
+                </div>
 
-                <form @@submit.prevent="submitPayout()">
-                    {{-- Amount --}}
-                    <div class="mb-4">
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Amount (GHS)</label>
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            x-model="payoutForm.amount"
-                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white/60 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none"
-                            required
-                        />
-                    </div>
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Payment Method</label>
+                    <select x-model="payoutForm.payment_method" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" required>
+                        <option value="momo">MoMo</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="cash">Cash</option>
+                    </select>
+                </div>
 
-                    {{-- Payment Method --}}
-                    <div class="mb-4">
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Payment Method</label>
-                        <select
-                            x-model="payoutForm.payment_method"
-                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white/60 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none"
-                            required
-                        >
-                            <option value="momo">MoMo</option>
-                            <option value="bank_transfer">Bank Transfer</option>
-                            <option value="cash">Cash</option>
-                        </select>
-                    </div>
+                <div class="mb-4" x-show="payoutForm.payment_method === 'momo'">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Payment Phone</label>
+                    <input type="text" x-model="payoutForm.payment_phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" />
+                </div>
 
-                    {{-- Payment Phone (MoMo only) --}}
-                    <div class="mb-4" x-show="payoutForm.payment_method === 'momo'"
-                         x-transition:enter="transition ease-out duration-150"
-                         x-transition:enter-start="opacity-0"
-                         x-transition:enter-end="opacity-100"
-                         x-transition:leave="transition ease-in duration-100"
-                         x-transition:leave-start="opacity-100"
-                         x-transition:leave-end="opacity-0">
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Payment Phone</label>
-                        <input
-                            type="text"
-                            x-model="payoutForm.payment_phone"
-                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white/60 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none"
-                        />
-                    </div>
+                <div class="mb-5">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Notes (optional)</label>
+                    <textarea x-model="payoutForm.notes" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
+                </div>
 
-                    {{-- Notes --}}
-                    <div class="mb-5">
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Notes (optional)</label>
-                        <textarea
-                            x-model="payoutForm.notes"
-                            rows="2"
-                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white/60 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"
-                        ></textarea>
-                    </div>
-
-                    {{-- Actions --}}
-                    <div class="flex items-center justify-end gap-3">
-                        <button
-                            type="button"
-                            @@click="createModalOpen = false"
-                            class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
-                        >Cancel</button>
-                        <button
-                            type="submit"
-                            :disabled="submitting"
-                            class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50"
-                        >
-                            <span x-show="!submitting">Create Payout</span>
-                            <span x-show="submitting" class="flex items-center gap-2">
-                                <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                </svg>
-                                Creating...
-                            </span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-    {{-- Payout History Modal --}}
-        <div
-            x-cloak
-            x-show="historyModalOpen"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style="display: none;"
-        >
-            {{-- Backdrop --}}
-            <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @@click="historyModalOpen = false"></div>
-
-            {{-- Panel --}}
-            <div
-                x-show="historyModalOpen"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 scale-95"
-                x-transition:enter-end="opacity-100 scale-100"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100 scale-100"
-                x-transition:leave-end="opacity-0 scale-95"
-                class="relative bg-white/90 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col"
-            >
-                {{-- Header --}}
-                <div class="px-6 py-5 border-b border-slate-200/80 flex items-center justify-between shrink-0">
-                    <div>
-                        <h3 class="text-lg font-bold text-slate-900">Payout History</h3>
-                        <p class="text-xs text-slate-500 mt-0.5" x-text="historyVendor?.name ?? ''"></p>
-                    </div>
-                    <button @@click="historyModalOpen = false" class="p-1 rounded-lg hover:bg-slate-100 transition-colors">
-                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
+                <div class="flex items-center justify-end gap-3">
+                    <button type="button" @@click="createModalOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">Cancel</button>
+                    <button type="submit" :disabled="submitting" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">
+                        <span x-show="!submitting">Create Payout</span>
+                        <span x-show="submitting">Creating...</span>
                     </button>
                 </div>
+            </form>
+        </div>
+    </div>
 
-                {{-- Content --}}
-                <div class="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-                    <template x-if="historyLoading">
-                        <div class="py-12 text-center">
-                            <svg class="animate-spin h-5 w-5 mx-auto text-slate-400" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                            </svg>
-                        </div>
-                    </template>
-                    <template x-if="!historyLoading && payoutHistory.length === 0">
-                        <div class="py-12 text-center text-sm text-slate-400">No payouts yet.</div>
-                    </template>
-                    <template x-for="payout in payoutHistory" :key="payout.id">
-                        <div class="bg-white/60 border border-slate-100 rounded-2xl p-4">
-                            <div class="flex items-start justify-between mb-2">
-                                <div>
-                                    <span class="text-sm font-bold text-slate-900" x-text="'GHS ' + parseFloat(payout.amount).toFixed(2)"></span>
-                                    <span class="ml-2 text-xs text-slate-500" x-text="payout.payment_method"></span>
-                                </div>
-                                {{-- Status Badge --}}
-                                <span
-                                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
-                                    :class="{
-                                        'bg-amber-50 text-amber-700': payout.status === 'pending',
-                                        'bg-blue-50 text-blue-700': payout.status === 'sent',
-                                        'bg-emerald-50 text-emerald-700': payout.status === 'confirmed',
-                                    }"
-                                    x-text="payout.status.charAt(0).toUpperCase() + payout.status.slice(1)"
-                                ></span>
-                            </div>
-
-                            <div class="text-[10px] text-slate-400 space-y-0.5">
-                                <template x-if="payout.reference">
-                                    <p>Ref: <span class="text-slate-600" x-text="payout.reference"></span></p>
-                                </template>
-                                <p>Created: <span class="text-slate-600" x-text="payout.created_at"></span></p>
-                                <template x-if="payout.sent_at">
-                                    <p>Sent: <span class="text-slate-600" x-text="payout.sent_at"></span></p>
-                                </template>
-                                <template x-if="payout.confirmed_at">
-                                    <p>Confirmed: <span class="text-slate-600" x-text="payout.confirmed_at"></span></p>
-                                </template>
-                            </div>
-
-                            {{-- Payout Actions --}}
-                            <div class="mt-3 flex items-center gap-2">
-                                <template x-if="payout.status === 'pending'">
-                                    <button
-                                        @@click="promptMarkSent(payout)"
-                                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors"
-                                    >Mark as Sent</button>
-                                </template>
-                                <template x-if="payout.status === 'sent'">
-                                    <button
-                                        @@click="confirmPayout(payout)"
-                                        class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors"
-                                    >Confirm</button>
-                                </template>
-                            </div>
-                        </div>
-                    </template>
+    {{-- Payout History Modal --}}
+    <div x-cloak x-show="historyModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @@click="historyModalOpen = false"></div>
+        <div class="relative bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between shrink-0">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Payout History</h3>
+                    <p class="text-xs text-slate-500 mt-0.5" x-show="historyVendor" x-text="historyVendor ? historyVendor.name : ''"></p>
                 </div>
+                <button @@click="historyModalOpen = false" class="p-1 rounded-lg hover:bg-slate-100 transition-colors">
+                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
             </div>
-        </div>
 
-    {{-- Mark as Sent Prompt Modal --}}
-        <div
-            x-cloak
-            x-show="markSentModalOpen"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="fixed inset-0 z-[60] flex items-center justify-center p-4"
-            style="display: none;"
-        >
-            <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @@click="markSentModalOpen = false"></div>
-            <div
-                x-show="markSentModalOpen"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 scale-95"
-                x-transition:enter-end="opacity-100 scale-100"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100 scale-100"
-                x-transition:leave-end="opacity-0 scale-95"
-                class="relative bg-white/90 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-2xl w-full max-w-sm p-6"
-            >
-                <h3 class="text-base font-bold text-slate-900 mb-4">Mark Payout as Sent</h3>
-                <form @@submit.prevent="submitMarkSent()">
-                    <div class="mb-5">
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Payment Reference</label>
-                        <input
-                            type="text"
-                            x-model="markSentReference"
-                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white/60 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none"
-                            placeholder="e.g. MoMo transaction ID"
-                            required
-                        />
+            <div class="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+                <div x-show="historyLoading" class="py-12 text-center">
+                    <svg class="animate-spin h-5 w-5 mx-auto text-slate-400" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                </div>
+                <div x-show="!historyLoading && payoutHistory.length === 0" class="py-12 text-center text-sm text-slate-400">No payouts yet.</div>
+                <template x-for="payout in payoutHistory" :key="payout.id">
+                    <div class="bg-white/60 border border-slate-100 rounded-2xl p-4">
+                        <div class="flex items-start justify-between mb-2">
+                            <div>
+                                <span class="text-sm font-bold text-slate-900" x-text="'GHS ' + parseFloat(payout.amount).toFixed(2)"></span>
+                                <span class="ml-2 text-xs text-slate-500" x-text="payout.payment_method"></span>
+                            </div>
+                            <span
+                                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
+                                :class="{
+                                    'bg-amber-50 text-amber-700': payout.status === 'pending',
+                                    'bg-blue-50 text-blue-700': payout.status === 'sent',
+                                    'bg-emerald-50 text-emerald-700': payout.status === 'confirmed'
+                                }"
+                                x-text="payout.status.charAt(0).toUpperCase() + payout.status.slice(1)"
+                            ></span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 space-y-0.5">
+                            <p x-show="payout.reference">Ref: <span class="text-slate-600" x-text="payout.reference"></span></p>
+                            <p>Created: <span class="text-slate-600" x-text="payout.created_at"></span></p>
+                            <p x-show="payout.sent_at">Sent: <span class="text-slate-600" x-text="payout.sent_at"></span></p>
+                            <p x-show="payout.confirmed_at">Confirmed: <span class="text-slate-600" x-text="payout.confirmed_at"></span></p>
+                        </div>
+                        <div class="mt-3 flex items-center gap-2">
+                            <button x-show="payout.status === 'pending'" @@click="promptMarkSent(payout)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors">Mark as Sent</button>
+                            <button x-show="payout.status === 'sent'" @@click="confirmPayout(payout)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors">Confirm</button>
+                        </div>
                     </div>
-                    <div class="flex items-center justify-end gap-3">
-                        <button type="button" @@click="markSentModalOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">Cancel</button>
-                        <button type="submit" :disabled="submitting" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">
-                            <span x-show="!submitting">Submit</span>
-                            <span x-show="submitting">Saving...</span>
-                        </button>
-                    </div>
-                </form>
+                </template>
             </div>
         </div>
+    </div>
+
+    {{-- Mark as Sent Modal --}}
+    <div x-cloak x-show="markSentModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4" style="display: none;">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @@click="markSentModalOpen = false"></div>
+        <div class="relative bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-sm p-6">
+            <h3 class="text-base font-bold text-slate-900 mb-4">Mark Payout as Sent</h3>
+            <form @@submit.prevent="submitMarkSent()">
+                <div class="mb-5">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Payment Reference</label>
+                    <input type="text" x-model="markSentReference" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" placeholder="e.g. MoMo transaction ID" required />
+                </div>
+                <div class="flex items-center justify-end gap-3">
+                    <button type="button" @@click="markSentModalOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">Cancel</button>
+                    <button type="submit" :disabled="submitting" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">
+                        <span x-show="!submitting">Submit</span>
+                        <span x-show="submitting">Saving...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 @endsection
+
+@push('scripts')
+<script>
+function vendorPayoutsPage() {
+    return {
+        config: {},
+        vendors: [],
+        meta: {},
+        stats: {},
+        loading: false,
+        search: '',
+        page: 1,
+        createModalOpen: false,
+        selectedVendor: null,
+        submitting: false,
+        payoutForm: { amount: '', payment_method: 'momo', payment_phone: '', notes: '' },
+        historyModalOpen: false,
+        historyVendor: null,
+        historyLoading: false,
+        payoutHistory: [],
+        markSentModalOpen: false,
+        markSentPayout: null,
+        markSentReference: '',
+
+        init() {
+            this.config = JSON.parse(this.$el.getAttribute('data-payout-config'));
+            this.loadData();
+        },
+
+        csrfToken() {
+            return document.querySelector('meta[name="csrf-token"]').content;
+        },
+
+        async loadData() {
+            this.loading = true;
+            try {
+                var params = new URLSearchParams({ page: this.page, search: this.search });
+                var resp = await fetch(this.config.dataUrl + '?' + params.toString());
+                var json = await resp.json();
+                this.vendors = Array.isArray(json.data) ? json.data : [];
+                this.meta = json.meta || {};
+                if (json.stats) {
+                    this.stats = json.stats;
+                }
+            } catch (e) {
+                console.error('Failed to load payout data', e);
+                this.vendors = [];
+                this.meta = {};
+            }
+            this.loading = false;
+        },
+
+        goToPage(p) {
+            if (p < 1 || p > this.meta.last_page) return;
+            this.page = p;
+            this.loadData();
+        },
+
+        openCreate(vendor) {
+            this.selectedVendor = vendor;
+            this.payoutForm = {
+                amount: vendor.available_balance,
+                payment_method: 'momo',
+                payment_phone: vendor.phone || '',
+                notes: ''
+            };
+            this.createModalOpen = true;
+        },
+
+        async submitPayout() {
+            this.submitting = true;
+            try {
+                var url = this.config.createPayoutUrl.replace('__VENDOR__', this.selectedVendor.id);
+                var resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken(), 'Accept': 'application/json' },
+                    body: JSON.stringify(this.payoutForm)
+                });
+                var json = await resp.json();
+                if (resp.ok && json.success !== false) {
+                    window.showToast && window.showToast(json.message || 'Payout created', 'success');
+                    this.createModalOpen = false;
+                    this.loadData();
+                } else {
+                    window.showToast && window.showToast(json.message || 'Failed', 'error');
+                }
+            } catch (e) {
+                window.showToast && window.showToast('An error occurred', 'error');
+                console.error(e);
+            }
+            this.submitting = false;
+        },
+
+        async openHistory(vendor) {
+            this.historyVendor = vendor;
+            this.historyModalOpen = true;
+            this.historyLoading = true;
+            this.payoutHistory = [];
+            try {
+                var url = this.config.vendorPayoutsUrl.replace('__VENDOR__', vendor.id);
+                var resp = await fetch(url);
+                var json = await resp.json();
+                this.payoutHistory = json.data || json || [];
+            } catch (e) {
+                console.error('Failed to load payout history', e);
+            }
+            this.historyLoading = false;
+        },
+
+        promptMarkSent(payout) {
+            this.markSentPayout = payout;
+            this.markSentReference = '';
+            this.markSentModalOpen = true;
+        },
+
+        async submitMarkSent() {
+            if (!this.markSentReference.trim()) {
+                window.showToast && window.showToast('Reference required', 'error');
+                return;
+            }
+            this.submitting = true;
+            try {
+                var url = this.config.markSentUrl.replace('__PAYOUT__', this.markSentPayout.id);
+                var resp = await fetch(url, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken(), 'Accept': 'application/json' },
+                    body: JSON.stringify({ payment_reference: this.markSentReference.trim() })
+                });
+                var json = await resp.json();
+                if (resp.ok && json.success !== false) {
+                    window.showToast && window.showToast(json.message || 'Marked as sent', 'success');
+                    this.markSentModalOpen = false;
+                    this.openHistory(this.historyVendor);
+                    this.loadData();
+                } else {
+                    window.showToast && window.showToast(json.message || 'Failed', 'error');
+                }
+            } catch (e) {
+                window.showToast && window.showToast('An error occurred', 'error');
+                console.error(e);
+            }
+            this.submitting = false;
+        },
+
+        async confirmPayout(payout) {
+            try {
+                var url = this.config.confirmUrl.replace('__PAYOUT__', payout.id);
+                var resp = await fetch(url, {
+                    method: 'PATCH',
+                    headers: { 'X-CSRF-TOKEN': this.csrfToken(), 'Accept': 'application/json' }
+                });
+                var json = await resp.json();
+                if (resp.ok && json.success !== false) {
+                    window.showToast && window.showToast(json.message || 'Confirmed', 'success');
+                    this.openHistory(this.historyVendor);
+                    this.loadData();
+                } else {
+                    window.showToast && window.showToast(json.message || 'Failed', 'error');
+                }
+            } catch (e) {
+                window.showToast && window.showToast('An error occurred', 'error');
+                console.error(e);
+            }
+        }
+    };
+}
+</script>
+@endpush
