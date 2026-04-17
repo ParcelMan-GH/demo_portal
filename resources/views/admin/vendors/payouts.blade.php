@@ -170,8 +170,8 @@
     </div>
 
     {{-- Create Payout Modal --}}
-    <div>
         <div
+            x-cloak
             x-show="createModalOpen"
             x-transition:enter="transition ease-out duration-200"
             x-transition:enter-start="opacity-0"
@@ -278,11 +278,10 @@
                 </form>
             </div>
         </div>
-    </div>
 
     {{-- Payout History Modal --}}
-    <div>
         <div
+            x-cloak
             x-show="historyModalOpen"
             x-transition:enter="transition ease-out duration-200"
             x-transition:enter-start="opacity-0"
@@ -385,11 +384,10 @@
                 </div>
             </div>
         </div>
-    </div>
 
     {{-- Mark as Sent Prompt Modal --}}
-    <div>
         <div
+            x-cloak
             x-show="markSentModalOpen"
             x-transition:enter="transition ease-out duration-200"
             x-transition:enter-start="opacity-0"
@@ -433,7 +431,6 @@
                 </form>
             </div>
         </div>
-    </div>
 </div>
 
 @push('scripts')
