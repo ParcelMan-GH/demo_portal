@@ -467,8 +467,8 @@ function shipmentShow() {
         },
 
         async loadPackageDistricts(pkg, regionEl) {
-            const grid = regionEl ? regionEl.closest('.grid') : null;
-            const distSel = grid ? grid.querySelector('.rcv-district-select') : null;
+            // regionEl is the <select>, parent is the <div>, parent's parent is the grid, find district select in siblings
+            const distSel = regionEl ? regionEl.parentElement.parentElement.querySelector('.rcv-district-select') : null;
 
             const populate = (districts, selectedId) => {
                 if (!distSel) return;
