@@ -331,6 +331,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('contacts/{task}/resolve', [AdminContactQueueController::class, 'resolve'])->name('contacts.resolve');
         Route::get('contacts/{task}/attempts', [AdminContactQueueController::class, 'attempts'])->name('contacts.attempts');
         Route::get('contacts/worker-stats', [AdminContactQueueController::class, 'workerStats'])->name('contacts.worker-stats');
+        Route::post('contacts/add-to-queue', [AdminContactQueueController::class, 'addToQueue'])->name('contacts.add-to-queue');
         Route::post('bus-stations', [BusStationController::class, 'store'])->name('bus-stations.store');
         Route::put('bus-stations/{busStation}', [BusStationController::class, 'update'])->name('bus-stations.update');
         Route::patch('bus-stations/{busStation}/toggle', [BusStationController::class, 'toggleActive'])->name('bus-stations.toggle');

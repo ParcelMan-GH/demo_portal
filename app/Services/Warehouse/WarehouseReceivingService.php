@@ -506,15 +506,6 @@ class WarehouseReceivingService
                 'finalized_at' => now(),
             ]);
 
-            try {
-                app(PackageContactService::class)->createTasksForWarehouseItems(
-                    $warehouse,
-                    $shipmentItemIds->toArray()
-                );
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Failed to create contact tasks: ' . $e->getMessage());
-            }
-
             return [
                 'success' => true,
                 'message' => 'Receipt finalized successfully.',

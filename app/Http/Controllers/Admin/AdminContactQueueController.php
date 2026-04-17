@@ -204,6 +204,26 @@ class AdminContactQueueController extends Controller
         return response()->json(['data' => $stats]);
     }
 
+    public function addToQueue(Request $request): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $validated = $request->validate([
+            'shipment_item_ids' => ['required', 'array', 'min:1'],
+            'shipment_item_ids.*' => ['integer', 'exists:shipment_items,id'],
+            'warehouse_id' => ['required', 'exists:warehouses,id'],
+        ]);
+
+        $warehouse = Warehouse::findOrFail($validated['warehouse_id']);
+        $count = $this->contactService->createTasksForWarehouseItems($warehouse, $validated['shipment_item_ids']);
+
+        if ($count === 0) {
+            return response()->json(['success' => false, 'message' => 'No items added — they may already be in the queue or have no recipient phone.']);
+        }
+
+        return response()->json(['success' => true, 'message' => "{$count} item(s) added to contact queue."]);
+    }
+
     protected function authorizePermission(string $permission): void
     {
         if (!Auth::guard('admin')->user()?->hasPermission($permission)) {

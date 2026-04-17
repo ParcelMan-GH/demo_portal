@@ -104,6 +104,7 @@ class SettingsController extends Controller
             'delivery' => [
                 'delivery.allow_skip_verification' => ['label' => 'Allow Drivers to Skip OTP Verification', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, drivers can skip OTP verification during delivery with a reason. The delivery will be flagged for review.'],
                 'delivery.show_otp_to_vendor' => ['label' => 'Show OTP Code to Vendor', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, vendors can see the delivery OTP code in their shipment details. This allows recipients to call the vendor for the code if SMS fails.'],
+                'contact_queue.auto_queue_on_transport_receive' => ['label' => 'Auto-Queue on Transport Manifest Receive', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, items from incoming transport manifests are automatically added to the contact queue when received at the warehouse.'],
             ],
             'commission' => [
                 'vendor_commission.enabled' => ['label' => 'Enable Vendor Commission', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, vendors earn a commission for each package delivered to their recipients.'],

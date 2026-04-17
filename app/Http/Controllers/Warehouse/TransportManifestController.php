@@ -342,6 +342,15 @@ class TransportManifestController extends Controller
             notes: $validated['notes'] ?? null
         );
 
+        if ($result['success'] && \App\Models\PlatformSetting::getValue('contact_queue.auto_queue_on_transport_receive', false)) {
+            try {
+                $itemIds = $manifest->items()->pluck('shipment_item_id')->toArray();
+                app(\App\Services\Warehouse\PackageContactService::class)->createTasksForWarehouseItems($warehouse, $itemIds);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Auto-queue on transport receive failed: ' . $e->getMessage());
+            }
+        }
+
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
