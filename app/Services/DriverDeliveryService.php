@@ -36,7 +36,7 @@ class DriverDeliveryService
             ->where('assigned_driver_id', $driver->id)
             ->with([
                 'warehouse:id,name,code,address,latitude,longitude,contact_phone',
-                'stops:id,delivery_run_id,recipient_name,recipient_phone,status,total_packages,town,landmark,gh_post_address,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,failure_reason,failure_notes,delivery_notes',
+                'stops:id,delivery_run_id,recipient_name,recipient_phone,status,delivery_method,total_packages,town,landmark,gh_post_address,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,failure_reason,failure_notes,delivery_notes,handoff_courier_name,handoff_courier_phone,handoff_vehicle_number,handoff_at',
                 'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status',
                 'items.shipmentItem:id,shipment_id,description,tracking_code',
                 'items.shipmentItem.shipment:id,shipment_number',
@@ -103,7 +103,7 @@ class DriverDeliveryService
 
         $run->load([
             'warehouse:id,name,code,address,latitude,longitude,contact_phone',
-            'stops:id,delivery_run_id,recipient_name,recipient_phone,status,total_packages,region_id,district_id,town,latitude,longitude,gh_post_address,landmark,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,delivery_latitude,delivery_longitude,failure_reason,failure_notes,delivery_notes',
+            'stops:id,delivery_run_id,recipient_name,recipient_phone,status,delivery_method,total_packages,region_id,district_id,town,latitude,longitude,gh_post_address,landmark,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,delivery_latitude,delivery_longitude,failure_reason,failure_notes,delivery_notes,handoff_courier_name,handoff_courier_phone,handoff_vehicle_number,handoff_at',
             'stops.region:id,name',
             'stops.district:id,name',
             'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status,notes,delivered_at',
