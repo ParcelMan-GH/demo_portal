@@ -33,6 +33,7 @@ class SettingsController extends Controller
         'admin-audit-logs' => ['label' => 'Admin Audit Logs', 'icon' => 'shield'],
         'notification-logs' => ['label' => 'Notification Logs', 'icon' => 'bell'],
         'delivery' => ['label' => 'Delivery Settings', 'icon' => 'truck'],
+        'bus-stations' => ['label' => 'Bus Stations', 'icon' => 'truck'],
         'commission' => ['label' => 'Vendor Commission', 'icon' => 'cash'],
         'push' => ['label' => 'Push Notifications', 'icon' => 'bell'],
         'health' => ['label' => 'System Health', 'icon' => 'heart'],

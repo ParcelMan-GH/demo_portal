@@ -34,7 +34,7 @@
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">General</span>
                     </div>
                     <div class="space-y-1">
-                        @foreach(['platform' => $tabs['platform'], 'invoice' => $tabs['invoice']] as $key => $tab)
+                        @foreach(['platform' => $tabs['platform'], 'invoice' => $tabs['invoice'], 'delivery' => $tabs['delivery'], 'bus-stations' => $tabs['bus-stations'], 'commission' => $tabs['commission']] as $key => $tab)
                         <a href="{{ route('admin.settings.index', ['tab' => $key]) }}"
                            class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 {{ $activeTab === $key ? 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg shadow-slate-900/25' : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900' }}">
                             <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 {{ $activeTab === $key ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-slate-200' }}">
@@ -235,7 +235,7 @@
                         {{-- Total count badge --}}
                         <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="($store.notifLogs?.total || 0) + ' Total Logs'"></span>
                     </div>
-                    @elseif(!in_array($activeTab, ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates']))
+                    @elseif(!in_array($activeTab, ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates', 'bus-stations']))
                     <button type="button"
                             @@click="saveSettings()"
                             :disabled="saving"
