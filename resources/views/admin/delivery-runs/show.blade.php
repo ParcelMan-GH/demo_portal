@@ -441,7 +441,7 @@ $itemStatusColors = [
                                     <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                     </svg>
-                                    Delivered {{ $stop->delivered_at->format('H:i') }}
+                                    {{ ($stop->delivery_method ?? 'direct') === 'bus_handoff' ? 'Handed Off' : 'Delivered' }} {{ $stop->delivered_at->format('H:i') }}
                                 </span>
                             @endif
                             @if($stop->verification_attempts > 0)
