@@ -38,8 +38,7 @@ class VendorCommissionService
             return 0;
         }
 
-        $autoApprove = (bool) PlatformSetting::getValue('vendor_commission.auto_approve', true);
-        $status = $autoApprove ? VendorEarning::STATUS_APPROVED : 'pending';
+        $status = VendorEarning::STATUS_APPROVED;
 
         $items = DeliveryRunItem::where('delivery_run_stop_id', $stop->id)
             ->with('shipmentItem.shipment')

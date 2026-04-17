@@ -108,7 +108,6 @@ class SettingsController extends Controller
             'commission' => [
                 'vendor_commission.enabled' => ['label' => 'Enable Vendor Commission', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, vendors earn a commission for each package delivered to their recipients.'],
                 'vendor_commission.rate_per_package' => ['label' => 'Rate Per Package (GHS)', 'type' => 'number', 'default' => '2.00', 'help' => 'Amount in Ghana Cedis earned per delivered package.'],
-                'vendor_commission.auto_approve' => ['label' => 'Auto-Approve Earnings', 'type' => 'toggle', 'default' => '1', 'help' => 'Automatically approve earnings when a delivery is confirmed. If off, admin must manually approve each earning.'],
                 'vendor_commission.min_payout' => ['label' => 'Minimum Payout Amount (GHS)', 'type' => 'number', 'default' => '20.00', 'help' => 'Vendors must accumulate at least this amount before a payout can be processed.'],
             ],
             'push' => [
