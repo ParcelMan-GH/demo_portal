@@ -448,32 +448,42 @@ function shipmentShow() {
                     this.receiving.receipt = result.data.receipt;
                     this.receiving.assignmentId = result.data.assignment_id;
                     // Pre-load districts for packages that already have a region set
-                    for (const pkg of this.receiving.packages) {
-                        if (pkg.delivery_region_id) {
-                            this.loadPackageDistricts(pkg);
-                        }
-                    }
+                    this.$nextTick(() => {
+                        setTimeout(() => {
+                            document.querySelectorAll('.rcv-district-select').forEach(distSel => {
+                                const grid = distSel.closest('.grid');
+                                const regionSel = grid?.querySelector('select');
+                                if (regionSel && regionSel.value) {
+                                    const pkgIndex = Array.from(document.querySelectorAll('.rcv-district-select')).indexOf(distSel);
+                                    const pkg = this.receiving.packages[pkgIndex];
+                                    if (pkg) this.loadPackageDistricts(pkg, regionSel);
+                                }
+                            });
+                        }, 300);
+                    });
                 }
             } catch (e) { console.error('Failed to load receiving data', e); }
             this.receiving.loading = false;
         },
 
-        async loadPackageDistricts(pkg) {
-            const selId = 'rcv-district-' + pkg.shipment_item_id;
-            const populateSelect = (districts, selectedId) => {
-                const sel = document.getElementById(selId);
-                if (!sel) return;
-                sel.innerHTML = '<option value="">Select District</option>';
+        async loadPackageDistricts(pkg, regionEl) {
+            const grid = regionEl ? regionEl.closest('.grid') : null;
+            const distSel = grid ? grid.querySelector('.rcv-district-select') : null;
+
+            const populate = (districts, selectedId) => {
+                if (!distSel) return;
+                distSel.innerHTML = '<option value="">Select District</option>';
                 (districts || []).forEach(d => {
                     const opt = document.createElement('option');
                     opt.value = d.id;
                     opt.textContent = d.name;
                     if (String(d.id) === String(selectedId)) opt.selected = true;
-                    sel.appendChild(opt);
+                    distSel.appendChild(opt);
                 });
             };
+
             if (!pkg.delivery_region_id) {
-                populateSelect([], null);
+                populate([], null);
                 pkg.delivery_district_id = null;
                 return;
             }
@@ -482,10 +492,9 @@ function shipmentShow() {
                 const url = this.config.districtsUrl.replace('__REGION__', pkg.delivery_region_id);
                 const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
                 const json = await resp.json();
-                const districts = json.data?.districts || [];
-                populateSelect(districts, savedId);
+                populate(json.data?.districts || [], savedId);
             } catch (e) {
-                populateSelect([], null);
+                populate([], null);
             }
         },
 

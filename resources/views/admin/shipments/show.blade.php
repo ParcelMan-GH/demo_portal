@@ -2720,7 +2720,9 @@ $shipmentConfig = [
                                                 <div class="grid grid-cols-2 gap-3">
                                                     <div>
                                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Region</label>
-                                                        <select x-model="pkg.delivery_region_id" @@change="loadPackageDistricts(pkg)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                        <select x-model="pkg.delivery_region_id"
+                                                                @@change="loadPackageDistricts(pkg, $el)"
+                                                                class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
                                                             <option value="">Select Region</option>
                                                             @foreach(\App\Models\Region::orderBy('name')->get() as $region)
                                                                 <option value="{{ $region->id }}">{{ $region->name }}</option>
@@ -2729,9 +2731,8 @@ $shipmentConfig = [
                                                     </div>
                                                     <div>
                                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">District</label>
-                                                        <select :id="'rcv-district-' + pkg.shipment_item_id"
-                                                                @@change="pkg.delivery_district_id = $event.target.value"
-                                                                class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                        <select class="rcv-district-select w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none"
+                                                                @@change="pkg.delivery_district_id = $event.target.value">
                                                             <option value="">Select District</option>
                                                         </select>
                                                     </div>
