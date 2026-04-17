@@ -39,4 +39,14 @@ class Vendor extends Model
     {
         return $this->hasMany(Shipment::class);
     }
+
+    public function earnings(): HasMany
+    {
+        return $this->hasMany(VendorEarning::class);
+    }
+
+    public function payouts(): HasMany
+    {
+        return $this->hasMany(VendorPayout::class);
+    }
 }

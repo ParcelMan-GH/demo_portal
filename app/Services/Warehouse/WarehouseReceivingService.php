@@ -12,6 +12,7 @@ use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceiptItemPhoto;
 use App\Services\PickupAssignmentService;
+use App\Services\Warehouse\PackageContactService;
 use App\Services\StorageService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -504,6 +505,15 @@ class WarehouseReceivingService
                 'approval_reason' => $hasDiscrepancies ? $approvalReason : null,
                 'finalized_at' => now(),
             ]);
+
+            try {
+                app(PackageContactService::class)->createTasksForWarehouseItems(
+                    $warehouse,
+                    $shipmentItemIds->toArray()
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to create contact tasks: ' . $e->getMessage());
+            }
 
             return [
                 'success' => true,

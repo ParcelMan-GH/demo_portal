@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\ShipmentController;
 use App\Http\Controllers\Admin\ShipmentPaymentController;
 use App\Http\Controllers\Admin\AdminMarketingController;
 use App\Http\Controllers\Admin\VendorController;
+use App\Http\Controllers\Admin\VendorPayoutController;
 use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
 use App\Http\Controllers\Warehouse\DeliveryRunController as WarehouseDeliveryRunController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\Warehouse\SortingController as WarehouseSortingControll
 use App\Http\Controllers\Warehouse\TransportManifestController as WarehouseTransportManifestController;
 use App\Http\Controllers\Warehouse\UserController as WarehouseUserController;
 use App\Http\Controllers\Warehouse\CollectionController as WarehouseCollectionController;
+use App\Http\Controllers\Warehouse\ContactQueueController as WarehouseContactQueueController;
 use App\Http\Controllers\Warehouse\WalkinController as WarehouseWalkinController;
 use Illuminate\Support\Facades\Route;
 
@@ -192,6 +194,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('vendors/{vendor}/shipments', [VendorController::class, 'shipments'])->name('vendors.shipments')->withTrashed();
         Route::get('vendors/{vendor}/activity-logs', [VendorController::class, 'activityLogs'])->name('vendors.activity-logs')->withTrashed();
         Route::get('vendors/{vendor}/otp-logs', [VendorController::class, 'otpLogs'])->name('vendors.otp-logs')->withTrashed();
+
+        // Vendor Payouts Management
+        Route::get('vendor-payouts', [VendorPayoutController::class, 'index'])->name('vendor-payouts.index');
+        Route::get('vendor-payouts-data', [VendorPayoutController::class, 'data'])->name('vendor-payouts.data');
+        Route::get('vendors/{vendor}/payouts-data', [VendorPayoutController::class, 'vendorPayouts'])->name('vendors.payouts-data');
+        Route::post('vendors/{vendor}/payouts', [VendorPayoutController::class, 'store'])->name('vendors.payouts.store');
+        Route::patch('vendor-payouts/{payout}/mark-sent', [VendorPayoutController::class, 'markSent'])->name('vendor-payouts.mark-sent');
+        Route::patch('vendor-payouts/{payout}/confirm', [VendorPayoutController::class, 'confirm'])->name('vendor-payouts.confirm');
 
         // Shipment Management
         Route::get('shipments', [ShipmentController::class, 'index'])->name('shipments.index');
@@ -472,7 +482,22 @@ Route::prefix('warehouse')
         Route::post('deliveries/runs/{run}/dispatch', [WarehouseDeliveryRunController::class, 'dispatch'])->name('deliveries.runs.dispatch');
         Route::post('deliveries/runs/{run}/stops/{stop}/resend-code', [WarehouseDeliveryRunController::class, 'resendCode'])->name('deliveries.runs.stops.resend-code');
         Route::patch('deliveries/runs/{run}/stops/{stop}/packages', [WarehouseDeliveryRunController::class, 'updateStopPackages'])->name('deliveries.runs.stops.update-packages');
+        Route::patch('deliveries/runs/{run}/stops/{stop}/delivery-method', [WarehouseDeliveryRunController::class, 'updateStopDeliveryMethod'])->name('deliveries.runs.stops.update-delivery-method');
+        Route::post('deliveries/runs/{run}/stops/{stop}/confirm-handoff', [WarehouseDeliveryRunController::class, 'adminConfirmHandoff'])->name('deliveries.runs.stops.confirm-handoff');
+        Route::get('deliveries/pending-confirmations', [WarehouseDeliveryRunController::class, 'pendingConfirmations'])->name('deliveries.pending-confirmations');
+        Route::get('deliveries/pending-confirmations-data', [WarehouseDeliveryRunController::class, 'pendingConfirmationsData'])->name('deliveries.pending-confirmations-data');
         Route::get('deliveries/runs/{run}', [WarehouseDeliveryRunController::class, 'show'])->name('deliveries.runs.show');
+
+        // Contact Queue
+        Route::get('contacts', [WarehouseContactQueueController::class, 'index'])->name('contacts.index');
+        Route::get('contacts-data', [WarehouseContactQueueController::class, 'data'])->name('contacts.data');
+        Route::post('contacts/{task}/assign', [WarehouseContactQueueController::class, 'assign'])->name('contacts.assign');
+        Route::post('contacts/bulk-assign', [WarehouseContactQueueController::class, 'bulkAssign'])->name('contacts.bulk-assign');
+        Route::post('contacts/auto-assign', [WarehouseContactQueueController::class, 'autoAssign'])->name('contacts.auto-assign');
+        Route::post('contacts/{task}/log-call', [WarehouseContactQueueController::class, 'logCall'])->name('contacts.log-call');
+        Route::post('contacts/{task}/resolve', [WarehouseContactQueueController::class, 'resolve'])->name('contacts.resolve');
+        Route::get('contacts/{task}/attempts', [WarehouseContactQueueController::class, 'attempts'])->name('contacts.attempts');
+        Route::get('contacts/worker-stats', [WarehouseContactQueueController::class, 'workerStats'])->name('contacts.worker-stats');
 
         // Invoice Management
         Route::post('receipts/pending/{pickupAssignment}/invoices', [WarehouseInvoiceController::class, 'store'])->name('invoices.store');

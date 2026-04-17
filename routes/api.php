@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\DriverTransportController;
 use App\Http\Controllers\Api\V1\VendorInvoiceController;
 use App\Http\Controllers\Api\V1\VendorLocationController;
 use App\Http\Controllers\Api\V1\VendorProfileController;
+use App\Http\Controllers\Api\V1\VendorEarningsController;
 use App\Http\Controllers\Api\V1\VendorNotificationController;
 use App\Http\Controllers\Api\V1\VendorShipmentController;
 use App\Http\Controllers\Api\V1\VendorShipmentItemController;
@@ -77,6 +78,11 @@ Route::prefix('v1/vendor')->middleware(['auth:sanctum', 'vendor.active'])->group
     Route::get('notifications', [VendorNotificationController::class, 'index']);
     Route::post('notifications/read-all', [VendorNotificationController::class, 'markAllAsRead']);
     Route::post('notifications/{notification}/read', [VendorNotificationController::class, 'markAsRead']);
+
+    // Earnings & Payouts endpoints
+    Route::get('earnings/summary', [VendorEarningsController::class, 'summary']);
+    Route::get('earnings', [VendorEarningsController::class, 'earnings']);
+    Route::get('payouts', [VendorEarningsController::class, 'payouts']);
 });
 
 // API v1 - Driver Authentication
@@ -113,6 +119,7 @@ Route::prefix('v1/driver')->group(function () {
         Route::post('deliveries/{run}/stops/{stop}/arrive', [DriverDeliveryController::class, 'arriveStop']);
         Route::post('deliveries/{run}/stops/{stop}/confirm', [DriverDeliveryController::class, 'confirmStop']);
         Route::post('deliveries/{run}/stops/{stop}/confirm-packages', [DriverDeliveryController::class, 'confirmStopPackages']);
+        Route::post('deliveries/{run}/stops/{stop}/confirm-handoff', [DriverDeliveryController::class, 'confirmHandoff']);
         Route::post('deliveries/{run}/stops/{stop}/fail', [DriverDeliveryController::class, 'failStop']);
 
         // Notification endpoints

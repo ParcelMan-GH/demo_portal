@@ -26,6 +26,7 @@
         $canManifest = $authUser?->hasPermission('warehouse.manifest.manage');
         $canTransportAssign = $authUser?->hasPermission('warehouse.transport.assign');
         $canDeliveryAssign = $authUser?->hasPermission('warehouse.delivery.assign');
+        $canContacts = $authUser?->hasPermission('warehouse.contacts.manage');
     @endphp
 
     <div class="min-h-screen flex">
@@ -104,6 +105,13 @@
                     <template x-if="sidebarCollapsed"><span class="wh-tooltip">Sorting</span></template>
                 </a>
                 @endif
+                @if($canContacts)
+                <a href="{{ route('warehouse.contacts.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.contacts.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Contact Queue</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Contact Queue</span></template>
+                </a>
+                @endif
                 @endif
 
                 {{-- ═══════════ TRANSPORT ═══════════ --}}
@@ -133,6 +141,11 @@
                     <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
                     <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Delivery Runs</span>
                     <template x-if="sidebarCollapsed"><span class="wh-tooltip">Delivery Runs</span></template>
+                </a>
+                <a href="{{ route('warehouse.deliveries.pending-confirmations') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.deliveries.pending-confirmations*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Pending Confirmations</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Pending Confirmations</span></template>
                 </a>
                 @endif
                 @if($canReceiving)

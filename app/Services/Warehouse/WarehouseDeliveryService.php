@@ -2,6 +2,7 @@
 
 namespace App\Services\Warehouse;
 
+use App\Helpers\PhoneHelper;
 use App\Enums\ItemStatus;
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentStatus;
@@ -29,7 +30,8 @@ class WarehouseDeliveryService
     public function __construct(
         private DeliveryVerificationService $verificationService,
         private StorageService $storageService,
-        private SmsService $smsService
+        private SmsService $smsService,
+        private \App\Services\VendorCommissionService $commissionService,
     ) {
     }
 
@@ -495,7 +497,13 @@ class WarehouseDeliveryService
             'arrived_at' => now(),
         ]);
 
-        // Send OTP verification code to recipient now that driver has arrived
+        if ($stop->delivery_method === DeliveryRunStop::METHOD_BUS_HANDOFF) {
+            return [
+                'success' => true,
+                'message' => 'Arrival recorded. Ready for bus courier handoff.',
+            ];
+        }
+
         $this->verificationService->issueCode($stop, $run->run_number);
 
         return [
@@ -668,6 +676,10 @@ class WarehouseDeliveryService
             $shipments->unique('id')->each(function (Shipment $shipment) {
                 $this->syncShipmentDeliveryStatus($shipment);
             });
+
+            if ($allDelivered) {
+                $this->commissionService->createEarningsForStop($stop);
+            }
 
             if ($run->status === DeliveryRun::STATUS_COMPLETED && $run->assignedDriver) {
                 $run->assignedDriver->update(['status' => 'available']);
@@ -846,6 +858,10 @@ class WarehouseDeliveryService
                 $this->syncShipmentDeliveryStatus($shipment);
             });
 
+            if ($allDelivered) {
+                $this->commissionService->createEarningsForStop($stop);
+            }
+
             if ($run->status === DeliveryRun::STATUS_COMPLETED && $run->assignedDriver) {
                 $run->assignedDriver->update(['status' => 'available']);
             }
@@ -855,6 +871,115 @@ class WarehouseDeliveryService
                 'message' => $allDelivered
                     ? 'All packages delivered successfully.'
                     : "{$packagesDelivered} of {$totalPackages} packages delivered. Flagged for warehouse review.",
+            ];
+        });
+    }
+
+    public function driverConfirmHandoff(
+        Driver $driver,
+        DeliveryRun $run,
+        DeliveryRunStop $stop,
+        array $data,
+        $request = null,
+    ): array {
+        if ((int) $run->assigned_driver_id !== (int) $driver->id || (int) $stop->delivery_run_id !== (int) $run->id) {
+            return ['success' => false, 'message' => 'Delivery stop not found.'];
+        }
+
+        if (!in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED, DeliveryRun::STATUS_ASSIGNED], true)) {
+            return ['success' => false, 'message' => 'Delivery run is not active.'];
+        }
+
+        if ($stop->delivery_method !== DeliveryRunStop::METHOD_BUS_HANDOFF) {
+            return ['success' => false, 'message' => 'This stop is not a bus handoff stop.'];
+        }
+
+        return DB::transaction(function () use ($run, $stop, $driver, $data, $request) {
+            $run = DeliveryRun::query()->with(['items.shipmentItem.shipment', 'stops'])->lockForUpdate()->findOrFail($run->id);
+            $stop = DeliveryRunStop::query()->whereKey($stop->id)->where('delivery_run_id', $run->id)->lockForUpdate()->firstOrFail();
+
+            if ($run->status === DeliveryRun::STATUS_ASSIGNED) {
+                $run->update(['status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY, 'dispatched_at' => now()]);
+            }
+
+            $now = now();
+
+            $upload = $this->storageService->upload(
+                $request->file('proof_photo'),
+                "deliveries/runs/{$run->id}/stops/{$stop->id}"
+            );
+
+            $stop->update([
+                'status' => DeliveryRunStop::STATUS_HANDED_OFF,
+                'arrived_at' => $stop->arrived_at ?? $now,
+                'delivered_at' => $now,
+                'delivery_latitude' => $data['latitude'],
+                'delivery_longitude' => $data['longitude'],
+                'proof_photo_path' => $upload['path'],
+                'proof_photo_size' => $upload['size'],
+                'handoff_courier_name' => $data['courier_name'],
+                'handoff_courier_phone' => PhoneHelper::format($data['courier_phone']),
+                'handoff_vehicle_number' => strtoupper(trim($data['vehicle_number'])),
+                'handoff_at' => $now,
+            ]);
+
+            $runItems = DeliveryRunItem::query()
+                ->where('delivery_run_id', $run->id)
+                ->where('delivery_run_stop_id', $stop->id)
+                ->with('shipmentItem.shipment')
+                ->get();
+
+            $shipments = collect();
+
+            foreach ($runItems as $runItem) {
+                $runItem->update([
+                    'delivered_quantity' => $runItem->expected_quantity,
+                    'status' => DeliveryRunItem::STATUS_DELIVERED,
+                    'notes' => "Handed to courier: {$data['courier_name']} ({$data['vehicle_number']})",
+                    'delivered_at' => $now,
+                ]);
+
+                if ($runItem->shipmentItem) {
+                    $runItem->shipmentItem->update(['status' => ItemStatus::HANDED_TO_COURIER]);
+
+                    ShipmentItemTracking::query()->create([
+                        'shipment_item_id' => $runItem->shipmentItem->id,
+                        'status' => ShipmentStatus::HANDED_TO_COURIER->value,
+                        'location' => $stop->town ?: $stop->landmark,
+                        'notes' => "Handed to bus courier {$data['courier_name']}, vehicle {$data['vehicle_number']}, phone {$data['courier_phone']}",
+                        'meta' => [
+                            'delivery_run_id' => $run->id,
+                            'delivery_run_number' => $run->run_number,
+                            'delivery_run_stop_id' => $stop->id,
+                            'courier_name' => $data['courier_name'],
+                            'courier_phone' => $data['courier_phone'],
+                            'vehicle_number' => $data['vehicle_number'],
+                        ],
+                        'created_at' => $now,
+                    ]);
+
+                    if ($runItem->shipmentItem->shipment) {
+                        $shipments->push($runItem->shipmentItem->shipment);
+                    }
+                }
+            }
+
+            foreach ($shipments->unique('id') as $shipment) {
+                $allHandedOff = $shipment->items()->whereNotIn('status', [
+                    ItemStatus::HANDED_TO_COURIER->value,
+                    ItemStatus::DELIVERED->value,
+                ])->doesntExist();
+
+                if ($allHandedOff) {
+                    $shipment->update(['status' => ShipmentStatus::HANDED_TO_COURIER]);
+                }
+            }
+
+            $this->refreshRunStatus($run);
+
+            return [
+                'success' => true,
+                'message' => "Packages handed to courier {$data['courier_name']} ({$data['vehicle_number']}) successfully.",
             ];
         });
     }
@@ -1008,8 +1133,10 @@ class WarehouseDeliveryService
         $totalStops = $run->stops->count();
         $deliveredStops = $run->stops->where('status', DeliveryRunStop::STATUS_DELIVERED)->count();
         $failedStops = $run->stops->where('status', DeliveryRunStop::STATUS_FAILED)->count();
+        $handedOffStops = $run->stops->where('status', DeliveryRunStop::STATUS_HANDED_OFF)->count();
+        $completedStops = $deliveredStops + $failedStops + $handedOffStops;
 
-        if ($totalStops > 0 && ($deliveredStops + $failedStops) === $totalStops) {
+        if ($totalStops > 0 && $completedStops === $totalStops) {
             $run->update([
                 'status' => DeliveryRun::STATUS_COMPLETED,
                 'completed_at' => now(),
@@ -1017,7 +1144,7 @@ class WarehouseDeliveryService
             return;
         }
 
-        if ($deliveredStops > 0 || $failedStops > 0) {
+        if ($completedStops > 0) {
             $run->update(['status' => DeliveryRun::STATUS_PARTIALLY_DELIVERED]);
             return;
         }

@@ -70,6 +70,8 @@ class CreateShipmentRequest extends FormRequest
             'items.*.delivery_instructions' => ['nullable', 'string', 'max:1000'],
             'items.*.images' => ['required', 'array', 'min:1'],
             'items.*.images.*' => ['required', 'file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+            'items.*.phones' => ['nullable', 'array'],
+            'items.*.phones.*' => ['nullable', 'string', 'max:20'],
         ];
     }
 

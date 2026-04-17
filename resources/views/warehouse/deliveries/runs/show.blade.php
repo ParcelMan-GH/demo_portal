@@ -517,6 +517,12 @@
                                     <p class="text-sm font-bold text-slate-900 truncate" x-text="stop.recipient_name"></p>
                                     <p class="text-xs text-slate-400" x-text="stop.recipient_phone || '—'"></p>
                                 </div>
+                                <template x-if="stop.delivery_method === 'bus_handoff'">
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold flex-shrink-0 bg-violet-50 text-violet-700 ring-1 ring-violet-200">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                        Bus Handoff
+                                    </span>
+                                </template>
                                 <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold flex-shrink-0 ring-1"
                                     :class="stopStatusClass(stop.status)"
                                     x-text="stop.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())"></span>
@@ -598,6 +604,12 @@
                                         <svg class="w-3 h-3 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                                         Code sent: <span class="font-medium text-slate-600" x-text="stop.code_sent_at"></span>
                                     </span>
+                                    <template x-if="stop.verification_code && stop.status !== 'delivered'">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-700 tracking-widest">
+                                            <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                                            OTP: <span x-text="stop.verification_code"></span>
+                                        </span>
+                                    </template>
                                     <span x-show="stop.max_attempts" class="inline-flex items-center gap-1 text-xs text-slate-500">
                                         <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
                                         Attempts: <span class="font-medium text-slate-600" x-text="stop.attempts + '/' + stop.max_attempts"></span>
@@ -626,6 +638,46 @@
                                             <span class="font-semibold">OTP Verification Skipped</span>
                                             <span x-show="stop.verification_skip_reason" class="ml-1">— <span x-text="stop.verification_skip_reason"></span></span>
                                             <span x-show="stop.verification_skipped_at" class="block mt-0.5 text-amber-500" x-text="'Skipped at: ' + stop.verification_skipped_at"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            {{-- Handoff courier info --}}
+                            <template x-if="stop.handoff && stop.handoff.courier_name">
+                                <div class="border-t border-violet-100 px-5 py-3 bg-violet-50/50">
+                                    <div class="flex items-start gap-2.5 text-xs">
+                                        <svg class="w-4 h-4 text-violet-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                        <div class="flex-1">
+                                            <p class="font-semibold text-violet-800 mb-1">Bus Courier Handoff</p>
+                                            <div class="grid grid-cols-3 gap-3">
+                                                <div>
+                                                    <span class="text-[10px] text-violet-400 uppercase tracking-wider">Courier</span>
+                                                    <p class="font-semibold text-slate-800" x-text="stop.handoff.courier_name"></p>
+                                                </div>
+                                                <div>
+                                                    <span class="text-[10px] text-violet-400 uppercase tracking-wider">Phone</span>
+                                                    <p><a :href="'tel:' + stop.handoff.courier_phone" class="font-semibold text-violet-700 hover:underline" x-text="stop.handoff.courier_phone"></a></p>
+                                                </div>
+                                                <div>
+                                                    <span class="text-[10px] text-violet-400 uppercase tracking-wider">Vehicle</span>
+                                                    <p class="font-mono font-semibold text-slate-800" x-text="stop.handoff.vehicle_number"></p>
+                                                </div>
+                                            </div>
+                                            <p x-show="stop.handoff.handed_off_at" class="mt-1.5 text-violet-500">Handed off: <span class="font-medium" x-text="stop.handoff.handed_off_at"></span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            {{-- Admin confirmation info (for handed_off stops confirmed by admin) --}}
+                            <template x-if="stop.confirmation_notes && (stop.status === 'delivered' || stop.status === 'failed') && stop.confirmed_at">
+                                <div class="border-t border-emerald-100 px-5 py-3 bg-emerald-50/50">
+                                    <div class="flex items-start gap-2 text-xs text-emerald-700">
+                                        <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <div>
+                                            <span class="font-semibold">Admin Confirmed</span> — <span x-text="stop.confirmed_at"></span>
+                                            <p x-show="stop.confirmation_notes" class="mt-0.5 text-emerald-600" x-text="stop.confirmation_notes"></p>
                                         </div>
                                     </div>
                                 </div>
@@ -1125,6 +1177,7 @@ document.addEventListener('alpine:init', () => {
                     arrived: 'bg-amber-50 text-amber-700 ring-amber-200',
                     delivered: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
                     failed: 'bg-rose-50 text-rose-700 ring-rose-200',
+                    handed_off: 'bg-violet-50 text-violet-700 ring-violet-200',
                 };
                 return map[status] || 'bg-slate-50 text-slate-600 ring-slate-200';
             },

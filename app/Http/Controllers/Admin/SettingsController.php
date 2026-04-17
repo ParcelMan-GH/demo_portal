@@ -32,6 +32,8 @@ class SettingsController extends Controller
         'otp-logs' => ['label' => 'OTP Logs', 'icon' => 'chat'],
         'admin-audit-logs' => ['label' => 'Admin Audit Logs', 'icon' => 'shield'],
         'notification-logs' => ['label' => 'Notification Logs', 'icon' => 'bell'],
+        'delivery' => ['label' => 'Delivery Settings', 'icon' => 'truck'],
+        'commission' => ['label' => 'Vendor Commission', 'icon' => 'cash'],
         'push' => ['label' => 'Push Notifications', 'icon' => 'bell'],
         'health' => ['label' => 'System Health', 'icon' => 'heart'],
         'logs' => ['label' => 'System Logs', 'icon' => 'terminal'],
@@ -97,6 +99,16 @@ class SettingsController extends Controller
                 'mail_encryption' => ['label' => 'Encryption', 'type' => 'select', 'options' => ['tls' => 'TLS', 'ssl' => 'SSL', '' => 'None'], 'default' => 'tls'],
                 'mail_from_address' => ['label' => 'From Address', 'type' => 'email', 'default' => ''],
                 'mail_from_name' => ['label' => 'From Name', 'type' => 'text', 'default' => 'Parcelman Express'],
+            ],
+            'delivery' => [
+                'delivery.allow_skip_verification' => ['label' => 'Allow Drivers to Skip OTP Verification', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, drivers can skip OTP verification during delivery with a reason. The delivery will be flagged for review.'],
+                'delivery.show_otp_to_vendor' => ['label' => 'Show OTP Code to Vendor', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, vendors can see the delivery OTP code in their shipment details. This allows recipients to call the vendor for the code if SMS fails.'],
+            ],
+            'commission' => [
+                'vendor_commission.enabled' => ['label' => 'Enable Vendor Commission', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, vendors earn a commission for each package delivered to their recipients.'],
+                'vendor_commission.rate_per_package' => ['label' => 'Rate Per Package (GHS)', 'type' => 'number', 'default' => '2.00', 'help' => 'Amount in Ghana Cedis earned per delivered package.'],
+                'vendor_commission.auto_approve' => ['label' => 'Auto-Approve Earnings', 'type' => 'toggle', 'default' => '1', 'help' => 'Automatically approve earnings when a delivery is confirmed. If off, admin must manually approve each earning.'],
+                'vendor_commission.min_payout' => ['label' => 'Minimum Payout Amount (GHS)', 'type' => 'number', 'default' => '20.00', 'help' => 'Vendors must accumulate at least this amount before a payout can be processed.'],
             ],
             'push' => [
                 'push_notifications_enabled' => ['label' => 'Enable Push Notifications', 'type' => 'toggle', 'default' => '0'],

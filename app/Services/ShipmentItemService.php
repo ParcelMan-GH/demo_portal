@@ -18,7 +18,7 @@ class ShipmentItemService
         private StorageService $storageService
     ) {}
 
-    public function addItem(Shipment $shipment, array $data, Request $request, ?array $images = null): array
+    public function addItem(Shipment $shipment, array $data, Request $request, ?array $images = null, array $phones = []): array
     {
         if (!$shipment->canBeEdited()) {
             return [
@@ -59,7 +59,7 @@ class ShipmentItemService
         $files = array_values(array_filter(is_array($files) ? $files : []));
 
         if (!empty($files)) {
-            $uploadResult = $this->uploadImages($item, $files, $request);
+            $uploadResult = $this->uploadImages($item, $files, $request, $phones);
 
             if (!$uploadResult['success']) {
                 $item->delete();
@@ -320,7 +320,7 @@ class ShipmentItemService
         ];
     }
 
-    public function uploadImages(ShipmentItem $item, array $files, Request $request): array
+    public function uploadImages(ShipmentItem $item, array $files, Request $request, array $phones = []): array
     {
         $shipment = $item->shipment;
 
@@ -348,14 +348,17 @@ class ShipmentItemService
         $uploadedImages = [];
         $path = "shipments/{$shipment->id}/items/{$item->id}";
 
-        foreach ($files as $file) {
+        foreach ($files as $index => $file) {
             $uploadResult = $this->storageService->upload($file, $path);
+
+            $phone = !empty($phones[$index]) ? PhoneHelper::format($phones[$index]) : null;
 
             $image = $item->images()->create([
                 'path' => $uploadResult['path'],
                 'original_name' => $uploadResult['original_name'],
                 'size' => $uploadResult['size'],
                 'sort_order' => $currentCount++,
+                'recipient_phone' => $phone,
             ]);
 
             $uploadedImages[] = $image->getSignedUrl();

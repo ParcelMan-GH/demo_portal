@@ -73,6 +73,19 @@
                         <span class="sidebar-tooltip">Vendors</span>
                     </template>
                 </a>
+                <a href="{{ route('admin.vendor-payouts.index') }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.vendor-payouts.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3 pl-8'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[16px] h-[16px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                    </div>
+                    <span class="text-[11px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Vendor Payouts</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Vendor Payouts</span>
+                    </template>
+                </a>
                 @endhasPermission
 
                 @hasPermission('drivers.view')

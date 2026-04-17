@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\DeliveryRun;
 use App\Models\Driver;
+use App\Models\PlatformSetting;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -133,6 +134,7 @@ class DriverDeliveryService
             'run_number' => $run->run_number,
             'status' => $run->status,
             'is_direct_delivery' => $isDirectDelivery,
+            'allow_skip_verification' => (bool) PlatformSetting::getValue('delivery.allow_skip_verification', false),
             'warehouse' => $run->warehouse ? [
                 'id' => $run->warehouse->id,
                 'name' => $run->warehouse->name,
@@ -154,6 +156,7 @@ class DriverDeliveryService
                     'recipient_name' => $stop->recipient_name,
                     'recipient_phone' => $stop->recipient_phone,
                     'status' => $stop->status,
+                    'delivery_method' => $stop->delivery_method ?? 'direct',
                     'total_packages' => (int) $stop->total_packages,
                     'location' => [
                         'region' => $stop->region?->name,
@@ -180,6 +183,12 @@ class DriverDeliveryService
                     'failure_reason' => $stop->failure_reason,
                     'failure_notes' => $stop->failure_notes,
                     'delivery_notes' => $stop->delivery_notes,
+                    'handoff' => $stop->delivery_method === 'bus_handoff' ? [
+                        'courier_name' => $stop->handoff_courier_name,
+                        'courier_phone' => $stop->handoff_courier_phone,
+                        'vehicle_number' => $stop->handoff_vehicle_number,
+                        'handed_off_at' => $stop->handoff_at,
+                    ] : null,
                     'items' => $items->map(function ($item) {
                         $vendor = $item->shipmentItem?->shipment?->vendor;
                         return [

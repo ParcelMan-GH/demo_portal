@@ -1276,6 +1276,7 @@
                     { name: 'items[0][description]', type: 'string', required: false, description: 'Item description (optional, admin fills later)', example: '' },
                     { name: 'items[0][quantity]', type: 'number', required: false, description: 'Quantity (default 1)', example: '1' },
                     { name: 'items[0][images][]', type: 'file', required: true, description: 'Package photos (at least 1 per item, max 2MB each, max 500 total)', multiple: true },
+                    { name: 'items[0][phones][]', type: 'string', required: false, description: 'Recipient phone per photo (optional, same order as images). Tags each photo with a recipient phone for admin grouping later.', multiple: true, example: '+233241234567' },
                     { name: 'items[0][delivery_town]', type: 'string', required: false, description: 'Item delivery area (per_item mode only)', example: 'Tema', showWhen: { field: 'destination_mode', value: 'per_item' } },
                     { name: 'items[0][delivery_recipient_name]', type: 'string', required: false, description: 'Item recipient (per_item mode only)', example: 'Ama', showWhen: { field: 'destination_mode', value: 'per_item' } },
                 ],
@@ -1613,6 +1614,7 @@
                                                 id: 1,
                                                 url: 'https://gateway.storjshare.io/shaxi/demo/shipments/1/items/1/image.jpg?X-Amz-Signature=...',
                                                 original_name: 'fridge.jpg',
+                                                recipient_phone: '+233241234567',
                                                 expires_at: '2026-01-27T12:00:00Z'
                                             }
                                         ],
@@ -1689,6 +1691,7 @@
                                         original_name: 'fridge-front.jpg',
                                         size: 245760,
                                         size_human: '240.00 KB',
+                                        recipient_phone: '+233241234567',
                                         expires_at: '2026-01-27T11:00:00Z'
                                     }
                                 ],
@@ -1758,6 +1761,7 @@
                                         original_name: 'fridge-new.jpg',
                                         size: 289000,
                                         size_human: '282.23 KB',
+                                        recipient_phone: null,
                                         expires_at: '2026-01-27T11:30:00Z'
                                     }
                                 ],
@@ -1820,6 +1824,7 @@
                                     original_name: 'fridge-front.jpg',
                                     size: 245760,
                                     size_human: '240.00 KB',
+                                    recipient_phone: '+233241234567',
                                     expires_at: '2026-01-27T11:00:00Z'
                                 },
                                 {
@@ -1828,6 +1833,7 @@
                                     original_name: 'fridge-inside.jpg',
                                     size: 312450,
                                     size_human: '305.13 KB',
+                                    recipient_phone: null,
                                     expires_at: '2026-01-27T11:00:00Z'
                                 }
                             ]

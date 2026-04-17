@@ -84,6 +84,7 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouse', 'action' => 'invoices_create', 'name' => 'warehouse.invoices.create', 'description' => 'Create warehouse invoices', 'sort_order' => 133],
             ['module' => 'warehouse', 'action' => 'invoices_edit', 'name' => 'warehouse.invoices.edit', 'description' => 'Edit warehouse invoices', 'sort_order' => 134],
             ['module' => 'warehouse', 'action' => 'invoices_delete', 'name' => 'warehouse.invoices.delete', 'description' => 'Cancel warehouse invoices', 'sort_order' => 135],
+            ['module' => 'warehouse', 'action' => 'contacts_manage', 'name' => 'warehouse.contacts.manage', 'description' => 'Manage package contact queue and log calls', 'sort_order' => 136],
 
             // Reports (2)
             ['module' => 'reports', 'action' => 'view', 'name' => 'reports.view', 'description' => 'View reports', 'sort_order' => 80],

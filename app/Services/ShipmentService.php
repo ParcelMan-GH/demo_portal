@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentStatus;
 use App\Models\Invoice;
+use App\Models\OtpCode;
 use App\Models\PickupAssignment;
+use App\Models\PlatformSetting;
 use App\Models\PickupItemConfirmation;
 use App\Models\PickupPhoto;
 use App\Models\Shipment;
@@ -571,6 +573,7 @@ class ShipmentService
                 : null,
             'invoice_history' => $invoiceHistory,
             'collection' => $collectionData,
+            'delivery_verification' => $this->getDeliveryVerificationForVendor($shipment),
             'pickup_assignment' => $pickupAssignment ? array_merge([
                 'id' => $pickupAssignment->id,
                 'status' => $pickupAssignment->status->value,
@@ -721,6 +724,39 @@ class ShipmentService
             'cancelled_at' => $invoice->cancelled_at,
             'created_at' => $invoice->created_at,
             'updated_at' => $invoice->updated_at,
+        ];
+    }
+
+    private function getDeliveryVerificationForVendor(Shipment $shipment): ?array
+    {
+        if (!PlatformSetting::getValue('delivery.show_otp_to_vendor', false)) {
+            return null;
+        }
+
+        $deliveryStatuses = [
+            ShipmentStatus::OUT_FOR_DELIVERY->value,
+            ShipmentStatus::AT_DESTINATION->value,
+        ];
+
+        if (!in_array($shipment->status->value, $deliveryStatuses)) {
+            return null;
+        }
+
+        $otpCodes = OtpCode::where('phone', (string) $shipment->delivery_recipient_phone)
+            ->where('purpose', 'delivery_verification')
+            ->whereNull('verified_at')
+            ->where('expires_at', '>', now())
+            ->latest('created_at')
+            ->first();
+
+        if (!$otpCodes) {
+            return null;
+        }
+
+        return [
+            'code' => $otpCodes->code,
+            'expires_at' => $otpCodes->expires_at?->toIso8601String(),
+            'sent_at' => $otpCodes->created_at?->toIso8601String(),
         ];
     }
 }

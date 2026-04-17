@@ -155,6 +155,15 @@ class WalkinShipmentService
                 app(ShipmentCollectionService::class)->markReadyForCollection($shipment, $warehouse);
             }
 
+            try {
+                app(\App\Services\Warehouse\PackageContactService::class)->createTasksForWarehouseItems(
+                    $warehouse,
+                    $shipment->items->pluck('id')->toArray()
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to create contact tasks for walk-in: ' . $e->getMessage());
+            }
+
             return [
                 'shipment' => $shipment->fresh(['vendor', 'items']),
                 'receipt'  => $receipt,

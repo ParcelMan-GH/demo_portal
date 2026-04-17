@@ -158,12 +158,15 @@ class VendorShipmentController extends Controller
         foreach ($itemsData as $index => $itemData) {
             $images = $request->file("items.{$index}.images", []);
             $images = is_array($images) ? array_values(array_filter($images)) : [];
+            $phones = $request->input("items.{$index}.phones", []);
+            $phones = is_array($phones) ? $phones : [];
 
             $itemResult = $this->shipmentItemService->addItem(
                 shipment: $shipment,
                 data: $itemData,
                 request: $request,
-                images: $images
+                images: $images,
+                phones: $phones,
             );
 
             if (!($itemResult['success'] ?? false)) {

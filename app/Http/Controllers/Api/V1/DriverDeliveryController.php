@@ -132,6 +132,30 @@ class DriverDeliveryController extends Controller
         return $this->deliveryActionResponse($driver, $run, $result, 400);
     }
 
+    public function confirmHandoff(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
+    {
+        $driver = $request->user();
+
+        $validated = $request->validate([
+            'courier_name' => ['required', 'string', 'max:255'],
+            'courier_phone' => ['required', 'string', 'max:20'],
+            'vehicle_number' => ['required', 'string', 'max:50'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'proof_photo' => ['required', 'file', 'image', 'max:12288'],
+        ]);
+
+        $result = $this->warehouseDeliveryService->driverConfirmHandoff(
+            driver: $driver,
+            run: $run,
+            stop: $stop,
+            data: $validated,
+            request: $request,
+        );
+
+        return $this->deliveryActionResponse($driver, $run, $result, 400);
+    }
+
     private function deliveryActionResponse($driver, DeliveryRun $run, array $result, int $errorCode): JsonResponse
     {
         if (($result['success'] ?? false) === true) {

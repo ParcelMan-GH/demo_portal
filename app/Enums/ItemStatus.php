@@ -11,6 +11,7 @@ enum ItemStatus: string
     case IN_TRANSIT = 'in_transit';
     case AT_DESTINATION = 'at_destination';
     case OUT_FOR_DELIVERY = 'out_for_delivery';
+    case HANDED_TO_COURIER = 'handed_to_courier';
     case DELIVERED = 'delivered';
     case RETURNED = 'returned';
 
@@ -27,6 +28,7 @@ enum ItemStatus: string
             self::IN_TRANSIT => 'In Transit',
             self::AT_DESTINATION => 'At Destination',
             self::OUT_FOR_DELIVERY => 'Out for Delivery',
+            self::HANDED_TO_COURIER => 'Handed to Courier',
             self::DELIVERED => 'Delivered',
             self::RETURNED => 'Returned',
         };

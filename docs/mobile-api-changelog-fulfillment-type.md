@@ -971,3 +971,558 @@ These are sent automatically by the backend. The mobile app does NOT need to tri
   }
 }
 ```
+
+---
+
+# Mobile API Changelog — Photo Recipient Phone Tagging
+
+**Date**: 2026-04-16
+**Version**: Photo Tagging v1
+**Affects**: Vendor App only
+**Backwards Compatible**: Yes — `phones[]` is optional, existing behavior unchanged if omitted.
+
+---
+
+## Summary
+
+Vendors can now **tag each photo with a recipient phone number** when creating a shipment. This helps the admin group photos by recipient when processing the shipment later.
+
+- Each photo gets an optional phone number (not required)
+- Photos with the same phone are later grouped into the same delivery item by admin
+- Photos with no phone fall back to the shipment-level delivery recipient
+
+---
+
+## Vendor App Changes
+
+### 1. Create Shipment — `POST /api/v1/vendor/shipments`
+
+**New optional field per item: `phones[]`**
+
+The `phones` array corresponds 1:1 with the `images` array (same index = same photo). If a phone is empty or missing for an index, that photo has no tagged recipient.
+
+**Request (multipart/form-data):**
+```
+destination_mode = single
+pickup_contact_name = John Doe
+pickup_contact_phone = 0241234567
+items[0][images][0] = <photo_file_1>
+items[0][images][1] = <photo_file_2>
+items[0][images][2] = <photo_file_3>
+items[0][phones][0] = 0551234567       // Photo 1 → recipient phone A
+items[0][phones][1] = 0551234567       // Photo 2 → same recipient
+items[0][phones][2] = 0209876543       // Photo 3 → different recipient
+```
+
+**Rules:**
+- `items[0][phones][]` — optional, array of strings, max 20 chars each
+- Phones are auto-formatted by the backend (Ghana phone format)
+- If `phones` array is shorter than `images` array, remaining photos get `null`
+- If `phones` array is omitted entirely, all photos get `null`
+
+### 2. Image Object in Responses — All Endpoints
+
+**New field: `recipient_phone`**
+
+Every image object in API responses now includes `recipient_phone`:
+
+```json
+{
+  "id": 1,
+  "url": "https://storage.example.com/shipments/1/items/1/photo.jpg?...",
+  "original_name": "fridge-front.jpg",
+  "size": 245760,
+  "size_human": "240.00 KB",
+  "recipient_phone": "+233551234567",    // NEW — null if not tagged
+  "expires_at": "2026-04-16T12:00:00Z"
+}
+```
+
+| Value | Meaning |
+|-------|---------|
+| `"+233551234567"` | Photo tagged with this recipient's phone |
+| `null` | No recipient tagged — uses shipment-level delivery |
+
+This field appears in:
+- `GET /api/v1/vendor/shipments` (list)
+- `GET /api/v1/vendor/shipments/{id}` (show)
+- `POST /api/v1/vendor/shipments` (create response)
+- `PUT /api/v1/vendor/shipments/{id}` (update response)
+- `POST /api/v1/vendor/shipments/{id}/items/{itemId}/images` (upload response)
+
+---
+
+## Vendor App UX Recommendations
+
+### Photo Grid — Tagging Flow
+
+1. **After taking photos**, show all photos in the existing grid
+2. **Add a "Tag Recipients" button** (or use the existing select mode pattern)
+3. User selects one or more photos → enters a phone number → all selected photos get tagged
+4. Tagged photos show a **phone badge overlay** (e.g. small phone icon + last 4 digits)
+5. User can tap a tagged photo to change or remove the phone
+6. Untagged photos are fine — they go to the default shipment recipient
+
+### Visual Indicators
+
+```
+┌──────────┐  ┌──────────┐  ┌──────────┐
+│          │  │          │  │          │
+│  Photo 1 │  │  Photo 2 │  │  Photo 3 │
+│          │  │          │  │          │
+│ 📱 4567  │  │ 📱 4567  │  │          │  ← No tag
+└──────────┘  └──────────┘  └──────────┘
+  Recipient A   Recipient A   No phone
+```
+
+### Batch Tagging (Recommended)
+
+Since vendors often have many photos for the same recipient:
+1. Long-press to enter select mode (existing pattern)
+2. Select all photos for one recipient
+3. Tap "Assign Phone" → enter phone → done
+4. Repeat for next batch
+
+---
+
+## Backwards Compatibility
+
+| Scenario | Impact |
+|----------|--------|
+| App doesn't send `phones[]` | All photos get `recipient_phone: null` — existing behavior |
+| App ignores `recipient_phone` in response | No impact — field is just `null` for old photos |
+
+**No breaking changes.** The field is fully additive.
+
+---
+
+## Database Change
+
+New column on `shipment_item_images` table:
+- `recipient_phone` — `VARCHAR(20)`, nullable
+
+This is a tagging field only. The actual delivery phone for processed items remains on `shipment_items.delivery_recipient_phone`.
+
+---
+
+# Mobile API Changelog — OTP Verification Settings
+
+**Date**: 2026-04-16
+**Version**: OTP Settings v1
+**Affects**: Driver App, Vendor App
+**Backwards Compatible**: Yes — new fields are additive with safe defaults.
+
+---
+
+## Summary
+
+Two new admin-configurable settings control OTP verification behavior:
+
+| Setting | Default | Effect |
+|---------|---------|--------|
+| `delivery.allow_skip_verification` | OFF | Controls whether drivers can skip OTP with a reason |
+| `delivery.show_otp_to_vendor` | OFF | Controls whether vendors can see the OTP code in their shipment details |
+
+Both are toggle switches on the admin settings page under **Delivery Settings**.
+
+---
+
+## Driver App Changes
+
+### Delivery Run Response — New Field
+
+```json
+{
+  "id": 555,
+  "run_number": "DRN-2026-0042",
+  "allow_skip_verification": false,
+  ...
+}
+```
+
+| Value | Driver UX |
+|-------|-----------|
+| `false` | Hide skip verification toggle. Show OTP input only + "Call warehouse" banner |
+| `true` | Show skip verification toggle (existing behavior) |
+
+### "Call Warehouse" Banner (when `allow_skip_verification = false`)
+
+When the driver can't skip verification, show a help banner below the OTP input:
+
+```
+┌──────────────────────────────────────────┐
+│ 📞  Can't get the code?                 │
+│     Call the warehouse to get the        │
+│     verification code              [📱]  │
+└──────────────────────────────────────────┘
+```
+
+- Phone number: use `delivery.warehouse.contact_phone` from the run response
+- If no warehouse phone: show text only ("Call admin to get the verification code"), no call button
+- Tap the call button → `Linking.openURL(tel:${phone})`
+
+---
+
+## Vendor App Changes
+
+### Shipment Response — New Field
+
+```json
+{
+  "id": 123,
+  "shipment_number": "PCM-2026-00001",
+  "status": "out_for_delivery",
+  "delivery_verification": {
+    "code": "4821",
+    "expires_at": "2026-04-17T14:00:00+00:00",
+    "sent_at": "2026-04-16T14:00:00+00:00"
+  },
+  ...
+}
+```
+
+| Condition | Value |
+|-----------|-------|
+| Setting OFF | `"delivery_verification": null` |
+| Setting ON + shipment not in delivery | `"delivery_verification": null` |
+| Setting ON + shipment in delivery + active OTP | `{ "code": "4821", "expires_at": "...", "sent_at": "..." }` |
+| Setting ON + OTP already verified or expired | `"delivery_verification": null` |
+
+### Vendor UX Recommendation
+
+When `delivery_verification` is not null, show a card on the shipment detail screen:
+
+```
+┌──────────────────────────────────────────┐
+│ 🔑  Delivery Verification Code          │
+│                                          │
+│          4 8 2 1                         │
+│                                          │
+│  Share this code with the recipient      │
+│  if they didn't receive the SMS.         │
+│  Expires: Apr 17, 2026 2:00 PM          │
+└──────────────────────────────────────────┘
+```
+
+---
+
+## Warehouse Admin Changes
+
+### Delivery Run Show Page
+
+Warehouse staff can now see the **active OTP code** for each delivery stop directly on the delivery run detail page. Displayed as an `OTP: XXXX` badge next to the "Code sent" timestamp.
+
+Only shown when:
+- Stop has a code sent
+- Stop is NOT yet delivered
+- OTP has not expired
+
+This allows warehouse staff to read the code to drivers who call in.
+
+---
+
+## Backwards Compatibility
+
+| Scenario | Impact |
+|----------|--------|
+| Driver app ignores `allow_skip_verification` | Skip toggle hidden by default — safe |
+| Vendor app ignores `delivery_verification` | Field is `null` by default — safe |
+| Admin hasn't configured settings | Both default to OFF — existing behavior |
+
+---
+
+# Mobile API Changelog — Bus Courier Handoff
+
+**Date**: 2026-04-16
+**Version**: Bus Handoff v1
+**Affects**: Driver App
+**Backwards Compatible**: Yes — `delivery_method` defaults to `"direct"`, all existing stops unaffected.
+
+---
+
+## Summary
+
+For out-of-town deliveries, drivers can hand packages to a bus station courier instead of delivering directly. The admin confirms delivery via phone call to the recipient the next day.
+
+**Status flow**: `OUT_FOR_DELIVERY → HANDED_TO_COURIER → DELIVERED (admin confirms)`
+
+---
+
+## Driver App Changes
+
+### Delivery Run Stop Response — New Fields
+
+```json
+{
+  "id": 9,
+  "delivery_method": "bus_handoff",
+  "recipient_name": "Ama Mensah",
+  "recipient_phone": "+233241234567",
+  "status": "pending",
+  "handoff": null,
+  ...
+}
+```
+
+| Field | Type | Values |
+|-------|------|--------|
+| `delivery_method` | string | `"direct"` (default) or `"bus_handoff"` |
+| `handoff` | object\|null | Populated after handoff confirmed |
+
+### After Handoff
+
+```json
+{
+  "delivery_method": "bus_handoff",
+  "status": "handed_off",
+  "handoff": {
+    "courier_name": "Gucci",
+    "courier_phone": "+233549771816",
+    "vehicle_number": "GN 1439-13",
+    "handed_off_at": "2026-04-16T14:30:00+00:00"
+  }
+}
+```
+
+### New Stop Status: `handed_off`
+
+Added alongside existing `pending`, `arrived`, `delivered`, `failed`.
+
+### New Endpoint: Confirm Handoff
+
+**`POST /api/v1/driver/deliveries/{run}/stops/{stop}/confirm-handoff`** (multipart/form-data)
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `courier_name` | string (max 255) | Yes | Bus driver's name |
+| `courier_phone` | string (max 20) | Yes | Bus driver's phone |
+| `vehicle_number` | string (max 50) | Yes | Vehicle registration plate |
+| `latitude` | numeric | Yes | GPS at handoff location |
+| `longitude` | numeric | Yes | GPS at handoff location |
+| `proof_photo` | file (image, max 12MB) | Yes | Photo of handoff/slip |
+
+**No OTP, no packages count, no skip verification.** Just courier details + photo.
+
+### Arrive Behavior
+
+When `delivery_method = "bus_handoff"`:
+- `POST .../arrive` still works
+- **No OTP SMS is sent** (no recipient to verify at the bus station)
+- Message: "Arrival recorded. Ready for bus courier handoff."
+
+### Driver App UX
+
+When `stop.delivery_method === "bus_handoff"`:
+
+1. **Info tab**: same as normal — show recipient details, location, packages
+2. **Confirm tab**: show **BUS COURIER HANDOFF** form (violet theme):
+   - Courier Name (text input)
+   - Courier Phone (phone input)
+   - Vehicle Number (text input, auto-uppercase)
+   - Proof Photo (camera/gallery picker)
+   - **No** OTP input, packages stepper, or skip verification
+3. **Action button**: "Confirm Handoff" (violet gradient) instead of "Confirm Delivery"
+4. **Fail tab**: same as normal — can still mark as failed
+
+---
+
+## New Shipment Status: `handed_to_courier`
+
+Added to the ShipmentStatus enum. Sits between `out_for_delivery` and `delivered`.
+
+| Status | Label | Meaning |
+|--------|-------|---------|
+| `handed_to_courier` | Handed to Courier | Packages given to bus courier, awaiting admin confirmation |
+
+---
+
+## Backwards Compatibility
+
+| Scenario | Impact |
+|----------|--------|
+| Driver app ignores `delivery_method` | All stops default to `"direct"` — existing behavior |
+| Driver app ignores `handoff` field | Field is `null` for non-handoff stops — safe |
+| Stop with `delivery_method = "direct"` | No change — use `confirm-packages` as before |
+| Old app hits `confirm-handoff` on a direct stop | Returns 400: "This stop is not a bus handoff stop" |
+
+---
+
+# Mobile API Changelog — Vendor Commission / Earnings
+
+**Date**: 2026-04-17
+**Version**: Vendor Earnings v1
+**Affects**: Vendor App only
+**Backwards Compatible**: Yes — new endpoints, no changes to existing ones.
+
+---
+
+## Summary
+
+Vendors earn a commission (GHS) for each package successfully delivered. Earnings accumulate and admin can process payouts (MoMo transfer). The rate is configured by admin.
+
+---
+
+## New Vendor API Endpoints
+
+### 1. Earnings Summary — `GET /api/v1/vendor/earnings/summary`
+
+Returns the vendor's balance and payout eligibility.
+
+```json
+{
+  "success": true,
+  "data": {
+    "total_earned": 124.00,
+    "available_balance": 44.00,
+    "total_paid": 80.00,
+    "pending_payout": 0.00,
+    "min_payout": 20.00,
+    "can_request_payout": true,
+    "currency": "GHS"
+  }
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `total_earned` | Lifetime earnings |
+| `available_balance` | Approved earnings not yet in a payout |
+| `total_paid` | Sum of sent + confirmed payouts |
+| `pending_payout` | Payouts created but not yet sent |
+| `min_payout` | Minimum balance required for payout (admin-configured) |
+| `can_request_payout` | `true` if `available_balance >= min_payout` |
+
+### 2. Earnings List — `GET /api/v1/vendor/earnings`
+
+Paginated list of per-package earnings.
+
+**Query params**: `limit` (default 20, max 100), `offset` (default 0), `status` (optional: `approved` or `paid`)
+
+```json
+{
+  "success": true,
+  "data": {
+    "earnings": [
+      {
+        "id": 1,
+        "shipment_number": "PCM-2026-00045",
+        "amount": 2.00,
+        "status": "approved",
+        "created_at": "2026-04-16T14:00:00+00:00"
+      }
+    ],
+    "pagination": {
+      "offset": 0,
+      "limit": 20,
+      "total": 62,
+      "has_more": true,
+      "next_offset": 20,
+      "current_page": 1,
+      "last_page": 4,
+      "per_page": 20
+    }
+  }
+}
+```
+
+### 3. Payouts List — `GET /api/v1/vendor/payouts`
+
+Paginated list of payout history.
+
+**Query params**: `limit` (default 20, max 100), `offset` (default 0), `status` (optional: `pending`, `sent`, `confirmed`)
+
+```json
+{
+  "success": true,
+  "data": {
+    "payouts": [
+      {
+        "id": 1,
+        "amount": 40.00,
+        "status": "sent",
+        "payment_method": "momo",
+        "payment_reference": "TXN123456",
+        "payment_phone": "+233241234567",
+        "sent_at": "2026-04-15T10:00:00+00:00",
+        "confirmed_at": null,
+        "created_at": "2026-04-15T09:00:00+00:00"
+      }
+    ],
+    "pagination": { ... }
+  }
+}
+```
+
+---
+
+## Vendor App UX Recommendations
+
+### Earnings Card (Account tab or dedicated section)
+
+```
+┌──────────────────────────────────────────┐
+│ 💰  Your Earnings                        │
+│                                          │
+│  GHS 44.00                               │
+│  Available Balance                       │
+│                                          │
+│  Total Earned: GHS 124.00               │
+│  Paid Out: GHS 80.00                    │
+│                                          │
+│  Min. payout: GHS 20.00                 │
+└──────────────────────────────────────────┘
+```
+
+### Earnings History
+
+List of per-package earnings with shipment number, amount, date, and status badge (approved = green, paid = blue).
+
+### Payouts History
+
+List of payouts with amount, method, reference, status, and dates.
+
+---
+
+## How Earnings Are Created (Backend)
+
+Earnings are automatically created when:
+- A delivery stop is confirmed as `delivered` (normal delivery)
+- Admin confirms a bus handoff delivery via phone call
+
+Rate per package is configured at `Admin → Settings → Vendor Commission`.
+
+---
+
+## TypeScript Types
+
+```typescript
+interface EarningsSummary {
+  total_earned: number;
+  available_balance: number;
+  total_paid: number;
+  pending_payout: number;
+  min_payout: number;
+  can_request_payout: boolean;
+  currency: string;
+}
+
+interface VendorEarning {
+  id: number;
+  shipment_number: string;
+  amount: number;
+  status: 'approved' | 'paid';
+  created_at: string;
+}
+
+interface VendorPayout {
+  id: number;
+  amount: number;
+  status: 'pending' | 'sent' | 'confirmed';
+  payment_method: 'momo' | 'bank' | 'cash';
+  payment_reference: string | null;
+  payment_phone: string | null;
+  sent_at: string | null;
+  confirmed_at: string | null;
+  created_at: string;
+}
+```

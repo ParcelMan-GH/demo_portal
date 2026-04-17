@@ -22,6 +22,7 @@ class ShipmentItemImage extends Model
         'original_name',
         'size',
         'sort_order',
+        'recipient_phone',
     ];
 
     /**
@@ -76,6 +77,7 @@ class ShipmentItemImage extends Model
             'original_name' => $this->original_name,
             'size' => $this->size,
             'size_human' => $this->formatSize((int) $this->size),
+            'recipient_phone' => $this->recipient_phone,
             'expires_at' => $expiresAt,
         ];
     }

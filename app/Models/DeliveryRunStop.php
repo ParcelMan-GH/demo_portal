@@ -15,6 +15,10 @@ class DeliveryRunStop extends Model
     public const STATUS_ARRIVED = 'arrived';
     public const STATUS_DELIVERED = 'delivered';
     public const STATUS_FAILED = 'failed';
+    public const STATUS_HANDED_OFF = 'handed_off';
+
+    public const METHOD_DIRECT = 'direct';
+    public const METHOD_BUS_HANDOFF = 'bus_handoff';
 
     protected $fillable = [
         'delivery_run_id',
@@ -41,6 +45,14 @@ class DeliveryRunStop extends Model
         'proof_photo_size',
         'failure_reason',
         'failure_notes',
+        'delivery_method',
+        'handoff_courier_name',
+        'handoff_courier_phone',
+        'handoff_vehicle_number',
+        'handoff_at',
+        'confirmed_by_admin_id',
+        'confirmed_at',
+        'confirmation_notes',
     ];
 
     protected $casts = [
@@ -55,6 +67,8 @@ class DeliveryRunStop extends Model
         'longitude' => 'decimal:8',
         'delivery_latitude' => 'decimal:8',
         'delivery_longitude' => 'decimal:8',
+        'handoff_at' => 'datetime',
+        'confirmed_at' => 'datetime',
     ];
 
     public function run(): BelongsTo
@@ -80,6 +94,21 @@ class DeliveryRunStop extends Model
     public function verificationAttempts(): HasMany
     {
         return $this->hasMany(DeliveryVerificationAttempt::class, 'delivery_run_stop_id');
+    }
+
+    public function confirmedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'confirmed_by_admin_id');
+    }
+
+    public function isBusHandoff(): bool
+    {
+        return $this->delivery_method === self::METHOD_BUS_HANDOFF;
+    }
+
+    public function isHandedOff(): bool
+    {
+        return $this->status === self::STATUS_HANDED_OFF;
     }
 }
 

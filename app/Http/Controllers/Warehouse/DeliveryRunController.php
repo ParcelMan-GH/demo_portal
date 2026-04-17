@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\OtpCode;
 use Illuminate\View\View;
 
 class DeliveryRunController extends Controller
@@ -248,6 +249,7 @@ class DeliveryRunController extends Controller
                 'gh_post_address' => $stop->gh_post_address ?? '',
                 'landmark' => $stop->landmark ?? '',
                 'code_sent_at' => $stop->verification_code_sent_at?->format('M d, H:i'),
+                'verification_code' => $this->getStopOtpCode($stop),
                 'attempts' => (int) $stop->verification_attempts,
                 'max_attempts' => (int) $stop->max_attempts,
                 'arrived_at' => $stop->arrived_at?->format('M d, Y H:i'),
@@ -260,6 +262,15 @@ class DeliveryRunController extends Controller
                 'verification_skipped' => (bool) $stop->verification_skipped,
                 'verification_skip_reason' => $stop->verification_skip_reason,
                 'verification_skipped_at' => $stop->verification_skipped_at?->format('M d, Y H:i'),
+                'delivery_method' => $stop->delivery_method ?? 'direct',
+                'handoff' => $stop->delivery_method === 'bus_handoff' ? [
+                    'courier_name' => $stop->handoff_courier_name,
+                    'courier_phone' => $stop->handoff_courier_phone,
+                    'vehicle_number' => $stop->handoff_vehicle_number,
+                    'handed_off_at' => $stop->handoff_at?->format('M d, Y H:i'),
+                ] : null,
+                'confirmed_at' => $stop->confirmed_at?->format('M d, Y H:i'),
+                'confirmation_notes' => $stop->confirmation_notes,
                 'items_count' => $stop->items->count(),
                 'items' => $stop->items->map(fn($item) => [
                     'id' => $item->id,
@@ -373,5 +384,185 @@ class DeliveryRunController extends Controller
                 'to' => min($offset + $perPage, $total),
             ],
         ]);
+    }
+
+    public function updateStopDeliveryMethod(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+
+        $validated = $request->validate([
+            'delivery_method' => ['required', 'string', 'in:direct,bus_handoff'],
+        ]);
+
+        if ($stop->delivery_run_id !== $run->id) {
+            return response()->json(['success' => false, 'message' => 'Stop not found.'], 404);
+        }
+
+        if (in_array($stop->status, ['delivered', 'handed_off'])) {
+            return response()->json(['success' => false, 'message' => 'Cannot change delivery method for completed stops.'], 400);
+        }
+
+        $stop->update(['delivery_method' => $validated['delivery_method']]);
+
+        return response()->json(['success' => true, 'message' => 'Delivery method updated.', 'delivery_method' => $stop->delivery_method]);
+    }
+
+    public function adminConfirmHandoff(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+
+        $validated = $request->validate([
+            'action' => ['required', 'in:delivered,failed'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if ($stop->delivery_run_id !== $run->id) {
+            return response()->json(['success' => false, 'message' => 'Stop not found.'], 404);
+        }
+
+        if ($stop->status !== DeliveryRunStop::STATUS_HANDED_OFF) {
+            return response()->json(['success' => false, 'message' => 'This stop has not been handed off yet.'], 400);
+        }
+
+        $admin = Auth::guard('admin')->user();
+        $now = now();
+
+        if ($validated['action'] === 'delivered') {
+            $stop->update([
+                'status' => DeliveryRunStop::STATUS_DELIVERED,
+                'confirmed_by_admin_id' => $admin->id,
+                'confirmed_at' => $now,
+                'confirmation_notes' => $validated['notes'],
+            ]);
+
+            $runItems = \App\Models\DeliveryRunItem::where('delivery_run_stop_id', $stop->id)->with('shipmentItem.shipment')->get();
+            foreach ($runItems as $runItem) {
+                if ($runItem->shipmentItem) {
+                    $runItem->shipmentItem->update(['status' => \App\Enums\ItemStatus::DELIVERED]);
+
+                    \App\Models\ShipmentItemTracking::create([
+                        'shipment_item_id' => $runItem->shipmentItem->id,
+                        'status' => 'delivered',
+                        'location' => $stop->town ?: $stop->landmark,
+                        'notes' => 'Delivery confirmed by admin via phone call. ' . ($validated['notes'] ?? ''),
+                        'meta' => ['confirmed_by' => $admin->name, 'confirmed_at' => $now->toIso8601String()],
+                        'created_at' => $now,
+                    ]);
+
+                    if ($runItem->shipmentItem->shipment) {
+                        $allDelivered = $runItem->shipmentItem->shipment->items()
+                            ->where('status', '!=', \App\Enums\ItemStatus::DELIVERED->value)
+                            ->doesntExist();
+                        if ($allDelivered) {
+                            $runItem->shipmentItem->shipment->update(['status' => \App\Enums\ShipmentStatus::DELIVERED]);
+                        }
+                    }
+                }
+            }
+
+            app(\App\Services\VendorCommissionService::class)->createEarningsForStop($stop);
+
+            return response()->json(['success' => true, 'message' => 'Delivery confirmed. Recipient verified receipt via phone call.']);
+        }
+
+        $stop->update([
+            'status' => DeliveryRunStop::STATUS_FAILED,
+            'confirmed_by_admin_id' => $admin->id,
+            'confirmed_at' => $now,
+            'confirmation_notes' => $validated['notes'],
+            'failure_reason' => 'not_received_by_recipient',
+            'failure_notes' => 'Admin confirmed via phone call that recipient did not receive the package. ' . ($validated['notes'] ?? ''),
+        ]);
+
+        $runItems = \App\Models\DeliveryRunItem::where('delivery_run_stop_id', $stop->id)->with('shipmentItem')->get();
+        foreach ($runItems as $runItem) {
+            $runItem->update(['status' => \App\Models\DeliveryRunItem::STATUS_FAILED]);
+            if ($runItem->shipmentItem) {
+                $runItem->shipmentItem->update(['status' => \App\Enums\ItemStatus::AT_DESTINATION]);
+            }
+        }
+
+        return response()->json(['success' => true, 'message' => 'Stop marked as failed. Recipient did not receive the package.']);
+    }
+
+    public function pendingConfirmations(): View
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+
+        return view('warehouse.deliveries.pending-confirmations', compact('warehouse'));
+    }
+
+    public function pendingConfirmationsData(Request $request): JsonResponse
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+
+        $query = DeliveryRunStop::where('status', DeliveryRunStop::STATUS_HANDED_OFF)
+            ->where('delivery_method', DeliveryRunStop::METHOD_BUS_HANDOFF)
+            ->whereHas('run', fn ($q) => $q->where('warehouse_id', $warehouse->id));
+
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('recipient_name', 'like', "%{$search}%")
+                  ->orWhere('recipient_phone', 'like', "%{$search}%")
+                  ->orWhere('handoff_courier_name', 'like', "%{$search}%")
+                  ->orWhere('handoff_vehicle_number', 'like', "%{$search}%");
+            });
+        }
+
+        $total = $query->count();
+        $perPage = min((int) $request->get('per_page', 20), 100);
+        $page = max((int) $request->get('page', 1), 1);
+
+        $stops = $query->with(['run', 'region', 'district'])
+            ->latest('handoff_at')
+            ->skip(($page - 1) * $perPage)
+            ->take($perPage)
+            ->get();
+
+        $now = now();
+
+        return response()->json([
+            'data' => $stops->map(fn ($stop) => [
+                'id' => $stop->id,
+                'run_id' => $stop->delivery_run_id,
+                'run_number' => $stop->run?->run_number,
+                'recipient_name' => $stop->recipient_name,
+                'recipient_phone' => $stop->recipient_phone,
+                'town' => $stop->town,
+                'region' => $stop->region?->name,
+                'district' => $stop->district?->name,
+                'courier_name' => $stop->handoff_courier_name,
+                'courier_phone' => $stop->handoff_courier_phone,
+                'vehicle_number' => $stop->handoff_vehicle_number,
+                'handoff_at' => $stop->handoff_at?->format('M d, Y H:i'),
+                'hours_since_handoff' => $stop->handoff_at ? round($stop->handoff_at->diffInHours($now), 1) : null,
+                'needs_followup' => $stop->handoff_at && $stop->handoff_at->diffInHours($now) >= 24,
+                'total_packages' => (int) $stop->total_packages,
+            ])->values(),
+            'meta' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => max((int) ceil($total / $perPage), 1),
+                'from' => $total ? (($page - 1) * $perPage) + 1 : 0,
+                'to' => min($page * $perPage, $total),
+            ],
+        ]);
+    }
+
+    private function getStopOtpCode(DeliveryRunStop $stop): ?string
+    {
+        if ($stop->status === 'delivered' || !$stop->verification_code_sent_at) {
+            return null;
+        }
+
+        return OtpCode::where('phone', (string) $stop->recipient_phone)
+            ->where('purpose', 'delivery_verification')
+            ->whereNull('verified_at')
+            ->where('expires_at', '>', now())
+            ->latest('created_at')
+            ->value('code');
     }
 }
