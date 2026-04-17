@@ -468,7 +468,7 @@ function shipmentShow() {
                 const url = this.config.districtsUrl.replace('__REGION__', pkg.delivery_region_id);
                 const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
                 const json = await resp.json();
-                const raw = json.data || json || [];
+                const raw = json.data?.districts || json.data || json || [];
                 pkg._districts = Array.isArray(raw) ? raw : Object.values(raw);
             } catch (e) { pkg._districts = []; }
         },
