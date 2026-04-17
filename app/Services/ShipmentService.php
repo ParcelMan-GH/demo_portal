@@ -453,6 +453,24 @@ class ShipmentService
                 ]
                 : null;
 
+            $itemHandoff = null;
+            if ($item->status === \App\Enums\ItemStatus::HANDED_TO_COURIER) {
+                $stop = \App\Models\DeliveryRunStop::where('delivery_method', 'bus_handoff')
+                    ->whereIn('status', ['handed_off', 'delivered'])
+                    ->whereHas('items', fn ($q) => $q->where('shipment_item_id', $item->id))
+                    ->first();
+                if ($stop) {
+                    $station = $item->bus_station_id ? \App\Models\BusStation::find($item->bus_station_id) : null;
+                    $itemHandoff = [
+                        'bus_station' => $station?->name ?? $stop->recipient_name,
+                        'courier_name' => $stop->handoff_courier_name,
+                        'courier_phone' => $stop->handoff_courier_phone,
+                        'vehicle_number' => $stop->handoff_vehicle_number,
+                        'handed_off_at' => $stop->handoff_at?->toIso8601String(),
+                    ];
+                }
+            }
+
             $payload = [
                 'id' => $item->id,
                 'description' => $item->description,
@@ -461,6 +479,7 @@ class ShipmentService
                 'tracking_code' => $item->tracking_code,
                 'fulfillment_type' => $item->fulfillment_type?->value,
                 'delivery' => $itemDelivery,
+                'handoff' => $itemHandoff,
                 'images' => $item->images->map(fn($img) => $img->getSignedUrl()),
                 'created_at' => $item->created_at->toIso8601String(),
                 'updated_at' => $item->updated_at->toIso8601String(),
