@@ -317,7 +317,7 @@ class AdminDeliveryRunController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
-    public function confirmHandoff(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
+    public function confirmHandoffItem(Request $request, DeliveryRun $run, DeliveryRunStop $stop, \App\Models\DeliveryRunItem $item): JsonResponse
     {
         $this->authorizePermission('shipments.edit');
 
@@ -326,71 +326,69 @@ class AdminDeliveryRunController extends Controller
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        if ($stop->delivery_run_id !== $run->id) {
-            return response()->json(['success' => false, 'message' => 'Stop not found.'], 404);
+        if ($stop->delivery_run_id !== $run->id || $item->delivery_run_stop_id !== $stop->id) {
+            return response()->json(['success' => false, 'message' => 'Item not found.'], 404);
         }
 
-        if ($stop->status !== DeliveryRunStop::STATUS_HANDED_OFF) {
-            return response()->json(['success' => false, 'message' => 'This stop has not been handed off yet.'], 400);
+        if ($item->status === \App\Models\DeliveryRunItem::STATUS_DELIVERED || $item->status === \App\Models\DeliveryRunItem::STATUS_FAILED) {
+            return response()->json(['success' => false, 'message' => 'This item has already been resolved.'], 400);
         }
 
         $admin = Auth::guard('admin')->user();
         $now = now();
 
         if ($validated['action'] === 'delivered') {
-            $stop->update([
-                'status' => DeliveryRunStop::STATUS_DELIVERED,
-                'confirmed_by_admin_id' => $admin->id,
-                'confirmed_at' => $now,
-                'confirmation_notes' => $validated['notes'],
-            ]);
+            $item->update(['status' => \App\Models\DeliveryRunItem::STATUS_DELIVERED, 'notes' => $validated['notes']]);
 
-            $runItems = \App\Models\DeliveryRunItem::where('delivery_run_stop_id', $stop->id)->with('shipmentItem.shipment')->get();
-            foreach ($runItems as $runItem) {
-                $runItem->update(['status' => \App\Models\DeliveryRunItem::STATUS_DELIVERED]);
-                if ($runItem->shipmentItem) {
-                    $runItem->shipmentItem->update(['status' => \App\Enums\ItemStatus::DELIVERED]);
-                    \App\Models\ShipmentItemTracking::create([
-                        'shipment_item_id' => $runItem->shipmentItem->id,
-                        'status' => 'delivered',
-                        'location' => $stop->town ?: $stop->landmark,
-                        'notes' => 'Delivery confirmed by admin via phone call. ' . ($validated['notes'] ?? ''),
-                        'meta' => ['confirmed_by' => $admin->name, 'confirmed_at' => $now->toIso8601String()],
-                        'created_at' => $now,
-                    ]);
-                    if ($runItem->shipmentItem->shipment) {
-                        $allDelivered = $runItem->shipmentItem->shipment->items()
-                            ->where('status', '!=', \App\Enums\ItemStatus::DELIVERED->value)->doesntExist();
-                        if ($allDelivered) {
-                            $runItem->shipmentItem->shipment->update(['status' => \App\Enums\ShipmentStatus::DELIVERED]);
-                        }
+            if ($item->shipmentItem) {
+                $item->shipmentItem->update(['status' => \App\Enums\ItemStatus::DELIVERED]);
+                \App\Models\ShipmentItemTracking::create([
+                    'shipment_item_id' => $item->shipmentItem->id,
+                    'status' => 'delivered',
+                    'location' => $stop->town ?: $stop->landmark,
+                    'notes' => 'Delivery confirmed by admin via phone call. ' . ($validated['notes'] ?? ''),
+                    'meta' => ['confirmed_by' => $admin->name, 'confirmed_at' => $now->toIso8601String()],
+                    'created_at' => $now,
+                ]);
+                if ($item->shipmentItem->shipment) {
+                    $allDelivered = $item->shipmentItem->shipment->items()
+                        ->where('status', '!=', \App\Enums\ItemStatus::DELIVERED->value)->doesntExist();
+                    if ($allDelivered) {
+                        $item->shipmentItem->shipment->update(['status' => \App\Enums\ShipmentStatus::DELIVERED]);
                     }
                 }
             }
-
-            app(\App\Services\VendorCommissionService::class)->createEarningsForStop($stop);
-
-            return response()->json(['success' => true, 'message' => 'Delivery confirmed. Recipient verified receipt via phone call.']);
-        }
-
-        $stop->update([
-            'status' => DeliveryRunStop::STATUS_FAILED,
-            'confirmed_by_admin_id' => $admin->id,
-            'confirmed_at' => $now,
-            'confirmation_notes' => $validated['notes'],
-            'failure_reason' => 'not_received_by_recipient',
-            'failure_notes' => 'Admin confirmed recipient did not receive the package. ' . ($validated['notes'] ?? ''),
-        ]);
-
-        $runItems = \App\Models\DeliveryRunItem::where('delivery_run_stop_id', $stop->id)->with('shipmentItem')->get();
-        foreach ($runItems as $runItem) {
-            $runItem->update(['status' => \App\Models\DeliveryRunItem::STATUS_FAILED]);
-            if ($runItem->shipmentItem) {
-                $runItem->shipmentItem->update(['status' => \App\Enums\ItemStatus::AT_DESTINATION]);
+        } else {
+            $item->update(['status' => \App\Models\DeliveryRunItem::STATUS_FAILED, 'notes' => $validated['notes']]);
+            if ($item->shipmentItem) {
+                $item->shipmentItem->update(['status' => \App\Enums\ItemStatus::AT_DESTINATION]);
             }
         }
 
-        return response()->json(['success' => true, 'message' => 'Stop marked as failed. Recipient did not receive the package.']);
+        // Check if all items in this stop are resolved — if so, update stop status
+        $stopItems = \App\Models\DeliveryRunItem::where('delivery_run_stop_id', $stop->id)->get();
+        $allResolved = $stopItems->every(fn ($i) => in_array($i->status, ['delivered', 'failed']));
+
+        if ($allResolved) {
+            $allDelivered = $stopItems->every(fn ($i) => $i->status === 'delivered');
+            $stop->update([
+                'status' => $allDelivered ? DeliveryRunStop::STATUS_DELIVERED : DeliveryRunStop::STATUS_FAILED,
+                'confirmed_by_admin_id' => $admin->id,
+                'confirmed_at' => $now,
+                'confirmation_notes' => 'All items confirmed via phone calls.',
+            ]);
+
+            if ($allDelivered) {
+                app(\App\Services\VendorCommissionService::class)->createEarningsForStop($stop);
+            }
+        }
+
+        $recipName = $item->shipmentItem?->delivery_recipient_name ?? 'Item';
+        $msg = $validated['action'] === 'delivered'
+            ? "{$recipName}'s package confirmed as delivered."
+            : "{$recipName}'s package marked as failed.";
+
+        return response()->json(['success' => true, 'message' => $msg, 'all_resolved' => $allResolved]);
     }
 
     public function updateStopDeliveryMethod(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
