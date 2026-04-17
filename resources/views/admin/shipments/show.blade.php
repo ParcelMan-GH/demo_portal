@@ -2734,7 +2734,8 @@ $shipmentConfig = [
                                                                 x-effect="
                                                                     let el = $el;
                                                                     let opts = '<option value=\'\'>Select District</option>';
-                                                                    (pkg._districts || []).forEach(d => {
+                                                                    let dists = Array.isArray(pkg._districts) ? pkg._districts : Object.values(pkg._districts || {});
+                                                                    dists.forEach(d => {
                                                                         opts += '<option value=\'' + d.id + '\'>' + d.name + '</option>';
                                                                     });
                                                                     el.innerHTML = opts;
