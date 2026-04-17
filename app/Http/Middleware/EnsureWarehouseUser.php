@@ -24,6 +24,19 @@ class EnsureWarehouseUser
             return redirect()->route('admin.login');
         }
 
+        // Super admin bypasses warehouse checks — can access any warehouse
+        if ($user->isSuperAdmin()) {
+            // If super admin has no warehouse_id, assign the first active warehouse for context
+            if ((int) ($user->warehouse_id ?? 0) <= 0) {
+                $firstWarehouse = \App\Models\Warehouse::where('is_active', true)->first();
+                if ($firstWarehouse) {
+                    $user->warehouse_id = $firstWarehouse->id;
+                    $user->saveQuietly();
+                }
+            }
+            return $next($request);
+        }
+
         $hasWarehouseRole = $user->roles()->where('is_warehouse_role', true)->exists();
 
         if ((int) ($user->warehouse_id ?? 0) <= 0 || !$hasWarehouseRole) {
