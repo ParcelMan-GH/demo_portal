@@ -1523,6 +1523,7 @@
                     { name: 'pickup_town', type: 'string', required: false, description: 'Pickup area (free text)', example: 'Lapaz' },
                     { name: 'sender_notes', type: 'string', required: false, description: 'Notes for admin', example: 'Big box for Mark, small ones for Ama' },
                     { name: 'new_photos[]', type: 'file', required: false, description: 'New photos to upload (max 2MB each, jpeg/png/webp)', multiple: true },
+                    { name: 'new_photos_phones[]', type: 'string', required: false, description: 'Recipient phone per new photo (optional, same index as new_photos). Tags each new photo with a recipient.', multiple: true, example: '+233241234567' },
                     { name: 'remove_photo_ids[]', type: 'string', required: false, description: 'IDs of photos to delete (comma-separated or multiple fields)', example: '12,15' },
                 ],
                 sampleBody: null,
