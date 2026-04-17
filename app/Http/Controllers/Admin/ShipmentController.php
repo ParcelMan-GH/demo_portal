@@ -1659,9 +1659,16 @@ class ShipmentController extends Controller
             $multipleGroups = count($packages) > 1 || ($grouped->has('__untagged__') && $grouped->count() > 1);
             $newMode = $multipleGroups ? ShipmentDestinationMode::PER_ITEM : ShipmentDestinationMode::SINGLE;
 
-            if ($shipment->destination_mode !== $newMode) {
-                $shipment->update(['destination_mode' => $newMode]);
+            $shipmentUpdate = ['destination_mode' => $newMode];
+
+            if ($newMode === ShipmentDestinationMode::SINGLE) {
+                $singlePhone = collect($packages)->pluck('phone')->filter()->first();
+                if ($singlePhone) {
+                    $shipmentUpdate['delivery_recipient_phone'] = $singlePhone;
+                }
             }
+
+            $shipment->update($shipmentUpdate);
 
             $shipment->load('items.images');
 
@@ -1670,6 +1677,7 @@ class ShipmentController extends Controller
                 'message' => count($packages) . ' package(s) created. Destination mode set to ' . $newMode->value . '.',
                 'data' => [
                     'destination_mode' => $newMode->value,
+                    'delivery_recipient_phone' => $shipment->fresh()->delivery_recipient_phone,
                     'packages' => $shipment->items->map(fn ($item) => [
                         'id' => $item->id,
                         'description' => $item->description,

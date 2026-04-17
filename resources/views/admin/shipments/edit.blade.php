@@ -1105,12 +1105,19 @@ function shipmentEditor() {
                         delivery_recipient_phone: pkg.delivery_recipient_phone || null,
                         delivery_town: pkg.delivery_town || null,
                         delivery_landmark: pkg.delivery_landmark || null,
+                        delivery_region_id: pkg.delivery_region_id || null,
+                        delivery_district_id: pkg.delivery_district_id || null,
+                        delivery_instructions: pkg.delivery_instructions || null,
                         _saved: false,
                         _saving: false,
                         _districts: [],
                     }));
                     if (res.data.destination_mode) {
                         this.destinationMode = res.data.destination_mode;
+                    }
+                    // Pre-fill shipment-level delivery phone for single mode
+                    if (res.data.destination_mode === 'single' && res.data.delivery_recipient_phone) {
+                        this.form.delivery.recipient_phone = res.data.delivery_recipient_phone;
                     }
                     this._toast(res.message, 'success');
                 } else {
