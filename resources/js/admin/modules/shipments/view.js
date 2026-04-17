@@ -466,6 +466,13 @@ function shipmentShow() {
                         condition_status: pkg.condition_status || 'ok',
                         notes: pkg.notes || null,
                         description: pkg.description || null,
+                        delivery_recipient_name: pkg.delivery_recipient_name || null,
+                        delivery_recipient_phone: pkg.delivery_recipient_phone || null,
+                        delivery_region_id: pkg.delivery_region_id || null,
+                        delivery_district_id: pkg.delivery_district_id || null,
+                        delivery_town: pkg.delivery_town || null,
+                        delivery_landmark: pkg.delivery_landmark || null,
+                        delivery_instructions: pkg.delivery_instructions || null,
                     }),
                 });
                 const result = await response.json();

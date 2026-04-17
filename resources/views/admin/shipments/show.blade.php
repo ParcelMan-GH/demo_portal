@@ -2695,6 +2695,61 @@ $shipmentConfig = [
                                             <label class="block text-[10px] font-semibold text-slate-500 mb-1">Notes</label>
                                             <input type="text" x-model="pkg.notes" placeholder="Receiving notes..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 outline-none">
                                         </div>
+
+                                        {{-- Delivery Details --}}
+                                        <div class="mb-3 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100" x-data="{ deliveryOpen: true }">
+                                            <button @@click="deliveryOpen = !deliveryOpen" class="flex items-center justify-between w-full text-left">
+                                                <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                                    Delivery Details (required)
+                                                </span>
+                                                <svg class="w-4 h-4 text-indigo-400 transition-transform" :class="deliveryOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                            </button>
+                                            <div x-show="deliveryOpen" x-collapse class="mt-3 space-y-3">
+                                                <div class="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient Name *</label>
+                                                        <input type="text" x-model="pkg.delivery_recipient_name" placeholder="Who receives it?" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient Phone *</label>
+                                                        <input type="text" x-model="pkg.delivery_recipient_phone" placeholder="0241234567" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                    </div>
+                                                </div>
+                                                <div class="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Region</label>
+                                                        <select x-model="pkg.delivery_region_id" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                            <option value="">Select Region</option>
+                                                            @foreach(\App\Models\Region::orderBy('name')->get() as $region)
+                                                                <option value="{{ $region->id }}">{{ $region->name }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">District</label>
+                                                        <select x-model="pkg.delivery_district_id" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                            <option value="">Select District</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Town / Area *</label>
+                                                        <input type="text" x-model="pkg.delivery_town" placeholder="e.g. Madina" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Landmark</label>
+                                                        <input type="text" x-model="pkg.delivery_landmark" placeholder="Near..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Delivery Instructions</label>
+                                                    <input type="text" x-model="pkg.delivery_instructions" placeholder="e.g. Call before delivery" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         <div class="flex items-center gap-2">
                                             <button @@click="receivePackage(pkg)" :disabled="receiving.saving" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-semibold rounded-lg transition-all disabled:opacity-50">
                                                 <svg x-show="receiving.saving" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>

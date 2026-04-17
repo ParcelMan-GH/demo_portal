@@ -1449,6 +1449,13 @@ class ShipmentController extends Controller
                 'notes' => $receiptItem?->notes,
                 'barcode_value' => $receiptItem?->barcode_value,
                 'barcode_print_count' => (int) ($receiptItem?->barcode_print_count ?? 0),
+                'delivery_recipient_name' => $item->delivery_recipient_name,
+                'delivery_recipient_phone' => $item->delivery_recipient_phone,
+                'delivery_region_id' => $item->delivery_region_id,
+                'delivery_district_id' => $item->delivery_district_id,
+                'delivery_town' => $item->delivery_town,
+                'delivery_landmark' => $item->delivery_landmark,
+                'delivery_instructions' => $item->delivery_instructions,
                 'photos' => $receiptItem
                     ? $receivingService->serializeReceiptItem($receiptItem)['photos']
                     : [],
@@ -1498,12 +1505,28 @@ class ShipmentController extends Controller
             'photos.*' => ['file', 'image', 'max:12288'],
             'remove_photo_ids' => ['nullable', 'array'],
             'remove_photo_ids.*' => ['integer'],
+            'delivery_recipient_name' => ['nullable', 'string', 'max:255'],
+            'delivery_recipient_phone' => ['nullable', 'string', 'max:20'],
+            'delivery_region_id' => ['nullable', 'exists:regions,id'],
+            'delivery_district_id' => ['nullable', 'exists:districts,id'],
+            'delivery_town' => ['nullable', 'string', 'max:255'],
+            'delivery_landmark' => ['nullable', 'string', 'max:255'],
+            'delivery_instructions' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        // Update package details if provided
+        // Update package details + delivery info if provided
         $packageUpdates = array_filter([
             'description' => $validated['description'] ?? null,
             'quantity' => $validated['quantity'] ?? null,
+            'delivery_recipient_name' => $validated['delivery_recipient_name'] ?? null,
+            'delivery_recipient_phone' => !empty($validated['delivery_recipient_phone'])
+                ? \App\Helpers\PhoneHelper::format($validated['delivery_recipient_phone'])
+                : null,
+            'delivery_region_id' => $validated['delivery_region_id'] ?? null,
+            'delivery_district_id' => $validated['delivery_district_id'] ?? null,
+            'delivery_town' => $validated['delivery_town'] ?? null,
+            'delivery_landmark' => $validated['delivery_landmark'] ?? null,
+            'delivery_instructions' => $validated['delivery_instructions'] ?? null,
         ], fn ($v) => !is_null($v));
         if (!empty($packageUpdates)) {
             $item->update($packageUpdates);
