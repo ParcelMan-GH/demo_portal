@@ -459,28 +459,24 @@ function shipmentShow() {
         },
 
         async loadPackageDistricts(pkg) {
-            const sel = document.getElementById('district-select-' + pkg.shipment_item_id);
             if (!pkg.delivery_region_id) {
-                if (sel) sel.innerHTML = '<option value="">Select District</option>';
+                pkg._districts = [];
                 pkg.delivery_district_id = null;
                 return;
             }
             const savedId = pkg.delivery_district_id;
             try {
                 const url = this.config.districtsUrl.replace('__REGION__', pkg.delivery_region_id);
-                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-                const json = await res.json();
-                const districts = json.data?.districts || [];
-                if (sel) {
-                    let html = '<option value="">Select District</option>';
-                    districts.forEach(d => { html += `<option value="${d.id}">${d.name}</option>`; });
-                    sel.innerHTML = html;
-                    sel.value = savedId || '';
-                    sel.dispatchEvent(new Event('change'));
-                }
+                const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                const json = await resp.json();
+                pkg._districts = json.data?.districts || [];
             } catch (e) {
-                if (sel) sel.innerHTML = '<option value="">Select District</option>';
+                pkg._districts = [];
             }
+            // Restore saved district after options update
+            this.$nextTick(() => {
+                pkg.delivery_district_id = savedId;
+            });
         },
 
         async receivePackage(pkg) {
