@@ -5,53 +5,40 @@
 @section('breadcrumb-current', 'Vendor Payouts')
 
 @section('content')
+<div id="vendor-payouts-app" class="space-y-6">
 
-<div
-    x-data="vendorPayoutsPage()"
-    x-init="init()"
-    data-payout-config='@json($payoutConfig)'
-    class="space-y-6"
->
     {{-- Stats Row --}}
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg p-6">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Vendors with Balance</p>
-                    <p class="mt-2 text-2xl font-bold text-slate-900" x-text="stats.vendorsWithBalance != null ? stats.vendorsWithBalance : '—'"></p>
+                    <p id="stat-vendors-count" class="mt-2 text-2xl font-bold text-slate-900">&mdash;</p>
                 </div>
                 <div class="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    </svg>
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 </div>
             </div>
         </div>
-
         <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg p-6">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Available Balance</p>
-                    <p class="mt-2 text-2xl font-bold text-emerald-600" x-text="stats.totalAvailableBalance != null ? 'GHS ' + parseFloat(stats.totalAvailableBalance).toFixed(2) : '—'"></p>
+                    <p id="stat-total-balance" class="mt-2 text-2xl font-bold text-emerald-600">&mdash;</p>
                 </div>
                 <div class="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
             </div>
         </div>
-
         <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg p-6">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Pending Payouts</p>
-                    <p class="mt-2 text-2xl font-bold text-amber-600" x-text="stats.pendingPayoutsTotal != null ? 'GHS ' + parseFloat(stats.pendingPayoutsTotal).toFixed(2) : '—'"></p>
+                    <p id="stat-pending" class="mt-2 text-2xl font-bold text-amber-600">&mdash;</p>
                 </div>
                 <div class="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
+                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
             </div>
         </div>
@@ -62,16 +49,8 @@
         <div class="px-6 py-5 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="text-lg font-bold text-slate-900">Vendor Payouts</h2>
             <div class="relative">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-                <input
-                    type="text"
-                    x-model.debounce.300ms="search"
-                    @@input="loadData()"
-                    placeholder="Search vendors..."
-                    class="pl-10 pr-4 py-2 text-xs border border-slate-200 rounded-xl bg-white/60 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none w-64"
-                />
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" id="search-input" placeholder="Search vendors..." class="pl-10 pr-4 py-2 text-xs border border-slate-200 rounded-xl bg-white/60 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none w-64" />
             </div>
         </div>
 
@@ -87,355 +66,453 @@
                         <th class="px-6 py-3 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr x-show="loading">
+                <tbody id="vendors-tbody">
+                    <tr id="loading-row">
                         <td colspan="6" class="px-6 py-12 text-center text-slate-400 text-sm">
-                            <svg class="animate-spin h-5 w-5 mx-auto text-slate-400" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                            </svg>
+                            <svg class="animate-spin h-5 w-5 mx-auto text-slate-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                         </td>
                     </tr>
-                    <tr x-show="!loading && vendors.length === 0">
+                    <tr id="empty-row" style="display:none;">
                         <td colspan="6" class="px-6 py-12 text-center text-slate-400 text-sm">No vendors found.</td>
                     </tr>
-                    <template x-for="vendor in vendors" :key="vendor.id">
-                        <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                            <td class="px-6 py-4">
-                                <button @@click="openHistory(vendor)" class="text-left group">
-                                    <p class="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors" x-text="vendor.name"></p>
-                                    <p class="text-slate-500 text-[10px]" x-text="vendor.business_name"></p>
-                                    <p class="text-slate-400 text-[10px]" x-text="vendor.phone"></p>
-                                </button>
-                            </td>
-                            <td class="px-6 py-4 text-right font-medium text-slate-700" x-text="'GHS ' + parseFloat(vendor.total_earned || 0).toFixed(2)"></td>
-                            <td class="px-6 py-4 text-right">
-                                <span
-                                    class="font-semibold"
-                                    :class="vendor.can_payout ? 'text-emerald-600' : 'text-slate-500'"
-                                    x-text="'GHS ' + parseFloat(vendor.available_balance || 0).toFixed(2)"
-                                ></span>
-                                <div class="mt-1">
-                                    <span x-show="vendor.can_payout" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700">Ready</span>
-                                    <span x-show="!vendor.can_payout" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">Below minimum</span>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 text-right font-medium text-slate-700" x-text="'GHS ' + parseFloat(vendor.total_paid || 0).toFixed(2)"></td>
-                            <td class="px-6 py-4 text-right font-medium text-amber-600" x-text="'GHS ' + parseFloat(vendor.pending_payouts || 0).toFixed(2)"></td>
-                            <td class="px-6 py-4 text-center">
-                                <button
-                                    @@click="openCreate(vendor)"
-                                    :disabled="!vendor.can_payout"
-                                    class="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    Create Payout
-                                </button>
-                            </td>
-                        </tr>
-                    </template>
                 </tbody>
             </table>
         </div>
 
-        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between" x-show="meta.last_page > 1">
-            <p class="text-xs text-slate-500">
-                Showing <span x-text="meta.from || 0"></span> to <span x-text="meta.to || 0"></span> of <span x-text="meta.total || 0"></span>
-            </p>
+        <div id="pagination-row" class="px-6 py-4 border-t border-slate-100 flex items-center justify-between" style="display:none;">
+            <p class="text-xs text-slate-500">Showing <span id="pag-from">0</span> to <span id="pag-to">0</span> of <span id="pag-total">0</span></p>
             <div class="flex items-center gap-1">
-                <button @@click="goToPage(meta.current_page - 1)" :disabled="meta.current_page <= 1" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Prev</button>
-                <button @@click="goToPage(meta.current_page + 1)" :disabled="meta.current_page >= meta.last_page" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
+                <button id="btn-prev" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Prev</button>
+                <button id="btn-next" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
             </div>
         </div>
     </div>
 
     {{-- Create Payout Modal --}}
-    <div x-cloak x-show="createModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @@click="createModalOpen = false"></div>
+    <div id="create-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="VendorPayouts.closeCreate()"></div>
         <div class="relative bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md p-6">
             <h3 class="text-lg font-bold text-slate-900 mb-1">Create Payout</h3>
-            <p class="text-xs text-slate-500 mb-5" x-show="selectedVendor" x-text="'For ' + (selectedVendor ? selectedVendor.name : '')"></p>
-
-            <form @@submit.prevent="submitPayout()">
+            <p id="create-modal-vendor" class="text-xs text-slate-500 mb-5"></p>
+            <form id="create-form" onsubmit="VendorPayouts.submitCreate(event)">
                 <div class="mb-4">
                     <label class="block text-xs font-semibold text-slate-700 mb-1.5">Amount (GHS)</label>
-                    <input type="number" step="0.01" min="0" x-model="payoutForm.amount" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" required />
+                    <input type="number" id="create-amount" step="0.01" min="0" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" required />
                 </div>
-
                 <div class="mb-4">
                     <label class="block text-xs font-semibold text-slate-700 mb-1.5">Payment Method</label>
-                    <select x-model="payoutForm.payment_method" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" required>
+                    <select id="create-method" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" required onchange="VendorPayouts.togglePhone()">
                         <option value="momo">MoMo</option>
-                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="bank">Bank Transfer</option>
                         <option value="cash">Cash</option>
                     </select>
                 </div>
-
-                <div class="mb-4" x-show="payoutForm.payment_method === 'momo'">
+                <div id="phone-field" class="mb-4">
                     <label class="block text-xs font-semibold text-slate-700 mb-1.5">Payment Phone</label>
-                    <input type="text" x-model="payoutForm.payment_phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" />
+                    <input type="text" id="create-phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" />
                 </div>
-
                 <div class="mb-5">
                     <label class="block text-xs font-semibold text-slate-700 mb-1.5">Notes (optional)</label>
-                    <textarea x-model="payoutForm.notes" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
+                    <textarea id="create-notes" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
                 </div>
-
                 <div class="flex items-center justify-end gap-3">
-                    <button type="button" @@click="createModalOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">Cancel</button>
-                    <button type="submit" :disabled="submitting" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">
-                        <span x-show="!submitting">Create Payout</span>
-                        <span x-show="submitting">Creating...</span>
-                    </button>
+                    <button type="button" onclick="VendorPayouts.closeCreate()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">Cancel</button>
+                    <button type="submit" id="create-submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">Create Payout</button>
                 </div>
             </form>
         </div>
     </div>
 
-    {{-- Payout History Modal --}}
-    <div x-cloak x-show="historyModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @@click="historyModalOpen = false"></div>
+    {{-- History Modal --}}
+    <div id="history-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="VendorPayouts.closeHistory()"></div>
         <div class="relative bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
             <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between shrink-0">
                 <div>
                     <h3 class="text-lg font-bold text-slate-900">Payout History</h3>
-                    <p class="text-xs text-slate-500 mt-0.5" x-show="historyVendor" x-text="historyVendor ? historyVendor.name : ''"></p>
+                    <p id="history-vendor-name" class="text-xs text-slate-500 mt-0.5"></p>
                 </div>
-                <button @@click="historyModalOpen = false" class="p-1 rounded-lg hover:bg-slate-100 transition-colors">
-                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
+                <button onclick="VendorPayouts.closeHistory()" class="p-1 rounded-lg hover:bg-slate-100 transition-colors">
+                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-
-            <div class="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-                <div x-show="historyLoading" class="py-12 text-center">
-                    <svg class="animate-spin h-5 w-5 mx-auto text-slate-400" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                </div>
-                <div x-show="!historyLoading && payoutHistory.length === 0" class="py-12 text-center text-sm text-slate-400">No payouts yet.</div>
-                <template x-for="payout in payoutHistory" :key="payout.id">
-                    <div class="bg-white/60 border border-slate-100 rounded-2xl p-4">
-                        <div class="flex items-start justify-between mb-2">
-                            <div>
-                                <span class="text-sm font-bold text-slate-900" x-text="'GHS ' + parseFloat(payout.amount).toFixed(2)"></span>
-                                <span class="ml-2 text-xs text-slate-500" x-text="payout.payment_method"></span>
-                            </div>
-                            <span
-                                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
-                                :class="{
-                                    'bg-amber-50 text-amber-700': payout.status === 'pending',
-                                    'bg-blue-50 text-blue-700': payout.status === 'sent',
-                                    'bg-emerald-50 text-emerald-700': payout.status === 'confirmed'
-                                }"
-                                x-text="payout.status.charAt(0).toUpperCase() + payout.status.slice(1)"
-                            ></span>
-                        </div>
-                        <div class="text-[10px] text-slate-400 space-y-0.5">
-                            <p x-show="payout.reference">Ref: <span class="text-slate-600" x-text="payout.reference"></span></p>
-                            <p>Created: <span class="text-slate-600" x-text="payout.created_at"></span></p>
-                            <p x-show="payout.sent_at">Sent: <span class="text-slate-600" x-text="payout.sent_at"></span></p>
-                            <p x-show="payout.confirmed_at">Confirmed: <span class="text-slate-600" x-text="payout.confirmed_at"></span></p>
-                        </div>
-                        <div class="mt-3 flex items-center gap-2">
-                            <button x-show="payout.status === 'pending'" @@click="promptMarkSent(payout)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors">Mark as Sent</button>
-                            <button x-show="payout.status === 'sent'" @@click="confirmPayout(payout)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors">Confirm</button>
-                        </div>
-                    </div>
-                </template>
+            <div id="history-content" class="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+                <div class="py-12 text-center text-sm text-slate-400">Loading...</div>
             </div>
         </div>
     </div>
 
-    {{-- Mark as Sent Modal --}}
-    <div x-cloak x-show="markSentModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4" style="display: none;">
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @@click="markSentModalOpen = false"></div>
+    {{-- Mark Sent Modal --}}
+    <div id="mark-sent-modal" class="fixed inset-0 z-[60] flex items-center justify-center p-4" style="display:none;">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="VendorPayouts.closeMarkSent()"></div>
         <div class="relative bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-sm p-6">
             <h3 class="text-base font-bold text-slate-900 mb-4">Mark Payout as Sent</h3>
-            <form @@submit.prevent="submitMarkSent()">
+            <form onsubmit="VendorPayouts.submitMarkSent(event)">
                 <div class="mb-5">
                     <label class="block text-xs font-semibold text-slate-700 mb-1.5">Payment Reference</label>
-                    <input type="text" x-model="markSentReference" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" placeholder="e.g. MoMo transaction ID" required />
+                    <input type="text" id="mark-sent-ref" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" placeholder="e.g. MoMo transaction ID" required />
                 </div>
                 <div class="flex items-center justify-end gap-3">
-                    <button type="button" @@click="markSentModalOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">Cancel</button>
-                    <button type="submit" :disabled="submitting" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">
-                        <span x-show="!submitting">Submit</span>
-                        <span x-show="submitting">Saving...</span>
-                    </button>
+                    <button type="button" onclick="VendorPayouts.closeMarkSent()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">Cancel</button>
+                    <button type="submit" id="mark-sent-submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">Submit</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-
 @endsection
 
 @push('scripts')
 <script>
-function vendorPayoutsPage() {
-    return {
-        config: {},
+(function() {
+    var CONFIG = @json($payoutConfig);
+    var CSRF = document.querySelector('meta[name="csrf-token"]').content;
+
+    var state = {
         vendors: [],
         meta: {},
-        stats: {},
-        loading: false,
         search: '',
         page: 1,
-        createModalOpen: false,
         selectedVendor: null,
-        submitting: false,
-        payoutForm: { amount: '', payment_method: 'momo', payment_phone: '', notes: '' },
-        historyModalOpen: false,
         historyVendor: null,
-        historyLoading: false,
-        payoutHistory: [],
-        markSentModalOpen: false,
-        markSentPayout: null,
-        markSentReference: '',
-
-        init() {
-            this.config = JSON.parse(this.$el.getAttribute('data-payout-config'));
-            this.loadData();
-        },
-
-        csrfToken() {
-            return document.querySelector('meta[name="csrf-token"]').content;
-        },
-
-        async loadData() {
-            this.loading = true;
-            try {
-                var params = new URLSearchParams({ page: this.page, search: this.search });
-                var resp = await fetch(this.config.dataUrl + '?' + params.toString());
-                var json = await resp.json();
-                this.vendors = Array.isArray(json.data) ? json.data : [];
-                this.meta = json.meta || {};
-                if (json.stats) {
-                    this.stats = json.stats;
-                }
-            } catch (e) {
-                console.error('Failed to load payout data', e);
-                this.vendors = [];
-                this.meta = {};
-            }
-            this.loading = false;
-        },
-
-        goToPage(p) {
-            if (p < 1 || p > this.meta.last_page) return;
-            this.page = p;
-            this.loadData();
-        },
-
-        openCreate(vendor) {
-            this.selectedVendor = vendor;
-            this.payoutForm = {
-                amount: vendor.available_balance,
-                payment_method: 'momo',
-                payment_phone: vendor.phone || '',
-                notes: ''
-            };
-            this.createModalOpen = true;
-        },
-
-        async submitPayout() {
-            this.submitting = true;
-            try {
-                var url = this.config.createPayoutUrl.replace('__VENDOR__', this.selectedVendor.id);
-                var resp = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken(), 'Accept': 'application/json' },
-                    body: JSON.stringify(this.payoutForm)
-                });
-                var json = await resp.json();
-                if (resp.ok && json.success !== false) {
-                    window.showToast && window.showToast(json.message || 'Payout created', 'success');
-                    this.createModalOpen = false;
-                    this.loadData();
-                } else {
-                    window.showToast && window.showToast(json.message || 'Failed', 'error');
-                }
-            } catch (e) {
-                window.showToast && window.showToast('An error occurred', 'error');
-                console.error(e);
-            }
-            this.submitting = false;
-        },
-
-        async openHistory(vendor) {
-            this.historyVendor = vendor;
-            this.historyModalOpen = true;
-            this.historyLoading = true;
-            this.payoutHistory = [];
-            try {
-                var url = this.config.vendorPayoutsUrl.replace('__VENDOR__', vendor.id);
-                var resp = await fetch(url);
-                var json = await resp.json();
-                this.payoutHistory = json.data || json || [];
-            } catch (e) {
-                console.error('Failed to load payout history', e);
-            }
-            this.historyLoading = false;
-        },
-
-        promptMarkSent(payout) {
-            this.markSentPayout = payout;
-            this.markSentReference = '';
-            this.markSentModalOpen = true;
-        },
-
-        async submitMarkSent() {
-            if (!this.markSentReference.trim()) {
-                window.showToast && window.showToast('Reference required', 'error');
-                return;
-            }
-            this.submitting = true;
-            try {
-                var url = this.config.markSentUrl.replace('__PAYOUT__', this.markSentPayout.id);
-                var resp = await fetch(url, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken(), 'Accept': 'application/json' },
-                    body: JSON.stringify({ payment_reference: this.markSentReference.trim() })
-                });
-                var json = await resp.json();
-                if (resp.ok && json.success !== false) {
-                    window.showToast && window.showToast(json.message || 'Marked as sent', 'success');
-                    this.markSentModalOpen = false;
-                    this.openHistory(this.historyVendor);
-                    this.loadData();
-                } else {
-                    window.showToast && window.showToast(json.message || 'Failed', 'error');
-                }
-            } catch (e) {
-                window.showToast && window.showToast('An error occurred', 'error');
-                console.error(e);
-            }
-            this.submitting = false;
-        },
-
-        async confirmPayout(payout) {
-            try {
-                var url = this.config.confirmUrl.replace('__PAYOUT__', payout.id);
-                var resp = await fetch(url, {
-                    method: 'PATCH',
-                    headers: { 'X-CSRF-TOKEN': this.csrfToken(), 'Accept': 'application/json' }
-                });
-                var json = await resp.json();
-                if (resp.ok && json.success !== false) {
-                    window.showToast && window.showToast(json.message || 'Confirmed', 'success');
-                    this.openHistory(this.historyVendor);
-                    this.loadData();
-                } else {
-                    window.showToast && window.showToast(json.message || 'Failed', 'error');
-                }
-            } catch (e) {
-                window.showToast && window.showToast('An error occurred', 'error');
-                console.error(e);
-            }
-        }
+        markSentPayoutId: null
     };
-}
+
+    var debounceTimer = null;
+
+    // ─── Helpers ───
+    function $(id) { return document.getElementById(id); }
+    function ghs(n) { return 'GHS ' + parseFloat(n || 0).toFixed(2); }
+
+    async function api(url, opts) {
+        opts = opts || {};
+        opts.headers = opts.headers || {};
+        opts.headers['Accept'] = 'application/json';
+        opts.headers['X-CSRF-TOKEN'] = CSRF;
+        if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
+            opts.headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(opts.body);
+        }
+        var resp = await fetch(url, opts);
+        var json = await resp.json();
+        return { ok: resp.ok, data: json };
+    }
+
+    function toast(msg, type) {
+        if (window.showToast) window.showToast(msg, type);
+    }
+
+    // ─── Load Data ───
+    async function loadData() {
+        $('loading-row').style.display = '';
+        $('empty-row').style.display = 'none';
+        removeVendorRows();
+
+        var params = new URLSearchParams({ page: state.page, search: state.search });
+        try {
+            var result = await api(CONFIG.dataUrl + '?' + params.toString());
+            state.vendors = result.data.data || [];
+            state.meta = result.data.meta || {};
+        } catch(e) {
+            console.error(e);
+            state.vendors = [];
+            state.meta = {};
+        }
+
+        $('loading-row').style.display = 'none';
+        renderTable();
+        renderStats();
+        renderPagination();
+    }
+
+    function removeVendorRows() {
+        var rows = document.querySelectorAll('.vendor-row');
+        for (var i = 0; i < rows.length; i++) rows[i].remove();
+    }
+
+    // ─── Render Table ───
+    function renderTable() {
+        var tbody = $('vendors-tbody');
+
+        if (state.vendors.length === 0) {
+            $('empty-row').style.display = '';
+            return;
+        }
+
+        $('empty-row').style.display = 'none';
+
+        for (var i = 0; i < state.vendors.length; i++) {
+            var v = state.vendors[i];
+            var tr = document.createElement('tr');
+            tr.className = 'vendor-row border-b border-slate-50 hover:bg-slate-50/50 transition-colors';
+            tr.innerHTML =
+                '<td class="px-6 py-4">' +
+                    '<button class="text-left group" data-action="history" data-idx="' + i + '">' +
+                        '<p class="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">' + esc(v.vendor_name) + '</p>' +
+                        '<p class="text-slate-500 text-[10px]">' + esc(v.business_name || '') + '</p>' +
+                        '<p class="text-slate-400 text-[10px]">' + esc(v.vendor_phone || '') + '</p>' +
+                    '</button>' +
+                '</td>' +
+                '<td class="px-6 py-4 text-right font-medium text-slate-700">' + ghs(v.total_earned) + '</td>' +
+                '<td class="px-6 py-4 text-right">' +
+                    '<span class="font-semibold ' + (v.can_payout ? 'text-emerald-600' : 'text-slate-500') + '">' + ghs(v.available_balance) + '</span>' +
+                    '<div class="mt-1">' +
+                        (v.can_payout
+                            ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700">Ready</span>'
+                            : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">Below minimum</span>') +
+                    '</div>' +
+                '</td>' +
+                '<td class="px-6 py-4 text-right font-medium text-slate-700">' + ghs(v.total_paid) + '</td>' +
+                '<td class="px-6 py-4 text-right font-medium text-amber-600">' + ghs(v.pending_payouts) + '</td>' +
+                '<td class="px-6 py-4 text-center">' +
+                    '<button data-action="create" data-idx="' + i + '" ' + (v.can_payout ? '' : 'disabled') +
+                        ' class="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Create Payout</button>' +
+                '</td>';
+            tbody.appendChild(tr);
+        }
+    }
+
+    function esc(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    // ─── Render Stats ───
+    function renderStats() {
+        var totalBalance = 0;
+        var totalPending = 0;
+        var withBalance = 0;
+        for (var i = 0; i < state.vendors.length; i++) {
+            var v = state.vendors[i];
+            totalBalance += parseFloat(v.available_balance || 0);
+            totalPending += parseFloat(v.pending_payouts || 0);
+            if (parseFloat(v.available_balance || 0) > 0) withBalance++;
+        }
+        $('stat-vendors-count').textContent = withBalance;
+        $('stat-total-balance').textContent = ghs(totalBalance);
+        $('stat-pending').textContent = ghs(totalPending);
+    }
+
+    // ─── Pagination ───
+    function renderPagination() {
+        var m = state.meta;
+        if (!m.last_page || m.last_page <= 1) {
+            $('pagination-row').style.display = 'none';
+            return;
+        }
+        $('pagination-row').style.display = '';
+        $('pag-from').textContent = m.from || 0;
+        $('pag-to').textContent = m.to || 0;
+        $('pag-total').textContent = m.total || 0;
+        $('btn-prev').disabled = m.current_page <= 1;
+        $('btn-next').disabled = m.current_page >= m.last_page;
+    }
+
+    // ─── Create Payout ───
+    function openCreate(idx) {
+        var v = state.vendors[idx];
+        state.selectedVendor = v;
+        $('create-modal-vendor').textContent = 'For ' + v.vendor_name;
+        $('create-amount').value = v.available_balance;
+        $('create-method').value = 'momo';
+        $('create-phone').value = v.vendor_phone || '';
+        $('create-notes').value = '';
+        $('phone-field').style.display = '';
+        $('create-modal').style.display = '';
+    }
+
+    function closeCreate() { $('create-modal').style.display = 'none'; }
+
+    function togglePhone() {
+        $('phone-field').style.display = $('create-method').value === 'momo' ? '' : 'none';
+    }
+
+    async function submitCreate(e) {
+        e.preventDefault();
+        var btn = $('create-submit');
+        btn.disabled = true;
+        btn.textContent = 'Creating...';
+        try {
+            var url = CONFIG.createPayoutUrl.replace('__VENDOR__', state.selectedVendor.vendor_id);
+            var result = await api(url, {
+                method: 'POST',
+                body: {
+                    amount: $('create-amount').value,
+                    payment_method: $('create-method').value,
+                    payment_phone: $('create-phone').value,
+                    notes: $('create-notes').value
+                }
+            });
+            if (result.ok && result.data.success !== false) {
+                toast(result.data.message || 'Payout created', 'success');
+                closeCreate();
+                loadData();
+            } else {
+                toast(result.data.message || 'Failed to create payout', 'error');
+            }
+        } catch(e) {
+            toast('An error occurred', 'error');
+            console.error(e);
+        }
+        btn.disabled = false;
+        btn.textContent = 'Create Payout';
+    }
+
+    // ─── History ───
+    function openHistory(idx) {
+        var v = state.vendors[idx];
+        state.historyVendor = v;
+        $('history-vendor-name').textContent = v.vendor_name;
+        $('history-content').innerHTML = '<div class="py-12 text-center"><svg class="animate-spin h-5 w-5 mx-auto text-slate-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></div>';
+        $('history-modal').style.display = '';
+        loadHistory(v.vendor_id);
+    }
+
+    function closeHistory() { $('history-modal').style.display = 'none'; }
+
+    async function loadHistory(vendorId) {
+        try {
+            var url = CONFIG.vendorPayoutsUrl.replace('__VENDOR__', vendorId);
+            var result = await api(url);
+            var payouts = result.data.data || [];
+            renderHistory(payouts);
+        } catch(e) {
+            $('history-content').innerHTML = '<div class="py-12 text-center text-sm text-red-400">Failed to load history.</div>';
+            console.error(e);
+        }
+    }
+
+    function renderHistory(payouts) {
+        if (payouts.length === 0) {
+            $('history-content').innerHTML = '<div class="py-12 text-center text-sm text-slate-400">No payouts yet.</div>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < payouts.length; i++) {
+            var p = payouts[i];
+            var statusClass = p.status === 'pending' ? 'bg-amber-50 text-amber-700' : p.status === 'sent' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700';
+            var statusLabel = p.status.charAt(0).toUpperCase() + p.status.slice(1);
+
+            html += '<div class="bg-white/60 border border-slate-100 rounded-2xl p-4">';
+            html += '<div class="flex items-start justify-between mb-2"><div>';
+            html += '<span class="text-sm font-bold text-slate-900">' + ghs(p.amount) + '</span>';
+            html += '<span class="ml-2 text-xs text-slate-500">' + esc(p.payment_method || '') + '</span>';
+            html += '</div>';
+            html += '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold ' + statusClass + '">' + statusLabel + '</span>';
+            html += '</div>';
+            html += '<div class="text-[10px] text-slate-400 space-y-0.5">';
+            if (p.payment_reference) html += '<p>Ref: <span class="text-slate-600">' + esc(p.payment_reference) + '</span></p>';
+            html += '<p>Created: <span class="text-slate-600">' + esc(p.created_at || '') + '</span></p>';
+            if (p.sent_at) html += '<p>Sent: <span class="text-slate-600">' + esc(p.sent_at) + '</span></p>';
+            if (p.confirmed_at) html += '<p>Confirmed: <span class="text-slate-600">' + esc(p.confirmed_at) + '</span></p>';
+            html += '</div>';
+            html += '<div class="mt-3 flex items-center gap-2">';
+            if (p.status === 'pending') html += '<button onclick="VendorPayouts.openMarkSent(' + p.id + ')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors">Mark as Sent</button>';
+            if (p.status === 'sent') html += '<button onclick="VendorPayouts.confirmPayout(' + p.id + ')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors">Confirm</button>';
+            html += '</div></div>';
+        }
+        $('history-content').innerHTML = html;
+    }
+
+    // ─── Mark Sent ───
+    function openMarkSent(payoutId) {
+        state.markSentPayoutId = payoutId;
+        $('mark-sent-ref').value = '';
+        $('mark-sent-modal').style.display = '';
+    }
+
+    function closeMarkSent() { $('mark-sent-modal').style.display = 'none'; }
+
+    async function submitMarkSent(e) {
+        e.preventDefault();
+        var ref = $('mark-sent-ref').value.trim();
+        if (!ref) { toast('Reference required', 'error'); return; }
+        var btn = $('mark-sent-submit');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+        try {
+            var url = CONFIG.markSentUrl.replace('__PAYOUT__', state.markSentPayoutId);
+            var result = await api(url, { method: 'PATCH', body: { payment_reference: ref } });
+            if (result.ok && result.data.success !== false) {
+                toast(result.data.message || 'Marked as sent', 'success');
+                closeMarkSent();
+                if (state.historyVendor) loadHistory(state.historyVendor.vendor_id);
+                loadData();
+            } else {
+                toast(result.data.message || 'Failed', 'error');
+            }
+        } catch(e) {
+            toast('An error occurred', 'error');
+            console.error(e);
+        }
+        btn.disabled = false;
+        btn.textContent = 'Submit';
+    }
+
+    // ─── Confirm Payout ───
+    async function confirmPayout(payoutId) {
+        try {
+            var url = CONFIG.confirmUrl.replace('__PAYOUT__', payoutId);
+            var result = await api(url, { method: 'PATCH' });
+            if (result.ok && result.data.success !== false) {
+                toast(result.data.message || 'Confirmed', 'success');
+                if (state.historyVendor) loadHistory(state.historyVendor.vendor_id);
+                loadData();
+            } else {
+                toast(result.data.message || 'Failed', 'error');
+            }
+        } catch(e) {
+            toast('An error occurred', 'error');
+            console.error(e);
+        }
+    }
+
+    // ─── Event Delegation ───
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        var action = btn.getAttribute('data-action');
+        var idx = parseInt(btn.getAttribute('data-idx'));
+        if (action === 'create') openCreate(idx);
+        if (action === 'history') openHistory(idx);
+    });
+
+    $('btn-prev').addEventListener('click', function() {
+        if (state.page > 1) { state.page--; loadData(); }
+    });
+
+    $('btn-next').addEventListener('click', function() {
+        if (state.meta.last_page && state.page < state.meta.last_page) { state.page++; loadData(); }
+    });
+
+    $('search-input').addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        var val = this.value;
+        debounceTimer = setTimeout(function() {
+            state.search = val;
+            state.page = 1;
+            loadData();
+        }, 300);
+    });
+
+    // ─── Public API (for onclick handlers in dynamic HTML) ───
+    window.VendorPayouts = {
+        openCreate: openCreate,
+        closeCreate: closeCreate,
+        togglePhone: togglePhone,
+        submitCreate: submitCreate,
+        openHistory: openHistory,
+        closeHistory: closeHistory,
+        openMarkSent: openMarkSent,
+        closeMarkSent: closeMarkSent,
+        submitMarkSent: submitMarkSent,
+        confirmPayout: confirmPayout
+    };
+
+    // ─── Init ───
+    loadData();
+})();
 </script>
 @endpush
