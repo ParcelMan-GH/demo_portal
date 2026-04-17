@@ -2729,11 +2729,19 @@ $shipmentConfig = [
                                                     </div>
                                                     <div>
                                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">District</label>
-                                                        <select x-model="pkg.delivery_district_id" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                        <select x-model="pkg.delivery_district_id"
+                                                                x-ref="districtSelect"
+                                                                x-effect="
+                                                                    let el = $el;
+                                                                    let opts = '<option value=\'\'>Select District</option>';
+                                                                    (pkg._districts || []).forEach(d => {
+                                                                        opts += '<option value=\'' + d.id + '\'>' + d.name + '</option>';
+                                                                    });
+                                                                    el.innerHTML = opts;
+                                                                    el.value = pkg.delivery_district_id || '';
+                                                                "
+                                                                class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
                                                             <option value="">Select District</option>
-                                                            <template x-for="d in (pkg._districts || [])" :key="d.id">
-                                                                <option :value="d.id" x-text="d.name"></option>
-                                                            </template>
                                                         </select>
                                                     </div>
                                                 </div>
