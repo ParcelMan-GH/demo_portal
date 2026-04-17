@@ -1096,35 +1096,17 @@ function shipmentEditor() {
             this.autoGrouping = true;
             try {
                 const res = await this._fetch(this.config.autoGroupByPhoneUrl, { method: 'POST', body: JSON.stringify({}) });
-                if (res.success && res.data?.packages) {
-                    this.packages = res.data.packages.map(pkg => ({
-                        ...pkg,
-                        delivery_preference: pkg.delivery_preference || 'deliver',
-                        fulfillment_type: pkg.fulfillment_type || null,
-                        delivery_recipient_name: pkg.delivery_recipient_name || null,
-                        delivery_recipient_phone: pkg.delivery_recipient_phone || null,
-                        delivery_town: pkg.delivery_town || null,
-                        delivery_landmark: pkg.delivery_landmark || null,
-                        delivery_region_id: pkg.delivery_region_id || null,
-                        delivery_district_id: pkg.delivery_district_id || null,
-                        delivery_instructions: pkg.delivery_instructions || null,
-                        _saved: false,
-                        _saving: false,
-                        _districts: [],
-                    }));
-                    if (res.data.destination_mode) {
-                        this.destinationMode = res.data.destination_mode;
-                    }
-                    // Pre-fill shipment-level delivery phone for single mode
-                    if (res.data.destination_mode === 'single' && res.data.delivery_recipient_phone) {
-                        this.form.delivery.recipient_phone = res.data.delivery_recipient_phone;
-                    }
+                if (res.success) {
                     this._toast(res.message, 'success');
+                    setTimeout(() => window.location.reload(), 500);
                 } else {
                     this._toast(res.message || 'Auto-group failed.', 'error');
+                    this.autoGrouping = false;
                 }
-            } catch (e) { this._toast(e.message || 'Error during auto-group.', 'error'); }
-            finally { this.autoGrouping = false; }
+            } catch (e) {
+                this._toast(e.message || 'Error during auto-group.', 'error');
+                this.autoGrouping = false;
+            }
         },
 
         async deletePackage(pkg) {
