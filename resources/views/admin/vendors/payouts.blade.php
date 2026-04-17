@@ -88,9 +88,11 @@
         </div>
     </div>
 
-    {{-- Create Payout Modal --}}
-    <div id="create-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="VendorPayouts.closeCreate()"></div>
+    {{-- Modals are moved to body via JS to avoid overflow/transform clipping --}}
+</div>
+
+<div id="create-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="VendorPayouts.closeCreate()"></div>
         <div class="relative bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md p-6">
             <h3 class="text-lg font-bold text-slate-900 mb-1">Create Payout</h3>
             <p id="create-modal-vendor" class="text-xs text-slate-500 mb-5"></p>
@@ -160,6 +162,7 @@
         </div>
     </div>
 </div>
+
 @endsection
 
 @push('scripts')
