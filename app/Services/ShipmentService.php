@@ -574,6 +574,7 @@ class ShipmentService
             'invoice_history' => $invoiceHistory,
             'collection' => $collectionData,
             'delivery_verification' => $this->getDeliveryVerificationForVendor($shipment),
+            'courier_handoff' => $this->getCourierHandoffForVendor($shipment),
             'pickup_assignment' => $pickupAssignment ? array_merge([
                 'id' => $pickupAssignment->id,
                 'status' => $pickupAssignment->status->value,
@@ -757,6 +758,40 @@ class ShipmentService
             'code' => $otpCodes->code,
             'expires_at' => $otpCodes->expires_at?->toIso8601String(),
             'sent_at' => $otpCodes->created_at?->toIso8601String(),
+        ];
+    }
+
+    private function getCourierHandoffForVendor(Shipment $shipment): ?array
+    {
+        if (!in_array($shipment->status->value, [
+            ShipmentStatus::HANDED_TO_COURIER->value,
+            ShipmentStatus::DELIVERED->value,
+        ])) {
+            return null;
+        }
+
+        $stop = \App\Models\DeliveryRunStop::where('delivery_method', 'bus_handoff')
+            ->where('status', 'handed_off')
+            ->whereHas('items', fn ($q) => $q->whereHas('shipmentItem', fn ($sq) => $sq->where('shipment_id', $shipment->id)))
+            ->first();
+
+        if (!$stop) {
+            return null;
+        }
+
+        $station = null;
+        $firstItem = $shipment->items->first();
+        if ($firstItem?->bus_station_id) {
+            $station = \App\Models\BusStation::find($firstItem->bus_station_id);
+        }
+
+        return [
+            'status' => $stop->status,
+            'bus_station' => $station?->name ?? $stop->recipient_name,
+            'courier_name' => $stop->handoff_courier_name,
+            'courier_phone' => $stop->handoff_courier_phone,
+            'vehicle_number' => $stop->handoff_vehicle_number,
+            'handed_off_at' => $stop->handoff_at?->toIso8601String(),
         ];
     }
 }
