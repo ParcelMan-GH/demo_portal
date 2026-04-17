@@ -422,6 +422,18 @@ $itemStatusColors = [
                                             {{ $stop->landmark }}
                                         </span>
                                     @endif
+                                    @if($stop->handoff_courier_phone)
+                                        <span class="inline-flex items-center gap-1 text-violet-600">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                                            <a href="tel:{{ $stop->handoff_courier_phone }}" class="hover:underline">{{ $stop->handoff_courier_phone }}</a>
+                                        </span>
+                                    @endif
+                                    @if($stop->handoff_vehicle_number)
+                                        <span class="inline-flex items-center gap-1 text-violet-600 font-mono text-[10px]">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                            {{ $stop->handoff_vehicle_number }}
+                                        </span>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -594,29 +606,6 @@ $itemStatusColors = [
                         </div>
                     @endif
 
-                    {{-- Bus Handoff Courier Details --}}
-                    @if(($stop->delivery_method ?? 'direct') === 'bus_handoff' && $stop->handoff_courier_name)
-                        <div class="ml-11 mt-3 p-4 bg-violet-50 rounded-xl border border-violet-200">
-                            <p class="text-[10px] font-bold text-violet-700 uppercase tracking-wider mb-2">Bus Courier Details</p>
-                            <div class="grid grid-cols-3 gap-4">
-                                <div>
-                                    <span class="text-[10px] text-violet-400 uppercase tracking-wider">Courier Name</span>
-                                    <p class="text-sm font-semibold text-slate-800">{{ $stop->handoff_courier_name }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-violet-400 uppercase tracking-wider">Phone</span>
-                                    <p><a href="tel:{{ $stop->handoff_courier_phone }}" class="text-sm font-semibold text-violet-700 hover:underline">{{ $stop->handoff_courier_phone }}</a></p>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-violet-400 uppercase tracking-wider">Vehicle</span>
-                                    <p class="text-sm font-mono font-semibold text-slate-800">{{ $stop->handoff_vehicle_number }}</p>
-                                </div>
-                            </div>
-                            @if($stop->handoff_at)
-                                <p class="text-[10px] text-violet-500 mt-2">Handed off {{ $stop->handoff_at->diffForHumans() }}</p>
-                            @endif
-                        </div>
-                    @endif
 
                     {{-- Per-item confirmation info for bus handoff --}}
                     @if(($stop->delivery_method ?? 'direct') === 'bus_handoff' && $stop->status === 'handed_off')
