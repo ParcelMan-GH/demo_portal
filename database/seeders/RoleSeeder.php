@@ -207,7 +207,26 @@ class RoleSeeder extends Seeder
         ])->pluck('id');
         $warehouseDispatcher->permissions()->sync($warehouseDispatcherPermissions);
 
-        $this->command->info('Successfully seeded 7 system roles:');
+        // 8. Warehouse Contact Agent — calls recipients to arrange delivery/pickup
+        $warehouseContactAgent = Role::updateOrCreate(
+            ['slug' => 'warehouse_contact_agent'],
+            [
+                'name' => 'Contact Agent',
+                'description' => 'Calls recipients to confirm delivery preference (deliver or self-pickup)',
+                'is_system_role' => true,
+                'is_warehouse_role' => true,
+                'is_assignable_by_warehouse_manager' => true,
+                'is_active' => true,
+            ]
+        );
+
+        $contactAgentPermissions = Permission::whereIn('name', [
+            'warehouse.dashboard.view',
+            'warehouse.contacts.manage',
+        ])->pluck('id');
+        $warehouseContactAgent->permissions()->sync($contactAgentPermissions);
+
+        $this->command->info('Successfully seeded 8 system roles:');
         $this->command->info('  - Super Administrator (' . $superAdmin->permissions->count() . ' permissions)');
         $this->command->info('  - Operations Manager (' . $operationsManager->permissions->count() . ' permissions)');
         $this->command->info('  - Accountant (' . $accountant->permissions->count() . ' permissions)');
@@ -215,5 +234,6 @@ class RoleSeeder extends Seeder
         $this->command->info('  - Warehouse Receiver (' . $warehouseReceiver->permissions->count() . ' permissions)');
         $this->command->info('  - Warehouse Sorter (' . $warehouseSorter->permissions->count() . ' permissions)');
         $this->command->info('  - Warehouse Dispatcher (' . $warehouseDispatcher->permissions->count() . ' permissions)');
+        $this->command->info('  - Contact Agent (' . $warehouseContactAgent->permissions->count() . ' permissions)');
     }
 }
