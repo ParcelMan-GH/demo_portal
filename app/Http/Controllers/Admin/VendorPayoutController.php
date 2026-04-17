@@ -27,7 +27,15 @@ class VendorPayoutController extends Controller
     {
         $this->authorizePermission('vendors.manage');
 
-        return view('admin.vendors.payouts');
+        $payoutConfig = [
+            'dataUrl' => route('admin.vendor-payouts.data'),
+            'createPayoutUrl' => route('admin.vendors.payouts.store', ['vendor' => '__VENDOR__']),
+            'vendorPayoutsUrl' => route('admin.vendors.payouts-data', ['vendor' => '__VENDOR__']),
+            'markSentUrl' => route('admin.vendor-payouts.mark-sent', ['payout' => '__PAYOUT__']),
+            'confirmUrl' => route('admin.vendor-payouts.confirm', ['payout' => '__PAYOUT__']),
+        ];
+
+        return view('admin.vendors.payouts', compact('payoutConfig'));
     }
 
     /**
