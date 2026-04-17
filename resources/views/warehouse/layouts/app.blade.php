@@ -70,7 +70,7 @@
                 @endif
 
                 {{-- ═══════════ OPERATIONS ═══════════ --}}
-                @if($canReceiving || $canItems || $canSorting)
+                @if($canReceiving || $canItems || $canSorting || $canContacts)
                 <div class="wh-nav-section-label mt-6" x-show="!sidebarCollapsed">Operations</div>
                 <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
 

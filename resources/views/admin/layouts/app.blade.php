@@ -153,6 +153,19 @@
                         <span class="sidebar-tooltip">Delivery Runs</span>
                     </template>
                 </a>
+                <a href="{{ route('warehouse.contacts.index') }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('warehouse.contacts.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3 pl-8'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[16px] h-[16px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                        </svg>
+                    </div>
+                    <span class="text-[11px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Contact Queue</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Contact Queue</span>
+                    </template>
+                </a>
                 @endhasPermission
 
                 <!-- WAREHOUSE Section -->
