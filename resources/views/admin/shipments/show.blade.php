@@ -2730,9 +2730,9 @@ $shipmentConfig = [
                                                     <div>
                                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">District</label>
                                                         <select x-model="pkg.delivery_district_id"
+                                                                :id="'district-select-' + pkg.shipment_item_id"
                                                                 class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
                                                             <option value="">Select District</option>
-                                                            <template x-for="d in (pkg._districts || [])" :key="d.id"><option :value="String(d.id)" :selected="String(d.id) === String(pkg.delivery_district_id)" x-text="d.name"></option></template>
                                                         </select>
                                                     </div>
                                                 </div>
