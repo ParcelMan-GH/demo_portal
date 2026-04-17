@@ -14,6 +14,7 @@ class DeliveryRunItem extends Model
     public const STATUS_DELIVERED = 'delivered';
     public const STATUS_FAILED = 'failed';
     public const STATUS_PARTIAL = 'partial';
+    public const STATUS_HANDED_OFF = 'handed_off';
 
     protected $fillable = [
         'delivery_run_id',

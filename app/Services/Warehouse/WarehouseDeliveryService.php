@@ -969,7 +969,7 @@ class WarehouseDeliveryService
             foreach ($runItems as $runItem) {
                 $runItem->update([
                     'delivered_quantity' => $runItem->expected_quantity,
-                    'status' => DeliveryRunItem::STATUS_DELIVERED,
+                    'status' => DeliveryRunItem::STATUS_HANDED_OFF,
                     'notes' => "Handed to courier: {$data['courier_name']} ({$data['vehicle_number']})",
                     'delivered_at' => $now,
                 ]);
