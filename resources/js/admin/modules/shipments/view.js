@@ -27,6 +27,20 @@ function shipmentShow() {
         receivingLightbox: null,
         receiving: { loading: false, saving: false, completingPickup: false, canReceive: false, packages: [], receipt: null, assignmentId: null },
 
+        // Charges
+        chargesLoaded: false,
+        chargesLoading: false,
+        chargesData: [],
+        chargesSummary: { revenue_total: 0, revenue_paid: 0, revenue_pending: 0, expense_total: 0, net: 0, outstanding_count: 0 },
+        chargesDefaults: { pickup_fee: 0 },
+        canManageCharges: false,
+        chargeSubmitting: false,
+        addChargeOpen: false,
+        newCharge: { charge_type: 'delivery_fee', payer_type: 'recipient', due_stage: 'before_delivery', amount: '', shipment_item_id: '', notes: '', mark_paid: false, payment_method: 'cash', payment_reference: '' },
+        markPaidOpen: false,
+        markPaidCharge: null,
+        markPaidForm: { payment_method: 'cash', payment_reference: '' },
+
         // Fulfillment type
         ftLoading: false,
         ftToast: '',
@@ -431,6 +445,236 @@ function shipmentShow() {
             this.receiving.completingPickup = false;
         },
 
+        // ── Charges ──────────────────────────────────────────────────────
+        async loadCharges(silent = false) {
+            if (!silent) this.chargesLoading = true;
+            this.chargesLoaded = true;
+            try {
+                const res = await fetch(this.config.chargesIndexEndpoint, { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) {
+                    if (res.status === 403) {
+                        this.canManageCharges = false;
+                        window.showToast?.('You don\'t have permission to view charges.', 'error');
+                        return;
+                    }
+                    throw new Error('Failed to load charges');
+                }
+                const json = await res.json();
+                this.chargesData = json.data || [];
+                this.chargesSummary = json.summary || this.chargesSummary;
+                this.chargesDefaults = json.defaults || this.chargesDefaults;
+            } catch (e) {
+                window.showToast?.('Failed to load charges.', 'error');
+            }
+            if (!silent) this.chargesLoading = false;
+        },
+
+        hasPickupFee() {
+            return this.chargesData.some(c =>
+                c.charge_type === 'pickup_fee' && !['cancelled'].includes(c.status)
+            );
+        },
+
+        formatChargeType(type) {
+            const map = {
+                pickup_fee: 'Pickup Fee',
+                delivery_fee: 'Delivery Fee',
+                station_fee: 'Station Fee',
+                handling_fee: 'Handling Fee',
+                other: 'Other',
+            };
+            return map[type] || type;
+        },
+
+        formatStage(stage) {
+            const map = {
+                at_pickup: 'At pickup',
+                at_receiving: 'At receiving',
+                before_delivery: 'Before delivery',
+                at_delivery: 'At delivery',
+                at_handoff: 'At handoff',
+            };
+            return map[stage] || stage;
+        },
+
+        applyChargeTypeDefaults() {
+            // Set sensible defaults for each charge type; user can still change them.
+            const defaults = {
+                pickup_fee:   { payer_type: 'vendor',    due_stage: 'at_pickup' },
+                delivery_fee: { payer_type: 'recipient', due_stage: 'before_delivery' },
+                station_fee:  { payer_type: 'parcelman', due_stage: 'at_handoff' },
+                handling_fee: { payer_type: 'vendor',    due_stage: 'at_receiving' },
+                other:        { payer_type: 'vendor',    due_stage: 'at_pickup' },
+            };
+            const d = defaults[this.newCharge.charge_type];
+            if (d) {
+                this.newCharge.payer_type = d.payer_type;
+                this.newCharge.due_stage = d.due_stage;
+            }
+        },
+
+        openAddCharge() {
+            this.newCharge = {
+                charge_type: 'delivery_fee',
+                payer_type: 'recipient',
+                due_stage: 'before_delivery',
+                amount: '',
+                shipment_item_id: '',
+                notes: '',
+                mark_paid: false,
+                payment_method: 'cash',
+                payment_reference: '',
+            };
+            this.addChargeOpen = true;
+        },
+
+        async submitAddCharge() {
+            if (!this.newCharge.amount) return;
+            this.chargeSubmitting = true;
+            try {
+                const body = {
+                    charge_type: this.newCharge.charge_type,
+                    payer_type: this.newCharge.payer_type,
+                    due_stage: this.newCharge.due_stage,
+                    amount: Number(this.newCharge.amount),
+                    shipment_item_id: this.newCharge.shipment_item_id || null,
+                    notes: this.newCharge.notes || null,
+                };
+                if (this.newCharge.mark_paid) {
+                    body.status = 'paid';
+                    body.payment_method = this.newCharge.payment_method;
+                    body.payment_reference = this.newCharge.payment_reference || null;
+                }
+                const res = await fetch(this.config.chargesStoreEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify(body),
+                });
+                const json = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    window.showToast?.(json.message || 'Charge added.', 'success');
+                    this.addChargeOpen = false;
+                    await this.loadCharges(true);
+                } else {
+                    window.showToast?.(json.message || 'Failed to add charge.', 'error');
+                }
+            } catch (e) {
+                window.showToast?.('Network error.', 'error');
+            }
+            this.chargeSubmitting = false;
+        },
+
+        async seedPickupFee() {
+            try {
+                const res = await fetch(this.config.chargesSeedPickupFeeEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        'Accept': 'application/json',
+                    },
+                });
+                const json = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    window.showToast?.(json.message || 'Pickup fee added.', 'success');
+                    await this.loadCharges(true);
+                } else {
+                    window.showToast?.(json.message || 'Could not add pickup fee. Set a default in Settings → Revenue & Pricing.', 'error');
+                }
+            } catch (e) {
+                window.showToast?.('Network error.', 'error');
+            }
+        },
+
+        openMarkPaid(charge) {
+            this.markPaidCharge = charge;
+            this.markPaidForm = { payment_method: 'cash', payment_reference: '' };
+            this.markPaidOpen = true;
+        },
+
+        async submitMarkPaid() {
+            if (!this.markPaidCharge || !this.markPaidForm.payment_method) return;
+            this.chargeSubmitting = true;
+            try {
+                const url = this.config.chargesMarkPaidEndpointTemplate.replace('__CHARGE__', this.markPaidCharge.id);
+                const res = await fetch(url, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        payment_method: this.markPaidForm.payment_method,
+                        payment_reference: this.markPaidForm.payment_reference || null,
+                    }),
+                });
+                const json = await res.json().catch(() => ({}));
+                if (res.ok && json.success !== false) {
+                    window.showToast?.(json.message || 'Marked paid.', 'success');
+                    this.markPaidOpen = false;
+                    await this.loadCharges(true);
+                } else {
+                    window.showToast?.(json.message || 'Failed to mark paid.', 'error');
+                }
+            } catch (e) {
+                window.showToast?.('Network error.', 'error');
+            }
+            this.chargeSubmitting = false;
+        },
+
+        async waiveCharge(charge) {
+            const reason = prompt('Reason for waiving this charge (optional):') ?? null;
+            try {
+                const url = this.config.chargesWaiveEndpointTemplate.replace('__CHARGE__', charge.id);
+                const res = await fetch(url, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ reason }),
+                });
+                const json = await res.json().catch(() => ({}));
+                if (res.ok && json.success !== false) {
+                    window.showToast?.(json.message || 'Charge waived.', 'success');
+                    await this.loadCharges(true);
+                } else {
+                    window.showToast?.(json.message || 'Failed to waive.', 'error');
+                }
+            } catch (e) {
+                window.showToast?.('Network error.', 'error');
+            }
+        },
+
+        async cancelCharge(charge) {
+            if (!confirm('Cancel this charge? This cannot be undone.')) return;
+            try {
+                const url = this.config.chargesCancelEndpointTemplate.replace('__CHARGE__', charge.id);
+                const res = await fetch(url, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        'Accept': 'application/json',
+                    },
+                });
+                const json = await res.json().catch(() => ({}));
+                if (res.ok && json.success !== false) {
+                    window.showToast?.(json.message || 'Charge cancelled.', 'success');
+                    await this.loadCharges(true);
+                } else {
+                    window.showToast?.(json.message || 'Failed to cancel.', 'error');
+                }
+            } catch (e) {
+                window.showToast?.('Network error.', 'error');
+            }
+        },
+
         async loadReceiving() {
             this.receiving.loading = true;
             this.receivingLoaded = true;
@@ -598,6 +842,7 @@ function shipmentShow() {
             this.config = window.shipmentShowConfig;
             this.shipment = this.config.shipment;
             this.canManage = this.config.canManage;
+            this.canManageCharges = this.config.canManageCharges ?? false;
             this.isSuperAdmin = this.config.isSuperAdmin ?? false;
             this.invoice = this.config.invoice;
             this.invoiceHistory = this.config.invoiceHistory || [];
@@ -607,6 +852,20 @@ function shipmentShow() {
             }
             this.assignment = this.config.assignment;
             this.assignmentHistory = this.config.assignmentHistory || [];
+
+            // Honour ?tab=<name> query param so deep-links (including the
+            // legacy /edit redirect) open the right tab.
+            const tabParam = new URLSearchParams(window.location.search).get('tab');
+            if (tabParam) {
+                this.activeTab = tabParam;
+                if (tabParam === 'charges' && !this.chargesLoaded) {
+                    this.loadCharges();
+                }
+                if (tabParam === 'receiving' && !this.receivingLoaded) {
+                    this.loadReceiving();
+                }
+            }
+
             this.loadItems();
         },
 

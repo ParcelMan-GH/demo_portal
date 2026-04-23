@@ -24,12 +24,20 @@ $shipmentConfig = [
     'custodyDataEndpoint' => route('admin.shipments.custody-data', $shipment),
     'createRunFromClaimsEndpoint' => route('admin.shipments.create-run-from-claims'),
     'adminCompletePickupEndpoint' => route('admin.shipments.admin-complete-pickup', $shipment),
+    'chargesIndexEndpoint' => route('admin.shipments.charges.index', $shipment),
+    'chargesStoreEndpoint' => route('admin.shipments.charges.store', $shipment),
+    'chargesSeedPickupFeeEndpoint' => route('admin.shipments.charges.seed-pickup-fee', $shipment),
+    'chargesUpdateEndpointTemplate' => route('admin.shipments.charges.update', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
+    'chargesMarkPaidEndpointTemplate' => route('admin.shipments.charges.mark-paid', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
+    'chargesWaiveEndpointTemplate' => route('admin.shipments.charges.waive', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
+    'chargesCancelEndpointTemplate' => route('admin.shipments.charges.cancel', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
     'receivingDataEndpoint' => route('admin.shipments.receiving-data', $shipment),
     'receiveSaveEndpoint' => route('admin.shipments.receiving.save', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
     'receivePrintLabelEndpoint' => route('admin.shipments.receiving.print-label', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
     'receiveFinalizeEndpoint' => route('admin.shipments.receiving.finalize', $shipment),
     'districtsUrl' => '/admin/locations-data/districts?region_id=__REGION__',
     'canManage' => $canManage,
+    'canManageCharges' => $canManageCharges ?? false,
     'isSuperAdmin' => auth('admin')->user()?->isSuperAdmin() ?? false,
     'paymentsDataEndpoint' => route('admin.shipments.payments.data', $shipment),
     'storePaymentEndpoint' => route('admin.shipments.payments.store', $shipment),
@@ -113,11 +121,13 @@ $shipmentConfig = [
                             </svg>
                             Assign Driver
                         </button>
-                        <a href="{{ route('admin.shipments.edit', $shipment) }}"
+                        @if($editConfig)
+                        <button type="button" @@click="activeTab = 'packages'; window.scrollTo({ top: 0, behavior: 'smooth' })"
                            class="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs font-semibold rounded-xl border border-blue-500/30 transition-all backdrop-blur-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                            Edit Shipment
-                        </a>
+                            Edit Packages
+                        </button>
+                        @endif
                         <button @@click="duplicateShipment()" :disabled="duplicating"
                                 class="inline-flex items-center gap-2 px-4 py-2 bg-slate-500/20 hover:bg-slate-500/30 text-slate-300 text-xs font-semibold rounded-xl border border-slate-500/30 transition-all backdrop-blur-sm disabled:opacity-50">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
@@ -418,6 +428,37 @@ $shipmentConfig = [
                     </svg>
                 </div>
                 <span class="text-xs transition-colors" :class="activeTab === 'tracking' ? 'font-bold text-amber-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Tracking</span>
+            </button>
+
+            <!-- Packages (full editor) -->
+            @if($editConfig)
+            <button @@click="activeTab = 'packages'"
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg transition-all duration-150 text-left"
+                :class="activeTab === 'packages' ? 'bg-blue-50 ring-1 ring-blue-100 shadow-sm' : 'hover:bg-slate-50'">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'packages' ? 'bg-blue-500 shadow-sm shadow-blue-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'packages' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                </div>
+                <span class="text-xs transition-colors" :class="activeTab === 'packages' ? 'font-bold text-blue-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Packages</span>
+            </button>
+            @endif
+
+            <!-- Charges -->
+            <button @@click="activeTab = 'charges'; if (!chargesLoaded) loadCharges()"
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg transition-all duration-150 text-left"
+                :class="activeTab === 'charges' ? 'bg-emerald-50 ring-1 ring-emerald-100 shadow-sm' : 'hover:bg-slate-50'">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'charges' ? 'bg-emerald-500 shadow-sm shadow-emerald-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'charges' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <span class="text-xs transition-colors" :class="activeTab === 'charges' ? 'font-bold text-emerald-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Charges</span>
+                <span x-show="chargesSummary?.outstanding_count > 0" x-cloak
+                      class="ml-auto inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold"
+                      x-text="chargesSummary.outstanding_count"></span>
             </button>
 
             <!-- Receiving -->
@@ -2563,6 +2604,298 @@ $shipmentConfig = [
                     </div>
                 </template>
 
+            </div>
+
+            <!-- ═══════════════════════════════════════ -->
+            <!-- PACKAGES TAB (full editor)              -->
+            <!-- ═══════════════════════════════════════ -->
+            @if($editConfig)
+            <div x-show="activeTab === 'packages'" x-cloak>
+                @include('admin.shipments._packages-editor')
+            </div>
+            @endif
+
+            <!-- ═══════════════════════════════════════ -->
+            <!-- CHARGES TAB                             -->
+            <!-- ═══════════════════════════════════════ -->
+            <div x-show="activeTab === 'charges'" x-cloak>
+                <!-- Loading state -->
+                <div x-show="chargesLoading" class="flex items-center justify-center py-20">
+                    <svg class="w-6 h-6 animate-spin text-slate-300" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                </div>
+
+                <div x-show="!chargesLoading && chargesLoaded">
+                    {{-- ─── Summary bar ────────────────────────────────── --}}
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-5">
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Revenue (Total)</p>
+                            <p class="mt-1.5 text-lg font-bold text-emerald-600" x-text="'GHS ' + (chargesSummary.revenue_total ?? 0).toFixed(2)"></p>
+                            <p class="text-[11px] text-slate-400 mt-0.5">
+                                <span x-text="'GHS ' + (chargesSummary.revenue_paid ?? 0).toFixed(2)"></span> paid,
+                                <span x-text="'GHS ' + (chargesSummary.revenue_pending ?? 0).toFixed(2)"></span> pending
+                            </p>
+                        </div>
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Expenses</p>
+                            <p class="mt-1.5 text-lg font-bold text-rose-600" x-text="'GHS ' + (chargesSummary.expense_total ?? 0).toFixed(2)"></p>
+                            <p class="text-[11px] text-slate-400 mt-0.5">station / handoff outflows</p>
+                        </div>
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Net</p>
+                            <p class="mt-1.5 text-lg font-bold" :class="(chargesSummary.net ?? 0) >= 0 ? 'text-slate-900' : 'text-rose-600'"
+                               x-text="'GHS ' + (chargesSummary.net ?? 0).toFixed(2)"></p>
+                            <p class="text-[11px] text-slate-400 mt-0.5">revenue - expenses</p>
+                        </div>
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Outstanding</p>
+                            <p class="mt-1.5 text-lg font-bold text-amber-600" x-text="chargesSummary.outstanding_count ?? 0"></p>
+                            <p class="text-[11px] text-slate-400 mt-0.5">lines awaiting payment</p>
+                        </div>
+                    </div>
+
+                    {{-- ─── Actions bar ────────────────────────────────── --}}
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
+                        <h3 class="text-sm font-bold text-slate-900">Charges Ledger</h3>
+                        <div class="flex items-center gap-2 ml-auto">
+                            <button x-show="canManageCharges && !hasPickupFee()" @@click="seedPickupFee()"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                                <span>Add Pickup Fee</span>
+                                <span class="text-slate-400" x-text="'(default GHS ' + (chargesDefaults.pickup_fee ?? 0).toFixed(2) + ')'"></span>
+                            </button>
+                            <button x-show="canManageCharges" @@click="openAddCharge()"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Add Charge
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- ─── Charges list ───────────────────────────────── --}}
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <table class="w-full text-xs">
+                            <thead class="bg-slate-50 border-b border-slate-100">
+                                <tr class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                    <th class="px-4 py-2.5">Type</th>
+                                    <th class="px-4 py-2.5">Package</th>
+                                    <th class="px-4 py-2.5">Payer</th>
+                                    <th class="px-4 py-2.5">Due at</th>
+                                    <th class="px-4 py-2.5 text-right">Amount</th>
+                                    <th class="px-4 py-2.5">Status</th>
+                                    <th class="px-4 py-2.5 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr x-show="chargesData.length === 0">
+                                    <td colspan="7" class="px-4 py-10 text-center text-sm text-slate-400">
+                                        No charges on this shipment yet.
+                                    </td>
+                                </tr>
+                                <template x-for="charge in chargesData" :key="charge.id">
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/40 transition-colors">
+                                        <td class="px-4 py-3">
+                                            <div class="flex items-center gap-2">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                                                      :class="{
+                                                          'bg-emerald-50 text-emerald-700': charge.direction === 'revenue',
+                                                          'bg-rose-50 text-rose-700': charge.direction === 'expense',
+                                                      }"
+                                                      x-text="formatChargeType(charge.charge_type)"></span>
+                                            </div>
+                                            <template x-if="charge.notes">
+                                                <p class="mt-1 text-[11px] text-slate-400" x-text="charge.notes"></p>
+                                            </template>
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600">
+                                            <span x-show="!charge.shipment_item_id" class="text-slate-400">All packages</span>
+                                            <span x-show="charge.shipment_item_id" x-text="'Package #' + charge.shipment_item_id"></span>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <span class="capitalize text-slate-700" x-text="charge.payer_type"></span>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <span class="text-slate-600" x-text="formatStage(charge.due_stage)"></span>
+                                        </td>
+                                        <td class="px-4 py-3 text-right font-semibold"
+                                            :class="charge.direction === 'expense' ? 'text-rose-600' : 'text-slate-900'"
+                                            x-text="(charge.direction === 'expense' ? '-' : '') + 'GHS ' + Number(charge.amount).toFixed(2)"></td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                                                  :class="{
+                                                      'bg-amber-50 text-amber-700': ['pending','draft'].includes(charge.status),
+                                                      'bg-emerald-50 text-emerald-700': charge.status === 'paid',
+                                                      'bg-slate-100 text-slate-600': charge.status === 'waived',
+                                                      'bg-rose-50 text-rose-600': charge.status === 'cancelled',
+                                                  }"
+                                                  x-text="charge.status.charAt(0).toUpperCase() + charge.status.slice(1)"></span>
+                                        </td>
+                                        <td class="px-4 py-3 text-right">
+                                            <div class="inline-flex items-center gap-1">
+                                                <button x-show="canManageCharges && ['pending','draft'].includes(charge.status)"
+                                                        @@click="openMarkPaid(charge)"
+                                                        class="px-2 py-1 rounded-lg text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors">Mark Paid</button>
+                                                <button x-show="canManageCharges && ['pending','draft'].includes(charge.status)"
+                                                        @@click="waiveCharge(charge)"
+                                                        class="px-2 py-1 rounded-lg text-[10px] font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Waive</button>
+                                                <button x-show="canManageCharges && ['pending','draft'].includes(charge.status)"
+                                                        @@click="cancelCharge(charge)"
+                                                        class="px-2 py-1 rounded-lg text-[10px] font-semibold text-rose-600 hover:bg-rose-50 transition-colors">Cancel</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {{-- ─── Add Charge modal ─────────────────────────────── --}}
+                <div x-show="addChargeOpen" x-cloak x-transition.opacity
+                     class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display:none">
+                    <div @@click.away="addChargeOpen = false" x-show="addChargeOpen" x-transition
+                         class="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-slate-900">Add Charge</h3>
+                            <button @@click="addChargeOpen = false" class="p-1.5 rounded-lg hover:bg-slate-100">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Charge Type</label>
+                                    <select x-model="newCharge.charge_type" @@change="applyChargeTypeDefaults()"
+                                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white">
+                                        <option value="pickup_fee">Pickup Fee</option>
+                                        <option value="delivery_fee">Delivery Fee</option>
+                                        <option value="station_fee">Station Fee</option>
+                                        <option value="handling_fee">Handling Fee</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Paid by</label>
+                                    <select x-model="newCharge.payer_type"
+                                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white">
+                                        <option value="vendor">Vendor</option>
+                                        <option value="recipient">Recipient</option>
+                                        <option value="parcelman">Parcelman (expense)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Due at</label>
+                                    <select x-model="newCharge.due_stage"
+                                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white">
+                                        <option value="at_pickup">At Pickup</option>
+                                        <option value="at_receiving">At Receiving</option>
+                                        <option value="before_delivery">Before Delivery</option>
+                                        <option value="at_delivery">At Delivery</option>
+                                        <option value="at_handoff">At Handoff</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Amount (GHS)</label>
+                                    <input type="number" step="0.01" min="0" x-model.number="newCharge.amount"
+                                           class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Package (optional)</label>
+                                <select x-model="newCharge.shipment_item_id"
+                                        class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white">
+                                    <option value="">Shipment-level (applies to whole shipment)</option>
+                                    <template x-for="item in (shipment.items || [])" :key="item.id">
+                                        <option :value="item.id" x-text="'Package #' + item.id + (item.description ? ' - ' + item.description : '')"></option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Notes (optional)</label>
+                                <textarea x-model="newCharge.notes" rows="2"
+                                          class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white"
+                                          placeholder="e.g. Quoted to recipient over phone"></textarea>
+                            </div>
+
+                            <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700">
+                                <input type="checkbox" x-model="newCharge.mark_paid" class="rounded border-slate-300">
+                                <span>Mark as already paid (e.g. vendor paid cash at pickup)</span>
+                            </label>
+
+                            <template x-if="newCharge.mark_paid">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Payment method</label>
+                                        <select x-model="newCharge.payment_method"
+                                                class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white">
+                                            <option value="cash">Cash</option>
+                                            <option value="momo">Mobile Money</option>
+                                            <option value="bank">Bank</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Reference</label>
+                                        <input type="text" x-model="newCharge.payment_reference"
+                                               class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white"
+                                               placeholder="MoMo txn ID, receipt #, etc.">
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2">
+                            <button @@click="addChargeOpen = false"
+                                    class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                            <button @@click="submitAddCharge()" :disabled="chargeSubmitting || !newCharge.amount"
+                                    class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span x-show="!chargeSubmitting">Add</span>
+                                <span x-show="chargeSubmitting">Saving…</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- ─── Mark Paid modal ──────────────────────────────── --}}
+                <div x-show="markPaidOpen" x-cloak x-transition.opacity
+                     class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display:none">
+                    <div @@click.away="markPaidOpen = false" x-show="markPaidOpen" x-transition
+                         class="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100">
+                            <h3 class="text-sm font-bold text-slate-900">Mark Paid</h3>
+                            <p class="text-[11px] text-slate-500 mt-0.5" x-text="markPaidCharge ? ('GHS ' + Number(markPaidCharge.amount).toFixed(2) + ' — ' + formatChargeType(markPaidCharge.charge_type)) : ''"></p>
+                        </div>
+                        <div class="p-6 space-y-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Payment method</label>
+                                <select x-model="markPaidForm.payment_method"
+                                        class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white">
+                                    <option value="cash">Cash</option>
+                                    <option value="momo">Mobile Money</option>
+                                    <option value="bank">Bank</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Reference (optional)</label>
+                                <input type="text" x-model="markPaidForm.payment_reference"
+                                       class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white">
+                            </div>
+                        </div>
+                        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2">
+                            <button @@click="markPaidOpen = false"
+                                    class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                            <button @@click="submitMarkPaid()" :disabled="chargeSubmitting || !markPaidForm.payment_method"
+                                    class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors disabled:opacity-50">
+                                <span x-show="!chargeSubmitting">Mark Paid</span>
+                                <span x-show="chargeSubmitting">Saving…</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- ═══════════════════════════════════════ -->

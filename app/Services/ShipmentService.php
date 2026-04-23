@@ -38,6 +38,7 @@ class ShipmentService
             'pickupAssignment.driver',
             'pickupAssignment.targetWarehouse',
             'pickupAssignment.receivedWarehouse',
+            'charges',
         ];
 
         if ($includePickupDetails) {
@@ -185,6 +186,7 @@ class ShipmentService
             'pickupAssignment.receivedWarehouse',
             'pickupAssignment.itemConfirmations',
             'pickupAssignment.photos',
+            'charges',
         ]);
 
         return [
@@ -594,6 +596,7 @@ class ShipmentService
             'collection' => $collectionData,
             'delivery_verification' => $this->getDeliveryVerificationForVendor($shipment),
             'courier_handoff' => $this->getCourierHandoffForVendor($shipment),
+            'charges' => $this->getChargesForVendor($shipment),
             'pickup_assignment' => $pickupAssignment ? array_merge([
                 'id' => $pickupAssignment->id,
                 'status' => $pickupAssignment->status->value,
@@ -811,6 +814,62 @@ class ShipmentService
             'courier_phone' => $stop->handoff_courier_phone,
             'vehicle_number' => $stop->handoff_vehicle_number,
             'handed_off_at' => $stop->handoff_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Vendor-facing charges summary for a shipment.
+     *
+     * Returns only charges the vendor should see: everything EXCEPT internal
+     * expense lines (e.g., station fees paid to bus couriers). Exposes the
+     * lines the vendor or recipient is expected to pay and a totals block so
+     * the mobile app can show a balance banner without doing the maths.
+     */
+    private function getChargesForVendor(Shipment $shipment): array
+    {
+        if (!$shipment->relationLoaded('charges')) {
+            $shipment->load('charges');
+        }
+
+        // Hide internal expenses (station fees, future expense types). Vendors
+        // never pay these, so showing them would confuse the ledger they see.
+        $visible = $shipment->charges->filter(fn (\App\Models\ShipmentCharge $c) =>
+            $c->direction !== \App\Models\ShipmentCharge::DIRECTION_EXPENSE
+        )->values();
+
+        $lines = $visible->map(function (\App\Models\ShipmentCharge $c) {
+            return [
+                'id'                => $c->id,
+                'shipment_item_id'  => $c->shipment_item_id,
+                'charge_type'       => $c->charge_type,
+                'payer_type'        => $c->payer_type,
+                'due_stage'         => $c->due_stage,
+                'amount'            => (float) $c->amount,
+                'currency'          => $c->currency,
+                'status'            => $c->status,
+                'paid_at'           => $c->paid_at?->toIso8601String(),
+                'payment_method'    => $c->payment_method,
+                'notes'             => $c->notes,
+                'created_at'        => $c->created_at?->toIso8601String(),
+            ];
+        })->all();
+
+        $active = $visible->whereNotIn('status', [
+            \App\Models\ShipmentCharge::STATUS_CANCELLED,
+            \App\Models\ShipmentCharge::STATUS_WAIVED,
+        ]);
+
+        $paid = (float) $active->where('status', \App\Models\ShipmentCharge::STATUS_PAID)->sum('amount');
+        $total = (float) $active->sum('amount');
+
+        return [
+            'lines' => $lines,
+            'totals' => [
+                'currency'    => \App\Services\ChargesService::DEFAULT_CURRENCY,
+                'total'       => round($total, 2),
+                'paid'        => round($paid, 2),
+                'outstanding' => round($total - $paid, 2),
+            ],
         ];
     }
 }

@@ -150,7 +150,9 @@ class ShipmentController extends Controller
         ]);
 
         $itemsCount = $shipment->items()->count();
-        $canManage = Auth::guard('admin')->user()->hasPermission('shipments.edit');
+        $currentAdmin = Auth::guard('admin')->user();
+        $canManage = $currentAdmin->hasPermission('shipments.edit');
+        $canManageCharges = $currentAdmin->hasPermission('charges.manage');
         $currentAssignment = $shipment->pickupAssignment;
         if ($currentAssignment?->status === PickupAssignmentStatus::CANCELLED) {
             $currentAssignment = null;
@@ -234,11 +236,15 @@ class ShipmentController extends Controller
             'currentAssignment' => $currentAssignment,
             'itemsCount' => $itemsCount,
             'canManage' => $canManage,
+            'canManageCharges' => $canManageCharges,
             'invoiceHistory' => $invoiceHistory,
             'assignmentHistory' => $assignmentHistory,
             'statuses' => ShipmentStatus::toArray(),
             'invoiceStatuses' => InvoiceStatus::toArray(),
             'assignmentStatuses' => PickupAssignmentStatus::toArray(),
+            // Full editor config for the Packages tab (same payload the old
+            // /edit page used to consume).
+            'editConfig' => $canManage ? $this->buildEditConfig($shipment) : null,
         ]);
     }
 
@@ -869,6 +875,19 @@ class ShipmentController extends Controller
     {
         $this->authorizePermission('shipments.edit');
 
+        // Legacy route — unified workspace now lives at /admin/shipments/{id}
+        // with the Packages tab pre-selected.
+        return redirect()->route('admin.shipments.show', [
+            'shipment' => $shipment->id,
+            'tab' => 'packages',
+        ]);
+    }
+
+    /**
+     * Build the edit config payload consumed by the Packages editor partial.
+     */
+    protected function buildEditConfig(Shipment $shipment): array
+    {
         $shipment->load([
             'vendor', 'items.images', 'items.deliveryRegion', 'items.deliveryDistrict',
             'pickupRegion', 'pickupDistrict', 'deliveryRegion', 'deliveryDistrict',
@@ -876,7 +895,7 @@ class ShipmentController extends Controller
 
         $regions = Region::active()->select('id', 'name', 'code')->orderBy('name')->get();
 
-        $editConfig = [
+        return [
             'shipmentId' => $shipment->id,
             'saveUrl' => route('admin.shipments.update', $shipment),
             'addPackageUrl' => route('admin.shipments.packages.add', $shipment),
@@ -970,10 +989,6 @@ class ShipmentController extends Controller
             ],
         ];
 
-        return view('admin.shipments.edit', [
-            'shipment' => $shipment,
-            'editConfig' => $editConfig,
-        ]);
     }
 
     public function updateShipment(Request $request, Shipment $shipment): JsonResponse
