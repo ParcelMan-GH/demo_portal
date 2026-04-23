@@ -8,10 +8,23 @@ use App\Models\PackageContactTask;
 use App\Models\ShipmentItem;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\SmsService;
 use Illuminate\Support\Facades\DB;
 
 class PackageContactService
 {
+    public const CODE_LENGTH = 6;
+    public const CODE_TTL_MINUTES = 15;
+    public const CODE_MAX_ATTEMPTS = 5;
+    public const CODE_RESEND_SECONDS = 60;
+
+    // Uppercase alphanumeric with confusable characters removed (no O/0/I/1).
+    private const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+    public function __construct(
+        private SmsService $smsService,
+    ) {}
+
     public function createTasksForWarehouseItems(Warehouse $warehouse, array $shipmentItemIds): int
     {
         $created = 0;
@@ -117,8 +130,84 @@ class PackageContactService
         return $attempt;
     }
 
-    public function resolveTask(PackageContactTask $task, string $outcome, ?string $notes = null, ?\DateTime $callbackAt = null): void
+    /**
+     * Generate a fresh alphanumeric confirmation code, SMS it to the recipient,
+     * and persist it on the task. Any prior unverified code is superseded.
+     *
+     * @return array{success: bool, message: string, data?: array}
+     */
+    public function sendConfirmationCode(PackageContactTask $task): array
     {
+        if (!$task->recipient_phone) {
+            return ['success' => false, 'message' => 'Task has no recipient phone on file.'];
+        }
+
+        // Throttle: last send must be at least CODE_RESEND_SECONDS ago.
+        if ($task->confirmation_code_sent_at) {
+            $secondsSince = $task->confirmation_code_sent_at->diffInSeconds(now());
+            if ($secondsSince < self::CODE_RESEND_SECONDS) {
+                $wait = self::CODE_RESEND_SECONDS - $secondsSince;
+                return [
+                    'success' => false,
+                    'message' => "Please wait {$wait}s before resending.",
+                    'data' => ['resend_after_seconds' => $wait],
+                ];
+            }
+        }
+
+        $code = $this->generateAlphanumericCode(self::CODE_LENGTH);
+        $now = now();
+        $expiresAt = $now->copy()->addMinutes(self::CODE_TTL_MINUTES);
+
+        $task->update([
+            'confirmation_code' => $code,
+            'confirmation_code_sent_at' => $now,
+            'confirmation_code_expires_at' => $expiresAt,
+            'confirmation_code_verified_at' => null,
+            'confirmation_attempts' => 0,
+        ]);
+
+        $recipientName = $task->recipient_name ?: 'Hello';
+        $message = "Parcelman: {$recipientName}, your confirmation code is {$code}. "
+            . "Share it with the agent on the call to confirm your delivery. "
+            . "Do NOT share with anyone else.";
+
+        $this->smsService->send($task->recipient_phone, $message);
+
+        return [
+            'success' => true,
+            'message' => 'Confirmation code sent to recipient.',
+            'data' => [
+                'sent_at' => $now->toIso8601String(),
+                'expires_at' => $expiresAt->toIso8601String(),
+                'resend_after_seconds' => self::CODE_RESEND_SECONDS,
+                'ttl_minutes' => self::CODE_TTL_MINUTES,
+            ],
+        ];
+    }
+
+    /**
+     * Resolve the task. For outcomes that require verification (deliver,
+     * self_pickup), the caller must pass the code the recipient read off
+     * their phone; invalid/expired/too-many-attempts codes are rejected.
+     *
+     * @return array{success: bool, message: string, code?: string}
+     *         code is one of: missing, expired, invalid, exhausted
+     */
+    public function resolveTask(
+        PackageContactTask $task,
+        string $outcome,
+        ?string $notes = null,
+        ?\DateTime $callbackAt = null,
+        ?string $confirmationCode = null,
+    ): array {
+        if (in_array($outcome, PackageContactTask::VERIFIED_OUTCOMES, true)) {
+            $verification = $this->verifyConfirmationCode($task, $confirmationCode);
+            if (!$verification['success']) {
+                return $verification;
+            }
+        }
+
         $task->update([
             'outcome' => $outcome,
             'notes' => $notes,
@@ -135,6 +224,58 @@ class PackageContactService
                 $shipment->update(['fulfillment_type' => FulfillmentType::SELF_PICKUP]);
             }
         }
+
+        return ['success' => true, 'message' => 'Task resolved.'];
+    }
+
+    /**
+     * Validate a code against a task. Increments attempt counter on misses.
+     * Marks the task's code as verified on success so it can't be re-used.
+     */
+    private function verifyConfirmationCode(PackageContactTask $task, ?string $code): array
+    {
+        $code = is_string($code) ? strtoupper(trim($code)) : '';
+
+        if ($code === '') {
+            return ['success' => false, 'message' => 'Confirmation code is required.', 'code' => 'missing'];
+        }
+
+        if (!$task->confirmation_code || !$task->confirmation_code_expires_at) {
+            return ['success' => false, 'message' => 'No confirmation code has been sent yet.', 'code' => 'missing'];
+        }
+
+        if ($task->confirmation_code_expires_at->isPast()) {
+            return ['success' => false, 'message' => 'Confirmation code has expired. Please resend.', 'code' => 'expired'];
+        }
+
+        if ($task->confirmation_attempts >= self::CODE_MAX_ATTEMPTS) {
+            return ['success' => false, 'message' => 'Too many attempts. Please resend a new code.', 'code' => 'exhausted'];
+        }
+
+        if (!hash_equals(strtoupper((string) $task->confirmation_code), $code)) {
+            $task->increment('confirmation_attempts');
+            $remaining = max(0, self::CODE_MAX_ATTEMPTS - ($task->confirmation_attempts));
+            return [
+                'success' => false,
+                'message' => "Invalid code. {$remaining} attempt(s) remaining.",
+                'code' => 'invalid',
+            ];
+        }
+
+        $task->update(['confirmation_code_verified_at' => now()]);
+
+        return ['success' => true, 'message' => 'Confirmation verified.'];
+    }
+
+    private function generateAlphanumericCode(int $length): string
+    {
+        $alphabet = self::CODE_ALPHABET;
+        $max = strlen($alphabet) - 1;
+        $code = '';
+        for ($i = 0; $i < $length; $i++) {
+            $code .= $alphabet[random_int(0, $max)];
+        }
+        return $code;
     }
 
     public function getWorkerStats(User $worker, Warehouse $warehouse): array

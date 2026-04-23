@@ -11,6 +11,7 @@
         'bulkAssignUrl'  => route('warehouse.contacts.bulk-assign'),
         'autoAssignUrl'  => route('warehouse.contacts.auto-assign'),
         'logCallUrl'     => route('warehouse.contacts.log-call', ['task' => '__TASK__']),
+        'sendCodeUrl'    => route('warehouse.contacts.send-code', ['task' => '__TASK__']),
         'resolveUrl'     => route('warehouse.contacts.resolve', ['task' => '__TASK__']),
         'attemptsUrl'    => route('warehouse.contacts.attempts', ['task' => '__TASK__']),
         'workerStatsUrl' => route('warehouse.contacts.worker-stats'),
@@ -452,6 +453,52 @@
                            class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-600/20 focus:border-violet-400 outline-none">
                 </div>
 
+                {{-- Recipient confirmation code (deliver / self_pickup only) --}}
+                <div x-show="requiresVerification(resolveForm.outcome)" x-transition
+                     class="rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center shrink-0">
+                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm font-bold text-emerald-900">Confirm with recipient</p>
+                            <p class="text-[11px] text-emerald-800/80 mt-0.5 leading-relaxed">
+                                Send a code to the recipient, ask them to read it back on the call, then enter it below.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button" @@click="sendConfirmationCode()"
+                                :disabled="codeSending || codeResendAfter > 0"
+                                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg x-show="codeSending" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            </svg>
+                            <span x-show="!codeSentAt && !codeSending">Send Code</span>
+                            <span x-show="codeSentAt && codeResendAfter === 0 && !codeSending">Resend Code</span>
+                            <span x-show="codeResendAfter > 0" x-text="'Resend in ' + codeResendAfter + 's'"></span>
+                            <span x-show="codeSending">Sending…</span>
+                        </button>
+                        <span x-show="codeSentAt" class="text-[11px] text-emerald-700">
+                            Sent to <span class="font-mono" x-text="resolveTask?.recipient_phone"></span>
+                        </span>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Code from recipient</label>
+                        <input type="text" x-model="resolveCode" maxlength="10"
+                               placeholder="e.g. XK7R4Q"
+                               @@input="resolveCode = resolveCode.toUpperCase(); resolveCodeError = ''"
+                               class="w-full px-3.5 py-2.5 text-base border-2 rounded-xl bg-white font-mono tracking-[0.3em] uppercase text-slate-900 placeholder-slate-400 outline-none transition-colors focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-400"
+                               :class="resolveCodeError ? 'border-rose-300' : 'border-slate-200'">
+                        <p x-show="resolveCodeError" x-text="resolveCodeError" class="mt-1.5 text-[11px] text-rose-600 font-medium"></p>
+                    </div>
+                </div>
+
                 {{-- Notes --}}
                 <div>
                     <label class="block text-[11px] font-bold text-slate-600 mb-1">Notes <span class="text-slate-400 font-normal">(optional)</span></label>
@@ -689,6 +736,15 @@ function contactQueuePage() {
         resolveError: '',
         resolveForm: { outcome: '', notes: '', callback_at: '' },
 
+        // Confirmation code state (deliver / self_pickup only)
+        resolveCode: '',
+        resolveCodeError: '',
+        codeSending: false,
+        codeSentAt: null,
+        codeExpiresAt: null,
+        codeResendAfter: 0,
+        codeCountdownTimer: null,
+
         // Call History modal
         historyOpen: false,
         historyTask: null,
@@ -850,32 +906,99 @@ function contactQueuePage() {
         },
 
         // ── Resolve modal ─────────────────────────────────────────────────
+        requiresVerification(outcome) {
+            return outcome === 'deliver' || outcome === 'self_pickup';
+        },
+
         openResolve(task) {
             this.resolveTask = task;
             this.resolveForm = { outcome: '', notes: '', callback_at: '' };
             this.resolveError = '';
+            this.resetCodeState();
             this.resolveOpen = true;
         },
 
+        resetCodeState() {
+            this.resolveCode = '';
+            this.resolveCodeError = '';
+            this.codeSending = false;
+            this.codeSentAt = null;
+            this.codeExpiresAt = null;
+            this.codeResendAfter = 0;
+            if (this.codeCountdownTimer) {
+                clearInterval(this.codeCountdownTimer);
+                this.codeCountdownTimer = null;
+            }
+        },
+
+        startResendCountdown(seconds) {
+            this.codeResendAfter = seconds;
+            if (this.codeCountdownTimer) clearInterval(this.codeCountdownTimer);
+            this.codeCountdownTimer = setInterval(() => {
+                this.codeResendAfter = Math.max(0, this.codeResendAfter - 1);
+                if (this.codeResendAfter === 0) {
+                    clearInterval(this.codeCountdownTimer);
+                    this.codeCountdownTimer = null;
+                }
+            }, 1000);
+        },
+
+        async sendConfirmationCode() {
+            if (!this.resolveTask || this.codeSending || this.codeResendAfter > 0) return;
+            this.codeSending = true;
+            this.resolveCodeError = '';
+            try {
+                const url = this.cfg.sendCodeUrl.replace('__TASK__', this.resolveTask.id);
+                const res = await fetch(url, { method: 'POST', headers: this.headers(true) });
+                const json = await res.json().catch(() => ({}));
+                if (res.ok && json.success) {
+                    this.codeSentAt = json.data?.sent_at ?? new Date().toISOString();
+                    this.codeExpiresAt = json.data?.expires_at ?? null;
+                    this.startResendCountdown(json.data?.resend_after_seconds ?? 60);
+                    window.showToast?.(json.message || 'Code sent to recipient', 'success');
+                } else {
+                    if (json.data?.resend_after_seconds) {
+                        this.startResendCountdown(json.data.resend_after_seconds);
+                    }
+                    window.showToast?.(json.message || 'Failed to send code', 'error');
+                }
+            } catch {
+                window.showToast?.('Network error', 'error');
+            }
+            this.codeSending = false;
+        },
+
         async submitResolve() {
+            if (this.requiresVerification(this.resolveForm.outcome) && !this.resolveCode.trim()) {
+                this.resolveCodeError = 'Enter the code the recipient read to you.';
+                return;
+            }
             this.resolveSubmitting = true;
             this.resolveError = '';
+            this.resolveCodeError = '';
             try {
                 const url = this.cfg.resolveUrl.replace('__TASK__', this.resolveTask.id);
                 const payload = { outcome: this.resolveForm.outcome, notes: this.resolveForm.notes };
                 if (this.resolveForm.outcome === 'callback' && this.resolveForm.callback_at) {
                     payload.callback_at = this.resolveForm.callback_at;
                 }
+                if (this.requiresVerification(this.resolveForm.outcome)) {
+                    payload.confirmation_code = this.resolveCode.trim().toUpperCase();
+                }
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: this.headers(true),
                     body: JSON.stringify(payload),
                 });
-                const json = await res.json();
-                if (json.success) {
+                const json = await res.json().catch(() => ({}));
+                if (res.ok && json.success) {
                     this.resolveOpen = false;
+                    this.resetCodeState();
                     window.showToast?.('Task resolved successfully', 'success');
                     this.fetchData(this.meta.current_page);
+                } else if (json.code) {
+                    // Verification failure (invalid/expired/missing/exhausted) — inline error, keep modal open.
+                    this.resolveCodeError = json.message || 'Code could not be verified.';
                 } else if (json.errors) {
                     this.resolveError = Object.values(json.errors).flat().join(', ');
                 } else {

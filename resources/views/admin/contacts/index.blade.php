@@ -12,6 +12,7 @@
         'assignUrl' => route('admin.contacts.assign', ['task' => '__TASK__']),
         'autoAssignUrl' => route('admin.contacts.auto-assign'),
         'logCallUrl' => route('admin.contacts.log-call', ['task' => '__TASK__']),
+        'sendCodeUrl' => route('admin.contacts.send-code', ['task' => '__TASK__']),
         'resolveUrl' => route('admin.contacts.resolve', ['task' => '__TASK__']),
         'attemptsUrl' => route('admin.contacts.attempts', ['task' => '__TASK__']),
         'workerStatsUrl' => route('admin.contacts.worker-stats'),
@@ -47,6 +48,15 @@
         resolveNotes: '',
         resolveCallbackAt: '',
         resolveSubmitting: false,
+
+        /* Confirmation code (for deliver/self_pickup) */
+        resolveCode: '',
+        resolveCodeError: '',
+        codeSending: false,
+        codeSentAt: null,
+        codeExpiresAt: null,
+        codeResendAfter: 0,
+        codeCountdownTimer: null,
 
         historyOpen: false,
         historyTask: null,
@@ -183,36 +193,110 @@
         },
 
         /* Resolve Modal */
+        requiresVerification(outcome) {
+            return outcome === 'deliver' || outcome === 'self_pickup';
+        },
+
         openResolve(task) {
             this.resolveTask = task;
             this.resolveOutcome = '';
             this.resolveNotes = '';
             this.resolveCallbackAt = '';
             this.resolveSubmitting = false;
+            this.resetCodeState();
             this.resolveOpen = true;
+        },
+
+        resetCodeState() {
+            this.resolveCode = '';
+            this.resolveCodeError = '';
+            this.codeSending = false;
+            this.codeSentAt = null;
+            this.codeExpiresAt = null;
+            this.codeResendAfter = 0;
+            if (this.codeCountdownTimer) {
+                clearInterval(this.codeCountdownTimer);
+                this.codeCountdownTimer = null;
+            }
+        },
+
+        startResendCountdown(seconds) {
+            this.codeResendAfter = seconds;
+            if (this.codeCountdownTimer) clearInterval(this.codeCountdownTimer);
+            this.codeCountdownTimer = setInterval(() => {
+                this.codeResendAfter = Math.max(0, this.codeResendAfter - 1);
+                if (this.codeResendAfter === 0) {
+                    clearInterval(this.codeCountdownTimer);
+                    this.codeCountdownTimer = null;
+                }
+            }, 1000);
+        },
+
+        async sendConfirmationCode() {
+            if (!this.resolveTask || this.codeSending || this.codeResendAfter > 0) return;
+            this.codeSending = true;
+            this.resolveCodeError = '';
+            try {
+                const url = this.config.sendCodeUrl.replace('__TASK__', this.resolveTask.id);
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrf, 'Accept': 'application/json' },
+                });
+                const json = await res.json().catch(() => ({}));
+                if (res.ok && json.success) {
+                    this.codeSentAt = json.data?.sent_at ?? new Date().toISOString();
+                    this.codeExpiresAt = json.data?.expires_at ?? null;
+                    this.startResendCountdown(json.data?.resend_after_seconds ?? 60);
+                    window.showToast?.(json.message || 'Code sent to recipient', 'success');
+                } else {
+                    // Throttled resend still returns resend_after_seconds; restart the timer.
+                    if (json.data?.resend_after_seconds) {
+                        this.startResendCountdown(json.data.resend_after_seconds);
+                    }
+                    window.showToast?.(json.message || 'Failed to send code', 'error');
+                }
+            } catch (e) {
+                window.showToast?.('Network error', 'error');
+            } finally {
+                this.codeSending = false;
+            }
         },
 
         async submitResolve() {
             if (!this.resolveOutcome) return;
+            if (this.requiresVerification(this.resolveOutcome) && !this.resolveCode.trim()) {
+                this.resolveCodeError = 'Enter the code the recipient read to you.';
+                return;
+            }
             this.resolveSubmitting = true;
+            this.resolveCodeError = '';
             try {
                 const url = this.config.resolveUrl.replace('__TASK__', this.resolveTask.id);
                 const body = { outcome: this.resolveOutcome, notes: this.resolveNotes };
                 if (this.resolveOutcome === 'callback' && this.resolveCallbackAt) {
                     body.callback_at = this.resolveCallbackAt;
                 }
+                if (this.requiresVerification(this.resolveOutcome)) {
+                    body.confirmation_code = this.resolveCode.trim().toUpperCase();
+                }
                 const res = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrf },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrf, 'Accept': 'application/json' },
                     body: JSON.stringify(body),
                 });
-                if (res.ok) {
+                const json = await res.json().catch(() => ({}));
+                if (res.ok && json.success !== false) {
                     window.showToast?.('Task resolved successfully', 'success');
                     this.resolveOpen = false;
+                    this.resetCodeState();
                     this.loadData();
                 } else {
-                    const err = await res.json();
-                    window.showToast?.(err.message || 'Failed to resolve', 'error');
+                    // Verification failures come back as 422 with { code: 'invalid' | 'expired' | 'missing' | 'exhausted' }
+                    if (json.code) {
+                        this.resolveCodeError = json.message || 'Code could not be verified.';
+                    } else {
+                        window.showToast?.(json.message || 'Failed to resolve', 'error');
+                    }
                 }
             } catch (e) {
                 window.showToast?.('Network error', 'error');
@@ -850,6 +934,50 @@
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5">Callback Date & Time</label>
                         <input type="datetime-local" x-model="resolveCallbackAt"
                                class="w-full px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 text-sm text-slate-900 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors">
+                    </div>
+
+                    <!-- Recipient confirmation code (deliver / self_pickup only) -->
+                    <div x-show="requiresVerification(resolveOutcome)" x-transition
+                         class="rounded-2xl border border-emerald-200/80 bg-emerald-50/40 p-4">
+                        <div class="flex items-start gap-3 mb-3">
+                            <div class="w-8 h-8 rounded-lg bg-emerald-500/90 flex items-center justify-center shrink-0">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm font-semibold text-emerald-900">Confirm with recipient</p>
+                                <p class="text-[11px] text-emerald-800/80 mt-0.5">
+                                    Send a code to the recipient, ask them to read it back on the call, then enter it below.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 mb-3">
+                            <button type="button" @@click="sendConfirmationCode()"
+                                    :disabled="codeSending || codeResendAfter > 0"
+                                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                <svg x-show="codeSending" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                                <span x-show="!codeSentAt && !codeSending">Send Code</span>
+                                <span x-show="codeSentAt && codeResendAfter === 0 && !codeSending">Resend Code</span>
+                                <span x-show="codeResendAfter > 0" x-text="'Resend in ' + codeResendAfter + 's'"></span>
+                                <span x-show="codeSending">Sending…</span>
+                            </button>
+                            <span x-show="codeSentAt" class="text-[11px] text-emerald-700">
+                                Sent to <span class="font-mono" x-text="resolveTask?.recipient_phone"></span>
+                            </span>
+                        </div>
+
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Code from recipient</label>
+                        <input type="text" x-model="resolveCode" maxlength="10"
+                               placeholder="e.g. XK7R4Q"
+                               @@input="resolveCode = resolveCode.toUpperCase(); resolveCodeError = ''"
+                               class="w-full px-3 py-2 border rounded-xl bg-white text-base font-mono tracking-[0.3em] uppercase text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-300 transition-colors"
+                               :class="resolveCodeError ? 'border-rose-300' : 'border-slate-200/70'">
+                        <p x-show="resolveCodeError" x-text="resolveCodeError" class="mt-1.5 text-[11px] text-rose-600"></p>
                     </div>
 
                     <div>

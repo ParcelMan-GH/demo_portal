@@ -34,6 +34,11 @@ class PackageContactTask extends Model
         'notes',
         'attempts_count',
         'resolved_at',
+        'confirmation_code',
+        'confirmation_code_sent_at',
+        'confirmation_code_expires_at',
+        'confirmation_code_verified_at',
+        'confirmation_attempts',
     ];
 
     protected $casts = [
@@ -41,7 +46,16 @@ class PackageContactTask extends Model
         'callback_at' => 'datetime',
         'resolved_at' => 'datetime',
         'attempts_count' => 'integer',
+        'confirmation_code_sent_at' => 'datetime',
+        'confirmation_code_expires_at' => 'datetime',
+        'confirmation_code_verified_at' => 'datetime',
+        'confirmation_attempts' => 'integer',
     ];
+
+    /**
+     * Outcomes that require confirming the recipient with an SMS code.
+     */
+    public const VERIFIED_OUTCOMES = [self::OUTCOME_DELIVER, self::OUTCOME_SELF_PICKUP];
 
     public function shipmentItem(): BelongsTo
     {

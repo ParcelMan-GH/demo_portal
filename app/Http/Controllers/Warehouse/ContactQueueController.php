@@ -180,10 +180,22 @@ class ContactQueueController extends Controller
             'outcome' => ['required', 'in:deliver,self_pickup,unreachable,wrong_number,callback'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'callback_at' => ['nullable', 'required_if:outcome,callback', 'date', 'after:now'],
+            'confirmation_code' => ['nullable', 'string', 'max:10'],
         ]);
 
         $callbackAt = !empty($validated['callback_at']) ? new \DateTime($validated['callback_at']) : null;
-        $this->contactService->resolveTask($task, $validated['outcome'], $validated['notes'], $callbackAt);
+
+        $result = $this->contactService->resolveTask(
+            $task,
+            $validated['outcome'],
+            $validated['notes'] ?? null,
+            $callbackAt,
+            $validated['confirmation_code'] ?? null,
+        );
+
+        if (!($result['success'] ?? false)) {
+            return response()->json($result, 422);
+        }
 
         $labels = [
             'deliver' => 'Marked for delivery.',
@@ -194,6 +206,13 @@ class ContactQueueController extends Controller
         ];
 
         return response()->json(['success' => true, 'message' => $labels[$validated['outcome']] ?? 'Task resolved.']);
+    }
+
+    public function sendCode(Request $request, PackageContactTask $task): JsonResponse
+    {
+        $this->authorizePermission('warehouse.contacts.manage');
+        $result = $this->contactService->sendConfirmationCode($task);
+        return response()->json($result, $result['success'] ? 200 : 422);
     }
 
     public function attempts(PackageContactTask $task): JsonResponse
