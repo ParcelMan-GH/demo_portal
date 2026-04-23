@@ -766,7 +766,7 @@ function shipmentShow() {
                         delivery_town: pkg.delivery_town || null,
                         delivery_landmark: pkg.delivery_landmark || null,
                         delivery_instructions: pkg.delivery_instructions || null,
-                        bus_station_id: pkg.bus_station_id || null,
+                        delivery_method: pkg.delivery_method || 'direct',
                     }),
                 });
                 const result = await response.json();

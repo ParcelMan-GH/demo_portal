@@ -24,7 +24,6 @@ use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\AdminContactQueueController;
 use App\Http\Controllers\Admin\AdminShipmentChargesController;
 use App\Http\Controllers\Warehouse\WarehouseShipmentChargesController;
-use App\Http\Controllers\Admin\BusStationController;
 use App\Http\Controllers\Admin\VendorPayoutController;
 use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
@@ -328,11 +327,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::patch('locations/towns/{town}/toggle', [AdminLocationController::class, 'toggleTown'])->name('locations.towns.toggle');
         Route::delete('locations/towns/{town}', [AdminLocationController::class, 'destroyTown'])->name('locations.towns.destroy');
 
-        // Bus Stations
-        Route::get('bus-stations', [BusStationController::class, 'index'])->name('bus-stations.index');
-        Route::get('bus-stations-data', [BusStationController::class, 'data'])->name('bus-stations.data');
-        Route::get('bus-stations-list', [BusStationController::class, 'list'])->name('bus-stations.list');
-
         // Contact Queue (admin-side)
         Route::get('contacts', [AdminContactQueueController::class, 'index'])->name('contacts.index');
         Route::get('contacts-data', [AdminContactQueueController::class, 'data'])->name('contacts.data');
@@ -344,10 +338,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('contacts/{task}/attempts', [AdminContactQueueController::class, 'attempts'])->name('contacts.attempts');
         Route::get('contacts/worker-stats', [AdminContactQueueController::class, 'workerStats'])->name('contacts.worker-stats');
         Route::post('contacts/add-to-queue', [AdminContactQueueController::class, 'addToQueue'])->name('contacts.add-to-queue');
-        Route::post('bus-stations', [BusStationController::class, 'store'])->name('bus-stations.store');
-        Route::put('bus-stations/{busStation}', [BusStationController::class, 'update'])->name('bus-stations.update');
-        Route::patch('bus-stations/{busStation}/toggle', [BusStationController::class, 'toggleActive'])->name('bus-stations.toggle');
-        Route::delete('bus-stations/{busStation}', [BusStationController::class, 'destroy'])->name('bus-stations.destroy');
 
         // Delivery Runs (admin read visibility)
         Route::get('delivery-runs', [AdminDeliveryRunController::class, 'index'])->name('delivery-runs.index');

@@ -49,6 +49,7 @@ class DeliveryRunStop extends Model
         'handoff_courier_name',
         'handoff_courier_phone',
         'handoff_vehicle_number',
+        'bus_station_name',
         'handoff_at',
         'confirmed_by_admin_id',
         'confirmed_at',

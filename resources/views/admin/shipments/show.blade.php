@@ -3085,20 +3085,18 @@ $shipmentConfig = [
                                                     <input type="text" x-model="pkg.delivery_instructions" placeholder="e.g. Call before delivery" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
                                                 </div>
 
-                                                {{-- Bus Station Toggle --}}
-                                                <div class="pt-2 border-t border-indigo-100" x-data="{ busToggle: !!pkg.bus_station_id }">
-                                                    <label class="flex items-center gap-2 cursor-pointer">
-                                                        <input type="checkbox" x-model="busToggle" @@change="if (!busToggle) pkg.bus_station_id = null" class="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500">
-                                                        <span class="text-[10px] font-bold text-violet-700 uppercase tracking-wider">Send via Bus Station</span>
+                                                {{-- Delivery method: direct or via bus courier --}}
+                                                <div class="pt-2 border-t border-indigo-100">
+                                                    <label class="flex items-start gap-2 cursor-pointer">
+                                                        <input type="checkbox"
+                                                               :checked="pkg.delivery_method === 'bus_handoff'"
+                                                               @@change="pkg.delivery_method = $event.target.checked ? 'bus_handoff' : 'direct'"
+                                                               class="w-4 h-4 mt-0.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500">
+                                                        <div>
+                                                            <span class="text-[10px] font-bold text-violet-700 uppercase tracking-wider">Send via Bus Courier</span>
+                                                            <p class="text-[10px] text-slate-400 mt-0.5">The driver will pick any bus station in the field and record it at handoff.</p>
+                                                        </div>
                                                     </label>
-                                                    <div x-show="busToggle" class="mt-2">
-                                                        <select x-model="pkg.bus_station_id" class="w-full px-3 py-2 text-sm border border-violet-200 rounded-xl bg-violet-50/50 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none">
-                                                            <option value="">Select Bus Station</option>
-                                                            @foreach(\App\Models\BusStation::where('is_active', true)->orderBy('name')->get() as $station)
-                                                                <option value="{{ $station->id }}">{{ $station->name }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

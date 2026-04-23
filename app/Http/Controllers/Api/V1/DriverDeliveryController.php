@@ -149,6 +149,9 @@ class DriverDeliveryController extends Controller
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'proof_photo' => ['required', 'file', 'image', 'max:12288'],
+            // Free-text bus station where the handoff happened. Driver types this
+            // in the field — there's no pre-selected list anymore.
+            'bus_station_name' => ['nullable', 'string', 'max:255'],
             // Optional: how much was paid to the bus station courier to take these packages.
             // Recorded as a parcelman→station expense charge line per shipment handed off.
             'station_fee' => ['nullable', 'numeric', 'min:0', 'max:9999999.99'],

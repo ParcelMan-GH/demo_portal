@@ -1765,6 +1765,20 @@
                                     </div>
                                 </div>
 
+                                {{-- Delivery method tag: direct vs bus courier --}}
+                                <div class="rounded-xl border border-violet-100 bg-violet-50/40 p-4">
+                                    <label class="flex items-start gap-3 cursor-pointer">
+                                        <input type="checkbox"
+                                               :checked="items[receiveModal.itemIndex].delivery_method === 'bus_handoff'"
+                                               @@change="items[receiveModal.itemIndex].delivery_method = $event.target.checked ? 'bus_handoff' : 'direct'"
+                                               class="mt-0.5 w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500">
+                                        <div>
+                                            <span class="text-xs font-bold text-violet-700 uppercase tracking-wider">Send via Bus Courier</span>
+                                            <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Tag this package for bus-courier handoff. A bus-handoff driver will pick it up; they choose the station in the field.</p>
+                                        </div>
+                                    </label>
+                                </div>
+
                                 {{-- Notes --}}
                                 <div>
                                     <label class="block text-xs font-bold text-slate-700 mb-2">Notes</label>

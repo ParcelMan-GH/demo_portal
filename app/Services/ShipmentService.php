@@ -462,9 +462,8 @@ class ShipmentService
                     ->whereHas('items', fn ($q) => $q->where('shipment_item_id', $item->id))
                     ->first();
                 if ($stop) {
-                    $station = $item->bus_station_id ? \App\Models\BusStation::find($item->bus_station_id) : null;
                     $itemHandoff = [
-                        'bus_station' => $station?->name ?? $stop->recipient_name,
+                        'bus_station' => $stop->bus_station_name,
                         'courier_name' => $stop->handoff_courier_name,
                         'courier_phone' => $stop->handoff_courier_phone,
                         'vehicle_number' => $stop->handoff_vehicle_number,
@@ -801,15 +800,9 @@ class ShipmentService
             return null;
         }
 
-        $station = null;
-        $firstItem = $shipment->items->first();
-        if ($firstItem?->bus_station_id) {
-            $station = \App\Models\BusStation::find($firstItem->bus_station_id);
-        }
-
         return [
             'status' => $stop->status,
-            'bus_station' => $station?->name ?? $stop->recipient_name,
+            'bus_station' => $stop->bus_station_name,
             'courier_name' => $stop->handoff_courier_name,
             'courier_phone' => $stop->handoff_courier_phone,
             'vehicle_number' => $stop->handoff_vehicle_number,

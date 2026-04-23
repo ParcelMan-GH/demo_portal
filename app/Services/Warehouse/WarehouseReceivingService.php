@@ -530,6 +530,7 @@ class WarehouseReceivingService
             'discrepancy_type' => $item->discrepancy_type,
             'condition_status' => $item->condition_status,
             'notes' => $item->notes,
+            'delivery_method' => $item->shipmentItem?->delivery_method ?? 'direct',
             'barcode_value' => $item->barcode_value,
             'barcode_format' => $item->barcode_format,
             'barcode_printed_at' => optional($item->barcode_printed_at)?->toIso8601String(),

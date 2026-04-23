@@ -1476,8 +1476,7 @@ class ShipmentController extends Controller
                 'delivery_town' => $deliverySource->delivery_town,
                 'delivery_landmark' => $deliverySource->delivery_landmark,
                 'delivery_instructions' => $deliverySource->delivery_instructions,
-                'bus_station_id' => $item->bus_station_id,
-                'bus_station_name' => $item->busStation?->name,
+                'delivery_method' => $item->delivery_method,
                 'photos' => $receiptItem
                     ? $receivingService->serializeReceiptItem($receiptItem)['photos']
                     : [],
@@ -1534,7 +1533,7 @@ class ShipmentController extends Controller
             'delivery_town' => ['nullable', 'string', 'max:255'],
             'delivery_landmark' => ['nullable', 'string', 'max:255'],
             'delivery_instructions' => ['nullable', 'string', 'max:1000'],
-            'bus_station_id' => ['nullable', 'integer', 'exists:bus_stations,id'],
+            'delivery_method' => ['nullable', 'in:direct,bus_handoff'],
         ]);
 
         $deliveryUpdates = [
@@ -1547,7 +1546,7 @@ class ShipmentController extends Controller
             'delivery_town' => $validated['delivery_town'] ?? null,
             'delivery_landmark' => $validated['delivery_landmark'] ?? null,
             'delivery_instructions' => $validated['delivery_instructions'] ?? null,
-            'bus_station_id' => $validated['bus_station_id'] ?? null,
+            'delivery_method' => $validated['delivery_method'] ?? \App\Models\ShipmentItem::DELIVERY_METHOD_DIRECT,
         ];
 
         $packageUpdates = [];

@@ -180,6 +180,7 @@ function registerWarehouseReceiptShowPage() {
                 formData.append('damaged_quantity', String(item.damaged_quantity ?? 0));
                 formData.append('condition_status', item.condition_status || 'ok');
                 formData.append('notes', item.notes || '');
+                formData.append('delivery_method', item.delivery_method || 'direct');
                 formData.append('_token', csrfToken());
 
                 (this.pendingFiles[itemId] || []).forEach((file) => {

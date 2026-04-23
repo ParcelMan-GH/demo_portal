@@ -733,7 +733,7 @@
                                     <span class="text-xs font-semibold text-slate-600" x-text="(form.task_capabilities || []).length + ' selected'"></span>
                                 </div>
 
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
                                         <input type="checkbox"
                                                value="pickup"
@@ -757,6 +757,14 @@
                                                :disabled="modalMode === 'view'"
                                                class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500">
                                         <span class="text-sm font-medium text-slate-700">Delivery</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50/40 px-3 py-2">
+                                        <input type="checkbox"
+                                               value="bus_handoff"
+                                               x-model="form.task_capabilities"
+                                               :disabled="modalMode === 'view'"
+                                               class="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500">
+                                        <span class="text-sm font-medium text-violet-700">Bus Handoff</span>
                                     </label>
                                 </div>
 

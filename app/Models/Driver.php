@@ -14,11 +14,13 @@ class Driver extends Authenticatable
     public const CAPABILITY_PICKUP = 'pickup';
     public const CAPABILITY_TRANSPORT = 'transport';
     public const CAPABILITY_DELIVERY = 'delivery';
+    public const CAPABILITY_BUS_HANDOFF = 'bus_handoff';
 
     public const CAPABILITIES = [
         self::CAPABILITY_PICKUP,
         self::CAPABILITY_TRANSPORT,
         self::CAPABILITY_DELIVERY,
+        self::CAPABILITY_BUS_HANDOFF,
     ];
 
     protected $fillable = [

@@ -301,7 +301,16 @@ class ReceiptController extends Controller
             'photos.*' => ['file', 'image', 'max:12288'],
             'remove_photo_ids' => ['nullable', 'array'],
             'remove_photo_ids.*' => ['integer', 'exists:warehouse_receipt_item_photos,id'],
+            // Tag the package for bus-courier handoff at the moment of
+            // receiving, so the right driver picks it up downstream.
+            'delivery_method' => ['nullable', 'in:direct,bus_handoff'],
         ]);
+
+        // Persist delivery_method on the shipment item itself (independent of
+        // the receipt/qty flow). Only update if the caller sent it.
+        if (array_key_exists('delivery_method', $validated) && $validated['delivery_method'] !== null) {
+            $shipmentItem->update(['delivery_method' => $validated['delivery_method']]);
+        }
 
         $result = $this->warehouseReceivingService->upsertReceiptItem(
             assignment: $pickupAssignment,

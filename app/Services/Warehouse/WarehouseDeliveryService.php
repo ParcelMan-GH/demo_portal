@@ -137,7 +137,7 @@ class WarehouseDeliveryService
         }
 
         $labels = WarehouseReceiptItemLabel::whereIn('id', $claimedLabelIds)
-            ->with(['receiptItem.shipmentItem.shipment.vendor', 'receiptItem.shipmentItem.busStation'])
+            ->with(['receiptItem.shipmentItem.shipment.vendor'])
             ->get();
 
         // Collect unique shipment items (a package may have multiple labels)
@@ -172,27 +172,30 @@ class WarehouseDeliveryService
                 'created_by_user_id' => $admin?->id,
             ]);
 
-            // Separate bus station items from direct delivery items
-            $busStationItems = $shipmentItems->filter(fn ($item) => !empty($item->bus_station_id));
-            $directItems = $shipmentItems->reject(fn ($item) => !empty($item->bus_station_id));
+            // Items tagged for bus handoff at receiving go onto a single
+            // handoff stop — the driver picks the actual bus station when
+            // they get there, so there's no point pre-grouping by station.
+            $busStationItems = $shipmentItems->filter(
+                fn ($item) => $item->delivery_method === ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF
+            );
+            $directItems = $shipmentItems->reject(
+                fn ($item) => $item->delivery_method === ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF
+            );
 
             $stopsCount = 0;
 
-            // Create bus station stops — group by bus_station_id
-            $busGroups = $busStationItems->groupBy('bus_station_id');
-            foreach ($busGroups as $stationId => $items) {
-                $station = $items->first()->busStation;
+            if ($busStationItems->isNotEmpty()) {
                 $stop = DeliveryRunStop::query()->create([
                     'delivery_run_id' => $run->id,
-                    'recipient_name' => $station?->name ?? 'Bus Station',
+                    'recipient_name' => 'Bus Station Handoff',
                     'recipient_phone' => '',
-                    'town' => $station?->name,
-                    'total_packages' => $items->count(),
+                    'town' => null,
+                    'total_packages' => $busStationItems->count(),
                     'status' => DeliveryRunStop::STATUS_PENDING,
                     'delivery_method' => DeliveryRunStop::METHOD_BUS_HANDOFF,
                 ]);
 
-                foreach ($items as $shipmentItem) {
+                foreach ($busStationItems as $shipmentItem) {
                     DeliveryRunItem::query()->create([
                         'delivery_run_id' => $run->id,
                         'delivery_run_stop_id' => $stop->id,
@@ -990,7 +993,11 @@ class WarehouseDeliveryService
             ? strtoupper(trim((string) $data['vehicle_number']))
             : null;
 
-        return DB::transaction(function () use ($run, $stop, $driver, $data, $request, $courierName, $courierPhone, $vehicleNumber) {
+        $busStationName = isset($data['bus_station_name']) && trim((string) $data['bus_station_name']) !== ''
+            ? trim((string) $data['bus_station_name'])
+            : null;
+
+        return DB::transaction(function () use ($run, $stop, $driver, $data, $request, $courierName, $courierPhone, $vehicleNumber, $busStationName) {
             $run = DeliveryRun::query()->with(['items.shipmentItem.shipment', 'stops'])->lockForUpdate()->findOrFail($run->id);
             $stop = DeliveryRunStop::query()->whereKey($stop->id)->where('delivery_run_id', $run->id)->lockForUpdate()->firstOrFail();
 
@@ -1016,17 +1023,23 @@ class WarehouseDeliveryService
                 'handoff_courier_name' => $courierName,
                 'handoff_courier_phone' => $courierPhone,
                 'handoff_vehicle_number' => $vehicleNumber,
+                'bus_station_name' => $busStationName,
                 'handoff_at' => $now,
             ]);
 
             $courierLabel = $this->buildCourierLabel($courierName, $vehicleNumber, $courierPhone);
+            $stationPrefix = $busStationName ? "{$busStationName} — " : '';
             $itemNote = $courierLabel !== ''
-                ? "Handed to courier: {$courierLabel}"
-                : 'Handed to courier (details on proof photo)';
+                ? "Handed to courier at {$stationPrefix}{$courierLabel}"
+                : ($busStationName
+                    ? "Handed to courier at {$busStationName} (details on proof photo)"
+                    : 'Handed to courier (details on proof photo)');
 
             $trackingNote = $courierLabel !== ''
-                ? "Handed to bus courier — {$courierLabel}"
-                : 'Handed to bus courier — details on proof photo';
+                ? "Handed to bus courier — {$stationPrefix}{$courierLabel}"
+                : ($busStationName
+                    ? "Handed to bus courier at {$busStationName} — details on proof photo"
+                    : 'Handed to bus courier — details on proof photo');
 
             $runItems = DeliveryRunItem::query()
                 ->where('delivery_run_id', $run->id)
@@ -1056,6 +1069,7 @@ class WarehouseDeliveryService
                             'delivery_run_id' => $run->id,
                             'delivery_run_number' => $run->run_number,
                             'delivery_run_stop_id' => $stop->id,
+                            'bus_station_name' => $busStationName,
                             'courier_name' => $courierName,
                             'courier_phone' => $courierPhone,
                             'vehicle_number' => $vehicleNumber,
@@ -1109,9 +1123,10 @@ class WarehouseDeliveryService
 
             $this->refreshRunStatus($run);
 
+            $stationSuffix = $busStationName ? " at {$busStationName}" : '';
             $message = $courierLabel !== ''
-                ? "Packages handed to courier {$courierLabel} successfully."
-                : 'Packages handed to courier successfully.';
+                ? "Packages handed to courier {$courierLabel}{$stationSuffix} successfully."
+                : "Packages handed to courier{$stationSuffix} successfully.";
 
             return [
                 'success' => true,
