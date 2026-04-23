@@ -157,6 +157,11 @@ class ShipmentItem extends Model
         return $this->hasMany(DeliveryRunItem::class);
     }
 
+    public function charges(): HasMany
+    {
+        return $this->hasMany(ShipmentCharge::class);
+    }
+
     public function getDeliveryLocationTypeAttribute(): string
     {
         if ($this->delivery_region_id && $this->delivery_district_id) {

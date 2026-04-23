@@ -58,6 +58,10 @@ class PermissionSeeder extends Seeder
             ['module' => 'invoices', 'action' => 'edit', 'name' => 'invoices.edit', 'description' => 'Edit invoices', 'sort_order' => 72],
             ['module' => 'invoices', 'action' => 'delete', 'name' => 'invoices.delete', 'description' => 'Delete invoices', 'sort_order' => 73],
 
+            // Charges ledger (admin-side: pickup/delivery/station/handling fees per shipment)
+            ['module' => 'charges', 'action' => 'view', 'name' => 'charges.view', 'description' => 'View shipment charges ledger', 'sort_order' => 75],
+            ['module' => 'charges', 'action' => 'manage', 'name' => 'charges.manage', 'description' => 'Add / edit / mark paid / waive shipment charges', 'sort_order' => 76],
+
             // Warehouses (4)
             ['module' => 'warehouses', 'action' => 'view', 'name' => 'warehouses.view', 'description' => 'View warehouses', 'sort_order' => 110],
             ['module' => 'warehouses', 'action' => 'create', 'name' => 'warehouses.create', 'description' => 'Create warehouses', 'sort_order' => 111],
@@ -85,6 +89,8 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouse', 'action' => 'invoices_edit', 'name' => 'warehouse.invoices.edit', 'description' => 'Edit warehouse invoices', 'sort_order' => 134],
             ['module' => 'warehouse', 'action' => 'invoices_delete', 'name' => 'warehouse.invoices.delete', 'description' => 'Cancel warehouse invoices', 'sort_order' => 135],
             ['module' => 'warehouse', 'action' => 'contacts_manage', 'name' => 'warehouse.contacts.manage', 'description' => 'Manage package contact queue and log calls', 'sort_order' => 136],
+            ['module' => 'warehouse', 'action' => 'charges_view', 'name' => 'warehouse.charges.view', 'description' => 'View shipment charges at this warehouse', 'sort_order' => 137],
+            ['module' => 'warehouse', 'action' => 'charges_manage', 'name' => 'warehouse.charges.manage', 'description' => 'Add / edit / mark paid / waive charges on shipments at this warehouse', 'sort_order' => 138],
 
             // Reports (2)
             ['module' => 'reports', 'action' => 'view', 'name' => 'reports.view', 'description' => 'View reports', 'sort_order' => 80],

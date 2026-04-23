@@ -22,6 +22,8 @@ use App\Http\Controllers\Admin\ShipmentPaymentController;
 use App\Http\Controllers\Admin\AdminMarketingController;
 use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\AdminContactQueueController;
+use App\Http\Controllers\Admin\AdminShipmentChargesController;
+use App\Http\Controllers\Warehouse\WarehouseShipmentChargesController;
 use App\Http\Controllers\Admin\BusStationController;
 use App\Http\Controllers\Admin\VendorPayoutController;
 use App\Http\Controllers\Admin\WarehouseController;
@@ -232,6 +234,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('shipments/{shipment}/receiving/{item}/print-label', [ShipmentController::class, 'printPackageLabel'])->name('shipments.receiving.print-label');
         Route::post('shipments/{shipment}/receiving/finalize', [ShipmentController::class, 'finalizeReceiving'])->name('shipments.receiving.finalize');
         Route::post('shipments/{shipment}/admin-complete-pickup', [ShipmentController::class, 'adminCompletePickup'])->name('shipments.admin-complete-pickup');
+
+        // Shipment charges ledger (admin)
+        Route::get('shipments/{shipment}/charges', [AdminShipmentChargesController::class, 'index'])->name('shipments.charges.index');
+        Route::post('shipments/{shipment}/charges', [AdminShipmentChargesController::class, 'store'])->name('shipments.charges.store');
+        Route::post('shipments/{shipment}/charges/seed-pickup-fee', [AdminShipmentChargesController::class, 'seedPickupFee'])->name('shipments.charges.seed-pickup-fee');
+        Route::put('shipments/{shipment}/charges/{charge}', [AdminShipmentChargesController::class, 'update'])->name('shipments.charges.update');
+        Route::patch('shipments/{shipment}/charges/{charge}/mark-paid', [AdminShipmentChargesController::class, 'markPaid'])->name('shipments.charges.mark-paid');
+        Route::patch('shipments/{shipment}/charges/{charge}/waive', [AdminShipmentChargesController::class, 'waive'])->name('shipments.charges.waive');
+        Route::delete('shipments/{shipment}/charges/{charge}', [AdminShipmentChargesController::class, 'cancel'])->name('shipments.charges.cancel');
         Route::get('shipments/{shipment}/custody-data', [ShipmentController::class, 'custodyData'])->name('shipments.custody-data');
         Route::post('shipments/create-run-from-claims', [ShipmentController::class, 'createRunFromClaims'])->name('shipments.create-run-from-claims');
         Route::post('shipments/{shipment}/fulfillment-type', [ShipmentController::class, 'updateFulfillmentType'])->name('shipments.update-fulfillment-type');
@@ -328,6 +339,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('contacts/{task}/assign', [AdminContactQueueController::class, 'assign'])->name('contacts.assign');
         Route::post('contacts/auto-assign', [AdminContactQueueController::class, 'autoAssign'])->name('contacts.auto-assign');
         Route::post('contacts/{task}/log-call', [AdminContactQueueController::class, 'logCall'])->name('contacts.log-call');
+        Route::post('contacts/{task}/send-code', [AdminContactQueueController::class, 'sendCode'])->name('contacts.send-code');
         Route::post('contacts/{task}/resolve', [AdminContactQueueController::class, 'resolve'])->name('contacts.resolve');
         Route::get('contacts/{task}/attempts', [AdminContactQueueController::class, 'attempts'])->name('contacts.attempts');
         Route::get('contacts/worker-stats', [AdminContactQueueController::class, 'workerStats'])->name('contacts.worker-stats');
@@ -472,6 +484,14 @@ Route::prefix('warehouse')
         Route::get('items/received-data', [WarehouseReceiptController::class, 'receivedItemsData'])->name('items.received.data');
         Route::get('items/received/{warehouseReceiptItem}', [WarehouseReceiptController::class, 'receivedItemShow'])->name('items.received.show');
 
+        // Shipment charges ledger (warehouse)
+        Route::get('shipments/{shipment}/charges', [WarehouseShipmentChargesController::class, 'index'])->name('shipments.charges.index');
+        Route::post('shipments/{shipment}/charges', [WarehouseShipmentChargesController::class, 'store'])->name('shipments.charges.store');
+        Route::put('shipments/{shipment}/charges/{charge}', [WarehouseShipmentChargesController::class, 'update'])->name('shipments.charges.update');
+        Route::patch('shipments/{shipment}/charges/{charge}/mark-paid', [WarehouseShipmentChargesController::class, 'markPaid'])->name('shipments.charges.mark-paid');
+        Route::patch('shipments/{shipment}/charges/{charge}/waive', [WarehouseShipmentChargesController::class, 'waive'])->name('shipments.charges.waive');
+        Route::delete('shipments/{shipment}/charges/{charge}', [WarehouseShipmentChargesController::class, 'cancel'])->name('shipments.charges.cancel');
+
         // Sorting
         Route::get('sorting', [WarehouseSortingController::class, 'index'])->name('sorting.index');
         Route::get('sorting/items-data', [WarehouseSortingController::class, 'itemsData'])->name('sorting.items.data');
@@ -520,6 +540,7 @@ Route::prefix('warehouse')
         Route::post('contacts/bulk-assign', [WarehouseContactQueueController::class, 'bulkAssign'])->name('contacts.bulk-assign');
         Route::post('contacts/auto-assign', [WarehouseContactQueueController::class, 'autoAssign'])->name('contacts.auto-assign');
         Route::post('contacts/{task}/log-call', [WarehouseContactQueueController::class, 'logCall'])->name('contacts.log-call');
+        Route::post('contacts/{task}/send-code', [WarehouseContactQueueController::class, 'sendCode'])->name('contacts.send-code');
         Route::post('contacts/{task}/resolve', [WarehouseContactQueueController::class, 'resolve'])->name('contacts.resolve');
         Route::get('contacts/{task}/attempts', [WarehouseContactQueueController::class, 'attempts'])->name('contacts.attempts');
         Route::get('contacts/worker-stats', [WarehouseContactQueueController::class, 'workerStats'])->name('contacts.worker-stats');

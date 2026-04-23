@@ -18,6 +18,8 @@ use App\Models\ShipmentItemTracking;
 use App\Models\SortBatch;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Models\ShipmentCharge;
+use App\Services\ChargesService;
 use App\Services\SmsService;
 use App\Services\StorageService;
 use Illuminate\Database\Eloquent\Builder;
@@ -32,6 +34,7 @@ class WarehouseDeliveryService
         private StorageService $storageService,
         private SmsService $smsService,
         private \App\Services\VendorCommissionService $commissionService,
+        private ChargesService $chargesService,
     ) {
     }
 
@@ -487,13 +490,25 @@ class WarehouseDeliveryService
                 }
             }
 
-            $shipments->unique('id')->each(function (Shipment $shipment) {
+            $uniqueShipments = $shipments->unique('id');
+            $uniqueShipments->each(function (Shipment $shipment) {
                 $this->syncShipmentOutForDeliveryStatus($shipment);
             });
+
+            // Soft-warn: any shipments in this run that still have unpaid
+            // before-delivery charges. We don't block — the admin has chosen
+            // to dispatch — but the warning comes back in the response so
+            // the UI can show a banner. The run's tracking entries above
+            // already record that it was dispatched; the warning context is
+            // present in the response for UI to display.
+            $warnings = $this->chargesService->dispatchWarningsForShipments(
+                $uniqueShipments->pluck('id')->all()
+            );
 
             return [
                 'success' => true,
                 'message' => 'Delivery run dispatched successfully.',
+                'warnings' => $warnings,
                 'data' => [
                     'run' => $run->fresh(['assignedDriver', 'stops', 'items.shipmentItem']),
                 ],
@@ -747,7 +762,8 @@ class WarehouseDeliveryService
         ?string $ipAddress = null,
         bool $skipVerification = false,
         ?string $skipReason = null,
-        ?string $deliveryNotes = null
+        ?string $deliveryNotes = null,
+        ?float $inFieldDeliveryFee = null,
     ): array {
         if ((int) $run->assigned_driver_id !== (int) $driver->id || (int) $stop->delivery_run_id !== (int) $run->id) {
             return ['success' => false, 'message' => 'Delivery stop not found.'];
@@ -779,7 +795,7 @@ class WarehouseDeliveryService
             }
         }
 
-        return DB::transaction(function () use ($run, $stop, $driver, $packagesDelivered, $latitude, $longitude, $proofPhoto, $deliveryNotes) {
+        return DB::transaction(function () use ($run, $stop, $driver, $packagesDelivered, $latitude, $longitude, $proofPhoto, $deliveryNotes, $inFieldDeliveryFee) {
             $run = DeliveryRun::query()
                 ->with(['items.shipmentItem.shipment', 'stops'])
                 ->lockForUpdate()
@@ -907,6 +923,33 @@ class WarehouseDeliveryService
                 $run->assignedDriver->update(['status' => 'available']);
             }
 
+            // Optional in-field delivery fee the driver collected on arrival
+            // (recipient→parcelman, due_stage=at_delivery, already paid). Only
+            // recorded when the stop was at least partially delivered — we
+            // don't bill a failed delivery.
+            if ($inFieldDeliveryFee !== null && $inFieldDeliveryFee > 0 && !$noneDelivered) {
+                $uniqueShipments = $shipments->unique('id');
+                if ($uniqueShipments->isNotEmpty()) {
+                    $shipmentCount = $uniqueShipments->count();
+                    $share = round($inFieldDeliveryFee / $shipmentCount, 2);
+                    $noteSuffix = $shipmentCount > 1
+                        ? " (split from GHS " . number_format($inFieldDeliveryFee, 2) . " across {$shipmentCount} shipments delivered at this stop)"
+                        : '';
+                    foreach ($uniqueShipments as $shipment) {
+                        $this->chargesService->addCharge($shipment, [
+                            'charge_type'          => ShipmentCharge::TYPE_DELIVERY_FEE,
+                            'payer_type'           => ShipmentCharge::PAYER_RECIPIENT,
+                            'due_stage'            => ShipmentCharge::STAGE_AT_DELIVERY,
+                            'amount'               => $share,
+                            'status'               => ShipmentCharge::STATUS_PAID,
+                            'payment_method'       => 'cash',
+                            'delivery_run_stop_id' => $stop->id,
+                            'notes'                => "Driver collected delivery fee on arrival{$noteSuffix}",
+                        ], $driver);
+                    }
+                }
+            }
+
             return [
                 'success' => true,
                 'message' => $allDelivered
@@ -1026,7 +1069,9 @@ class WarehouseDeliveryService
                 }
             }
 
-            foreach ($shipments->unique('id') as $shipment) {
+            $uniqueShipments = $shipments->unique('id');
+
+            foreach ($uniqueShipments as $shipment) {
                 $allHandedOff = $shipment->items()->whereNotIn('status', [
                     ItemStatus::HANDED_TO_COURIER->value,
                     ItemStatus::DELIVERED->value,
@@ -1034,6 +1079,31 @@ class WarehouseDeliveryService
 
                 if ($allHandedOff) {
                     $shipment->update(['status' => ShipmentStatus::HANDED_TO_COURIER]);
+                }
+            }
+
+            // Optional station fee the driver paid to the bus courier — recorded
+            // as a parcelman→station expense charge. If multiple shipments were
+            // handed off together, we split the total equally and note that.
+            $stationFee = isset($data['station_fee']) ? (float) $data['station_fee'] : 0.0;
+            if ($stationFee > 0 && $uniqueShipments->isNotEmpty()) {
+                $shipmentCount = $uniqueShipments->count();
+                $share = round($stationFee / $shipmentCount, 2);
+                $noteSuffix = $shipmentCount > 1
+                    ? " (split from GHS " . number_format($stationFee, 2) . " across {$shipmentCount} shipments handed off together)"
+                    : '';
+
+                foreach ($uniqueShipments as $shipment) {
+                    $this->chargesService->addCharge($shipment, [
+                        'charge_type'           => ShipmentCharge::TYPE_STATION_FEE,
+                        'payer_type'            => ShipmentCharge::PAYER_PARCELMAN,
+                        'due_stage'             => ShipmentCharge::STAGE_AT_HANDOFF,
+                        'amount'                => $share,
+                        'status'                => ShipmentCharge::STATUS_PAID,
+                        'payment_method'        => 'cash',
+                        'delivery_run_stop_id'  => $stop->id,
+                        'notes'                 => "Driver paid bus courier at handoff{$noteSuffix}",
+                    ], $driver);
                 }
             }
 

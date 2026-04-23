@@ -235,6 +235,14 @@ class Shipment extends Model
     }
 
     /**
+     * All charge lines (pickup/delivery/station/handling/other) on this shipment.
+     */
+    public function charges(): HasMany
+    {
+        return $this->hasMany(ShipmentCharge::class)->latest('id');
+    }
+
+    /**
      * Get the latest pickup assignment for this shipment.
      */
     public function pickupAssignment(): HasOne

@@ -93,6 +93,11 @@ class DriverDeliveryController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'proof_photo' => ['required', 'file', 'image', 'max:12288'],
             'delivery_notes' => ['nullable', 'string', 'max:1000'],
+            // Optional: the delivery fee the driver collected from the recipient
+            // on arrival (for stops where the fee wasn't set in advance, or
+            // renegotiated in the field). Recorded as a paid recipient→parcelman
+            // delivery_fee charge at at_delivery stage.
+            'in_field_delivery_fee' => ['nullable', 'numeric', 'min:0', 'max:9999999.99'],
         ]);
 
         $result = $this->warehouseDeliveryService->driverConfirmStopByPackage(
@@ -107,7 +112,8 @@ class DriverDeliveryController extends Controller
             ipAddress: (string) $request->ip(),
             skipVerification: $skipVerification,
             skipReason: $validated['skip_reason'] ?? null,
-            deliveryNotes: $validated['delivery_notes'] ?? null
+            deliveryNotes: $validated['delivery_notes'] ?? null,
+            inFieldDeliveryFee: isset($validated['in_field_delivery_fee']) ? (float) $validated['in_field_delivery_fee'] : null,
         );
 
         return $this->deliveryActionResponse($driver, $run, $result, 400);
@@ -143,6 +149,9 @@ class DriverDeliveryController extends Controller
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'proof_photo' => ['required', 'file', 'image', 'max:12288'],
+            // Optional: how much was paid to the bus station courier to take these packages.
+            // Recorded as a parcelman→station expense charge line per shipment handed off.
+            'station_fee' => ['nullable', 'numeric', 'min:0', 'max:9999999.99'],
         ]);
 
         $result = $this->warehouseDeliveryService->driverConfirmHandoff(

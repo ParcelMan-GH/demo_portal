@@ -69,6 +69,10 @@ class RoleSeeder extends Seeder
             'vendors.delete',
             'vendors.activate',
 
+            // Charges
+            'charges.view',
+            'charges.manage',
+
             // Reports
             'reports.view',
             'reports.export',
@@ -94,6 +98,8 @@ class RoleSeeder extends Seeder
             'invoices.create',
             'invoices.edit',
             'invoices.delete',
+            'charges.view',
+            'charges.manage',
             'reports.view',
             'reports.export',
             'settings.view',
@@ -138,6 +144,8 @@ class RoleSeeder extends Seeder
             'warehouse.invoices.create',
             'warehouse.invoices.edit',
             'warehouse.invoices.delete',
+            'warehouse.charges.view',
+            'warehouse.charges.manage',
         ])->pluck('id');
         $warehouseManager->permissions()->sync($warehouseManagerPermissions);
 
@@ -158,6 +166,8 @@ class RoleSeeder extends Seeder
             'warehouse.dashboard.view',
             'warehouse.receiving.manage',
             'warehouse.items.scan',
+            'warehouse.charges.view',
+            'warehouse.charges.manage',
         ])->pluck('id');
         $warehouseReceiver->permissions()->sync($warehouseReceiverPermissions);
 

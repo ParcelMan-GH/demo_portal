@@ -34,7 +34,7 @@ class SettingsController extends Controller
         'notification-logs' => ['label' => 'Notification Logs', 'icon' => 'bell'],
         'delivery' => ['label' => 'Delivery Settings', 'icon' => 'truck'],
         'bus-stations' => ['label' => 'Bus Stations', 'icon' => 'truck'],
-        'commission' => ['label' => 'Vendor Commission', 'icon' => 'cash'],
+        'pricing' => ['label' => 'Revenue & Pricing', 'icon' => 'cash'],
         'push' => ['label' => 'Push Notifications', 'icon' => 'bell'],
         'health' => ['label' => 'System Health', 'icon' => 'heart'],
         'logs' => ['label' => 'System Logs', 'icon' => 'terminal'],
@@ -106,10 +106,14 @@ class SettingsController extends Controller
                 'delivery.show_otp_to_vendor' => ['label' => 'Show OTP Code to Vendor', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, vendors can see the delivery OTP code in their shipment details. This allows recipients to call the vendor for the code if SMS fails.'],
                 'contact_queue.auto_queue_on_transport_receive' => ['label' => 'Auto-Queue on Transport Manifest Receive', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, items from incoming transport manifests are automatically added to the contact queue when received at the warehouse.'],
             ],
-            'commission' => [
-                'vendor_commission.enabled' => ['label' => 'Enable Vendor Commission', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, vendors earn a commission for each package delivered to their recipients.'],
-                'vendor_commission.rate_per_package' => ['label' => 'Rate Per Package (GHS)', 'type' => 'number', 'default' => '2.00', 'help' => 'Amount in Ghana Cedis earned per delivered package.'],
-                'vendor_commission.min_payout' => ['label' => 'Minimum Payout Amount (GHS)', 'type' => 'number', 'default' => '20.00', 'help' => 'Vendors must accumulate at least this amount before a payout can be processed.'],
+            'pricing' => [
+                // Pickup fee — charged to vendor when we go collect items
+                'charges.pickup_fee_default' => ['label' => 'Default Pickup Fee (GHS)', 'type' => 'number', 'default' => '0.00', 'help' => 'Flat fee charged to the vendor for going to pick up a shipment. Overridable per shipment. Set to 0 to disable the default.'],
+
+                // Vendor commission — what Parcelman pays vendors per delivered package
+                'vendor_commission.enabled' => ['label' => 'Enable Vendor Commission', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, vendors earn a commission for each package delivered to their recipients. Can be overridden per vendor on their profile.'],
+                'vendor_commission.rate_per_package' => ['label' => 'Commission Rate Per Package (GHS)', 'type' => 'number', 'default' => '2.00', 'help' => 'Amount in Ghana Cedis earned by the vendor per delivered package.'],
+                'vendor_commission.min_payout' => ['label' => 'Minimum Vendor Payout (GHS)', 'type' => 'number', 'default' => '20.00', 'help' => 'Vendors must accumulate at least this amount before a payout can be processed.'],
             ],
             'push' => [
                 'push_notifications_enabled' => ['label' => 'Enable Push Notifications', 'type' => 'toggle', 'default' => '0'],
