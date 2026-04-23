@@ -137,11 +137,11 @@ class DriverDeliveryController extends Controller
         $driver = $request->user();
 
         $validated = $request->validate([
-            'courier_name' => ['required', 'string', 'max:255'],
-            'courier_phone' => ['required', 'string', 'max:20'],
-            'vehicle_number' => ['required', 'string', 'max:50'],
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'courier_name' => ['nullable', 'string', 'max:255'],
+            'courier_phone' => ['nullable', 'string', 'max:20'],
+            'vehicle_number' => ['nullable', 'string', 'max:50'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'proof_photo' => ['required', 'file', 'image', 'max:12288'],
         ]);
 

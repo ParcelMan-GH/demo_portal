@@ -18,14 +18,14 @@ class DriverAuthController extends Controller
     }
 
     /**
-     * Login with email and password.
+     * Login with email/phone and password.
      * POST /api/v1/driver/login
      */
     public function login(LoginRequest $request): JsonResponse
     {
         $result = $this->authService->login(
-            $request->email,
-            $request->password,
+            $request->input('identifier'),
+            $request->input('password'),
             $request
         );
 

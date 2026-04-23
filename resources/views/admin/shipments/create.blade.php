@@ -176,22 +176,6 @@ $walkinConfig = [
                         </div>
                     </div>
 
-                    <!-- Vendor Selected -->
-                    <div x-show="vendorId && step === 1" x-transition class="rounded-2xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-5">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3.5">
-                                <div class="w-11 h-11 rounded-full bg-blue-200 flex items-center justify-center text-blue-700 text-lg font-bold" x-text="vendorData?.name?.charAt(0)?.toUpperCase()"></div>
-                                <div>
-                                    <p class="text-sm font-bold text-slate-900" x-text="vendorData?.name"></p>
-                                    <p class="text-xs text-slate-500 font-mono" x-text="vendorData?.phone"></p>
-                                </div>
-                            </div>
-                            <button @@click="step = 2" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-600/25 hover:shadow-lg hover:shadow-blue-600/30 active:scale-[0.98] flex items-center gap-2">
-                                Continue
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -645,7 +629,7 @@ function walkinShipment() {
             this.vendorLoading = false;
         },
 
-        selectVendor(v) { this.vendorId = v.id; this.vendorData = v; },
+        selectVendor(v) { this.vendorId = v.id; this.vendorData = v; this.step = 2; },
         resetVendor() { this.vendorFound = null; this.vendorData = null; this.vendorId = null; this.vendorError = ''; this.newVendor = { name: '', business_name: '', phone: '', email: '' }; },
 
         async createVendor() {

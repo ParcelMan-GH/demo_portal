@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\PhoneHelper;
 use App\Models\Driver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -16,24 +17,24 @@ class DriverAuthService
     }
 
     /**
-     * Login with email and password.
+     * Login with email or phone and password.
      */
-    public function login(string $email, string $password, Request $request): array
+    public function login(string $identifier, string $password, Request $request): array
     {
-        $driver = Driver::where('email', $email)->first();
+        $driver = $this->findDriverByIdentifier($identifier);
 
         if (!$driver || !Hash::check($password, $driver->password)) {
             // Log failed attempt
             $this->activityLogService->log(
                 $driver?->id,
                 'driver_login_failed',
-                'Invalid email or password',
+                'Invalid email/phone or password',
                 $request
             );
 
             return [
                 'success' => false,
-                'message' => 'Invalid email or password.',
+                'message' => 'Invalid email/phone or password.',
             ];
         }
 
@@ -100,6 +101,33 @@ class DriverAuthService
             'success' => true,
             'message' => 'Logged out successfully.',
         ];
+    }
+
+    /**
+     * Resolve a driver by email or phone. Phone input is normalized to the
+     * stored +233xxxxxxxxx format before lookup.
+     */
+    protected function findDriverByIdentifier(string $identifier): ?Driver
+    {
+        $identifier = trim($identifier);
+
+        if ($identifier === '') {
+            return null;
+        }
+
+        if (str_contains($identifier, '@')) {
+            return Driver::where('email', $identifier)->first();
+        }
+
+        $normalized = PhoneHelper::format($identifier);
+
+        if ($normalized === null) {
+            // Not an email and not a parseable Ghana phone — fall back to a raw
+            // phone match so odd formats still have a chance to authenticate.
+            return Driver::where('phone', $identifier)->first();
+        }
+
+        return Driver::where('phone', $normalized)->first();
     }
 
     /**

@@ -13,20 +13,27 @@ class LoginRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        // Accept `identifier` (preferred) OR legacy `email` field from older clients.
+        if (!$this->filled('identifier') && $this->filled('email')) {
+            $this->merge(['identifier' => $this->input('email')]);
+        }
+    }
+
     public function rules(): array
     {
         return [
-            'email'     => ['required', 'string', 'email', 'max:255'],
-            'password'  => ['required', 'string'],
-            'fcm_token' => ['nullable', 'string', 'max:512'],
+            'identifier' => ['required', 'string', 'max:255'],
+            'password'   => ['required', 'string'],
+            'fcm_token'  => ['nullable', 'string', 'max:512'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'email.required' => 'Email is required.',
-            'email.email' => 'Please enter a valid email address.',
+            'identifier.required' => 'Email or phone is required.',
             'password.required' => 'Password is required.',
         ];
     }

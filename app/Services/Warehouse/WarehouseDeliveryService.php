@@ -935,7 +935,19 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'This stop is not a bus handoff stop.'];
         }
 
-        return DB::transaction(function () use ($run, $stop, $driver, $data, $request) {
+        $courierName = isset($data['courier_name']) && trim((string) $data['courier_name']) !== ''
+            ? trim((string) $data['courier_name'])
+            : null;
+
+        $courierPhone = isset($data['courier_phone']) && trim((string) $data['courier_phone']) !== ''
+            ? (PhoneHelper::format($data['courier_phone']) ?? trim((string) $data['courier_phone']))
+            : null;
+
+        $vehicleNumber = isset($data['vehicle_number']) && trim((string) $data['vehicle_number']) !== ''
+            ? strtoupper(trim((string) $data['vehicle_number']))
+            : null;
+
+        return DB::transaction(function () use ($run, $stop, $driver, $data, $request, $courierName, $courierPhone, $vehicleNumber) {
             $run = DeliveryRun::query()->with(['items.shipmentItem.shipment', 'stops'])->lockForUpdate()->findOrFail($run->id);
             $stop = DeliveryRunStop::query()->whereKey($stop->id)->where('delivery_run_id', $run->id)->lockForUpdate()->firstOrFail();
 
@@ -954,15 +966,24 @@ class WarehouseDeliveryService
                 'status' => DeliveryRunStop::STATUS_HANDED_OFF,
                 'arrived_at' => $stop->arrived_at ?? $now,
                 'delivered_at' => $now,
-                'delivery_latitude' => $data['latitude'],
-                'delivery_longitude' => $data['longitude'],
+                'delivery_latitude' => $data['latitude'] ?? null,
+                'delivery_longitude' => $data['longitude'] ?? null,
                 'proof_photo_path' => $upload['path'],
                 'proof_photo_size' => $upload['size'],
-                'handoff_courier_name' => $data['courier_name'],
-                'handoff_courier_phone' => PhoneHelper::format($data['courier_phone']),
-                'handoff_vehicle_number' => strtoupper(trim($data['vehicle_number'])),
+                'handoff_courier_name' => $courierName,
+                'handoff_courier_phone' => $courierPhone,
+                'handoff_vehicle_number' => $vehicleNumber,
                 'handoff_at' => $now,
             ]);
+
+            $courierLabel = $this->buildCourierLabel($courierName, $vehicleNumber, $courierPhone);
+            $itemNote = $courierLabel !== ''
+                ? "Handed to courier: {$courierLabel}"
+                : 'Handed to courier (details on proof photo)';
+
+            $trackingNote = $courierLabel !== ''
+                ? "Handed to bus courier — {$courierLabel}"
+                : 'Handed to bus courier — details on proof photo';
 
             $runItems = DeliveryRunItem::query()
                 ->where('delivery_run_id', $run->id)
@@ -976,7 +997,7 @@ class WarehouseDeliveryService
                 $runItem->update([
                     'delivered_quantity' => $runItem->expected_quantity,
                     'status' => DeliveryRunItem::STATUS_HANDED_OFF,
-                    'notes' => "Handed to courier: {$data['courier_name']} ({$data['vehicle_number']})",
+                    'notes' => $itemNote,
                     'delivered_at' => $now,
                 ]);
 
@@ -987,14 +1008,14 @@ class WarehouseDeliveryService
                         'shipment_item_id' => $runItem->shipmentItem->id,
                         'status' => ShipmentStatus::HANDED_TO_COURIER->value,
                         'location' => $stop->town ?: $stop->landmark,
-                        'notes' => "Handed to bus courier {$data['courier_name']}, vehicle {$data['vehicle_number']}, phone {$data['courier_phone']}",
+                        'notes' => $trackingNote,
                         'meta' => [
                             'delivery_run_id' => $run->id,
                             'delivery_run_number' => $run->run_number,
                             'delivery_run_stop_id' => $stop->id,
-                            'courier_name' => $data['courier_name'],
-                            'courier_phone' => $data['courier_phone'],
-                            'vehicle_number' => $data['vehicle_number'],
+                            'courier_name' => $courierName,
+                            'courier_phone' => $courierPhone,
+                            'vehicle_number' => $vehicleNumber,
                         ],
                         'created_at' => $now,
                     ]);
@@ -1018,9 +1039,13 @@ class WarehouseDeliveryService
 
             $this->refreshRunStatus($run);
 
+            $message = $courierLabel !== ''
+                ? "Packages handed to courier {$courierLabel} successfully."
+                : 'Packages handed to courier successfully.';
+
             return [
                 'success' => true,
-                'message' => "Packages handed to courier {$data['courier_name']} ({$data['vehicle_number']}) successfully.",
+                'message' => $message,
             ];
         });
     }
@@ -1165,6 +1190,22 @@ class WarehouseDeliveryService
         }
 
         return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+    }
+
+    private function buildCourierLabel(?string $name, ?string $vehicle, ?string $phone): string
+    {
+        $head = $name ?: '';
+        $bits = array_filter([$vehicle, $phone], fn($v) => $v !== null && $v !== '');
+
+        if ($head !== '' && !empty($bits)) {
+            return $head . ' (' . implode(', ', $bits) . ')';
+        }
+
+        if ($head !== '') {
+            return $head;
+        }
+
+        return implode(', ', $bits);
     }
 
     private function refreshRunStatus(DeliveryRun $run): void
