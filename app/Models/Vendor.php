@@ -18,10 +18,12 @@ class Vendor extends Model
         'email',
         'is_active',
         'fcm_token',
+        'commission_rate_override',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'commission_rate_override' => 'decimal:2',
     ];
 
     /**

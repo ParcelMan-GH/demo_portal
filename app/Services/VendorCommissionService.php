@@ -22,6 +22,20 @@ class VendorCommissionService
         return (float) PlatformSetting::getValue('vendor_commission.rate_per_package', 2.00);
     }
 
+    /**
+     * Effective commission rate for a specific vendor: the per-vendor override
+     * if set (including 0, which means "no commission for this vendor"),
+     * otherwise the global default.
+     */
+    public function getRatePerPackageFor(Vendor $vendor): float
+    {
+        if ($vendor->commission_rate_override !== null) {
+            return (float) $vendor->commission_rate_override;
+        }
+
+        return $this->getRatePerPackage();
+    }
+
     public function getMinPayout(): float
     {
         return (float) PlatformSetting::getValue('vendor_commission.min_payout', 20.00);
@@ -33,18 +47,15 @@ class VendorCommissionService
             return 0;
         }
 
-        $rate = $this->getRatePerPackage();
-        if ($rate <= 0) {
-            return 0;
-        }
-
+        $globalRate = $this->getRatePerPackage();
         $status = VendorEarning::STATUS_APPROVED;
 
         $items = DeliveryRunItem::where('delivery_run_stop_id', $stop->id)
-            ->with('shipmentItem.shipment')
+            ->with('shipmentItem.shipment.vendor')
             ->get();
 
         $created = 0;
+        $rateCache = [];
 
         foreach ($items as $runItem) {
             $shipmentItem = $runItem->shipmentItem;
@@ -52,8 +63,19 @@ class VendorCommissionService
                 continue;
             }
 
+            $vendor = $shipmentItem->shipment->vendor;
             $vendorId = $shipmentItem->shipment->vendor_id;
-            if (!$vendorId) {
+            if (!$vendorId || !$vendor) {
+                continue;
+            }
+
+            if (!array_key_exists($vendorId, $rateCache)) {
+                $rateCache[$vendorId] = $this->getRatePerPackageFor($vendor);
+            }
+            $rate = $rateCache[$vendorId];
+
+            // Rate of 0 = "no commission for this vendor" → skip earning creation.
+            if ($rate <= 0) {
                 continue;
             }
 

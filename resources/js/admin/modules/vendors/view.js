@@ -111,7 +111,8 @@ function vendorShow() {
             business_name: '',
             email: '',
             phone: '',
-            is_active: true
+            is_active: true,
+            commission_rate_override: ''
         },
 
         init() {
@@ -347,7 +348,8 @@ function vendorShow() {
                 business_name: this.vendor.business_name || '',
                 email: this.vendor.email,
                 phone: this.vendor.phone,
-                is_active: this.vendor.is_active
+                is_active: this.vendor.is_active,
+                commission_rate_override: this.vendor.commission_rate_override ?? ''
             };
             this.errors = {};
             this.showEditModal = true;
@@ -384,6 +386,7 @@ function vendorShow() {
                 this.vendor.business_name = this.form.business_name;
                 this.vendor.email = this.form.email;
                 this.vendor.is_active = this.form.is_active;
+                this.vendor.commission_rate_override = this.form.commission_rate_override === '' ? null : this.form.commission_rate_override;
 
                 this.showEditModal = false;
 

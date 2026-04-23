@@ -30,7 +30,7 @@ class VendorController extends Controller
     /**
      * Display vendor detail page.
      */
-    public function showPage(Vendor $vendor)
+    public function showPage(Vendor $vendor, \App\Services\VendorCommissionService $commissionService)
     {
         $this->authorizePermission('vendors.view');
 
@@ -68,6 +68,7 @@ class VendorController extends Controller
             'lastLogin' => $lastLogin,
             'canManage' => $canManage,
             'statuses' => ShipmentStatus::toArray(),
+            'globalCommissionRate' => $commissionService->getRatePerPackage(),
         ]);
     }
 
@@ -410,17 +411,28 @@ class VendorController extends Controller
     {
         $this->authorizePermission('vendors.edit');
 
+        // Empty string on commission_rate_override means "inherit the global default".
+        if ($request->exists('commission_rate_override') && $request->input('commission_rate_override') === '') {
+            $request->merge(['commission_rate_override' => null]);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'business_name' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255', Rule::unique('vendors')->ignore($vendor->id)],
             'is_active' => ['boolean'],
+            'commission_rate_override' => ['nullable', 'numeric', 'min:0', 'max:9999.99'],
         ]);
 
         $vendor->name = $validated['name'];
         $vendor->business_name = $validated['business_name'] ?? null;
         $vendor->email = $validated['email'] ?? null;
         $vendor->is_active = $validated['is_active'] ?? $vendor->is_active;
+
+        if ($request->exists('commission_rate_override')) {
+            $vendor->commission_rate_override = $validated['commission_rate_override'] ?? null;
+        }
+
         $vendor->save();
 
         return response()->json([
