@@ -110,28 +110,36 @@
                                 Location
                             </p>
                             <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Region</label>
-                                    <select x-model="form.pickup.region_id" @@change="loadDistricts('pickup')"
-                                            class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
-                                        <option value="">Select Region</option>
-                                        <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" :selected="String(r.id) === form.pickup.region_id" x-text="r.name"></option></template>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">District</label>
-                                    <select x-model="form.pickup.district_id"
-                                            class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
-                                        <option value="">Select District</option>
-                                        <template x-for="d in pickupDistricts" :key="d.id"><option :value="String(d.id)" :selected="String(d.id) === form.pickup.district_id" x-text="d.name"></option></template>
-                                    </select>
-                                </div>
-                                <div>
+                                <div class="col-span-2 relative" @@click.outside="closeTownSearch(form.pickup)">
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Town / Area</label>
-                                    <input type="text" x-model="form.pickup.town"
-                                           class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                    <div class="relative">
+                                        <input type="text"
+                                               :value="form.pickup._town_query"
+                                               @@input="updateTownQuery(form.pickup, $event.target.value)"
+                                               placeholder="Search saved towns or keep vendor text"
+                                               class="w-full px-3 py-2 pr-16 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
+                                        <div x-show="form.pickup._town_loading" class="absolute inset-y-0 right-9 flex items-center text-slate-400" style="display:none">
+                                            <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                        </div>
+                                        <button x-show="form.pickup._town_query" @@click.prevent="clearTownField(form.pickup)"
+                                                class="absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-600 transition-colors" style="display:none" type="button">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        </button>
+                                        <div x-show="form.pickup._town_open" x-transition
+                                             class="absolute z-30 mt-1 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl" style="display:none">
+                                            <template x-for="town in form.pickup._town_results" :key="`${town.id}-${town.region_id}`">
+                                                <button type="button" @@click.prevent="selectTownOption(form.pickup, town)"
+                                                        class="w-full border-b border-slate-100 px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-violet-50">
+                                                    <p class="text-sm font-semibold text-slate-800" x-text="town.name"></p>
+                                                    <p class="text-[11px] text-slate-500" x-text="town.context"></p>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <p x-show="form.pickup._town_linked && form.pickup._town_context" x-transition class="mt-1 text-[10px] font-medium text-emerald-600" x-text="'Linked to ' + form.pickup._town_context" style="display:none"></p>
+                                    <p x-show="form.pickup.town && !form.pickup._town_linked" x-transition class="mt-1 text-[10px] text-amber-600" style="display:none">Free-text town. Region and district stay empty until you select a saved town.</p>
                                 </div>
-                                <div>
+                                <div class="col-span-2">
                                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Landmark</label>
                                     <input type="text" x-model="form.pickup.landmark"
                                            class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 outline-none transition-all">
@@ -229,28 +237,36 @@
                                     Delivery Location
                                 </p>
                                 <div class="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Region</label>
-                                        <select x-model="form.delivery.region_id" @@change="loadDistricts('delivery')"
-                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
-                                            <option value="">Select Region</option>
-                                            <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" :selected="String(r.id) === form.delivery.region_id" x-text="r.name"></option></template>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">District</label>
-                                        <select x-model="form.delivery.district_id"
-                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
-                                            <option value="">Select District</option>
-                                            <template x-for="d in deliveryDistricts" :key="d.id"><option :value="String(d.id)" :selected="String(d.id) === form.delivery.district_id" x-text="d.name"></option></template>
-                                        </select>
-                                    </div>
-                                    <div>
+                                    <div class="col-span-2 relative" @@click.outside="closeTownSearch(form.delivery)">
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Town / Area</label>
-                                        <input type="text" x-model="form.delivery.town"
-                                               class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                        <div class="relative">
+                                            <input type="text"
+                                                   :value="form.delivery._town_query"
+                                                   @@input="updateTownQuery(form.delivery, $event.target.value)"
+                                                   placeholder="Search saved towns or keep free text"
+                                                   class="w-full px-3 py-2 pr-16 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                            <div x-show="form.delivery._town_loading" class="absolute inset-y-0 right-9 flex items-center text-slate-400" style="display:none">
+                                                <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                            </div>
+                                            <button x-show="form.delivery._town_query" @@click.prevent="clearTownField(form.delivery)"
+                                                    class="absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-600 transition-colors" style="display:none" type="button">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            </button>
+                                            <div x-show="form.delivery._town_open" x-transition
+                                                 class="absolute z-30 mt-1 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl" style="display:none">
+                                                <template x-for="town in form.delivery._town_results" :key="`${town.id}-${town.region_id}`">
+                                                    <button type="button" @@click.prevent="selectTownOption(form.delivery, town)"
+                                                            class="w-full border-b border-slate-100 px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-emerald-50">
+                                                        <p class="text-sm font-semibold text-slate-800" x-text="town.name"></p>
+                                                        <p class="text-[11px] text-slate-500" x-text="town.context"></p>
+                                                    </button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <p x-show="form.delivery._town_linked && form.delivery._town_context" x-transition class="mt-1 text-[10px] font-medium text-emerald-600" x-text="'Linked to ' + form.delivery._town_context" style="display:none"></p>
+                                        <p x-show="form.delivery.town && !form.delivery._town_linked" x-transition class="mt-1 text-[10px] text-amber-600" style="display:none">Free-text town. Region and district stay empty until you select a saved town.</p>
                                     </div>
-                                    <div>
+                                    <div class="col-span-2">
                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Landmark</label>
                                         <input type="text" x-model="form.delivery.landmark"
                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
@@ -457,28 +473,36 @@
                                                         <input type="text" x-model="pkg.delivery_recipient_phone"
                                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
                                                     </div>
-                                                    <div>
-                                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Region</label>
-                                                        <select x-model="pkg.delivery_region_id" @@change="loadPackageDistricts(pkg)"
-                                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
-                                                            <option value="">Select Region</option>
-                                                            <template x-for="r in regions" :key="r.id"><option :value="String(r.id)" :selected="String(r.id) === pkg.delivery_region_id" x-text="r.name"></option></template>
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">District</label>
-                                                        <select x-model="pkg.delivery_district_id"
-                                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
-                                                            <option value="">Select District</option>
-                                                            <template x-for="d in (pkg._districts || [])" :key="d.id"><option :value="String(d.id)" :selected="String(d.id) === pkg.delivery_district_id" x-text="d.name"></option></template>
-                                                        </select>
-                                                    </div>
-                                                    <div>
+                                                    <div class="col-span-2 relative" @@click.outside="closeTownSearch(pkg)">
                                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Town / Area</label>
-                                                        <input type="text" x-model="pkg.delivery_town"
-                                                               class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                        <div class="relative">
+                                                            <input type="text"
+                                                                   :value="pkg._town_query"
+                                                                   @@input="updateTownQuery(pkg, $event.target.value)"
+                                                                   placeholder="Search saved towns or keep free text"
+                                                                   class="w-full px-3 py-2 pr-16 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
+                                                            <div x-show="pkg._town_loading" class="absolute inset-y-0 right-9 flex items-center text-slate-400" style="display:none">
+                                                                <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                                            </div>
+                                                            <button x-show="pkg._town_query" @@click.prevent="clearTownField(pkg)"
+                                                                    class="absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-600 transition-colors" style="display:none" type="button">
+                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                            </button>
+                                                            <div x-show="pkg._town_open" x-transition
+                                                                 class="absolute z-30 mt-1 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl" style="display:none">
+                                                                <template x-for="town in pkg._town_results" :key="`${town.id}-${town.region_id}`">
+                                                                    <button type="button" @@click.prevent="selectTownOption(pkg, town)"
+                                                                            class="w-full border-b border-slate-100 px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-emerald-50">
+                                                                        <p class="text-sm font-semibold text-slate-800" x-text="town.name"></p>
+                                                                        <p class="text-[11px] text-slate-500" x-text="town.context"></p>
+                                                                    </button>
+                                                                </template>
+                                                            </div>
+                                                        </div>
+                                                        <p x-show="pkg._town_linked && pkg._town_context" x-transition class="mt-1 text-[10px] font-medium text-emerald-600" x-text="'Linked to ' + pkg._town_context" style="display:none"></p>
+                                                        <p x-show="pkg.delivery_town && !pkg._town_linked" x-transition class="mt-1 text-[10px] text-amber-600" style="display:none">Free-text town. Region and district stay empty until you select a saved town.</p>
                                                     </div>
-                                                    <div>
+                                                    <div class="col-span-2">
                                                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Landmark</label>
                                                         <input type="text" x-model="pkg.delivery_landmark"
                                                                class="w-full px-3 py-2 text-sm border border-slate-200/70 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition-all">
@@ -856,12 +880,9 @@ function shipmentEditor() {
     return {
         config: {},
         shipment: {},
-        regions: [],
         packages: [],
         destinationMode: 'single',
         form: { pickup: {}, delivery: {}, delivery_preference: 'deliver', fulfillment_type: null },
-        pickupDistricts: [],
-        deliveryDistricts: [],
         savingPickup: false,
         pickupSaved: false,
         savingDelivery: false,
@@ -877,75 +898,219 @@ function shipmentEditor() {
         init() {
             this.config = JSON.parse(this.$root.dataset.editConfig);
             this.shipment = this.config.shipment;
-            this.regions = this.config.regions;
-            this.packages = (this.shipment.packages || []).map(pkg => ({
-                ...pkg,
-                delivery_region_id: String(pkg.delivery_region_id || ''),
-                delivery_district_id: String(pkg.delivery_district_id || ''),
-                _districts: [],
-                _saving: false,
-                _saved: false,
-            }));
-            // Load districts for packages that have a region set
-            this.packages.forEach(pkg => {
-                if (pkg.delivery_region_id) this.loadPackageDistricts(pkg);
-            });
+            this.packages = (this.shipment.packages || []).map(pkg => this.preparePackage(pkg));
             this.destinationMode = this.shipment.destination_mode;
             const p = this.shipment.pickup || {};
-            this.form.pickup = {
+            this.form.pickup = this.buildPickupForm({
                 contact_name: p.contact_name || '',
                 contact_phone: p.contact_phone || '',
                 region_id: p.region_id ? String(p.region_id) : '',
+                region_name: p.region_name || '',
                 district_id: p.district_id ? String(p.district_id) : '',
+                district_name: p.district_name || '',
                 town: p.town || '',
                 landmark: p.landmark || '',
                 instructions: p.instructions || '',
-            };
+            });
             const d = this.shipment.delivery || {};
-            this.form.delivery = {
+            this.form.delivery = this.buildDeliveryForm({
                 recipient_name: d.recipient_name || '',
                 recipient_phone: d.recipient_phone || '',
                 region_id: d.region_id ? String(d.region_id) : '',
+                region_name: d.region_name || '',
                 district_id: d.district_id ? String(d.district_id) : '',
+                district_name: d.district_name || '',
                 town: d.town || '',
                 landmark: d.landmark || '',
                 instructions: d.instructions || '',
-            };
+            });
             this.form.delivery_preference = this.shipment.delivery_preference || 'deliver';
             this.form.fulfillment_type = this.shipment.fulfillment_type;
 
             this.currentAssignment = this.config.currentAssignment || null;
             this.canEditShipmentFields = this.config.canEditShipmentFields ?? true;
-
-            if (this.form.pickup.region_id) this.loadDistricts('pickup');
-            if (this.form.delivery.region_id) this.loadDistricts('delivery');
         },
 
-        async loadDistricts(type) {
-            const regionId = type === 'pickup' ? this.form.pickup.region_id : this.form.delivery.region_id;
-            if (!regionId) { if (type === 'pickup') this.pickupDistricts = []; else this.deliveryDistricts = []; return; }
-            // Save current district_id before loading (will re-apply after)
-            const savedDistrictId = type === 'pickup' ? this.form.pickup.district_id : this.form.delivery.district_id;
-            const url = this.config.districtsByRegionUrlTemplate.replace('__REGION__', regionId);
-            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-            const data = await res.json();
-            if (type === 'pickup') this.pickupDistricts = data.data?.districts || [];
-            else this.deliveryDistricts = data.data?.districts || [];
-            // Re-apply district_id after options are available
-            await this.$nextTick();
-            if (type === 'pickup') this.form.pickup.district_id = savedDistrictId;
-            else this.form.delivery.district_id = savedDistrictId;
+        buildPickupForm(source = {}) {
+            const form = {
+                contact_name: source.contact_name || '',
+                contact_phone: source.contact_phone || '',
+                region_id: source.region_id ? String(source.region_id) : '',
+                district_id: source.district_id ? String(source.district_id) : '',
+                town: source.town || '',
+                landmark: source.landmark || '',
+                instructions: source.instructions || '',
+            };
+            this.initializeTownSearch(form, source);
+            return form;
         },
 
-        async loadPackageDistricts(pkg) {
-            if (!pkg.delivery_region_id) { pkg._districts = []; return; }
-            const savedDistrictId = pkg.delivery_district_id;
-            const url = this.config.districtsByRegionUrlTemplate.replace('__REGION__', pkg.delivery_region_id);
-            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-            const data = await res.json();
-            pkg._districts = data.data?.districts || [];
-            await this.$nextTick();
-            pkg.delivery_district_id = savedDistrictId;
+        buildDeliveryForm(source = {}) {
+            const form = {
+                recipient_name: source.recipient_name || '',
+                recipient_phone: source.recipient_phone || '',
+                region_id: source.region_id ? String(source.region_id) : '',
+                district_id: source.district_id ? String(source.district_id) : '',
+                town: source.town || '',
+                landmark: source.landmark || '',
+                instructions: source.instructions || '',
+            };
+            this.initializeTownSearch(form, source);
+            return form;
+        },
+
+        preparePackage(pkg = {}) {
+            const prepared = {
+                ...pkg,
+                photos: Array.isArray(pkg.photos) ? pkg.photos : [],
+                delivery_preference: pkg.delivery_preference || 'deliver',
+                fulfillment_type: pkg.fulfillment_type || null,
+                delivery_recipient_name: pkg.delivery_recipient_name || null,
+                delivery_recipient_phone: pkg.delivery_recipient_phone || null,
+                delivery_region_id: pkg.delivery_region_id ? String(pkg.delivery_region_id) : '',
+                delivery_district_id: pkg.delivery_district_id ? String(pkg.delivery_district_id) : '',
+                delivery_town: pkg.delivery_town || '',
+                delivery_landmark: pkg.delivery_landmark || null,
+                delivery_instructions: pkg.delivery_instructions || null,
+                _saving: false,
+                _saved: false,
+            };
+            this.initializeTownSearch(prepared, {
+                town: prepared.delivery_town,
+                region_id: prepared.delivery_region_id,
+                district_id: prepared.delivery_district_id,
+                region_name: pkg.delivery_region_name || '',
+                district_name: pkg.delivery_district_name || '',
+            });
+            return prepared;
+        },
+
+        townFieldKeys(target) {
+            return Object.prototype.hasOwnProperty.call(target, 'delivery_town')
+                ? { town: 'delivery_town', region: 'delivery_region_id', district: 'delivery_district_id' }
+                : { town: 'town', region: 'region_id', district: 'district_id' };
+        },
+
+        townContext(districtName, regionName) {
+            return [districtName, regionName].filter(Boolean).join(', ');
+        },
+
+        townDisplayLabel(town, districtName = '', regionName = '', isLinked = false) {
+            if (!town) return '';
+            return isLinked ? [town, districtName, regionName].filter(Boolean).join(', ') : town;
+        },
+
+        initializeTownSearch(target, meta = {}) {
+            const keys = this.townFieldKeys(target);
+            const town = target[keys.town] || meta.town || '';
+            const regionId = target[keys.region] || meta.region_id || '';
+            const districtId = target[keys.district] || meta.district_id || '';
+            const isLinked = Boolean(town && regionId && districtId);
+            const districtName = meta.district_name || '';
+            const regionName = meta.region_name || '';
+
+            target[keys.town] = town;
+            target[keys.region] = regionId ? String(regionId) : '';
+            target[keys.district] = districtId ? String(districtId) : '';
+            target._town_query = this.townDisplayLabel(town, districtName, regionName, isLinked);
+            target._town_results = [];
+            target._town_open = false;
+            target._town_loading = false;
+            target._town_request = 0;
+            target._town_debounce = null;
+            target._town_linked = isLinked;
+            target._town_context = isLinked ? this.townContext(districtName, regionName) : '';
+            target._town_selected_display = isLinked ? target._town_query : null;
+        },
+
+        closeTownSearch(target) {
+            target._town_open = false;
+        },
+
+        clearTownField(target) {
+            const keys = this.townFieldKeys(target);
+            clearTimeout(target._town_debounce);
+            target._town_query = '';
+            target._town_results = [];
+            target._town_open = false;
+            target._town_loading = false;
+            target._town_linked = false;
+            target._town_context = '';
+            target._town_selected_display = null;
+            target[keys.town] = '';
+            target[keys.region] = '';
+            target[keys.district] = '';
+        },
+
+        updateTownQuery(target, value) {
+            const keys = this.townFieldKeys(target);
+            target._town_query = value;
+            target[keys.town] = value.trim();
+            target[keys.region] = '';
+            target[keys.district] = '';
+            target._town_linked = false;
+            target._town_context = '';
+            target._town_selected_display = null;
+            this.searchTownOptions(target);
+        },
+
+        async searchTownOptions(target) {
+            const query = (target._town_query || '').trim();
+            clearTimeout(target._town_debounce);
+
+            if (query.length < 2) {
+                target._town_results = [];
+                target._town_open = false;
+                target._town_loading = false;
+                return;
+            }
+
+            const requestId = ++target._town_request;
+            target._town_debounce = setTimeout(async () => {
+                target._town_loading = true;
+                try {
+                    const url = new URL(this.config.townsSearchUrl, window.location.origin);
+                    url.searchParams.set('search', query);
+                    url.searchParams.set('active', '1');
+                    url.searchParams.set('limit', '12');
+
+                    const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                    const data = await res.json();
+                    if (requestId !== target._town_request) return;
+
+                    target._town_results = (data.data?.towns || []).map(town => ({
+                        ...town,
+                        display: this.townDisplayLabel(town.name, town.district_name, town.region_name, true),
+                        context: this.townContext(town.district_name, town.region_name),
+                    }));
+                    target._town_open = target._town_results.length > 0;
+                } catch (e) {
+                    if (requestId === target._town_request) {
+                        target._town_results = [];
+                        target._town_open = false;
+                    }
+                } finally {
+                    if (requestId === target._town_request) {
+                        target._town_loading = false;
+                    }
+                }
+            }, 300);
+        },
+
+        selectTownOption(target, town) {
+            const keys = this.townFieldKeys(target);
+            const display = this.townDisplayLabel(town.name, town.district_name, town.region_name, true);
+
+            target[keys.town] = town.name || '';
+            target[keys.region] = town.region_id ? String(town.region_id) : '';
+            target[keys.district] = town.district_id ? String(town.district_id) : '';
+            target._town_query = display;
+            target._town_results = [];
+            target._town_open = false;
+            target._town_loading = false;
+            target._town_linked = Boolean(town.region_id && town.district_id);
+            target._town_context = this.townContext(town.district_name, town.region_name);
+            target._town_selected_display = display;
         },
 
         async savePickup() {
@@ -1029,7 +1194,7 @@ function shipmentEditor() {
         async addPackage() {
             const res = await this._fetch(this.config.addPackageUrl, { method: 'POST', body: JSON.stringify({}) });
             if (res.success && res.data?.package) {
-                this.packages.push({ ...res.data.package, photos: [], delivery_preference: 'deliver', fulfillment_type: null, delivery_recipient_name: null, delivery_recipient_phone: null, delivery_town: null, delivery_landmark: null, _saved: false, _saving: false });
+                this.packages.push(this.preparePackage(res.data.package));
                 this._toast('Package added.', 'success');
             }
         },
@@ -1120,7 +1285,7 @@ function shipmentEditor() {
                 if (srcPkg) {
                     srcPkg.photos = srcPkg.photos.filter(p => !this.splitModal.selectedIds.includes(p.id));
                 }
-                this.packages.push({ ...res.data.package, delivery_preference: 'deliver', fulfillment_type: null, delivery_recipient_name: null, delivery_recipient_phone: null, delivery_town: null, delivery_landmark: null, _saved: false, _saving: false });
+                this.packages.push(this.preparePackage(res.data.package));
                 this.splitModal.open = false;
                 this._toast(res.message, 'success');
             }
@@ -1132,7 +1297,7 @@ function shipmentEditor() {
             // Always required
             if (!this.form.pickup.contact_name?.trim()) errors.push('Pickup contact name is required.');
             if (!this.form.pickup.contact_phone?.trim()) errors.push('Pickup contact phone is required.');
-            if (!this.form.pickup.town?.trim() && !this.form.pickup.region_id) errors.push('Pickup location is required (at least a town or region).');
+            if (!this.form.pickup.town?.trim()) errors.push('Pickup town is required.');
             if (this.packages.length === 0) errors.push('At least one package is required.');
 
             // Direct delivery — need delivery details
@@ -1141,7 +1306,7 @@ function shipmentEditor() {
             if (isDirect && this.destinationMode === 'single') {
                 if (!this.form.delivery.recipient_name?.trim()) errors.push('Delivery recipient name is required for direct delivery.');
                 if (!this.form.delivery.recipient_phone?.trim()) errors.push('Delivery recipient phone is required for direct delivery.');
-                if (!this.form.delivery.town?.trim() && !this.form.delivery.region_id) errors.push('Delivery location is required for direct delivery (at least a town or region).');
+                if (!this.form.delivery.town?.trim()) errors.push('Delivery town is required for direct delivery.');
             }
 
             if (isDirect && this.destinationMode === 'per_item') {
@@ -1150,7 +1315,7 @@ function shipmentEditor() {
                     if (ft === 'direct') {
                         if (!pkg.delivery_recipient_name?.trim()) errors.push(`Package ${i + 1}: recipient name required for direct delivery.`);
                         if (!pkg.delivery_recipient_phone?.trim()) errors.push(`Package ${i + 1}: recipient phone required for direct delivery.`);
-                        if (!pkg.delivery_town?.trim() && !pkg.delivery_region_id) errors.push(`Package ${i + 1}: delivery location required for direct delivery.`);
+                        if (!pkg.delivery_town?.trim()) errors.push(`Package ${i + 1}: delivery town required for direct delivery.`);
                     }
                 });
             }
@@ -1242,15 +1407,16 @@ function shipmentEditor() {
             if (res.success) {
                 this.shipment.destination_mode = newMode;
                 if (newMode === 'per_item') {
-                    this.form.delivery = {};
+                    this.form.delivery = this.buildDeliveryForm({});
                     this.form.delivery_preference = null;
                     this.form.fulfillment_type = null;
                 } else {
                     this.packages.forEach(pkg => {
                         pkg.delivery_recipient_name = null;
                         pkg.delivery_recipient_phone = null;
-                        pkg.delivery_town = null;
+                        this.clearTownField(pkg);
                         pkg.delivery_landmark = null;
+                        pkg.delivery_instructions = null;
                         pkg.delivery_preference = null;
                         pkg.fulfillment_type = null;
                     });

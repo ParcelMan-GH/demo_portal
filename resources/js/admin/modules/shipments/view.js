@@ -675,6 +675,132 @@ function shipmentShow() {
             }
         },
 
+        receivingTownContext(districtName, regionName) {
+            return [districtName, regionName].filter(Boolean).join(', ');
+        },
+
+        receivingTownDisplay(town, districtName = '', regionName = '', isLinked = false) {
+            if (!town) return '';
+            return isLinked ? [town, districtName, regionName].filter(Boolean).join(', ') : town;
+        },
+
+        prepareReceivingPackage(pkg) {
+            const prepared = {
+                ...pkg,
+                delivery_region_id: pkg.delivery_region_id ? String(pkg.delivery_region_id) : '',
+                delivery_district_id: pkg.delivery_district_id ? String(pkg.delivery_district_id) : '',
+                delivery_town: pkg.delivery_town || '',
+            };
+
+            const isLinked = Boolean(prepared.delivery_town && prepared.delivery_region_id && prepared.delivery_district_id);
+            prepared._town_query = this.receivingTownDisplay(
+                prepared.delivery_town,
+                pkg.delivery_district_name,
+                pkg.delivery_region_name,
+                isLinked
+            );
+            prepared._town_results = [];
+            prepared._town_open = false;
+            prepared._town_loading = false;
+            prepared._town_request = 0;
+            prepared._town_debounce = null;
+            prepared._town_linked = isLinked;
+            prepared._town_context = isLinked
+                ? this.receivingTownContext(pkg.delivery_district_name, pkg.delivery_region_name)
+                : '';
+            prepared._town_selected_display = isLinked ? prepared._town_query : null;
+
+            return prepared;
+        },
+
+        closeReceivingTownSearch(pkg) {
+            pkg._town_open = false;
+        },
+
+        clearReceivingTown(pkg) {
+            clearTimeout(pkg._town_debounce);
+            pkg._town_query = '';
+            pkg._town_results = [];
+            pkg._town_open = false;
+            pkg._town_loading = false;
+            pkg._town_linked = false;
+            pkg._town_context = '';
+            pkg._town_selected_display = null;
+            pkg.delivery_town = '';
+            pkg.delivery_region_id = '';
+            pkg.delivery_district_id = '';
+        },
+
+        updateReceivingTownQuery(pkg, value) {
+            pkg._town_query = value;
+            pkg.delivery_town = value.trim();
+            pkg.delivery_region_id = '';
+            pkg.delivery_district_id = '';
+            pkg._town_linked = false;
+            pkg._town_context = '';
+            pkg._town_selected_display = null;
+            this.searchReceivingTownOptions(pkg);
+        },
+
+        async searchReceivingTownOptions(pkg) {
+            const query = (pkg._town_query || '').trim();
+            clearTimeout(pkg._town_debounce);
+
+            if (query.length < 2) {
+                pkg._town_results = [];
+                pkg._town_open = false;
+                pkg._town_loading = false;
+                return;
+            }
+
+            const requestId = ++pkg._town_request;
+            pkg._town_debounce = setTimeout(async () => {
+                pkg._town_loading = true;
+                try {
+                    const url = new URL(this.config.townsSearchUrl, window.location.origin);
+                    url.searchParams.set('search', query);
+                    url.searchParams.set('active', '1');
+                    url.searchParams.set('limit', '12');
+
+                    const response = await fetch(url.toString(), {
+                        headers: { 'Accept': 'application/json' },
+                    });
+                    const result = await response.json();
+                    if (requestId !== pkg._town_request) return;
+
+                    pkg._town_results = (result.data?.towns || []).map(town => ({
+                        ...town,
+                        display: this.receivingTownDisplay(town.name, town.district_name, town.region_name, true),
+                        context: this.receivingTownContext(town.district_name, town.region_name),
+                    }));
+                    pkg._town_open = pkg._town_results.length > 0;
+                } catch (e) {
+                    if (requestId === pkg._town_request) {
+                        pkg._town_results = [];
+                        pkg._town_open = false;
+                    }
+                } finally {
+                    if (requestId === pkg._town_request) {
+                        pkg._town_loading = false;
+                    }
+                }
+            }, 300);
+        },
+
+        selectReceivingTownOption(pkg, town) {
+            const display = this.receivingTownDisplay(town.name, town.district_name, town.region_name, true);
+            pkg.delivery_town = town.name || '';
+            pkg.delivery_region_id = town.region_id ? String(town.region_id) : '';
+            pkg.delivery_district_id = town.district_id ? String(town.district_id) : '';
+            pkg._town_query = display;
+            pkg._town_results = [];
+            pkg._town_open = false;
+            pkg._town_loading = false;
+            pkg._town_linked = Boolean(town.region_id && town.district_id);
+            pkg._town_context = this.receivingTownContext(town.district_name, town.region_name);
+            pkg._town_selected_display = display;
+        },
+
         async loadReceiving() {
             this.receiving.loading = true;
             this.receivingLoaded = true;
@@ -684,62 +810,13 @@ function shipmentShow() {
                 });
                 const result = await response.json();
                 if (result.success) {
-                    this.receiving.packages = (result.data.packages || []).map(pkg => ({
-                        ...pkg,
-                        _districts: [],
-                    }));
+                    this.receiving.packages = (result.data.packages || []).map(pkg => this.prepareReceivingPackage(pkg));
                     this.receiving.canReceive = result.data.can_receive;
                     this.receiving.receipt = result.data.receipt;
                     this.receiving.assignmentId = result.data.assignment_id;
-                    // Pre-load districts for packages that already have a region set
-                    this.$nextTick(() => {
-                        setTimeout(() => {
-                            document.querySelectorAll('.rcv-district-select').forEach(distSel => {
-                                const grid = distSel.closest('.grid');
-                                const regionSel = grid?.querySelector('select');
-                                if (regionSel && regionSel.value) {
-                                    const pkgIndex = Array.from(document.querySelectorAll('.rcv-district-select')).indexOf(distSel);
-                                    const pkg = this.receiving.packages[pkgIndex];
-                                    if (pkg) this.loadPackageDistricts(pkg, regionSel);
-                                }
-                            });
-                        }, 300);
-                    });
                 }
             } catch (e) { console.error('Failed to load receiving data', e); }
             this.receiving.loading = false;
-        },
-
-        async loadPackageDistricts(pkg, regionEl) {
-            // regionEl is the <select>, parent is the <div>, parent's parent is the grid, find district select in siblings
-            const distSel = regionEl ? regionEl.parentElement.parentElement.querySelector('.rcv-district-select') : null;
-
-            const populate = (districts, selectedId) => {
-                if (!distSel) return;
-                distSel.innerHTML = '<option value="">Select District</option>';
-                (districts || []).forEach(d => {
-                    const opt = document.createElement('option');
-                    opt.value = d.id;
-                    opt.textContent = d.name;
-                    if (String(d.id) === String(selectedId)) opt.selected = true;
-                    distSel.appendChild(opt);
-                });
-            };
-
-            if (!pkg.delivery_region_id) {
-                populate([], null);
-                pkg.delivery_district_id = null;
-                return;
-            }
-            const savedId = pkg.delivery_district_id;
-            try {
-                const url = this.config.districtsUrl.replace('__REGION__', pkg.delivery_region_id);
-                const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
-                const json = await resp.json();
-                populate(json.data?.districts || [], savedId);
-            } catch (e) {
-                populate([], null);
-            }
         },
 
         async receivePackage(pkg) {
@@ -773,6 +850,24 @@ function shipmentShow() {
                 if (result.success) {
                     if (result.data?.barcode_value) pkg.barcode_value = result.data.barcode_value;
                     if (result.data?.barcode_print_count) pkg.barcode_print_count = result.data.barcode_print_count;
+                    if (this.shipmentDestinationMode() === 'single') {
+                        this.receiving.packages = this.receiving.packages.map(candidate => {
+                            const synced = {
+                                ...candidate,
+                                delivery_recipient_name: pkg.delivery_recipient_name,
+                                delivery_recipient_phone: pkg.delivery_recipient_phone,
+                                delivery_region_id: pkg.delivery_region_id,
+                                delivery_district_id: pkg.delivery_district_id,
+                                delivery_town: pkg.delivery_town,
+                                delivery_landmark: pkg.delivery_landmark,
+                                delivery_instructions: pkg.delivery_instructions,
+                            };
+
+                            return this.prepareReceivingPackage(synced);
+                        });
+                    } else {
+                        Object.assign(pkg, this.prepareReceivingPackage(pkg));
+                    }
                     window.showToast?.('Package received.', 'success');
                 } else {
                     window.showToast?.(result.message || 'Failed.', 'error');

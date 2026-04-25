@@ -905,8 +905,7 @@ class ShipmentController extends Controller
             'uploadPhotosUrlTemplate' => route('admin.shipments.packages.photos.upload', ['shipment' => $shipment->id, 'item' => '__PKG__']),
             'movePhotoUrl' => route('admin.shipments.packages.photos.move', $shipment),
             'deletePhotoUrlTemplate' => route('admin.shipments.packages.photos.delete', ['image' => '__IMG__']),
-            'locationSearchUrl' => route('admin.locations.search'),
-            'districtsByRegionUrlTemplate' => '/admin/locations-data/districts?region_id=__REGION__',
+            'townsSearchUrl' => route('admin.locations.towns.data'),
             'assignDriverEndpoint' => route('admin.assignments.assign', $shipment),
             'updateAssignmentEndpointTemplate' => $shipment->pickupAssignment
                 ? route('admin.assignments.update', ['pickupAssignment' => $shipment->pickupAssignment->id])
@@ -942,7 +941,9 @@ class ShipmentController extends Controller
                     'contact_name' => $shipment->pickup_contact_name,
                     'contact_phone' => $shipment->pickup_contact_phone,
                     'region_id' => $shipment->pickup_region_id,
+                    'region_name' => $shipment->pickupRegion?->name,
                     'district_id' => $shipment->pickup_district_id,
+                    'district_name' => $shipment->pickupDistrict?->name,
                     'town' => $shipment->pickup_town,
                     'latitude' => $shipment->pickup_latitude,
                     'longitude' => $shipment->pickup_longitude,
@@ -954,7 +955,9 @@ class ShipmentController extends Controller
                     'recipient_name' => $shipment->delivery_recipient_name,
                     'recipient_phone' => $shipment->delivery_recipient_phone,
                     'region_id' => $shipment->delivery_region_id,
+                    'region_name' => $shipment->deliveryRegion?->name,
                     'district_id' => $shipment->delivery_district_id,
+                    'district_name' => $shipment->deliveryDistrict?->name,
                     'town' => $shipment->delivery_town,
                     'latitude' => $shipment->delivery_latitude,
                     'longitude' => $shipment->delivery_longitude,
@@ -973,7 +976,9 @@ class ShipmentController extends Controller
                         'delivery_recipient_name' => $item->delivery_recipient_name,
                         'delivery_recipient_phone' => $item->delivery_recipient_phone,
                         'delivery_region_id' => $item->delivery_region_id,
+                        'delivery_region_name' => $item->deliveryRegion?->name,
                         'delivery_district_id' => $item->delivery_district_id,
+                        'delivery_district_name' => $item->deliveryDistrict?->name,
                         'delivery_town' => $item->delivery_town,
                         'delivery_landmark' => $item->delivery_landmark,
                         'delivery_instructions' => $item->delivery_instructions,
@@ -1256,7 +1261,13 @@ class ShipmentController extends Controller
     {
         $this->authorizePermission('shipments.edit');
 
-        $shipment->load(['items.images']);
+        $shipment->load([
+            'items.images',
+            'items.deliveryRegion:id,name',
+            'items.deliveryDistrict:id,name',
+            'deliveryRegion:id,name',
+            'deliveryDistrict:id,name',
+        ]);
 
         // Clone shipment
         $newShipment = $shipment->replicate([
@@ -1472,7 +1483,9 @@ class ShipmentController extends Controller
                 'delivery_recipient_name' => $deliverySource->delivery_recipient_name,
                 'delivery_recipient_phone' => $deliverySource->delivery_recipient_phone,
                 'delivery_region_id' => $deliverySource->delivery_region_id,
+                'delivery_region_name' => $deliverySource->deliveryRegion?->name,
                 'delivery_district_id' => $deliverySource->delivery_district_id,
+                'delivery_district_name' => $deliverySource->deliveryDistrict?->name,
                 'delivery_town' => $deliverySource->delivery_town,
                 'delivery_landmark' => $deliverySource->delivery_landmark,
                 'delivery_instructions' => $deliverySource->delivery_instructions,

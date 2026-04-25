@@ -35,7 +35,7 @@ $shipmentConfig = [
     'receiveSaveEndpoint' => route('admin.shipments.receiving.save', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
     'receivePrintLabelEndpoint' => route('admin.shipments.receiving.print-label', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
     'receiveFinalizeEndpoint' => route('admin.shipments.receiving.finalize', $shipment),
-    'districtsUrl' => '/admin/locations-data/districts?region_id=__REGION__',
+    'townsSearchUrl' => route('admin.locations.towns.data'),
     'canManage' => $canManage,
     'canManageCharges' => $canManageCharges ?? false,
     'isSuperAdmin' => auth('admin')->user()?->isSuperAdmin() ?? false,
@@ -3051,31 +3051,36 @@ $shipmentConfig = [
                                                     </div>
                                                 </div>
                                                 <div class="grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">Region</label>
-                                                        <select x-model="pkg.delivery_region_id"
-                                                                @@change="loadPackageDistricts(pkg, $event.target)"
-                                                                class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
-                                                            <option value="">Select Region</option>
-                                                            @foreach(\App\Models\Region::orderBy('name')->get() as $region)
-                                                                <option value="{{ $region->id }}">{{ $region->name }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label class="block text-[10px] font-semibold text-slate-500 mb-1">District</label>
-                                                        <select class="rcv-district-select w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none"
-                                                                @@change="pkg.delivery_district_id = $event.target.value">
-                                                            <option value="">Select District</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                                <div class="grid grid-cols-2 gap-3">
-                                                    <div>
+                                                    <div class="col-span-2 relative" @@click.outside="closeReceivingTownSearch(pkg)">
                                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Town / Area *</label>
-                                                        <input type="text" x-model="pkg.delivery_town" placeholder="e.g. Madina" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                        <div class="relative">
+                                                            <input type="text"
+                                                                   :value="pkg._town_query"
+                                                                   @@input="updateReceivingTownQuery(pkg, $event.target.value)"
+                                                                   placeholder="Search saved towns or keep free text"
+                                                                   class="w-full px-3 py-2 pr-16 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
+                                                            <div x-show="pkg._town_loading" class="absolute inset-y-0 right-9 flex items-center text-slate-400" style="display:none">
+                                                                <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                                            </div>
+                                                            <button x-show="pkg._town_query" @@click.prevent="clearReceivingTown(pkg)"
+                                                                    class="absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-600 transition-colors" style="display:none" type="button">
+                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                            </button>
+                                                            <div x-show="pkg._town_open" x-transition
+                                                                 class="absolute z-30 mt-1 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl" style="display:none">
+                                                                <template x-for="town in pkg._town_results" :key="`${town.id}-${town.region_id}`">
+                                                                    <button type="button" @@click.prevent="selectReceivingTownOption(pkg, town)"
+                                                                            class="w-full border-b border-slate-100 px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-indigo-50">
+                                                                        <p class="text-sm font-semibold text-slate-800" x-text="town.name"></p>
+                                                                        <p class="text-[11px] text-slate-500" x-text="town.context"></p>
+                                                                    </button>
+                                                                </template>
+                                                            </div>
+                                                        </div>
+                                                        <p x-show="pkg._town_linked && pkg._town_context" x-transition class="mt-1 text-[10px] font-medium text-emerald-600" x-text="'Linked to ' + pkg._town_context" style="display:none"></p>
+                                                        <p x-show="pkg.delivery_town && !pkg._town_linked" x-transition class="mt-1 text-[10px] text-amber-600" style="display:none">Free-text town. Region and district stay empty until you select a saved town.</p>
                                                     </div>
-                                                    <div>
+                                                    <div class="col-span-2">
                                                         <label class="block text-[10px] font-semibold text-slate-500 mb-1">Landmark</label>
                                                         <input type="text" x-model="pkg.delivery_landmark" placeholder="Near..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none">
                                                     </div>
