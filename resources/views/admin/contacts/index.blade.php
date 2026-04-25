@@ -117,14 +117,17 @@
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrf },
-                    body: JSON.stringify({ worker_id: workerId }),
+                    body: JSON.stringify({ user_id: workerId }),
                 });
-                if (res.ok) {
-                    window.showToast?.('Task assigned successfully', 'success');
+                const json = await res.json();
+                if (res.ok && json.success) {
+                    if (json.task) {
+                        this.tasks = this.tasks.map((row) => row.id === task.id ? json.task : row);
+                    }
+                    window.showToast?.(json.message || 'Task assigned successfully', 'success');
                     this.loadData();
                 } else {
-                    const err = await res.json();
-                    window.showToast?.(err.message || 'Failed to assign', 'error');
+                    window.showToast?.(json.message || 'Failed to assign', 'error');
                 }
             } catch (e) {
                 window.showToast?.('Network error', 'error');
@@ -667,7 +670,7 @@
                                 </td>
                                 <!-- Tracking -->
                                 <td class="py-3 px-3">
-                                    <span class="text-sm text-slate-600 font-mono" x-text="task.tracking_number || '-'"></span>
+                                    <span class="text-sm text-slate-600 font-mono" x-text="task.tracking_number || task.tracking_code || '-'"></span>
                                 </td>
                                 <!-- Recipient -->
                                 <td class="py-3 px-3">
@@ -680,7 +683,7 @@
                                 </td>
                                 <!-- Town -->
                                 <td class="py-3 px-3">
-                                    <span class="text-sm text-slate-600" x-text="task.recipient_town || '-'"></span>
+                                    <span class="text-sm text-slate-600" x-text="task.recipient_town || task.delivery_town || task.town || '-'"></span>
                                 </td>
                                 <!-- Warehouse -->
                                 <td class="py-3 px-3">
@@ -688,7 +691,12 @@
                                 </td>
                                 <!-- Assigned To -->
                                 <td class="py-3 px-3">
-                                    <span class="text-sm text-slate-600" x-text="task.assigned_to_name || 'Unassigned'"></span>
+                                    <div class="space-y-0.5">
+                                        <span class="text-sm text-slate-600" x-text="task.assigned_to_name || task.assigned_to || 'Unassigned'"></span>
+                                        <template x-if="task.assigned_at">
+                                            <p class="text-[11px] text-slate-400" x-text="'Assigned ' + task.assigned_at"></p>
+                                        </template>
+                                    </div>
                                 </td>
                                 <!-- Status -->
                                 <td class="py-3 px-3">
@@ -716,11 +724,13 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         <!-- Assign -->
                                         <div class="relative">
-                                            <button @@click="toggleAssignDropdown(task.id)" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                                            <button @@click="toggleAssignDropdown(task.id)"
+                                                    class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors"
+                                                    :class="task.assigned_to_id ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                                 </svg>
-                                                Assign
+                                                <span x-text="task.assigned_to_id ? 'Reassign' : 'Assign'"></span>
                                             </button>
                                             <div x-show="assignDropdownTask === task.id" @@click.away="assignDropdownTask = null" x-transition
                                                  class="absolute right-0 mt-1 w-48 rounded-xl border border-slate-200/70 bg-white/95 shadow-xl p-1.5 z-50 backdrop-blur-xl max-h-48 overflow-y-auto" style="display: none;">

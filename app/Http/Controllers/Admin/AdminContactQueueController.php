@@ -83,25 +83,7 @@ class AdminContactQueueController extends Controller
         $tasks = $query->latest('created_at')->skip(($page - 1) * $perPage)->take($perPage)->get();
 
         return response()->json([
-            'data' => $tasks->map(fn ($task) => [
-                'id' => $task->id,
-                'shipment_number' => $task->shipment?->shipment_number,
-                'tracking_code' => $task->shipmentItem?->tracking_code,
-                'description' => $task->shipmentItem?->description,
-                'recipient_name' => $task->recipient_name,
-                'recipient_phone' => $task->recipient_phone,
-                'delivery_town' => $task->delivery_town,
-                'warehouse_name' => $task->warehouse?->name,
-                'status' => $task->status,
-                'outcome' => $task->outcome,
-                'assigned_to' => $task->assignedTo?->name,
-                'assigned_at' => $task->assigned_at?->format('M d, H:i'),
-                'callback_at' => $task->callback_at?->format('M d, H:i'),
-                'attempts_count' => $task->attempts_count,
-                'resolved_at' => $task->resolved_at?->format('M d, H:i'),
-                'notes' => $task->notes,
-                'created_at' => $task->created_at?->format('M d, H:i'),
-            ])->values(),
+            'data' => $tasks->map(fn ($task) => $this->transformTask($task))->values(),
             'meta' => [
                 'total' => $total,
                 'per_page' => $perPage,
@@ -127,10 +109,22 @@ class AdminContactQueueController extends Controller
     public function assign(Request $request, PackageContactTask $task): JsonResponse
     {
         $this->authorizePermission('shipments.edit');
-        $validated = $request->validate(['user_id' => ['required', 'exists:users,id']]);
-        $worker = User::findOrFail($validated['user_id']);
+
+        $validated = $request->validate([
+            'user_id' => ['nullable', 'exists:users,id', 'required_without:worker_id'],
+            'worker_id' => ['nullable', 'exists:users,id', 'required_without:user_id'],
+        ]);
+
+        $worker = User::findOrFail((int) ($validated['user_id'] ?? $validated['worker_id']));
         $this->contactService->assignToWorker($task, $worker);
-        return response()->json(['success' => true, 'message' => "Assigned to {$worker->name}."]);
+
+        $task->loadMissing(['assignedTo:id,name', 'shipmentItem:id,tracking_code,description', 'shipment:id,shipment_number', 'warehouse:id,name']);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Assigned to {$worker->name}.",
+            'task' => $this->transformTask($task->fresh(['assignedTo:id,name', 'shipmentItem:id,tracking_code,description', 'shipment:id,shipment_number', 'warehouse:id,name'])),
+        ]);
     }
 
     public function autoAssign(Request $request): JsonResponse
@@ -249,5 +243,37 @@ class AdminContactQueueController extends Controller
         if (!Auth::guard('admin')->user()?->hasPermission($permission)) {
             abort(403, 'Unauthorized.');
         }
+    }
+
+    private function transformTask(PackageContactTask $task): array
+    {
+        $isCallbackDue = $task->outcome === PackageContactTask::OUTCOME_CALLBACK
+            && $task->callback_at?->lte(now());
+
+        return [
+            'id' => $task->id,
+            'shipment_number' => $task->shipment?->shipment_number,
+            'tracking_code' => $task->shipmentItem?->tracking_code,
+            'tracking_number' => $task->shipmentItem?->tracking_code,
+            'description' => $task->shipmentItem?->description,
+            'recipient_name' => $task->recipient_name,
+            'recipient_phone' => $task->recipient_phone,
+            'delivery_town' => $task->delivery_town,
+            'recipient_town' => $task->delivery_town,
+            'town' => $task->delivery_town,
+            'warehouse_name' => $task->warehouse?->name,
+            'status' => $task->status,
+            'outcome' => $task->outcome,
+            'assigned_to' => $task->assignedTo?->name,
+            'assigned_to_name' => $task->assignedTo?->name,
+            'assigned_to_id' => $task->assigned_to_user_id,
+            'assigned_at' => $task->assigned_at?->format('M d, H:i'),
+            'callback_at' => $task->callback_at?->format('M d, H:i'),
+            'attempts_count' => $task->attempts_count,
+            'resolved_at' => $task->resolved_at?->format('M d, H:i'),
+            'notes' => $task->notes,
+            'created_at' => $task->created_at?->format('M d, H:i'),
+            'is_callback_due' => (bool) $isCallbackDue,
+        ];
     }
 }
