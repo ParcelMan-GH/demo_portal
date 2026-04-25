@@ -61,6 +61,7 @@ function buildVendorsTable(config) {
             email: '',
             phone: '',
             is_active: true,
+            commission_rate_override: '',
         },
 
         init() {
@@ -252,6 +253,7 @@ function buildVendorsTable(config) {
                 email: '',
                 phone: '',
                 is_active: true,
+                commission_rate_override: '',
             };
             this.showModal = true;
         },
@@ -266,6 +268,7 @@ function buildVendorsTable(config) {
                 email: vendor.email,
                 phone: vendor.phone,
                 is_active: vendor.is_active,
+                commission_rate_override: vendor.commission_rate_override ?? '',
             };
             this.showModal = true;
         },
@@ -280,6 +283,7 @@ function buildVendorsTable(config) {
                 email: vendor.email,
                 phone: vendor.phone,
                 is_active: vendor.is_active,
+                commission_rate_override: vendor.commission_rate_override ?? '',
             };
             this.showModal = true;
         },

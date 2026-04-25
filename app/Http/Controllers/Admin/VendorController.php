@@ -335,6 +335,9 @@ class VendorController extends Controller
                     'is_deleted' => $vendor->trashed(),
                     'deleted_at' => $vendor->deleted_at?->format('Y-m-d H:i:s'),
                     'shipments_count' => $vendor->shipments()->count(),
+                    'commission_rate_override' => $vendor->commission_rate_override !== null
+                        ? (float) $vendor->commission_rate_override
+                        : null,
                     'created_at' => $vendor->created_at->format('Y-m-d H:i:s'),
                     'can_manage' => $canManage,
                 ];
