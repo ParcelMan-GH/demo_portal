@@ -13,6 +13,7 @@ use App\Models\PickupPhoto;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\Vendor;
+use App\Enums\ItemStatus;
 use Illuminate\Http\Request;
 
 class ShipmentService
@@ -456,7 +457,7 @@ class ShipmentService
                 : null;
 
             $itemHandoff = null;
-            if ($item->status === \App\Enums\ItemStatus::HANDED_TO_COURIER) {
+            if (in_array($item->status, [ItemStatus::HANDED_TO_COURIER, ItemStatus::DELIVERED], true)) {
                 $stop = \App\Models\DeliveryRunStop::where('delivery_method', 'bus_handoff')
                     ->whereIn('status', ['handed_off', 'delivered'])
                     ->whereHas('items', fn ($q) => $q->where('shipment_item_id', $item->id))
@@ -468,6 +469,7 @@ class ShipmentService
                         'courier_phone' => $stop->handoff_courier_phone,
                         'vehicle_number' => $stop->handoff_vehicle_number,
                         'handed_off_at' => $stop->handoff_at?->toIso8601String(),
+                        'proof_photo_url' => $this->getProofPhotoUrlForVendor($stop),
                     ];
                 }
             }
@@ -792,7 +794,7 @@ class ShipmentService
         }
 
         $stop = \App\Models\DeliveryRunStop::where('delivery_method', 'bus_handoff')
-            ->where('status', 'handed_off')
+            ->whereIn('status', ['handed_off', 'delivered'])
             ->whereHas('items', fn ($q) => $q->whereHas('shipmentItem', fn ($sq) => $sq->where('shipment_id', $shipment->id)))
             ->first();
 
@@ -807,7 +809,17 @@ class ShipmentService
             'courier_phone' => $stop->handoff_courier_phone,
             'vehicle_number' => $stop->handoff_vehicle_number,
             'handed_off_at' => $stop->handoff_at?->toIso8601String(),
+            'proof_photo_url' => $this->getProofPhotoUrlForVendor($stop),
         ];
+    }
+
+    private function getProofPhotoUrlForVendor(\App\Models\DeliveryRunStop $stop): ?string
+    {
+        if (blank($stop->proof_photo_path)) {
+            return null;
+        }
+
+        return $this->storageService->getUrl($stop->proof_photo_path);
     }
 
     /**

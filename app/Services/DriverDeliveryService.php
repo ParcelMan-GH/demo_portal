@@ -5,11 +5,17 @@ namespace App\Services;
 use App\Models\DeliveryRun;
 use App\Models\Driver;
 use App\Models\PlatformSetting;
+use App\Models\ShipmentCharge;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class DriverDeliveryService
 {
+    public function __construct(
+        private StorageService $storageService
+    ) {
+    }
+
     public function list(Driver $driver, Request $request): array
     {
         $statuses = [
@@ -36,7 +42,7 @@ class DriverDeliveryService
             ->where('assigned_driver_id', $driver->id)
             ->with([
                 'warehouse:id,name,code,address,latitude,longitude,contact_phone',
-                'stops:id,delivery_run_id,recipient_name,recipient_phone,status,delivery_method,total_packages,town,landmark,gh_post_address,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,failure_reason,failure_notes,delivery_notes,handoff_courier_name,handoff_courier_phone,handoff_vehicle_number,handoff_at',
+                'stops:id,delivery_run_id,recipient_name,recipient_phone,status,delivery_method,total_packages,town,landmark,gh_post_address,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,proof_photo_path,failure_reason,failure_notes,delivery_notes,handoff_courier_name,handoff_courier_phone,handoff_vehicle_number,bus_station_name,handoff_at',
                 'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status',
                 'items.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
                 'items.shipmentItem.shipment:id,shipment_number,delivery_recipient_name,delivery_recipient_phone,delivery_town',
@@ -103,7 +109,7 @@ class DriverDeliveryService
 
         $run->load([
             'warehouse:id,name,code,address,latitude,longitude,contact_phone',
-            'stops:id,delivery_run_id,recipient_name,recipient_phone,status,delivery_method,total_packages,region_id,district_id,town,latitude,longitude,gh_post_address,landmark,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,delivery_latitude,delivery_longitude,failure_reason,failure_notes,delivery_notes,handoff_courier_name,handoff_courier_phone,handoff_vehicle_number,handoff_at',
+            'stops:id,delivery_run_id,recipient_name,recipient_phone,status,delivery_method,total_packages,region_id,district_id,town,latitude,longitude,gh_post_address,landmark,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,delivery_latitude,delivery_longitude,proof_photo_path,failure_reason,failure_notes,delivery_notes,handoff_courier_name,handoff_courier_phone,handoff_vehicle_number,bus_station_name,handoff_at',
             'stops.region:id,name',
             'stops.district:id,name',
             'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status,notes,delivered_at',
@@ -151,6 +157,7 @@ class DriverDeliveryService
             ],
             'stops' => $run->stops->map(function ($stop) use ($run) {
                 $items = $run->items->where('delivery_run_stop_id', $stop->id)->values();
+                $stationFeeMeta = $this->getStationFeeMetaForStop($stop->id);
                 return [
                     'id' => $stop->id,
                     'recipient_name' => $stop->recipient_name,
@@ -184,10 +191,14 @@ class DriverDeliveryService
                     'failure_notes' => $stop->failure_notes,
                     'delivery_notes' => $stop->delivery_notes,
                     'handoff' => $stop->delivery_method === 'bus_handoff' ? [
+                        'bus_station' => $stop->bus_station_name,
                         'courier_name' => $stop->handoff_courier_name,
                         'courier_phone' => $stop->handoff_courier_phone,
                         'vehicle_number' => $stop->handoff_vehicle_number,
                         'handed_off_at' => $stop->handoff_at,
+                        'proof_photo_url' => $this->getStopProofPhotoUrl($stop),
+                        'amount_paid' => $stationFeeMeta['amount_paid'] ?? null,
+                        'currency' => $stationFeeMeta['currency'] ?? null,
                     ] : null,
                     'items' => $items->map(function ($item) {
                         $vendor = $item->shipmentItem?->shipment?->vendor;
@@ -220,5 +231,39 @@ class DriverDeliveryService
             'updated_at' => $run->updated_at,
         ];
     }
-}
 
+    private function getStationFeeMetaForStop(?int $stopId): ?array
+    {
+        if (!$stopId) {
+            return null;
+        }
+
+        $charges = ShipmentCharge::query()
+            ->where('delivery_run_stop_id', $stopId)
+            ->where('charge_type', ShipmentCharge::TYPE_STATION_FEE)
+            ->where('direction', ShipmentCharge::DIRECTION_EXPENSE)
+            ->whereNotIn('status', [
+                ShipmentCharge::STATUS_CANCELLED,
+                ShipmentCharge::STATUS_WAIVED,
+            ])
+            ->get(['amount', 'currency']);
+
+        if ($charges->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'amount_paid' => (float) $charges->sum(fn (ShipmentCharge $charge) => (float) $charge->amount),
+            'currency' => $charges->first()?->currency ?? 'GHS',
+        ];
+    }
+
+    private function getStopProofPhotoUrl(object $stop): ?string
+    {
+        if (blank($stop->proof_photo_path)) {
+            return null;
+        }
+
+        return $this->storageService->getUrl($stop->proof_photo_path);
+    }
+}

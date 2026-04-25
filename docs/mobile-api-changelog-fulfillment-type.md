@@ -125,6 +125,45 @@ When `fulfillment_type` is `"self_pickup"` and the shipment has reached the ware
 }
 ```
 
+### 5. Bus Courier Handoff Proof Photo
+
+Vendor shipment detail responses now expose the driver's bus-station proof photo when a package has been handed to a bus courier.
+
+**Shipment-level handoff object (`shipment.courier_handoff`):**
+
+```json
+{
+  "courier_handoff": {
+    "status": "handed_off",
+    "bus_station": "Accra Station",
+    "courier_name": "Station Runner",
+    "courier_phone": "+233201112223",
+    "vehicle_number": "GR-1234-26",
+    "handed_off_at": "2026-04-25T14:07:00+00:00",
+    "proof_photo_url": "https://..."
+  }
+}
+```
+
+**Per-item handoff object (`item.handoff`):**
+
+```json
+{
+  "handoff": {
+    "bus_station": "Accra Station",
+    "courier_name": "Station Runner",
+    "courier_phone": "+233201112223",
+    "vehicle_number": "GR-1234-26",
+    "handed_off_at": "2026-04-25T14:07:00+00:00",
+    "proof_photo_url": "https://..."
+  }
+}
+```
+
+`proof_photo_url` is `null` when no handoff proof image was captured.
+
+For bus-handoff packages, `item.handoff` now remains available even after the item status advances from `handed_to_courier` to `delivered`, so the vendor package detail screen can still show the station handoff history after final delivery.
+
 ### Vendor App UX Recommendations
 
 - Show a delivery method picker on the create shipment screen (3 options: Deliver, Self-Pickup, Direct)
@@ -242,6 +281,29 @@ When the driver confirms pickup on a direct delivery shipment, the response incl
   "auto_delivery": null
 }
 ```
+
+### 5. Delivery Stop Handoff Summary — `GET /api/v1/driver/deliveries/{id}`
+
+Bus-handoff stops now include richer summary data for completed handoffs:
+
+```json
+{
+  "handoff": {
+    "bus_station": "Accra station",
+    "courier_name": null,
+    "courier_phone": "+233201112223",
+    "vehicle_number": null,
+    "handed_off_at": "2026-04-25T14:07:00+00:00",
+    "proof_photo_url": "https://...",
+    "amount_paid": 18.50,
+    "currency": "GHS"
+  }
+}
+```
+
+- `bus_station` is the free-text station name entered by the driver at handoff.
+- `proof_photo_url` is the driver's proof photo from the station handoff.
+- `amount_paid` is the total station fee recorded against that stop, summed back from the expense charges linked to the stop.
 
 The `auto_delivery` field provides the delivery run and stop IDs that the app can use to navigate to the delivery confirmation screen. The delivery run will also appear in `GET /api/v1/driver/deliveries`.
 
