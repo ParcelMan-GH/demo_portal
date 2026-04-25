@@ -732,7 +732,9 @@ class WarehouseDeliveryService
             $this->refreshRunStatus($run);
             $run->refresh();
 
-            $shipments->unique('id')->each(function (Shipment $shipment) {
+            $uniqueShipments = $shipments->unique('id');
+
+            $uniqueShipments->each(function (Shipment $shipment) {
                 $this->syncShipmentDeliveryStatus($shipment);
             });
 
@@ -914,7 +916,9 @@ class WarehouseDeliveryService
             $this->refreshRunStatus($run);
             $run->refresh();
 
-            $shipments->unique('id')->each(function (Shipment $shipment) {
+            $uniqueShipments = $shipments->unique('id');
+
+            $uniqueShipments->each(function (Shipment $shipment) {
                 $this->syncShipmentDeliveryStatus($shipment);
             });
 
@@ -931,26 +935,13 @@ class WarehouseDeliveryService
             // recorded when the stop was at least partially delivered — we
             // don't bill a failed delivery.
             if ($inFieldDeliveryFee !== null && $inFieldDeliveryFee > 0 && !$noneDelivered) {
-                $uniqueShipments = $shipments->unique('id');
-                if ($uniqueShipments->isNotEmpty()) {
-                    $shipmentCount = $uniqueShipments->count();
-                    $share = round($inFieldDeliveryFee / $shipmentCount, 2);
-                    $noteSuffix = $shipmentCount > 1
-                        ? " (split from GHS " . number_format($inFieldDeliveryFee, 2) . " across {$shipmentCount} shipments delivered at this stop)"
-                        : '';
-                    foreach ($uniqueShipments as $shipment) {
-                        $this->chargesService->addCharge($shipment, [
-                            'charge_type'          => ShipmentCharge::TYPE_DELIVERY_FEE,
-                            'payer_type'           => ShipmentCharge::PAYER_RECIPIENT,
-                            'due_stage'            => ShipmentCharge::STAGE_AT_DELIVERY,
-                            'amount'               => $share,
-                            'status'               => ShipmentCharge::STATUS_PAID,
-                            'payment_method'       => 'cash',
-                            'delivery_run_stop_id' => $stop->id,
-                            'notes'                => "Driver collected delivery fee on arrival{$noteSuffix}",
-                        ], $driver);
-                    }
-                }
+                $this->recordInFieldDeliveryFeeForStop(
+                    uniqueShipments: $uniqueShipments,
+                    runItems: $runItems,
+                    stop: $stop,
+                    driver: $driver,
+                    inFieldDeliveryFee: $inFieldDeliveryFee,
+                );
             }
 
             return [
@@ -960,6 +951,118 @@ class WarehouseDeliveryService
                     : "{$packagesDelivered} of {$totalPackages} packages delivered. Flagged for warehouse review.",
             ];
         });
+    }
+
+    /**
+     * Record money collected from the recipient at a direct-delivery stop.
+     *
+     * If delivery fees were already recorded ahead of time, settle those
+     * existing draft/pending charges instead of creating duplicate ledger
+     * lines. Only create new paid delivery-fee charges when the stop had no
+     * prior delivery-fee record.
+     *
+     * @param Collection<int, Shipment> $uniqueShipments
+     * @param Collection<int, DeliveryRunItem> $runItems
+     */
+    private function recordInFieldDeliveryFeeForStop(
+        Collection $uniqueShipments,
+        Collection $runItems,
+        DeliveryRunStop $stop,
+        Driver $driver,
+        float $inFieldDeliveryFee,
+    ): void {
+        $outstandingCharges = $this->outstandingDeliveryFeeChargesForStop($stop->id, $runItems);
+
+        if ($outstandingCharges->isNotEmpty()) {
+            $outstandingCharges->each(function (ShipmentCharge $charge) use ($driver, $stop) {
+                $this->chargesService->markPaid($charge, 'cash', null, $driver);
+
+                $charge->update(array_filter([
+                    'delivery_run_stop_id' => $charge->delivery_run_stop_id ?: $stop->id,
+                    'recorded_by_driver_id' => $driver->id,
+                ]));
+            });
+
+            return;
+        }
+
+        if ($uniqueShipments->isEmpty()) {
+            return;
+        }
+
+        $shipmentCount = $uniqueShipments->count();
+        $share = round($inFieldDeliveryFee / $shipmentCount, 2);
+        $noteSuffix = $shipmentCount > 1
+            ? " (split from GHS " . number_format($inFieldDeliveryFee, 2) . " across {$shipmentCount} shipments delivered at this stop)"
+            : '';
+
+        foreach ($uniqueShipments as $shipment) {
+            $this->chargesService->addCharge($shipment, [
+                'charge_type'          => ShipmentCharge::TYPE_DELIVERY_FEE,
+                'payer_type'           => ShipmentCharge::PAYER_RECIPIENT,
+                'due_stage'            => ShipmentCharge::STAGE_AT_DELIVERY,
+                'amount'               => $share,
+                'status'               => ShipmentCharge::STATUS_PAID,
+                'payment_method'       => 'cash',
+                'delivery_run_stop_id' => $stop->id,
+                'notes'                => "Driver collected delivery fee on arrival{$noteSuffix}",
+            ], $driver);
+        }
+    }
+
+    /**
+     * Outstanding delivery-fee charges relevant to a direct-delivery stop.
+     *
+     * @param Collection<int, DeliveryRunItem> $runItems
+     * @return Collection<int, ShipmentCharge>
+     */
+    private function outstandingDeliveryFeeChargesForStop(?int $stopId, Collection $runItems): Collection
+    {
+        $shipmentIds = $runItems
+            ->map(fn (DeliveryRunItem $runItem) => (int) ($runItem->shipmentItem?->shipment_id ?? 0))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $shipmentItemIds = $runItems
+            ->map(fn (DeliveryRunItem $runItem) => (int) ($runItem->shipment_item_id ?? 0))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if (!$stopId && $shipmentIds->isEmpty() && $shipmentItemIds->isEmpty()) {
+            return collect();
+        }
+
+        return ShipmentCharge::query()
+            ->where('charge_type', ShipmentCharge::TYPE_DELIVERY_FEE)
+            ->where('payer_type', ShipmentCharge::PAYER_RECIPIENT)
+            ->where('due_stage', ShipmentCharge::STAGE_AT_DELIVERY)
+            ->whereIn('status', [ShipmentCharge::STATUS_DRAFT, ShipmentCharge::STATUS_PENDING])
+            ->where(function ($query) use ($stopId, $shipmentIds, $shipmentItemIds) {
+                $hasCondition = false;
+
+                if ($stopId) {
+                    $query->where('delivery_run_stop_id', $stopId);
+                    $hasCondition = true;
+                }
+
+                if ($shipmentItemIds->isNotEmpty()) {
+                    $method = $hasCondition ? 'orWhereIn' : 'whereIn';
+                    $query->{$method}('shipment_item_id', $shipmentItemIds->all());
+                    $hasCondition = true;
+                }
+
+                if ($shipmentIds->isNotEmpty()) {
+                    $method = $hasCondition ? 'orWhere' : 'where';
+                    $query->{$method}(function ($shipmentQuery) use ($shipmentIds) {
+                        $shipmentQuery
+                            ->whereNull('shipment_item_id')
+                            ->whereIn('shipment_id', $shipmentIds->all());
+                    });
+                }
+            })
+            ->get();
     }
 
     public function driverConfirmHandoff(
@@ -1370,4 +1473,3 @@ class WarehouseDeliveryService
         }
     }
 }
-

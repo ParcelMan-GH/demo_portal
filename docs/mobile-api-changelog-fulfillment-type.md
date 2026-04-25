@@ -307,7 +307,33 @@ Bus-handoff stops now include richer summary data for completed handoffs:
 
 The `auto_delivery` field provides the delivery run and stop IDs that the app can use to navigate to the delivery confirmation screen. The delivery run will also appear in `GET /api/v1/driver/deliveries`.
 
-### 5. Delivery Run List/Show — `GET /api/v1/driver/deliveries` and `GET /api/v1/driver/deliveries/{run}`
+### 6. Direct-Delivery Fee Summary — `GET /api/v1/driver/deliveries/{id}`
+
+Direct-recipient stops now include a `delivery_fee` summary so the driver app can tell whether the fee was already paid, is still to be collected, was waived, or was never recorded before arrival.
+
+```json
+{
+  "delivery_fee": {
+    "status": "collect",
+    "currency": "GHS",
+    "total_amount": 15.00,
+    "paid_amount": 0.00,
+    "outstanding_amount": 15.00,
+    "is_paid": false,
+    "can_capture_amount": true,
+    "paid_at": null,
+    "payment_method": null,
+    "notes": "Recipient pays on delivery"
+  }
+}
+```
+
+- `status` values used by mobile: `none`, `collect`, `partially_paid`, `paid`, `waived`
+- `status = "none"` means there was no delivery-fee line yet, so the driver may enter the amount collected in the field.
+- `status = "collect"` / `partially_paid` means the delivery fee already exists in the ledger; the app should show the amount due and let the driver mark that recorded amount as collected.
+- When the driver confirms delivery with `in_field_delivery_fee` and matching outstanding charges already exist for the stop, the backend now marks those existing charges as paid instead of creating duplicate delivery-fee lines.
+
+### 7. Delivery Run List/Show — `GET /api/v1/driver/deliveries` and `GET /api/v1/driver/deliveries/{run}`
 
 **One new field added per delivery run:**
 

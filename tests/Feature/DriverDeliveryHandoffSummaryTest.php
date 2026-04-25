@@ -263,3 +263,88 @@ test('driver delivery stop handoff summary exposes station fee and proof photo',
         ->and($payload['stops'][0]['handoff']['amount_paid'])->toBe(18.5)
         ->and($payload['stops'][0]['handoff']['currency'])->toBe('GHS');
 });
+
+test('driver delivery stop exposes outstanding delivery fee summary for direct delivery', function () {
+    $shipment = Shipment::create([
+        'vendor_id' => 1,
+        'shipment_number' => 'PCM-2026-02016',
+        'status' => ShipmentStatus::OUT_FOR_DELIVERY->value,
+        'source' => ShipmentSource::VENDOR_APP->value,
+        'destination_mode' => ShipmentDestinationMode::SINGLE->value,
+        'delivery_recipient_name' => 'Ama Mensah',
+        'delivery_recipient_phone' => '+233241234567',
+        'delivery_town' => 'Osu',
+    ]);
+
+    $item = ShipmentItem::create([
+        'shipment_id' => $shipment->id,
+        'description' => 'Shoes',
+        'quantity' => 1,
+        'delivery_recipient_name' => 'Ama Mensah',
+        'delivery_recipient_phone' => '+233241234567',
+        'delivery_town' => 'Osu',
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_DIRECT,
+        'status' => ItemStatus::OUT_FOR_DELIVERY->value,
+        'tracking_code' => 'TRKDRIVERSTOP2',
+    ]);
+
+    $run = DeliveryRun::create([
+        'run_number' => 'DRN-2026-00052',
+        'status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY,
+    ]);
+
+    $stop = DeliveryRunStop::create([
+        'delivery_run_id' => $run->id,
+        'recipient_name' => 'Ama Mensah',
+        'recipient_phone' => '+233241234567',
+        'status' => DeliveryRunStop::STATUS_ARRIVED,
+        'delivery_method' => DeliveryRunStop::METHOD_DIRECT,
+        'total_packages' => 1,
+        'town' => 'Osu',
+    ]);
+
+    $runItem = DeliveryRunItem::create([
+        'delivery_run_id' => $run->id,
+        'delivery_run_stop_id' => $stop->id,
+        'shipment_item_id' => $item->id,
+        'expected_quantity' => 1,
+        'delivered_quantity' => 0,
+        'status' => DeliveryRunItem::STATUS_PENDING,
+    ]);
+
+    ShipmentCharge::create([
+        'shipment_id' => $shipment->id,
+        'charge_type' => ShipmentCharge::TYPE_DELIVERY_FEE,
+        'payer_type' => ShipmentCharge::PAYER_RECIPIENT,
+        'direction' => ShipmentCharge::DIRECTION_REVENUE,
+        'due_stage' => ShipmentCharge::STAGE_AT_DELIVERY,
+        'amount' => 15.00,
+        'currency' => 'GHS',
+        'status' => ShipmentCharge::STATUS_PENDING,
+        'notes' => 'Recipient pays on delivery',
+    ]);
+
+    $shipment->setRelation('vendor', null);
+    $item->setRelation('shipment', $shipment);
+    $runItem->setRelation('shipmentItem', $item);
+    $stop->setRelation('region', null);
+    $stop->setRelation('district', null);
+    $run->setRelation('warehouse', null);
+    $run->setRelation('stops', new Collection([$stop]));
+    $run->setRelation('items', new Collection([$runItem]));
+
+    $storageService = Mockery::mock(StorageService::class);
+    $service = new DriverDeliveryService($storageService);
+
+    $payload = driverDeliveryHandoffSummaryInvokeTransformRun($service, $run);
+
+    expect($payload['stops'])->toHaveCount(1)
+        ->and($payload['stops'][0]['handoff'])->toBeNull()
+        ->and($payload['stops'][0]['delivery_fee'])->not->toBeNull()
+        ->and($payload['stops'][0]['delivery_fee']['status'])->toBe('collect')
+        ->and($payload['stops'][0]['delivery_fee']['total_amount'])->toBe(15.0)
+        ->and($payload['stops'][0]['delivery_fee']['outstanding_amount'])->toBe(15.0)
+        ->and($payload['stops'][0]['delivery_fee']['paid_amount'])->toBe(0.0)
+        ->and($payload['stops'][0]['delivery_fee']['can_capture_amount'])->toBeTrue()
+        ->and($payload['stops'][0]['delivery_fee']['notes'])->toBe('Recipient pays on delivery');
+});

@@ -7,6 +7,7 @@ use App\Models\Driver;
 use App\Models\PlatformSetting;
 use App\Models\ShipmentCharge;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
 class DriverDeliveryService
@@ -158,6 +159,9 @@ class DriverDeliveryService
             'stops' => $run->stops->map(function ($stop) use ($run) {
                 $items = $run->items->where('delivery_run_stop_id', $stop->id)->values();
                 $stationFeeMeta = $this->getStationFeeMetaForStop($stop->id);
+                $deliveryFeeMeta = $stop->delivery_method === 'bus_handoff'
+                    ? null
+                    : $this->getDeliveryFeeMetaForStop($stop->id, $items);
                 return [
                     'id' => $stop->id,
                     'recipient_name' => $stop->recipient_name,
@@ -190,6 +194,7 @@ class DriverDeliveryService
                     'failure_reason' => $stop->failure_reason,
                     'failure_notes' => $stop->failure_notes,
                     'delivery_notes' => $stop->delivery_notes,
+                    'delivery_fee' => $deliveryFeeMeta,
                     'handoff' => $stop->delivery_method === 'bus_handoff' ? [
                         'bus_station' => $stop->bus_station_name,
                         'courier_name' => $stop->handoff_courier_name,
@@ -255,6 +260,124 @@ class DriverDeliveryService
         return [
             'amount_paid' => (float) $charges->sum(fn (ShipmentCharge $charge) => (float) $charge->amount),
             'currency' => $charges->first()?->currency ?? 'GHS',
+        ];
+    }
+
+    /**
+     * Summary of recipient-paid delivery fees tied to this direct-delivery stop.
+     *
+     * We look for item-level charges, shipment-level charges for shipments on
+     * this stop, and charges already linked back to the stop itself.
+     */
+    private function getDeliveryFeeMetaForStop(?int $stopId, Collection $runItems): array
+    {
+        $shipmentIds = $runItems
+            ->map(fn ($runItem) => (int) ($runItem->shipmentItem?->shipment_id ?? 0))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $shipmentItemIds = $runItems
+            ->map(fn ($runItem) => (int) ($runItem->shipment_item_id ?? 0))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if (!$stopId && $shipmentIds->isEmpty() && $shipmentItemIds->isEmpty()) {
+            return $this->emptyDeliveryFeeMeta();
+        }
+
+        $charges = ShipmentCharge::query()
+            ->where('charge_type', ShipmentCharge::TYPE_DELIVERY_FEE)
+            ->where('payer_type', ShipmentCharge::PAYER_RECIPIENT)
+            ->where('due_stage', ShipmentCharge::STAGE_AT_DELIVERY)
+            ->whereNotIn('status', [ShipmentCharge::STATUS_CANCELLED])
+            ->where(function ($query) use ($stopId, $shipmentIds, $shipmentItemIds) {
+                $hasCondition = false;
+
+                if ($stopId) {
+                    $query->where('delivery_run_stop_id', $stopId);
+                    $hasCondition = true;
+                }
+
+                if ($shipmentItemIds->isNotEmpty()) {
+                    $method = $hasCondition ? 'orWhereIn' : 'whereIn';
+                    $query->{$method}('shipment_item_id', $shipmentItemIds->all());
+                    $hasCondition = true;
+                }
+
+                if ($shipmentIds->isNotEmpty()) {
+                    $method = $hasCondition ? 'orWhere' : 'where';
+                    $query->{$method}(function ($shipmentQuery) use ($shipmentIds) {
+                        $shipmentQuery
+                            ->whereNull('shipment_item_id')
+                            ->whereIn('shipment_id', $shipmentIds->all());
+                    });
+                }
+            })
+            ->get([
+                'id',
+                'amount',
+                'currency',
+                'status',
+                'paid_at',
+                'payment_method',
+                'notes',
+            ]);
+
+        if ($charges->isEmpty()) {
+            return $this->emptyDeliveryFeeMeta();
+        }
+
+        $currency = $charges->first()?->currency ?: 'GHS';
+        $paidAmount = (float) $charges
+            ->where('status', ShipmentCharge::STATUS_PAID)
+            ->sum('amount');
+        $outstandingAmount = (float) $charges
+            ->whereIn('status', [ShipmentCharge::STATUS_DRAFT, ShipmentCharge::STATUS_PENDING])
+            ->sum('amount');
+        $waivedAmount = (float) $charges
+            ->where('status', ShipmentCharge::STATUS_WAIVED)
+            ->sum('amount');
+        $status = match (true) {
+            $outstandingAmount > 0 && $paidAmount > 0 => 'partially_paid',
+            $outstandingAmount > 0 => 'collect',
+            $paidAmount > 0 => 'paid',
+            $waivedAmount > 0 => 'waived',
+            default => 'none',
+        };
+        $latestPaidCharge = $charges
+            ->where('status', ShipmentCharge::STATUS_PAID)
+            ->sortByDesc(fn (ShipmentCharge $charge) => $charge->paid_at?->getTimestamp() ?? 0)
+            ->first();
+
+        return [
+            'status' => $status,
+            'currency' => $currency,
+            'total_amount' => round((float) $charges->sum('amount'), 2),
+            'paid_amount' => round($paidAmount, 2),
+            'outstanding_amount' => round($outstandingAmount, 2),
+            'is_paid' => $outstandingAmount <= 0 && $paidAmount > 0,
+            'can_capture_amount' => in_array($status, ['none', 'collect', 'partially_paid'], true),
+            'paid_at' => $latestPaidCharge?->paid_at?->toIso8601String(),
+            'payment_method' => $latestPaidCharge?->payment_method,
+            'notes' => $charges->pluck('notes')->filter()->first(),
+        ];
+    }
+
+    private function emptyDeliveryFeeMeta(): array
+    {
+        return [
+            'status' => 'none',
+            'currency' => 'GHS',
+            'total_amount' => 0.0,
+            'paid_amount' => 0.0,
+            'outstanding_amount' => 0.0,
+            'is_paid' => false,
+            'can_capture_amount' => true,
+            'paid_at' => null,
+            'payment_method' => null,
+            'notes' => null,
         ];
     }
 
