@@ -10,11 +10,16 @@ use App\Exports\ShipmentsExport;
 use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Location;
+use App\Models\PickupItemConfirmation;
+use App\Models\PickupPhoto;
 use App\Models\Region;
 use App\Models\Shipment;
+use App\Models\ShipmentCharge;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemImage;
+use App\Models\ShipmentItemTracking;
 use App\Models\Warehouse;
+use App\Models\WarehouseReceiptItem;
 use App\Services\StorageService;
 use App\Services\WalkinShipmentService;
 use App\Services\Warehouse\WarehouseReceivingService;
@@ -973,6 +978,7 @@ class ShipmentController extends Controller
                         'tracking_code' => $item->tracking_code,
                         'delivery_preference' => $item->delivery_preference ?? 'deliver',
                         'fulfillment_type' => $item->fulfillment_type?->value,
+                        'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
                         'delivery_recipient_name' => $item->delivery_recipient_name,
                         'delivery_recipient_phone' => $item->delivery_recipient_phone,
                         'delivery_region_id' => $item->delivery_region_id,
@@ -1150,34 +1156,79 @@ class ShipmentController extends Controller
             'photo_ids.*' => ['required', 'integer'],
         ]);
 
-        // Create new package
-        $newItem = $shipment->items()->create([
-            'description' => null,
-            'quantity' => 1,
+        $shipment->load([
+            'pickupAssignment.warehouseReceipt.items',
+            'items.images',
+            'items.deliveryRegion',
+            'items.deliveryDistrict',
+            'deliveryRegion',
+            'deliveryDistrict',
         ]);
 
-        // Move selected photos to new package
+        $assignment = $shipment->pickupAssignment;
+        $receiptItem = $this->findReceiptItemForShipmentItem($assignment, $item);
+        $splitAllowed = is_null($assignment?->picked_up_at)
+            || $this->canSplitPackageDuringReceiving($assignment, $receiptItem);
+
+        if (! $splitAllowed) {
+            return response()->json([
+                'success' => false,
+                'message' => $this->receivingSplitLockReason($assignment, $receiptItem) ?? 'Package can no longer be split.',
+            ], 422);
+        }
+
+        $newItem = $shipment->items()->create([
+            'description' => $item->description,
+            'quantity' => 1,
+            'status' => $item->status?->value ?? $item->getRawOriginal('status') ?? 'pending',
+            'delivery_preference' => $item->delivery_preference ?? 'deliver',
+            'fulfillment_type' => $item->fulfillment_type?->value ?? $item->getRawOriginal('fulfillment_type'),
+            'delivery_recipient_name' => $item->delivery_recipient_name,
+            'delivery_recipient_phone' => $item->delivery_recipient_phone,
+            'delivery_region_id' => $item->delivery_region_id,
+            'delivery_district_id' => $item->delivery_district_id,
+            'delivery_town' => $item->delivery_town,
+            'delivery_landmark' => $item->delivery_landmark,
+            'delivery_instructions' => $item->delivery_instructions,
+            'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
+        ]);
+
         $movedCount = ShipmentItemImage::whereIn('id', $validated['photo_ids'])
             ->where('shipment_item_id', $item->id)
             ->update(['shipment_item_id' => $newItem->id]);
 
-        $newItem->load('images');
+        $shipment->load([
+            'pickupAssignment.itemConfirmations',
+            'pickupAssignment.photos',
+            'pickupAssignment.warehouseReceipt.items.photos',
+            'items.images',
+            'items.deliveryRegion',
+            'items.deliveryDistrict',
+            'deliveryRegion',
+            'deliveryDistrict',
+        ]);
+
+        $sourceItem = $shipment->items->firstWhere('id', $item->id) ?? $item->fresh(['images', 'deliveryRegion', 'deliveryDistrict']);
+        $newItem = $shipment->items->firstWhere('id', $newItem->id) ?? $newItem->fresh(['images', 'deliveryRegion', 'deliveryDistrict']);
 
         return response()->json([
             'success' => true,
             'message' => "{$movedCount} photo(s) moved to new package.",
             'data' => [
-                'package' => [
-                    'id' => $newItem->id,
-                    'description' => $newItem->description,
-                    'quantity' => $newItem->quantity,
-                    'photos' => $newItem->images->map(fn ($img) => [
-                        'id' => $img->id,
-                        'url' => $img->getSignedUrl()['url'] ?? null,
-                        'original_name' => $img->original_name,
-                        'size_human' => $img->size_human,
-                    ])->values(),
-                ],
+                'package' => $this->serializeEditorPackage($newItem),
+                'source_package' => $this->serializeEditorPackage($sourceItem),
+                'receiving_package' => ! is_null($assignment?->picked_up_at)
+                    ? $this->serializeReceivingPackage($shipment, $newItem, $assignment)
+                    : null,
+                'source_receiving_package' => ! is_null($assignment?->picked_up_at)
+                    ? $this->serializeReceivingPackage($shipment, $sourceItem, $assignment)
+                    : null,
+                'can_auto_group' => ! is_null($assignment?->picked_up_at)
+                    ? $this->canAutoGroupByPhoneDuringReceiving($assignment)
+                    : null,
+                'auto_group_lock_reason' => ! is_null($assignment?->picked_up_at)
+                    ? $this->receivingAutoGroupLockReason($assignment)
+                    : null,
             ],
         ]);
     }
@@ -1437,64 +1488,22 @@ class ShipmentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'No pickup assignment found for this shipment.',
-                'data' => ['packages' => [], 'can_receive' => false, 'receipt' => null],
+                'data' => [
+                    'packages' => [],
+                    'can_receive' => false,
+                    'receipt' => null,
+                    'can_auto_group' => false,
+                    'auto_group_lock_reason' => 'No pickup assignment found for this shipment.',
+                ],
             ]);
         }
 
-        $assignment->load(['itemConfirmations', 'photos', 'warehouseReceipt.items.photos']);
-        $shipment->load(['items.images']);
-
-        $receivingService = app(WarehouseReceivingService::class);
-        $storageService = app(StorageService::class);
+        $shipment = $this->reloadReceivingShipment($shipment);
+        $assignment = $shipment->pickupAssignment;
         $receipt = $assignment->warehouseReceipt;
-        $usesShipmentDeliveryDetails = $shipment->destination_mode === ShipmentDestinationMode::SINGLE;
-
-        $packages = $shipment->items->map(function (ShipmentItem $item) use ($assignment, $receipt, $receivingService, $storageService, $shipment, $usesShipmentDeliveryDetails) {
-            $receiptItem = $receipt?->items?->firstWhere('shipment_item_id', $item->id);
-            $driverConfirmation = $assignment->itemConfirmations->firstWhere('shipment_item_id', $item->id);
-            $driverPhotos = $assignment->photos
-                ->where('shipment_item_id', $item->id)->values()
-                ->map(fn ($photo) => [
-                    'id' => $photo->id,
-                    'url' => $storageService->getUrl($photo->path),
-                ])->values();
-
-            $vendorPhotos = $item->images->map(fn ($img) => $img->getSignedUrl()['url'] ?? $img->getSignedUrl())->filter()->values();
-
-            $vendorQuantity = (int) $item->quantity;
-            $driverQuantity = $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : null;
-            $deliverySource = $usesShipmentDeliveryDetails ? $shipment : $item;
-
-            return [
-                'shipment_item_id' => $item->id,
-                'description' => $item->description,
-                'tracking_code' => $item->tracking_code,
-                'vendor_quantity' => $vendorQuantity,
-                'driver_confirmed_quantity' => $driverQuantity,
-                'expected_quantity' => $driverQuantity ?? $vendorQuantity,
-                'vendor_photos' => $vendorPhotos,
-                'driver_photos' => $driverPhotos,
-                'received_quantity' => (int) ($receiptItem?->received_quantity ?? 0),
-                'damaged_quantity' => (int) ($receiptItem?->damaged_quantity ?? 0),
-                'condition_status' => $receiptItem?->condition_status ?? 'ok',
-                'notes' => $receiptItem?->notes,
-                'barcode_value' => $receiptItem?->barcode_value,
-                'barcode_print_count' => (int) ($receiptItem?->barcode_print_count ?? 0),
-                'delivery_recipient_name' => $deliverySource->delivery_recipient_name,
-                'delivery_recipient_phone' => $deliverySource->delivery_recipient_phone,
-                'delivery_region_id' => $deliverySource->delivery_region_id,
-                'delivery_region_name' => $deliverySource->deliveryRegion?->name,
-                'delivery_district_id' => $deliverySource->delivery_district_id,
-                'delivery_district_name' => $deliverySource->deliveryDistrict?->name,
-                'delivery_town' => $deliverySource->delivery_town,
-                'delivery_landmark' => $deliverySource->delivery_landmark,
-                'delivery_instructions' => $deliverySource->delivery_instructions,
-                'delivery_method' => $item->delivery_method,
-                'photos' => $receiptItem
-                    ? $receivingService->serializeReceiptItem($receiptItem)['photos']
-                    : [],
-            ];
-        })->values();
+        $packages = $shipment->items
+            ->map(fn (ShipmentItem $item) => $this->serializeReceivingPackage($shipment, $item, $assignment))
+            ->values();
 
         return response()->json([
             'success' => true,
@@ -1506,7 +1515,43 @@ class ShipmentController extends Controller
                     'status' => $receipt->status,
                 ] : null,
                 'assignment_id' => $assignment->id,
+                'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($assignment),
+                'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($assignment),
             ],
+        ]);
+    }
+
+    public function saveReceivingPackageDetails(Request $request, Shipment $shipment, ShipmentItem $item): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        if ($item->shipment_id !== $shipment->id) {
+            return response()->json(['success' => false, 'message' => 'Package not found.'], 404);
+        }
+
+        $assignment = $shipment->pickupAssignment;
+        if (! $assignment || is_null($assignment->picked_up_at)) {
+            return response()->json(['success' => false, 'message' => 'Shipment has not been picked up yet.'], 422);
+        }
+
+        $validated = $request->validate([
+            'description' => ['nullable', 'string', 'max:500'],
+            'delivery_recipient_name' => ['nullable', 'string', 'max:255'],
+            'delivery_recipient_phone' => ['nullable', 'string', 'max:20'],
+            'delivery_region_id' => ['nullable', 'exists:regions,id'],
+            'delivery_district_id' => ['nullable', 'exists:districts,id'],
+            'delivery_town' => ['nullable', 'string', 'max:255'],
+            'delivery_landmark' => ['nullable', 'string', 'max:255'],
+            'delivery_instructions' => ['nullable', 'string', 'max:1000'],
+            'delivery_method' => ['nullable', 'in:direct,bus_handoff'],
+        ]);
+
+        $this->applyReceivingPackageDetails($shipment, $item, $validated, false);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Package details saved.',
+            'data' => $this->buildReceivingWorkspaceResponseData($shipment, $item),
         ]);
     }
 
@@ -1549,44 +1594,14 @@ class ShipmentController extends Controller
             'delivery_method' => ['nullable', 'in:direct,bus_handoff'],
         ]);
 
-        $deliveryUpdates = [
-            'delivery_recipient_name' => $validated['delivery_recipient_name'] ?? null,
-            'delivery_recipient_phone' => ! empty($validated['delivery_recipient_phone'])
-                ? PhoneHelper::format($validated['delivery_recipient_phone'])
-                : null,
-            'delivery_region_id' => $validated['delivery_region_id'] ?? null,
-            'delivery_district_id' => $validated['delivery_district_id'] ?? null,
-            'delivery_town' => $validated['delivery_town'] ?? null,
-            'delivery_landmark' => $validated['delivery_landmark'] ?? null,
-            'delivery_instructions' => $validated['delivery_instructions'] ?? null,
-            'delivery_method' => $validated['delivery_method'] ?? \App\Models\ShipmentItem::DELIVERY_METHOD_DIRECT,
-        ];
-
-        $packageUpdates = [];
-        if (array_key_exists('description', $validated)) {
-            $packageUpdates['description'] = $validated['description'];
-        }
-        if (array_key_exists('quantity', $validated)) {
-            $packageUpdates['quantity'] = $validated['quantity'];
-        }
-
-        $packageUpdates = array_merge($packageUpdates, $deliveryUpdates);
-        if (! empty($packageUpdates)) {
-            $item->update($packageUpdates);
-
-            if ($shipment->destination_mode === ShipmentDestinationMode::SINGLE) {
-                $shipment->update($deliveryUpdates);
-            }
-        }
+        $this->applyReceivingPackageDetails($shipment, $item, $validated, true);
 
         // If already received at warehouse, skip receipt upsert — just save the delivery details
         if ($assignment->received_at) {
             return response()->json([
                 'success' => true,
                 'message' => 'Package details updated.',
-                'data' => [
-                    'barcode_value' => $item->tracking_code,
-                ],
+                'data' => $this->buildReceivingWorkspaceResponseData($shipment, $item),
             ]);
         }
 
@@ -1603,6 +1618,13 @@ class ShipmentController extends Controller
             photos: $request->file('photos', []),
             removePhotoIds: $validated['remove_photo_ids'] ?? []
         );
+
+        if (($result['success'] ?? false) === true) {
+            $result['data'] = array_merge(
+                $result['data'] ?? [],
+                $this->buildReceivingWorkspaceResponseData($shipment, $item)
+            );
+        }
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }
@@ -1638,7 +1660,451 @@ class ShipmentController extends Controller
             labelType: $labelType
         );
 
+        if (($result['success'] ?? false) === true) {
+            $result['data'] = array_merge(
+                $result['data'] ?? [],
+                $this->buildReceivingWorkspaceResponseData($shipment, $item)
+            );
+        }
+
         return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    protected function serializeEditorPackage(ShipmentItem $item): array
+    {
+        $item->loadMissing(['images', 'deliveryRegion', 'deliveryDistrict']);
+
+        return [
+            'id' => $item->id,
+            'description' => $item->description,
+            'quantity' => $item->quantity,
+            'tracking_code' => $item->tracking_code,
+            'delivery_preference' => $item->delivery_preference ?? 'deliver',
+            'fulfillment_type' => $item->fulfillment_type?->value ?? $item->getRawOriginal('fulfillment_type'),
+            'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
+            'delivery_recipient_name' => $item->delivery_recipient_name,
+            'delivery_recipient_phone' => $item->delivery_recipient_phone,
+            'delivery_region_id' => $item->delivery_region_id,
+            'delivery_region_name' => $item->deliveryRegion?->name,
+            'delivery_district_id' => $item->delivery_district_id,
+            'delivery_district_name' => $item->deliveryDistrict?->name,
+            'delivery_town' => $item->delivery_town,
+            'delivery_landmark' => $item->delivery_landmark,
+            'delivery_instructions' => $item->delivery_instructions,
+            'photos' => $item->images->map(fn ($img) => [
+                'id' => $img->id,
+                'url' => $img->getSignedUrl()['url'] ?? null,
+                'original_name' => $img->original_name,
+                'size_human' => $img->size_human,
+                'recipient_phone' => $img->recipient_phone,
+            ])->values(),
+        ];
+    }
+
+    protected function reloadReceivingShipment(Shipment $shipment): Shipment
+    {
+        return $shipment->load([
+            'items.images',
+            'items.deliveryRegion',
+            'items.deliveryDistrict',
+            'deliveryRegion',
+            'deliveryDistrict',
+            'pickupAssignment.itemConfirmations',
+            'pickupAssignment.photos',
+            'pickupAssignment.warehouseReceipt.items.photos',
+        ]);
+    }
+
+    protected function findReceiptItemForShipmentItem(?\App\Models\PickupAssignment $assignment, ShipmentItem $item): ?WarehouseReceiptItem
+    {
+        if (! $assignment?->relationLoaded('warehouseReceipt')) {
+            $assignment?->load('warehouseReceipt.items.photos');
+        } elseif ($assignment->warehouseReceipt && ! $assignment->warehouseReceipt->relationLoaded('items')) {
+            $assignment->warehouseReceipt->load('items.photos');
+        }
+
+        return $assignment?->warehouseReceipt?->items?->firstWhere('shipment_item_id', $item->id);
+    }
+
+    protected function canAutoGroupByPhoneDuringReceiving(?\App\Models\PickupAssignment $assignment): bool
+    {
+        if (! $assignment?->picked_up_at) {
+            return false;
+        }
+
+        if ($assignment->received_at) {
+            return false;
+        }
+
+        if (! $assignment->relationLoaded('warehouseReceipt')) {
+            $assignment->load('warehouseReceipt.items');
+        } elseif ($assignment->warehouseReceipt && ! $assignment->warehouseReceipt->relationLoaded('items')) {
+            $assignment->warehouseReceipt->load('items');
+        }
+
+        return ! $assignment->warehouseReceipt?->items?->isNotEmpty();
+    }
+
+    protected function receivingAutoGroupLockReason(?\App\Models\PickupAssignment $assignment): ?string
+    {
+        if (! $assignment) {
+            return 'No pickup assignment found for this shipment.';
+        }
+
+        if (! $assignment->picked_up_at) {
+            return 'This shipment can only be auto-grouped from Receiving after pickup.';
+        }
+
+        if ($assignment->received_at) {
+            return 'Warehouse receiving has already been finalized for this shipment.';
+        }
+
+        if (! $assignment->relationLoaded('warehouseReceipt')) {
+            $assignment->load('warehouseReceipt.items');
+        } elseif ($assignment->warehouseReceipt && ! $assignment->warehouseReceipt->relationLoaded('items')) {
+            $assignment->warehouseReceipt->load('items');
+        }
+
+        if ($assignment->warehouseReceipt?->items?->isNotEmpty()) {
+            return 'Auto-group by phone is only available before warehouse receiving starts.';
+        }
+
+        return null;
+    }
+
+    protected function canSplitPackageDuringReceiving(?\App\Models\PickupAssignment $assignment, ?WarehouseReceiptItem $receiptItem): bool
+    {
+        if (! $assignment?->picked_up_at) {
+            return false;
+        }
+
+        if (! $receiptItem) {
+            return true;
+        }
+
+        return (int) $receiptItem->received_quantity === 0
+            && (int) $receiptItem->barcode_print_count === 0;
+    }
+
+    protected function receivingSplitLockReason(?\App\Models\PickupAssignment $assignment, ?WarehouseReceiptItem $receiptItem): ?string
+    {
+        if (! $assignment?->picked_up_at) {
+            return 'This package can only be split from Receiving after pickup.';
+        }
+
+        if (! $receiptItem) {
+            return null;
+        }
+
+        if ((int) $receiptItem->barcode_print_count > 0) {
+            return 'Labels have already been printed for this package.';
+        }
+
+        if ((int) $receiptItem->received_quantity > 0) {
+            return 'This package has already been received at the warehouse.';
+        }
+
+        return null;
+    }
+
+    protected function serializeReceivingPackage(
+        Shipment $shipment,
+        ShipmentItem $item,
+        ?\App\Models\PickupAssignment $assignment = null,
+        ?WarehouseReceiptItem $receiptItem = null,
+    ): array {
+        $receivingService = app(WarehouseReceivingService::class);
+        $storageService = app(StorageService::class);
+
+        $shipment->loadMissing([
+            'deliveryRegion',
+            'deliveryDistrict',
+            'items.images',
+            'items.deliveryRegion',
+            'items.deliveryDistrict',
+            'pickupAssignment.itemConfirmations',
+            'pickupAssignment.photos',
+            'pickupAssignment.warehouseReceipt.items.photos',
+        ]);
+
+        $item->loadMissing(['images', 'deliveryRegion', 'deliveryDistrict']);
+
+        $assignment ??= $shipment->pickupAssignment;
+        $receiptItem ??= $this->findReceiptItemForShipmentItem($assignment, $item);
+
+        $driverConfirmation = $assignment?->itemConfirmations?->firstWhere('shipment_item_id', $item->id);
+        $driverPhotos = $assignment
+            ? $assignment->photos
+                ->where('shipment_item_id', $item->id)
+                ->values()
+                ->map(fn ($photo) => [
+                    'id' => $photo->id,
+                    'url' => $storageService->getUrl($photo->path),
+                ])->values()
+            : collect();
+
+        $vendorPhotos = $item->images->map(fn ($img) => [
+            'id' => $img->id,
+            'url' => $img->getSignedUrl()['url'] ?? null,
+            'original_name' => $img->original_name,
+            'size_human' => $img->size_human,
+            'recipient_phone' => $img->recipient_phone,
+        ])->values();
+
+        $usesShipmentDeliveryDetails = $shipment->destination_mode === ShipmentDestinationMode::SINGLE;
+        $deliverySource = $usesShipmentDeliveryDetails ? $shipment : $item;
+
+        return [
+            'shipment_item_id' => $item->id,
+            'description' => $item->description,
+            'tracking_code' => $item->tracking_code,
+            'vendor_quantity' => (int) $item->quantity,
+            'driver_confirmed_quantity' => $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : null,
+            'expected_quantity' => $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : (int) $item->quantity,
+            'vendor_photos' => $vendorPhotos,
+            'driver_photos' => $driverPhotos,
+            'received_quantity' => (int) ($receiptItem?->received_quantity ?? 0),
+            'damaged_quantity' => (int) ($receiptItem?->damaged_quantity ?? 0),
+            'condition_status' => $receiptItem?->condition_status ?? 'ok',
+            'notes' => $receiptItem?->notes,
+            'barcode_value' => $receiptItem?->barcode_value,
+            'barcode_print_count' => (int) ($receiptItem?->barcode_print_count ?? 0),
+            'delivery_recipient_name' => $deliverySource->delivery_recipient_name,
+            'delivery_recipient_phone' => $deliverySource->delivery_recipient_phone,
+            'delivery_region_id' => $deliverySource->delivery_region_id,
+            'delivery_region_name' => $deliverySource->deliveryRegion?->name,
+            'delivery_district_id' => $deliverySource->delivery_district_id,
+            'delivery_district_name' => $deliverySource->deliveryDistrict?->name,
+            'delivery_town' => $deliverySource->delivery_town,
+            'delivery_landmark' => $deliverySource->delivery_landmark,
+            'delivery_instructions' => $deliverySource->delivery_instructions,
+            'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
+            'photos' => $receiptItem
+                ? $receivingService->serializeReceiptItem($receiptItem)['photos']
+                : [],
+            'can_split' => $this->canSplitPackageDuringReceiving($assignment, $receiptItem),
+            'split_lock_reason' => $this->receivingSplitLockReason($assignment, $receiptItem),
+        ];
+    }
+
+    protected function buildReceivingPackageItemUpdates(array $validated, bool $allowQuantity): array
+    {
+        $updates = [];
+
+        if (array_key_exists('description', $validated)) {
+            $updates['description'] = $validated['description'];
+        }
+
+        if ($allowQuantity && array_key_exists('quantity', $validated)) {
+            $updates['quantity'] = $validated['quantity'];
+        }
+
+        if (array_key_exists('delivery_recipient_name', $validated)) {
+            $updates['delivery_recipient_name'] = $validated['delivery_recipient_name'] ?? null;
+        }
+
+        if (array_key_exists('delivery_recipient_phone', $validated)) {
+            $updates['delivery_recipient_phone'] = ! empty($validated['delivery_recipient_phone'])
+                ? PhoneHelper::format($validated['delivery_recipient_phone'])
+                : null;
+        }
+
+        if (array_key_exists('delivery_region_id', $validated)) {
+            $updates['delivery_region_id'] = $validated['delivery_region_id'] ?? null;
+        }
+
+        if (array_key_exists('delivery_district_id', $validated)) {
+            $updates['delivery_district_id'] = $validated['delivery_district_id'] ?? null;
+        }
+
+        if (array_key_exists('delivery_town', $validated)) {
+            $updates['delivery_town'] = $validated['delivery_town'] ?? null;
+        }
+
+        if (array_key_exists('delivery_landmark', $validated)) {
+            $updates['delivery_landmark'] = $validated['delivery_landmark'] ?? null;
+        }
+
+        if (array_key_exists('delivery_instructions', $validated)) {
+            $updates['delivery_instructions'] = $validated['delivery_instructions'] ?? null;
+        }
+
+        if (array_key_exists('delivery_method', $validated) && $validated['delivery_method'] !== null) {
+            $updates['delivery_method'] = $validated['delivery_method'];
+        }
+
+        return $updates;
+    }
+
+    protected function buildShipmentItemCloneAttributes(ShipmentItem $item, array $overrides = []): array
+    {
+        return array_merge([
+            'description' => $item->description,
+            'quantity' => 1,
+            'status' => $item->status?->value ?? $item->getRawOriginal('status') ?? 'pending',
+            'delivery_preference' => $item->delivery_preference ?? 'deliver',
+            'fulfillment_type' => $item->fulfillment_type?->value ?? $item->getRawOriginal('fulfillment_type'),
+            'delivery_recipient_name' => $item->delivery_recipient_name,
+            'delivery_recipient_phone' => $item->delivery_recipient_phone,
+            'delivery_region_id' => $item->delivery_region_id,
+            'delivery_district_id' => $item->delivery_district_id,
+            'delivery_town' => $item->delivery_town,
+            'delivery_landmark' => $item->delivery_landmark,
+            'delivery_instructions' => $item->delivery_instructions,
+            'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
+        ], $overrides);
+    }
+
+    protected function buildReceivingShipmentDeliveryUpdates(array $validated): array
+    {
+        $updates = [];
+
+        foreach ([
+            'delivery_recipient_name',
+            'delivery_region_id',
+            'delivery_district_id',
+            'delivery_town',
+            'delivery_landmark',
+            'delivery_instructions',
+        ] as $key) {
+            if (array_key_exists($key, $validated)) {
+                $updates[$key] = $validated[$key] ?? null;
+            }
+        }
+
+        if (array_key_exists('delivery_recipient_phone', $validated)) {
+            $updates['delivery_recipient_phone'] = ! empty($validated['delivery_recipient_phone'])
+                ? PhoneHelper::format($validated['delivery_recipient_phone'])
+                : null;
+        }
+
+        return $updates;
+    }
+
+    protected function applyReceivingPackageDetails(
+        Shipment $shipment,
+        ShipmentItem $item,
+        array $validated,
+        bool $allowQuantity,
+    ): void {
+        $itemUpdates = $this->buildReceivingPackageItemUpdates($validated, $allowQuantity);
+        if (! empty($itemUpdates)) {
+            $item->update($itemUpdates);
+        }
+
+        if ($shipment->destination_mode === ShipmentDestinationMode::SINGLE) {
+            $shipmentUpdates = $this->buildReceivingShipmentDeliveryUpdates($validated);
+            if (! empty($shipmentUpdates)) {
+                $shipment->update($shipmentUpdates);
+            }
+        }
+    }
+
+    protected function buildReceivingWorkspaceResponseData(Shipment $shipment, ShipmentItem $item): array
+    {
+        $shipment = $this->reloadReceivingShipment($shipment);
+        $assignment = $shipment->pickupAssignment;
+        $serializedItem = $shipment->items->firstWhere('id', $item->id) ?? $item;
+
+        $data = [
+            'package' => $this->serializeReceivingPackage($shipment, $serializedItem, $assignment),
+            'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($assignment),
+            'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($assignment),
+        ];
+
+        if ($shipment->destination_mode === ShipmentDestinationMode::SINGLE) {
+            $data['packages'] = $shipment->items
+                ->map(fn (ShipmentItem $candidate) => $this->serializeReceivingPackage($shipment, $candidate, $assignment))
+                ->values();
+        }
+
+        return $data;
+    }
+
+    protected function mergePickupItemConfirmationsForAutoGroup(int $assignmentId, array $sourceItemIds, int $targetItemId): void
+    {
+        $sourceIds = collect($sourceItemIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0 && $id !== $targetItemId)
+            ->unique()
+            ->values();
+
+        if ($sourceIds->isEmpty()) {
+            return;
+        }
+
+        $targetConfirmation = PickupItemConfirmation::query()
+            ->where('pickup_assignment_id', $assignmentId)
+            ->where('shipment_item_id', $targetItemId)
+            ->first();
+
+        $sourceConfirmations = PickupItemConfirmation::query()
+            ->where('pickup_assignment_id', $assignmentId)
+            ->whereIn('shipment_item_id', $sourceIds->all())
+            ->orderBy('id')
+            ->get();
+
+        foreach ($sourceConfirmations as $confirmation) {
+            if (! $targetConfirmation) {
+                $confirmation->update(['shipment_item_id' => $targetItemId]);
+                $targetConfirmation = $confirmation->fresh();
+                continue;
+            }
+
+            $confirmedAt = $targetConfirmation->confirmed_at ?? $confirmation->confirmed_at;
+            if ($targetConfirmation->confirmed_at && $confirmation->confirmed_at && $confirmation->confirmed_at->gt($targetConfirmation->confirmed_at)) {
+                $confirmedAt = $confirmation->confirmed_at;
+            }
+
+            $notes = collect([$targetConfirmation->notes, $confirmation->notes])
+                ->filter()
+                ->unique()
+                ->implode("\n");
+
+            $targetConfirmation->update([
+                'expected_quantity' => (int) $targetConfirmation->expected_quantity + (int) $confirmation->expected_quantity,
+                'confirmed_quantity' => (int) $targetConfirmation->confirmed_quantity + (int) $confirmation->confirmed_quantity,
+                'notes' => $notes ?: null,
+                'confirmed_at' => $confirmedAt,
+            ]);
+
+            $confirmation->delete();
+        }
+    }
+
+    protected function reassignAutoGroupDependencies(
+        Shipment $shipment,
+        ?\App\Models\PickupAssignment $assignment,
+        array $sourceItemIds,
+        int $targetItemId,
+    ): void {
+        $sourceIds = collect($sourceItemIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0 && $id !== $targetItemId)
+            ->unique()
+            ->values();
+
+        if ($sourceIds->isEmpty()) {
+            return;
+        }
+
+        if ($assignment) {
+            $this->mergePickupItemConfirmationsForAutoGroup($assignment->id, $sourceIds->all(), $targetItemId);
+
+            PickupPhoto::query()
+                ->where('pickup_assignment_id', $assignment->id)
+                ->whereIn('shipment_item_id', $sourceIds->all())
+                ->update(['shipment_item_id' => $targetItemId]);
+        }
+
+        ShipmentCharge::query()
+            ->where('shipment_id', $shipment->id)
+            ->whereIn('shipment_item_id', $sourceIds->all())
+            ->update(['shipment_item_id' => $targetItemId]);
+
+        ShipmentItemTracking::query()
+            ->whereIn('shipment_item_id', $sourceIds->all())
+            ->update(['shipment_item_id' => $targetItemId]);
     }
 
     public function finalizeReceiving(Request $request, Shipment $shipment): JsonResponse
@@ -1682,7 +2148,24 @@ class ShipmentController extends Controller
     {
         $this->authorizePermission('shipments.edit');
 
-        $shipment->load('items.images');
+        $shipment->load([
+            'items.images',
+            'items.deliveryRegion',
+            'items.deliveryDistrict',
+            'deliveryRegion',
+            'deliveryDistrict',
+            'pickupAssignment.itemConfirmations',
+            'pickupAssignment.photos',
+            'pickupAssignment.warehouseReceipt.items',
+        ]);
+
+        $assignment = $shipment->pickupAssignment;
+        if (! is_null($assignment?->picked_up_at) && ! $this->canAutoGroupByPhoneDuringReceiving($assignment)) {
+            return response()->json([
+                'success' => false,
+                'message' => $this->receivingAutoGroupLockReason($assignment) ?? 'Auto-group by phone is no longer available for this shipment.',
+            ], 422);
+        }
 
         $allImages = $shipment->items->flatMap(fn ($item) => $item->images);
 
@@ -1699,63 +2182,109 @@ class ShipmentController extends Controller
         $grouped = $allImages->groupBy(fn ($img) => $img->recipient_phone ?: '__untagged__');
 
         return DB::transaction(function () use ($shipment, $grouped) {
-            // Collect all image IDs before deleting items
-            $allImageIds = ShipmentItemImage::whereIn('shipment_item_id', $shipment->items()->pluck('id'))
-                ->pluck('id', 'id');
+            $shipment = Shipment::query()->lockForUpdate()->findOrFail($shipment->id);
+            $shipment->load([
+                'items.images',
+                'items.deliveryRegion',
+                'items.deliveryDistrict',
+                'deliveryRegion',
+                'deliveryDistrict',
+                'pickupAssignment.itemConfirmations',
+                'pickupAssignment.photos',
+                'pickupAssignment.warehouseReceipt.items',
+            ]);
 
-            // Detach images from items temporarily (set to first item to avoid FK issues)
-            // Then delete all existing items and create fresh ones
+            $assignment = $shipment->pickupAssignment;
+            $sourceItems = $shipment->items->keyBy('id');
+            $usedItemIds = collect();
+            $groupedItems = [];
 
-            // Step 1: Create new items per phone group
-            $newItems = [];
             foreach ($grouped as $phone => $images) {
                 $isUntagged = $phone === '__untagged__';
+                $images = collect($images)->values();
+                $sourceItemIds = $images->pluck('shipment_item_id')
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values();
 
-                $item = $shipment->items()->create([
-                    'description' => null,
-                    'quantity' => $images->count(),
-                    'status' => 'pending',
-                    'delivery_recipient_phone' => $isUntagged ? null : $phone,
-                ]);
+                $sourceItem = $sourceItems->get($sourceItemIds->first());
+                if (! $sourceItem) {
+                    continue;
+                }
 
-                // Move photos to this new item
-                ShipmentItemImage::whereIn('id', $images->pluck('id'))
-                    ->update(['shipment_item_id' => $item->id]);
+                $keeper = null;
+                foreach ($sourceItemIds as $sourceItemId) {
+                    if (! $usedItemIds->contains($sourceItemId)) {
+                        $keeper = $sourceItems->get($sourceItemId);
+                        break;
+                    }
+                }
 
-                $newItems[] = [
-                    'id' => $item->id,
+                if (! $keeper) {
+                    $keeper = $shipment->items()->create(
+                        $this->buildShipmentItemCloneAttributes($sourceItem, [
+                            'quantity' => max(1, $images->count()),
+                            'delivery_recipient_phone' => $isUntagged ? null : $phone,
+                        ])
+                    );
+                    $sourceItems->put($keeper->id, $keeper);
+                } else {
+                    $keeper->update([
+                        'quantity' => max(1, $images->count()),
+                        'delivery_recipient_phone' => $isUntagged ? null : $phone,
+                    ]);
+                }
+
+                $usedItemIds->push((int) $keeper->id);
+
+                ShipmentItemImage::query()
+                    ->whereIn('id', $images->pluck('id')->all())
+                    ->update(['shipment_item_id' => $keeper->id]);
+
+                $this->reassignAutoGroupDependencies($shipment, $assignment, $sourceItemIds->all(), $keeper->id);
+
+                $groupedItems[] = [
+                    'id' => $keeper->id,
                     'phone' => $isUntagged ? null : $phone,
                     'photos_count' => $images->count(),
                 ];
             }
 
-            // Step 2: Delete old items that no longer have photos
-            $newItemIds = collect($newItems)->pluck('id');
-            $shipment->items()->whereNotIn('id', $newItemIds)->each(function ($item) {
+            $keepItemIds = collect($groupedItems)->pluck('id')->unique()->values();
+            $shipment->items()->whereNotIn('id', $keepItemIds)->get()->each(function ($item) {
                 if ($item->images()->count() === 0) {
                     $item->delete();
                 }
             });
 
-            $multipleGroups = count($newItems) > 1;
+            $multipleGroups = count($groupedItems) > 1;
             $newMode = $multipleGroups ? ShipmentDestinationMode::PER_ITEM : ShipmentDestinationMode::SINGLE;
 
             $shipmentUpdate = ['destination_mode' => $newMode];
 
             if ($newMode === ShipmentDestinationMode::SINGLE) {
-                $singlePhone = collect($newItems)->pluck('phone')->filter()->first();
-                if ($singlePhone) {
-                    $shipmentUpdate['delivery_recipient_phone'] = $singlePhone;
-                }
+                $shipmentUpdate['delivery_recipient_phone'] = collect($groupedItems)->pluck('phone')->filter()->first();
+            } else {
+                $shipmentUpdate['delivery_recipient_phone'] = $shipment->delivery_recipient_phone;
             }
 
             $shipment->update($shipmentUpdate);
 
-            $shipment->load('items.images');
+            $shipment->load([
+                'items.images',
+                'items.deliveryRegion',
+                'items.deliveryDistrict',
+                'deliveryRegion',
+                'deliveryDistrict',
+                'pickupAssignment.itemConfirmations',
+                'pickupAssignment.photos',
+                'pickupAssignment.warehouseReceipt.items',
+            ]);
 
             return response()->json([
                 'success' => true,
-                'message' => count($newItems).' package(s) created. Destination mode set to '.$newMode->value.'.',
+                'message' => count($groupedItems).' package(s) created. Destination mode set to '.$newMode->value.'.',
                 'data' => [
                     'destination_mode' => $newMode->value,
                     'delivery_recipient_phone' => $shipment->fresh()->delivery_recipient_phone,
@@ -1763,6 +2292,7 @@ class ShipmentController extends Controller
                         'id' => $item->id,
                         'description' => $item->description,
                         'quantity' => $item->quantity,
+                        'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
                         'delivery_recipient_phone' => $item->delivery_recipient_phone,
                         'delivery_recipient_name' => $item->delivery_recipient_name,
                         'photos' => $item->images->map(fn ($img) => [
@@ -1772,6 +2302,15 @@ class ShipmentController extends Controller
                             'recipient_phone' => $img->recipient_phone,
                         ])->values(),
                     ])->values(),
+                    'receiving_packages' => ! is_null($assignment?->picked_up_at)
+                        ? $shipment->items->map(fn (ShipmentItem $item) => $this->serializeReceivingPackage($shipment, $item, $assignment))->values()
+                        : null,
+                    'can_auto_group' => ! is_null($assignment?->picked_up_at)
+                        ? $this->canAutoGroupByPhoneDuringReceiving($assignment)
+                        : null,
+                    'auto_group_lock_reason' => ! is_null($assignment?->picked_up_at)
+                        ? $this->receivingAutoGroupLockReason($assignment)
+                        : null,
                 ],
             ]);
         });

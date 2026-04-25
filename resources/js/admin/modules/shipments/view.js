@@ -25,7 +25,8 @@ function shipmentShow() {
         // Receiving
         receivingLoaded: false,
         receivingLightbox: null,
-        receiving: { loading: false, saving: false, completingPickup: false, canReceive: false, packages: [], receipt: null, assignmentId: null },
+        receivingSplitModal: { open: false, packageId: null, packageLabel: '', photos: [], selectedIds: [], saving: false },
+        receiving: { loading: false, saving: false, detailsSaving: false, autoGrouping: false, completingPickup: false, canReceive: false, canAutoGroup: false, autoGroupLockReason: '', packages: [], receipt: null, assignmentId: null },
 
         // Charges
         chargesLoaded: false,
@@ -684,12 +685,55 @@ function shipmentShow() {
             return isLinked ? [town, districtName, regionName].filter(Boolean).join(', ') : town;
         },
 
+        receivingExpectedQuantity(pkg) {
+            const expected = Number(pkg?.expected_quantity ?? pkg?.driver_confirmed_quantity ?? pkg?.vendor_quantity ?? 0);
+            return Number.isFinite(expected) ? expected : 0;
+        },
+
+        receivingObservedQuantity(pkg) {
+            const received = Number(pkg?.received_quantity ?? 0);
+            const damaged = Number(pkg?.damaged_quantity ?? 0);
+
+            return (Number.isFinite(received) ? received : 0) + (Number.isFinite(damaged) ? damaged : 0);
+        },
+
+        receivingReceivedUnits() {
+            return (this.receiving.packages || []).reduce((total, pkg) => {
+                const received = Number(pkg?.received_quantity ?? 0);
+                return total + (Number.isFinite(received) ? received : 0);
+            }, 0);
+        },
+
+        receivingPendingUnits() {
+            return (this.receiving.packages || []).reduce((total, pkg) => {
+                const expected = this.receivingExpectedQuantity(pkg);
+                const observed = this.receivingObservedQuantity(pkg);
+                return total + Math.max(expected - observed, 0);
+            }, 0);
+        },
+
         prepareReceivingPackage(pkg) {
             const prepared = {
                 ...pkg,
+                vendor_photos: (Array.isArray(pkg.vendor_photos) ? pkg.vendor_photos : []).map((photo) => {
+                    if (typeof photo === 'string') {
+                        return { id: null, url: photo, original_name: null, recipient_phone: null };
+                    }
+
+                    return {
+                        id: photo.id ?? null,
+                        url: photo.url || '',
+                        original_name: photo.original_name || null,
+                        recipient_phone: photo.recipient_phone || null,
+                    };
+                }),
+                driver_photos: Array.isArray(pkg.driver_photos) ? pkg.driver_photos : [],
+                photos: Array.isArray(pkg.photos) ? pkg.photos : [],
                 delivery_region_id: pkg.delivery_region_id ? String(pkg.delivery_region_id) : '',
                 delivery_district_id: pkg.delivery_district_id ? String(pkg.delivery_district_id) : '',
                 delivery_town: pkg.delivery_town || '',
+                can_split: !!pkg.can_split,
+                split_lock_reason: pkg.split_lock_reason || '',
             };
 
             const isLinked = Boolean(prepared.delivery_town && prepared.delivery_region_id && prepared.delivery_district_id);
@@ -711,6 +755,60 @@ function shipmentShow() {
             prepared._town_selected_display = isLinked ? prepared._town_query : null;
 
             return prepared;
+        },
+
+        applyReceivingMeta(data = {}) {
+            if (Object.prototype.hasOwnProperty.call(data, 'can_auto_group')) {
+                this.receiving.canAutoGroup = !!data.can_auto_group;
+            }
+
+            if (Object.prototype.hasOwnProperty.call(data, 'auto_group_lock_reason')) {
+                this.receiving.autoGroupLockReason = data.auto_group_lock_reason || '';
+            }
+
+            if (Object.prototype.hasOwnProperty.call(data, 'destination_mode') && data.destination_mode) {
+                this.shipment.destination_mode = data.destination_mode;
+            }
+
+            if (Object.prototype.hasOwnProperty.call(data, 'delivery_recipient_phone')) {
+                this.shipment.delivery_recipient_phone = data.delivery_recipient_phone || null;
+            }
+        },
+
+        replaceReceivingPackage(pkg) {
+            const prepared = this.prepareReceivingPackage(pkg);
+            const index = this.receiving.packages.findIndex((candidate) => Number(candidate.shipment_item_id) === Number(prepared.shipment_item_id));
+
+            if (index >= 0) {
+                this.receiving.packages.splice(index, 1, prepared);
+            } else {
+                this.receiving.packages.push(prepared);
+            }
+
+            return prepared;
+        },
+
+        applyReceivingResponse(result, pkg = null) {
+            this.applyReceivingMeta(result.data || {});
+
+            if (Array.isArray(result.data?.receiving_packages)) {
+                this.receiving.packages = result.data.receiving_packages.map((candidate) => this.prepareReceivingPackage(candidate));
+                return;
+            }
+
+            if (Array.isArray(result.data?.packages)) {
+                this.receiving.packages = result.data.packages.map((candidate) => this.prepareReceivingPackage(candidate));
+                return;
+            }
+
+            if (result.data?.package) {
+                const prepared = this.prepareReceivingPackage(result.data.package);
+                if (pkg) {
+                    Object.assign(pkg, prepared);
+                } else {
+                    this.replaceReceivingPackage(prepared);
+                }
+            }
         },
 
         closeReceivingTownSearch(pkg) {
@@ -814,9 +912,179 @@ function shipmentShow() {
                     this.receiving.canReceive = result.data.can_receive;
                     this.receiving.receipt = result.data.receipt;
                     this.receiving.assignmentId = result.data.assignment_id;
+                    this.receiving.canAutoGroup = !!result.data.can_auto_group;
+                    this.receiving.autoGroupLockReason = result.data.auto_group_lock_reason || '';
                 }
             } catch (e) { console.error('Failed to load receiving data', e); }
             this.receiving.loading = false;
+        },
+
+        async autoGroupReceivingPackagesByPhone() {
+            if (this.receiving.autoGrouping || !this.config.autoGroupByPhoneEndpoint) {
+                return;
+            }
+
+            if (!this.receiving.canAutoGroup && this.receiving.autoGroupLockReason) {
+                window.showToast?.(this.receiving.autoGroupLockReason, 'error');
+                return;
+            }
+
+            this.receiving.autoGrouping = true;
+
+            try {
+                const response = await fetch(this.config.autoGroupByPhoneEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({}),
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    this.applyReceivingResponse(result);
+                    if (!Array.isArray(result.data?.receiving_packages)) {
+                        await this.loadReceiving();
+                    }
+                    window.showToast?.(result.message || 'Packages grouped by phone.', 'success');
+                } else {
+                    this.applyReceivingMeta(result.data || {});
+                    window.showToast?.(result.message || 'Auto-group failed.', 'error');
+                }
+            } catch (e) {
+                window.showToast?.('Error grouping packages by phone.', 'error');
+            }
+
+            this.receiving.autoGrouping = false;
+        },
+
+        async saveReceivingPackageDetails(pkg) {
+            this.receiving.detailsSaving = true;
+            const url = this.config.receivingDetailsSaveEndpoint.replace('__ITEM__', pkg.shipment_item_id);
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        description: pkg.description || null,
+                        delivery_recipient_name: pkg.delivery_recipient_name || null,
+                        delivery_recipient_phone: pkg.delivery_recipient_phone || null,
+                        delivery_region_id: pkg.delivery_region_id || null,
+                        delivery_district_id: pkg.delivery_district_id || null,
+                        delivery_town: pkg.delivery_town || null,
+                        delivery_landmark: pkg.delivery_landmark || null,
+                        delivery_instructions: pkg.delivery_instructions || null,
+                        delivery_method: pkg.delivery_method || 'direct',
+                    }),
+                });
+                const result = await response.json();
+                if (result.success) {
+                    this.applyReceivingResponse(result, pkg);
+                    window.showToast?.(result.message || 'Package details saved.', 'success');
+                } else {
+                    window.showToast?.(result.message || 'Failed to save package details.', 'error');
+                }
+            } catch (e) {
+                window.showToast?.('Error saving package details.', 'error');
+            }
+            this.receiving.detailsSaving = false;
+        },
+
+        openReceivingSplitModal(pkg) {
+            if (!pkg.can_split) {
+                window.showToast?.(pkg.split_lock_reason || 'This package can no longer be split.', 'error');
+                return;
+            }
+
+            const photos = (pkg.vendor_photos || []).filter((photo) => photo && photo.id);
+            if (!photos.length) {
+                window.showToast?.('There are no vendor photos available to split on this package.', 'error');
+                return;
+            }
+
+            const packageIndex = this.receiving.packages.findIndex((candidate) => Number(candidate.shipment_item_id) === Number(pkg.shipment_item_id));
+            this.receivingSplitModal = {
+                open: true,
+                packageId: pkg.shipment_item_id,
+                packageLabel: packageIndex >= 0 ? `Package ${packageIndex + 1}` : 'Package',
+                photos,
+                selectedIds: [],
+                saving: false,
+            };
+        },
+
+        closeReceivingSplitModal() {
+            if (this.receivingSplitModal.saving) return;
+
+            this.receivingSplitModal = {
+                open: false,
+                packageId: null,
+                packageLabel: '',
+                photos: [],
+                selectedIds: [],
+                saving: false,
+            };
+        },
+
+        toggleReceivingSplitPhoto(id) {
+            const idx = this.receivingSplitModal.selectedIds.indexOf(id);
+            if (idx >= 0) this.receivingSplitModal.selectedIds.splice(idx, 1);
+            else this.receivingSplitModal.selectedIds.push(id);
+        },
+
+        async executeReceivingSplit() {
+            if (!this.receivingSplitModal.packageId || !this.receivingSplitModal.selectedIds.length || this.receivingSplitModal.saving) {
+                return;
+            }
+
+            this.receivingSplitModal.saving = true;
+            const url = this.config.splitPackageUrlTemplate.replace('__PKG__', this.receivingSplitModal.packageId);
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ photo_ids: this.receivingSplitModal.selectedIds }),
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    this.applyReceivingMeta(result.data || {});
+                    const sourcePackage = result.data?.source_receiving_package;
+                    const newPackage = result.data?.receiving_package;
+                    const sourceIndex = this.receiving.packages.findIndex((candidate) => Number(candidate.shipment_item_id) === Number(this.receivingSplitModal.packageId));
+
+                    if (sourcePackage) {
+                        this.replaceReceivingPackage(sourcePackage);
+                    }
+
+                    if (newPackage) {
+                        const prepared = this.prepareReceivingPackage(newPackage);
+                        const insertIndex = sourceIndex >= 0 ? sourceIndex + 1 : this.receiving.packages.length;
+                        this.receiving.packages.splice(insertIndex, 0, prepared);
+                    }
+
+                    window.showToast?.(result.message || 'Package split successfully.', 'success');
+                    this.receivingSplitModal.saving = false;
+                    this.closeReceivingSplitModal();
+                } else {
+                    window.showToast?.(result.message || 'Failed to split package.', 'error');
+                }
+            } catch (e) {
+                window.showToast?.('Error splitting package.', 'error');
+            }
+
+            this.receivingSplitModal.saving = false;
         },
 
         async receivePackage(pkg) {
@@ -848,27 +1116,8 @@ function shipmentShow() {
                 });
                 const result = await response.json();
                 if (result.success) {
-                    if (result.data?.barcode_value) pkg.barcode_value = result.data.barcode_value;
-                    if (result.data?.barcode_print_count) pkg.barcode_print_count = result.data.barcode_print_count;
-                    if (this.shipmentDestinationMode() === 'single') {
-                        this.receiving.packages = this.receiving.packages.map(candidate => {
-                            const synced = {
-                                ...candidate,
-                                delivery_recipient_name: pkg.delivery_recipient_name,
-                                delivery_recipient_phone: pkg.delivery_recipient_phone,
-                                delivery_region_id: pkg.delivery_region_id,
-                                delivery_district_id: pkg.delivery_district_id,
-                                delivery_town: pkg.delivery_town,
-                                delivery_landmark: pkg.delivery_landmark,
-                                delivery_instructions: pkg.delivery_instructions,
-                            };
-
-                            return this.prepareReceivingPackage(synced);
-                        });
-                    } else {
-                        Object.assign(pkg, this.prepareReceivingPackage(pkg));
-                    }
-                    window.showToast?.('Package received.', 'success');
+                    this.applyReceivingResponse(result, pkg);
+                    window.showToast?.(result.message || 'Package received.', 'success');
                 } else {
                     window.showToast?.(result.message || 'Failed.', 'error');
                 }
@@ -890,8 +1139,7 @@ function shipmentShow() {
                 });
                 const result = await response.json();
                 if (result.success) {
-                    if (result.data?.barcode_value) pkg.barcode_value = result.data.barcode_value;
-                    if (result.data?.barcode_print_count) pkg.barcode_print_count = result.data.barcode_print_count;
+                    this.applyReceivingResponse(result, pkg);
                     if (result.data?.label_html) {
                         const w = window.open('', '_blank', 'width=400,height=600');
                         if (w) { w.document.write(result.data.label_html); w.document.close(); setTimeout(() => w.print(), 300); }

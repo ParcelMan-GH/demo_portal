@@ -34,6 +34,7 @@ class ShipmentItem extends Model
         'delivery_landmark',
         'delivery_instructions',
         'fulfillment_type',
+        'delivery_preference',
         'delivery_method',
         'status',
         'tracking_code',

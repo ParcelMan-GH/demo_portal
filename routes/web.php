@@ -229,6 +229,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('shipments/{shipment}/items', [ShipmentController::class, 'items'])->name('shipments.items');
         Route::get('shipments/{shipment}/tracking', [ShipmentController::class, 'tracking'])->name('shipments.tracking');
         Route::get('shipments/{shipment}/receiving-data', [ShipmentController::class, 'receivingData'])->name('shipments.receiving-data');
+        Route::post('shipments/{shipment}/receiving/{item}/details', [ShipmentController::class, 'saveReceivingPackageDetails'])->name('shipments.receiving.details');
         Route::post('shipments/{shipment}/receiving/{item}/save', [ShipmentController::class, 'receivePackage'])->name('shipments.receiving.save');
         Route::post('shipments/{shipment}/receiving/{item}/print-label', [ShipmentController::class, 'printPackageLabel'])->name('shipments.receiving.print-label');
         Route::post('shipments/{shipment}/receiving/finalize', [ShipmentController::class, 'finalizeReceiving'])->name('shipments.receiving.finalize');

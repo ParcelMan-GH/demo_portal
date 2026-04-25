@@ -36,9 +36,9 @@
                             </div>
                         </div>
                     </div>
-                    <div class="p-5" :class="!canEditShipmentFields ? 'opacity-60 pointer-events-none' : ''">
+                    <div class="p-5" :class="!canEditPrePickupPackageSetup() ? 'opacity-60 pointer-events-none' : ''">
                         <div class="grid grid-cols-2 gap-3">
-                            <div @@click="if (canEditShipmentFields && destinationMode !== 'single') switchDestinationMode('single')"
+                            <div @@click="if (canEditPrePickupPackageSetup() && destinationMode !== 'single') switchDestinationMode('single')"
                                  class="cursor-pointer p-4 rounded-2xl border-2 transition-all duration-200"
                                  :class="destinationMode === 'single' ? 'border-blue-500 bg-blue-50 shadow-sm shadow-blue-200/60' : 'border-slate-200 hover:border-blue-200 hover:bg-blue-50/40'">
                                 <div class="flex items-center gap-2 mb-2">
@@ -50,7 +50,7 @@
                                 </div>
                                 <p class="text-[11px] text-slate-500 ml-7">All packages go to one address</p>
                             </div>
-                            <div @@click="if (canEditShipmentFields && destinationMode !== 'per_item') switchDestinationMode('per_item')"
+                            <div @@click="if (canEditPrePickupPackageSetup() && destinationMode !== 'per_item') switchDestinationMode('per_item')"
                                  class="cursor-pointer p-4 rounded-2xl border-2 transition-all duration-200"
                                  :class="destinationMode === 'per_item' ? 'border-violet-500 bg-violet-50 shadow-sm shadow-violet-200/60' : 'border-slate-200 hover:border-violet-200 hover:bg-violet-50/40'">
                                 <div class="flex items-center gap-2 mb-2">
@@ -183,7 +183,15 @@
                             </div>
                         </div>
 
-                        <fieldset :disabled="!canEditShipmentFields" class="p-4 space-y-3" :class="!canEditShipmentFields ? 'opacity-60 pointer-events-none' : ''">
+                        <div x-show="packageWorkspaceLocked()" class="mx-4 mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] text-amber-700" style="display:none">
+                            Delivery setup now happens from the Receiving tab after pickup.
+                            <button type="button" @@click="openReceivingWorkspace()" class="ml-2 inline-flex items-center gap-1 font-semibold text-amber-800 hover:text-amber-900">
+                                Open Receiving
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                            </button>
+                        </div>
+
+                        <fieldset :disabled="!canEditPrePickupPackageSetup()" class="p-4 space-y-3" :class="!canEditPrePickupPackageSetup() ? 'opacity-60 pointer-events-none' : ''">
                             {{-- Routing preferences --}}
                             <div class="bg-slate-50/60 border border-slate-100 rounded-xl p-3">
                                 <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -280,7 +288,7 @@
                             </div>
                         </fieldset>
                         {{-- Footer --}}
-                        <div x-show="canEditShipmentFields" class="px-5 py-3 border-t border-slate-100/80 bg-slate-50/30 rounded-b-3xl flex items-center justify-end gap-2">
+                        <div x-show="canEditPrePickupPackageSetup()" class="px-5 py-3 border-t border-slate-100/80 bg-slate-50/30 rounded-b-3xl flex items-center justify-end gap-2">
                             <span x-show="deliverySaved" x-transition.opacity class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                 Saved
@@ -311,7 +319,7 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button @@click="autoGroupByPhone()" :disabled="autoGrouping"
+                                <button @@click="autoGroupByPhone()" :disabled="autoGrouping || packageWorkspaceLocked()"
                                         class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 text-white text-[11px] font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-50">
                                     <template x-if="!autoGrouping">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
@@ -321,7 +329,7 @@
                                     </template>
                                     <span x-text="autoGrouping ? 'Grouping...' : 'Auto-group by Phone'"></span>
                                 </button>
-                                <button @@click="addPackage()"
+                                <button @@click="addPackage()" :disabled="packageWorkspaceLocked()"
                                         class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 text-white text-[11px] font-semibold rounded-xl hover:bg-slate-700 transition-all shadow-sm">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                     Add Package
@@ -331,6 +339,14 @@
                     </div>
 
                     <div class="p-4 space-y-3">
+                        <div x-show="packageWorkspaceLocked()" class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] text-amber-700" style="display:none">
+                            Package splitting, delivery setup, and package edits now move to the Receiving tab after pickup.
+                            <button type="button" @@click="openReceivingWorkspace()" class="ml-2 inline-flex items-center gap-1 font-semibold text-amber-800 hover:text-amber-900">
+                                Open Receiving
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                            </button>
+                        </div>
+
                         {{-- Empty state --}}
                         <template x-if="packages.length === 0">
                             <div class="text-center py-14">
@@ -356,11 +372,11 @@
                                         <span x-show="pkg.description" class="text-[11px] text-slate-400 truncate max-w-32" x-text="pkg.description"></span>
                                     </div>
                                     <div class="flex items-center gap-1" @@click.stop>
-                                        <button @@click="splitPackageModal(pkg)" x-show="pkg.photos.length > 1"
+                                        <button @@click="splitPackageModal(pkg)" x-show="!packageWorkspaceLocked() && pkg.photos.length > 1"
                                                 class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Split Package">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                                         </button>
-                                        <button @@click="deletePackage(pkg)"
+                                        <button @@click="deletePackage(pkg)" x-show="!packageWorkspaceLocked()"
                                                 class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Delete Package">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                         </button>
@@ -376,7 +392,7 @@
                                     <div class="px-4 py-3.5 border-b border-slate-100/80 bg-slate-50/30">
                                         <div class="flex items-center justify-between mb-2.5">
                                             <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Photos (<span x-text="pkg.photos.length"></span>)</span>
-                                            <label class="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors border border-blue-100">
+                                            <label x-show="!packageWorkspaceLocked()" class="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors border border-blue-100" style="display:none">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                                 Upload Photos
                                                 <input type="file" multiple accept="image/jpeg,image/png,image/webp" class="hidden" @@change="uploadPhotos(pkg, $event)">
@@ -387,7 +403,7 @@
                                                 <div class="flex flex-col items-center gap-1">
                                                 <div class="relative group w-20 h-20 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm" x-data="{ moveOpen: false }">
                                                     <img :src="photo.url" class="w-full h-full object-cover cursor-pointer" @@click="openLightbox(photo.url)">
-                                                    <div class="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100">
+                                                    <div x-show="!packageWorkspaceLocked()" class="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100" style="display:none">
                                                         <button x-show="packages.length > 1" @@click.stop="moveOpen = !moveOpen"
                                                                 class="w-7 h-7 rounded-full bg-white/90 text-blue-600 flex items-center justify-center shadow" title="Move photo">
                                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
@@ -423,7 +439,7 @@
                                     </div>
 
                                     {{-- Package fields --}}
-                                    <div class="px-4 py-4">
+                                    <div class="px-4 py-4" :class="packageWorkspaceLocked() ? 'opacity-60 pointer-events-none' : ''">
                                         <div class="grid grid-cols-2 gap-3 mb-4">
                                             <div>
                                                 <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Description <span class="text-slate-300 font-normal normal-case">(what's inside)</span></label>
@@ -530,7 +546,7 @@
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                                 Saved
                                             </span>
-                                            <button @@click="savePackage(pkg)" :disabled="pkg._saving"
+                                            <button x-show="!packageWorkspaceLocked()" @@click="savePackage(pkg)" :disabled="pkg._saving"
                                                     class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-slate-700 text-white text-[11px] font-semibold rounded-xl transition-all disabled:opacity-60 shadow-sm">
                                                 <svg x-show="pkg._saving" class="w-3 h-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                                 <span x-text="pkg._saving ? 'Saving…' : 'Save Package'"></span>
@@ -931,6 +947,20 @@ function shipmentEditor() {
             this.canEditShipmentFields = this.config.canEditShipmentFields ?? true;
         },
 
+        packageWorkspaceLocked() {
+            return Boolean(this.currentAssignment?.picked_up_at)
+                || ['picked_up', 'at_warehouse', 'sorted', 'in_transit', 'at_destination', 'out_for_delivery', 'delivered'].includes(this.shipment?.status);
+        },
+
+        canEditPrePickupPackageSetup() {
+            return this.canEditShipmentFields && !this.packageWorkspaceLocked();
+        },
+
+        openReceivingWorkspace() {
+            if (!this.config.showUrl) return;
+            window.location.assign(`${this.config.showUrl}?tab=receiving`);
+        },
+
         buildPickupForm(source = {}) {
             const form = {
                 contact_name: source.contact_name || '',
@@ -1138,6 +1168,7 @@ function shipmentEditor() {
         },
 
         async saveDelivery() {
+            if (!this.canEditPrePickupPackageSetup()) return;
             this.savingDelivery = true;
             try {
                 const payload = {
@@ -1164,6 +1195,7 @@ function shipmentEditor() {
         },
 
         async savePackage(pkg) {
+            if (this.packageWorkspaceLocked()) return;
             pkg._saving = true;
             const url = this.config.updatePackageUrlTemplate.replace('__PKG__', pkg.id);
             const payload = {
@@ -1192,6 +1224,7 @@ function shipmentEditor() {
         },
 
         async addPackage() {
+            if (this.packageWorkspaceLocked()) return;
             const res = await this._fetch(this.config.addPackageUrl, { method: 'POST', body: JSON.stringify({}) });
             if (res.success && res.data?.package) {
                 this.packages.push(this.preparePackage(res.data.package));
@@ -1200,6 +1233,7 @@ function shipmentEditor() {
         },
 
         async autoGroupByPhone() {
+            if (this.packageWorkspaceLocked()) return;
             if (this.autoGrouping) return;
             this.autoGrouping = true;
             try {
@@ -1218,6 +1252,7 @@ function shipmentEditor() {
         },
 
         async deletePackage(pkg) {
+            if (this.packageWorkspaceLocked()) return;
             if (!confirm('Delete this package and all its photos?')) return;
             const url = this.config.deletePackageUrlTemplate.replace('__PKG__', pkg.id);
             const res = await this._fetch(url, { method: 'DELETE' });
@@ -1228,6 +1263,7 @@ function shipmentEditor() {
         },
 
         async uploadPhotos(pkg, event) {
+            if (this.packageWorkspaceLocked()) return;
             const files = event.target.files;
             if (!files.length) return;
             const fd = new FormData();
@@ -1243,6 +1279,7 @@ function shipmentEditor() {
         },
 
         async deletePhoto(pkg, photo) {
+            if (this.packageWorkspaceLocked()) return;
             const url = this.config.deletePhotoUrlTemplate.replace('__IMG__', photo.id);
             const res = await this._fetch(url, { method: 'DELETE' });
             if (res.success) {
@@ -1251,6 +1288,7 @@ function shipmentEditor() {
         },
 
         async movePhoto(fromPkg, photo, toPkg) {
+            if (this.packageWorkspaceLocked()) return;
             const res = await this._fetch(this.config.movePhotoUrl, {
                 method: 'POST',
                 body: JSON.stringify({ photo_id: photo.id, target_package_id: toPkg.id })
@@ -1267,6 +1305,7 @@ function shipmentEditor() {
         openLightbox(url) { this.lightboxUrl = url; },
 
         splitPackageModal(pkg) {
+            if (this.packageWorkspaceLocked()) return;
             this.splitModal = { open: true, packageId: pkg.id, photos: [...pkg.photos], selectedIds: [] };
         },
 
@@ -1277,6 +1316,7 @@ function shipmentEditor() {
         },
 
         async executeSplit() {
+            if (this.packageWorkspaceLocked()) return;
             if (!this.splitModal.selectedIds.length) return;
             const url = this.config.splitPackageUrlTemplate.replace('__PKG__', this.splitModal.packageId);
             const res = await this._fetch(url, { method: 'POST', body: JSON.stringify({ photo_ids: this.splitModal.selectedIds }) });
@@ -1288,6 +1328,8 @@ function shipmentEditor() {
                 this.packages.push(this.preparePackage(res.data.package));
                 this.splitModal.open = false;
                 this._toast(res.message, 'success');
+            } else {
+                this._toast(res.message || 'Failed to split package.', 'error');
             }
         },
 

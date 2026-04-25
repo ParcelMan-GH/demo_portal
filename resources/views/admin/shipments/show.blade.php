@@ -32,9 +32,12 @@ $shipmentConfig = [
     'chargesWaiveEndpointTemplate' => route('admin.shipments.charges.waive', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
     'chargesCancelEndpointTemplate' => route('admin.shipments.charges.cancel', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
     'receivingDataEndpoint' => route('admin.shipments.receiving-data', $shipment),
+    'receivingDetailsSaveEndpoint' => route('admin.shipments.receiving.details', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
     'receiveSaveEndpoint' => route('admin.shipments.receiving.save', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
     'receivePrintLabelEndpoint' => route('admin.shipments.receiving.print-label', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
     'receiveFinalizeEndpoint' => route('admin.shipments.receiving.finalize', $shipment),
+    'splitPackageUrlTemplate' => route('admin.shipments.packages.split', ['shipment' => $shipment->id, 'item' => '__PKG__']),
+    'autoGroupByPhoneEndpoint' => route('admin.shipments.auto-group-by-phone', $shipment),
     'townsSearchUrl' => route('admin.locations.towns.data'),
     'canManage' => $canManage,
     'canManageCharges' => $canManageCharges ?? false,
@@ -2939,13 +2942,30 @@ $shipmentConfig = [
                                 <p class="text-[10px] text-slate-500 font-semibold uppercase">Total Packages</p>
                             </div>
                             <div class="bg-white rounded-xl border border-emerald-200 p-3">
-                                <p class="text-lg font-bold text-emerald-700" x-text="receiving.packages.filter(p => p.received_quantity > 0).length"></p>
-                                <p class="text-[10px] text-emerald-600 font-semibold uppercase">Received</p>
+                                <p class="text-lg font-bold text-emerald-700" x-text="receiving.packages.reduce((total, pkg) => total + (Number.isFinite(Number(pkg?.received_quantity ?? 0)) ? Number(pkg?.received_quantity ?? 0) : 0), 0)"></p>
+                                <p class="text-[10px] text-emerald-600 font-semibold uppercase">Received Qty</p>
                             </div>
                             <div class="bg-white rounded-xl border border-slate-200 p-3">
-                                <p class="text-lg font-bold text-slate-400" x-text="receiving.packages.filter(p => p.received_quantity === 0).length"></p>
-                                <p class="text-[10px] text-slate-500 font-semibold uppercase">Pending</p>
+                                <p class="text-lg font-bold text-slate-400" x-text="receiving.packages.reduce((total, pkg) => { const expected = Number(pkg?.expected_quantity ?? pkg?.driver_confirmed_quantity ?? pkg?.vendor_quantity ?? 0); const received = Number(pkg?.received_quantity ?? 0); const damaged = Number(pkg?.damaged_quantity ?? 0); const normalizedExpected = Number.isFinite(expected) ? expected : 0; const normalizedObserved = (Number.isFinite(received) ? received : 0) + (Number.isFinite(damaged) ? damaged : 0); return total + Math.max(normalizedExpected - normalizedObserved, 0); }, 0)"></p>
+                                <p class="text-[10px] text-slate-500 font-semibold uppercase">Pending Qty</p>
                             </div>
+                        </div>
+
+                        <div class="mb-4 flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <div>
+                                <p class="text-sm font-bold text-slate-800">Package Tools</p>
+                                <p class="text-xs text-slate-500">Use the vendor photo phone tags to regroup packages before warehouse receiving starts.</p>
+                                <p x-show="receiving.autoGroupLockReason" class="mt-1 text-[10px] text-amber-600" x-text="receiving.autoGroupLockReason" style="display:none"></p>
+                            </div>
+                            <button type="button"
+                                    @@click="autoGroupReceivingPackagesByPhone()"
+                                    :disabled="receiving.autoGrouping || !receiving.canAutoGroup"
+                                    class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-semibold rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    :class="receiving.canAutoGroup ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-200 text-slate-500'">
+                                <svg x-show="!receiving.autoGrouping" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                                <svg x-show="receiving.autoGrouping" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                <span x-text="receiving.autoGrouping ? 'Grouping...' : 'Auto-group by Phone'"></span>
+                            </button>
                         </div>
 
                         <!-- Package Cards -->
@@ -2968,15 +2988,34 @@ $shipmentConfig = [
                                     </div>
 
                                     <!-- Photos -->
-                                    <div class="px-4 py-3 border-b border-slate-100 space-y-3" x-show="pkg.vendor_photos.length > 0 || pkg.driver_photos.length > 0">
+                                    <div class="px-4 py-3 border-b border-slate-100 space-y-3" x-show="pkg.vendor_photos.length > 0 || pkg.driver_photos.length > 0 || pkg.photos.length > 0">
                                         <template x-if="pkg.vendor_photos.length > 0">
                                             <div>
-                                                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Vendor Photos (<span x-text="pkg.vendor_photos.length"></span>)</p>
+                                                <div class="flex items-center justify-between gap-3 mb-2">
+                                                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Vendor Photos (<span x-text="pkg.vendor_photos.length"></span>)</p>
+                                                    <button type="button"
+                                                            @@click="openReceivingSplitModal(pkg)"
+                                                            :disabled="!pkg.can_split || pkg.vendor_photos.length < 2"
+                                                            class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                                            :class="pkg.can_split && pkg.vendor_photos.length >= 2 ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100' : 'border-slate-200 bg-slate-50 text-slate-400'">
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                                        Split Photos
+                                                    </button>
+                                                </div>
                                                 <div class="flex flex-wrap gap-2">
-                                                    <template x-for="(url, i) in pkg.vendor_photos" :key="'v'+i">
-                                                        <img :src="url" class="w-20 h-20 rounded-xl object-cover border border-slate-200 cursor-pointer hover:ring-2 hover:ring-orange-400 transition-all" @@click="receivingLightbox = url">
+                                                    <template x-for="(photo, i) in pkg.vendor_photos" :key="'v'+(photo.id || i)">
+                                                        <div class="flex flex-col items-center gap-1">
+                                                            <img :src="photo.url" class="w-20 h-20 rounded-xl object-cover border border-slate-200 cursor-pointer hover:ring-2 hover:ring-orange-400 transition-all" @@click="receivingLightbox = photo.url">
+                                                            <template x-if="photo.recipient_phone">
+                                                                <span class="flex items-center gap-0.5 text-[9px] font-semibold text-indigo-600 max-w-20 truncate" :title="photo.recipient_phone">
+                                                                    <svg class="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                                                                    <span x-text="photo.recipient_phone"></span>
+                                                                </span>
+                                                            </template>
+                                                        </div>
                                                     </template>
                                                 </div>
+                                                <p x-show="pkg.split_lock_reason" class="mt-2 text-[10px] text-amber-600" x-text="pkg.split_lock_reason"></p>
                                             </div>
                                         </template>
                                         <template x-if="pkg.driver_photos.length > 0">
@@ -2985,6 +3024,16 @@ $shipmentConfig = [
                                                 <div class="flex flex-wrap gap-2">
                                                     <template x-for="(photo, i) in pkg.driver_photos" :key="'d'+photo.id">
                                                         <img :src="photo.url" class="w-20 h-20 rounded-xl object-cover border-2 border-blue-200 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all" @@click="receivingLightbox = photo.url">
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="pkg.photos.length > 0">
+                                            <div>
+                                                <p class="text-[10px] font-semibold text-emerald-500 uppercase tracking-wider mb-2">Receiving Photos (<span x-text="pkg.photos.length"></span>)</p>
+                                                <div class="flex flex-wrap gap-2">
+                                                    <template x-for="(photo, i) in pkg.photos" :key="'r'+(photo.id || i)">
+                                                        <img :src="photo.url" class="w-20 h-20 rounded-xl object-cover border-2 border-emerald-200 cursor-pointer hover:ring-2 hover:ring-emerald-400 transition-all" @@click="receivingLightbox = photo.url">
                                                     </template>
                                                 </div>
                                             </div>
@@ -3107,6 +3156,12 @@ $shipmentConfig = [
                                         </div>
 
                                         <div class="flex items-center gap-2">
+                                            <button @@click="saveReceivingPackageDetails(pkg)" :disabled="receiving.detailsSaving || receiving.saving"
+                                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-indigo-200 bg-indigo-50 text-indigo-700 text-[11px] font-semibold rounded-lg hover:bg-indigo-100 transition-all disabled:opacity-50">
+                                                <svg x-show="receiving.detailsSaving" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                                <svg x-show="!receiving.detailsSaving" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                <span x-text="receiving.detailsSaving ? 'Saving...' : 'Save Details'"></span>
+                                            </button>
                                             <button @@click="receivePackage(pkg)" :disabled="receiving.saving" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-semibold rounded-lg transition-all disabled:opacity-50">
                                                 <svg x-show="receiving.saving" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                                 <span x-text="pkg.received_quantity > 0 ? 'Update' : 'Receive'"></span>
@@ -3259,6 +3314,58 @@ $shipmentConfig = [
                                 <svg x-show="receiving.saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                 <span x-text="receiving.saving ? 'Finalizing...' : 'Finalize'"></span>
                             </button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Receiving Split Modal --}}
+                <div x-show="receivingSplitModal.open" x-transition.opacity class="fixed inset-0 z-[195] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" style="display:none">
+                    <div @@click.stop class="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden">
+                        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-900">Split Vendor Photos</h3>
+                                <p class="text-sm text-slate-500 mt-1">Select the vendor photos to move into a new package for <span class="font-semibold text-slate-700" x-text="receivingSplitModal.packageLabel"></span>.</p>
+                            </div>
+                            <button @@click="closeReceivingSplitModal()" class="w-10 h-10 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors">
+                                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <div class="p-6">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <template x-for="photo in receivingSplitModal.photos" :key="photo.id">
+                                    <div class="flex flex-col items-center gap-1.5">
+                                        <button type="button"
+                                                @@click="toggleReceivingSplitPhoto(photo.id)"
+                                                class="relative w-full rounded-2xl overflow-hidden border-2 transition-all"
+                                                :class="receivingSplitModal.selectedIds.includes(photo.id) ? 'border-indigo-500 ring-2 ring-indigo-500/20 scale-[0.98]' : 'border-slate-200 hover:border-indigo-300'">
+                                            <img :src="photo.url" class="w-full aspect-square object-cover">
+                                            <div x-show="receivingSplitModal.selectedIds.includes(photo.id)"
+                                                 class="absolute inset-0 bg-indigo-600/20 flex items-start justify-end p-2" style="display:none">
+                                                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white shadow-sm">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                </span>
+                                            </div>
+                                        </button>
+                                        <template x-if="photo.recipient_phone">
+                                            <span class="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 max-w-full truncate" :title="photo.recipient_phone">
+                                                <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                                                <span x-text="photo.recipient_phone"></span>
+                                            </span>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
+                            <p class="text-xs text-slate-500">A new package will be created with the selected vendor photos and the same delivery setup.</p>
+                            <div class="flex items-center gap-3">
+                                <button @@click="closeReceivingSplitModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-xl hover:bg-white transition-colors">Cancel</button>
+                                <button @@click="executeReceivingSplit()" :disabled="receivingSplitModal.selectedIds.length === 0 || receivingSplitModal.saving"
+                                        class="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors disabled:opacity-50">
+                                    <svg x-show="receivingSplitModal.saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                    <span x-text="receivingSplitModal.saving ? 'Splitting...' : ('Split (' + receivingSplitModal.selectedIds.length + ' photo' + (receivingSplitModal.selectedIds.length === 1 ? '' : 's') + ')')"></span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
