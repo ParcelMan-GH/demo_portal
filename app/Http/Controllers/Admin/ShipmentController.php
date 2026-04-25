@@ -1865,6 +1865,7 @@ class ShipmentController extends Controller
             'driver_photos' => $driverPhotos,
             'received_quantity' => (int) ($receiptItem?->received_quantity ?? 0),
             'damaged_quantity' => (int) ($receiptItem?->damaged_quantity ?? 0),
+            'discrepancy_type' => $receiptItem?->discrepancy_type ?? 'none',
             'condition_status' => $receiptItem?->condition_status ?? 'ok',
             'notes' => $receiptItem?->notes,
             'barcode_value' => $receiptItem?->barcode_value,

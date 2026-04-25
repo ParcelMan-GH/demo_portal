@@ -39,6 +39,7 @@ $shipmentConfig = [
     'splitPackageUrlTemplate' => route('admin.shipments.packages.split', ['shipment' => $shipment->id, 'item' => '__PKG__']),
     'autoGroupByPhoneEndpoint' => route('admin.shipments.auto-group-by-phone', $shipment),
     'townsSearchUrl' => route('admin.locations.towns.data'),
+    'canApproveReceivingDiscrepancy' => Auth::guard('admin')->user()?->hasPermission('warehouse.receiving.approve_discrepancy') ?? false,
     'canManage' => $canManage,
     'canManageCharges' => $canManageCharges ?? false,
     'isSuperAdmin' => auth('admin')->user()?->isSuperAdmin() ?? false,
@@ -3296,7 +3297,7 @@ $shipmentConfig = [
 
                 {{-- Finalize Confirm Modal --}}
                 <div x-show="finalizeConfirmOpen" x-transition.opacity class="fixed inset-0 z-[190] flex items-center justify-center bg-black/50 p-4" style="display:none">
-                    <div @@click.stop class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden">
+                    <div @@click.stop class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
                         <div class="px-6 py-5">
                             <div class="flex items-start gap-4">
                                 <div class="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
@@ -3308,9 +3309,65 @@ $shipmentConfig = [
                                 </div>
                             </div>
                         </div>
+                        <div class="px-6 pb-5 space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">Notes <span class="text-slate-400 font-normal">(optional)</span></label>
+                                <textarea rows="3"
+                                          x-model="finalizeNotes"
+                                          class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 transition resize-none"
+                                          placeholder="Any final receiving notes..."></textarea>
+                            </div>
+
+                            <template x-if="receiving.packages.some(pkg => pkg.discrepancy_type && pkg.discrepancy_type !== 'none')">
+                                <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+                                    <div class="flex items-start gap-2">
+                                        <svg class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                        <div>
+                                            <p class="text-xs font-bold text-amber-800">Discrepancy detected</p>
+                                            <p class="mt-1 text-xs text-amber-700">Discrepancy is detected automatically from the received, damaged, and expected quantities. Approval reason is required before finalizing.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="space-y-2">
+                                        <template x-for="(pkg, idx) in receiving.packages.filter(pkg => pkg.discrepancy_type && pkg.discrepancy_type !== 'none')" :key="`finalize-discrepancy-${pkg.shipment_item_id}`">
+                                            <div class="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white/80 px-3 py-2">
+                                                <div>
+                                                    <p class="text-xs font-semibold text-slate-800">Package <span x-text="idx + 1"></span><span x-show="pkg.description" x-text="pkg.description ? ` - ${pkg.description}` : ''"></span></p>
+                                                    <p class="text-[11px] text-slate-500">
+                                                        Expected <span x-text="pkg.expected_quantity"></span>,
+                                                        received <span x-text="pkg.received_quantity"></span>,
+                                                        damaged <span x-text="pkg.damaged_quantity"></span>
+                                                    </p>
+                                                </div>
+                                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700"
+                                                      x-text="pkg.discrepancy_label"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+
+                                    <template x-if="!canApproveReceivingDiscrepancy">
+                                        <div class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+                                            You do not have permission to approve discrepancy finalization. A warehouse manager or super admin needs to finalize this receipt.
+                                        </div>
+                                    </template>
+
+                                    <template x-if="canApproveReceivingDiscrepancy">
+                                        <div>
+                                            <label class="block text-xs font-bold text-amber-800 mb-1.5">Approval Reason <span class="text-rose-500">*</span></label>
+                                            <textarea rows="3"
+                                                      x-model="approvalReason"
+                                                      class="w-full rounded-xl border border-amber-300 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400 transition resize-none"
+                                                      placeholder="Explain why this discrepancy is approved for finalization..."></textarea>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
                         <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
                             <button @@click="finalizeConfirmOpen = false" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-xl hover:bg-white transition-colors">Cancel</button>
-                            <button @@click="finalizeReceiving()" :disabled="receiving.saving" class="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2">
+                            <button @@click="finalizeReceiving()"
+                                    :disabled="receiving.saving || (receiving.packages.some(pkg => pkg.discrepancy_type && pkg.discrepancy_type !== 'none') && (!canApproveReceivingDiscrepancy || !approvalReason.trim()))"
+                                    class="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2">
                                 <svg x-show="receiving.saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                 <span x-text="receiving.saving ? 'Finalizing...' : 'Finalize'"></span>
                             </button>

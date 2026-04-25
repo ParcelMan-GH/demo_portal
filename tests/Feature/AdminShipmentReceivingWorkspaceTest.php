@@ -321,6 +321,7 @@ function rwBuildSchema(): void
         $table->string('status');
         $table->string('location')->nullable();
         $table->text('notes')->nullable();
+        $table->json('meta')->nullable();
         $table->string('created_by')->nullable();
         $table->timestamp('created_at')->useCurrent();
     });
@@ -919,5 +920,47 @@ test('single-destination receiving details save syncs all receiving package card
         'delivery_town' => 'Tema Community 1',
         'delivery_landmark' => 'Near roundabout',
         'delivery_instructions' => 'Call vendor office first',
+    ]);
+});
+
+test('receiving finalization accepts approval reason for discrepancy receipts', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'description' => 'Damaged carton',
+        'quantity' => 2,
+    ]);
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'status' => 'completed',
+        'picked_up_at' => now(),
+    ]);
+    $receipt = rwCreateReceipt($assignment, $warehouse);
+
+    rwCreateReceiptItem($receipt, $item, [
+        'expected_quantity' => 2,
+        'received_quantity' => 1,
+        'damaged_quantity' => 0,
+        'discrepancy_type' => 'missing',
+        'condition_status' => 'partial',
+    ]);
+
+    $response = $this->postJson(route('admin.shipments.receiving.finalize', $shipment), [
+        'notes' => 'Finalized after warehouse review',
+        'approval_reason' => 'Vendor confirmed one piece was not handed over at pickup.',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.receipt.status', WarehouseReceipt::STATUS_FINALIZED);
+
+    $this->assertDatabaseHas('warehouse_receipts', [
+        'id' => $receipt->id,
+        'status' => WarehouseReceipt::STATUS_FINALIZED,
+        'notes' => 'Finalized after warehouse review',
+        'approval_reason' => 'Vendor confirmed one piece was not handed over at pickup.',
+        'approved_by_user_id' => auth('admin')->id(),
     ]);
 });

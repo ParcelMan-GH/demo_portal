@@ -27,6 +27,9 @@ function shipmentShow() {
         receivingLightbox: null,
         receivingSplitModal: { open: false, packageId: null, packageLabel: '', photos: [], selectedIds: [], saving: false },
         receiving: { loading: false, saving: false, detailsSaving: false, autoGrouping: false, completingPickup: false, canReceive: false, canAutoGroup: false, autoGroupLockReason: '', packages: [], receipt: null, assignmentId: null },
+        finalizeNotes: '',
+        approvalReason: '',
+        canApproveReceivingDiscrepancy: false,
 
         // Charges
         chargesLoaded: false,
@@ -712,6 +715,51 @@ function shipmentShow() {
             }, 0);
         },
 
+        receivingDiscrepancyType(pkg) {
+            const expected = this.receivingExpectedQuantity(pkg);
+            const received = Number(pkg?.received_quantity ?? 0);
+            const damaged = Number(pkg?.damaged_quantity ?? 0);
+            const normalizedReceived = Number.isFinite(received) ? received : 0;
+            const normalizedDamaged = Number.isFinite(damaged) ? damaged : 0;
+            const totalObserved = normalizedReceived + normalizedDamaged;
+            const hasMissing = totalObserved < expected;
+            const hasExcess = totalObserved > expected;
+            const hasDamaged = normalizedDamaged > 0;
+
+            if (!hasMissing && !hasExcess && !hasDamaged) {
+                return 'none';
+            }
+
+            if (hasMissing && !hasDamaged && !hasExcess) {
+                return 'missing';
+            }
+
+            if (hasExcess && !hasDamaged && !hasMissing) {
+                return 'excess';
+            }
+
+            if (hasDamaged && !hasMissing && !hasExcess) {
+                return 'damaged';
+            }
+
+            return 'mixed';
+        },
+
+        receivingDiscrepancyLabel(type) {
+            switch (String(type || 'none')) {
+                case 'missing':
+                    return 'Missing';
+                case 'excess':
+                    return 'Excess';
+                case 'damaged':
+                    return 'Damaged';
+                case 'mixed':
+                    return 'Mixed';
+                default:
+                    return 'No discrepancy';
+            }
+        },
+
         prepareReceivingPackage(pkg) {
             const prepared = {
                 ...pkg,
@@ -735,6 +783,9 @@ function shipmentShow() {
                 can_split: !!pkg.can_split,
                 split_lock_reason: pkg.split_lock_reason || '',
             };
+
+            prepared.discrepancy_type = pkg.discrepancy_type || this.receivingDiscrepancyType(prepared);
+            prepared.discrepancy_label = this.receivingDiscrepancyLabel(prepared.discrepancy_type);
 
             const isLinked = Boolean(prepared.delivery_town && prepared.delivery_region_id && prepared.delivery_district_id);
             prepared._town_query = this.receivingTownDisplay(
@@ -1154,11 +1205,26 @@ function shipmentShow() {
         finalizeConfirmOpen: false,
 
         openFinalizeConfirm() {
+            const hasDiscrepancies = this.receiving.packages.some((pkg) => pkg.discrepancy_type && pkg.discrepancy_type !== 'none');
+            if (!hasDiscrepancies) {
+                this.approvalReason = '';
+            }
             this.finalizeConfirmOpen = true;
         },
 
         async finalizeReceiving() {
-            this.finalizeConfirmOpen = false;
+            const hasDiscrepancies = this.receiving.packages.some((pkg) => pkg.discrepancy_type && pkg.discrepancy_type !== 'none');
+
+            if (hasDiscrepancies && !this.canApproveReceivingDiscrepancy) {
+                window.showToast?.('Discrepancy finalization requires warehouse manager approval.', 'error');
+                return;
+            }
+
+            if (hasDiscrepancies && !String(this.approvalReason || '').trim()) {
+                window.showToast?.('Approval reason is required for discrepancy finalization.', 'error');
+                return;
+            }
+
             this.receiving.saving = true;
             try {
                 const response = await fetch(this.config.receiveFinalizeEndpoint, {
@@ -1168,10 +1234,16 @@ function shipmentShow() {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                         'Accept': 'application/json',
                     },
-                    body: JSON.stringify({}),
+                    body: JSON.stringify({
+                        notes: String(this.finalizeNotes || '').trim() || null,
+                        approval_reason: hasDiscrepancies
+                            ? String(this.approvalReason || '').trim() || null
+                            : null,
+                    }),
                 });
                 const result = await response.json();
                 if (result.success) {
+                    this.finalizeConfirmOpen = false;
                     window.showToast?.('Receiving finalized!', 'success');
                     setTimeout(() => window.location.reload(), 1500);
                 } else {
@@ -1186,6 +1258,7 @@ function shipmentShow() {
             this.shipment = this.config.shipment;
             this.canManage = this.config.canManage;
             this.canManageCharges = this.config.canManageCharges ?? false;
+            this.canApproveReceivingDiscrepancy = !!this.config.canApproveReceivingDiscrepancy;
             this.isSuperAdmin = this.config.isSuperAdmin ?? false;
             this.invoice = this.config.invoice;
             this.invoiceHistory = this.config.invoiceHistory || [];
