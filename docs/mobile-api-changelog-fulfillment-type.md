@@ -1250,6 +1250,34 @@ For out-of-town deliveries, drivers can hand packages to a bus station courier i
 
 ## Driver App Changes
 
+### Claimed Package Responses — Route Intent
+
+The driver package-custody endpoints now expose the package routing intent before a delivery run is created:
+
+- `POST /api/v1/driver/scan-claim`
+- `GET /api/v1/driver/my-packages`
+- `GET /api/v1/driver/package-history/{barcode}`
+
+```json
+{
+  "barcode": "TRKRNDOBJCW-001",
+  "description": "Laptop",
+  "delivery_method": "bus_handoff",
+  "route_label": "Bus Station",
+  "recipient_name": "Ama Mensah",
+  "delivery_town": "Madina"
+}
+```
+
+| Field | Type | Values |
+|-------|------|--------|
+| `delivery_method` | string | `"direct"` or `"bus_handoff"` |
+| `route_label` | string | `"Bus Station"` for bus handoff, otherwise the recipient label |
+
+Purpose:
+- the My Packages screen can show `Bus Station -> Town` before a run exists
+- the actual station name is still captured only during `confirm-handoff`
+
 ### Delivery Run Stop Response — New Fields
 
 ```json

@@ -3987,7 +3987,7 @@ If the recipient did not receive the SMS code, send <code>skip_verification=true
                     { name: 'notes', type: 'string', required: false, description: 'Optional notes', example: 'Picked from shelf A2' },
                 ],
                 exampleResponses: {
-                    '200': { success: true, message: 'Package claimed successfully.', data: { label: { barcode: 'TRKRNDOBJCW-001', label_index: 1, labels_total: 10, label_type: 'unit', shipment_number: 'PCM-2026-00045', description: 'Fridge', tracking_code: 'TRKRNDOBJCW', recipient_name: 'Mark Asante', recipient_phone: '+233241234567', delivery_town: 'Madina' } } },
+                    '200': { success: true, message: 'Package claimed successfully.', data: { label: { barcode: 'TRKRNDOBJCW-001', label_index: 1, labels_total: 10, label_type: 'unit', shipment_number: 'PCM-2026-00045', description: 'Fridge', tracking_code: 'TRKRNDOBJCW', delivery_method: 'direct', route_label: 'Mark Asante', recipient_name: 'Mark Asante', recipient_phone: '+233241234567', delivery_town: 'Madina' } } },
                     '409': { success: false, message: 'This package is already claimed by John Mensah.' },
                     '404': { success: false, message: 'Label not found. Check the barcode and try again.' },
                 }
@@ -4008,7 +4008,7 @@ If the recipient did not receive the SMS code, send <code>skip_verification=true
                     { name: 'offset', type: 'number', required: false, description: 'Pagination offset', example: '0' },
                 ],
                 exampleResponses: {
-                    '200': { success: true, message: 'Your packages retrieved.', data: { packages: [{ barcode: 'TRKRNDOBJCW-001', label_index: 1, labels_total: 10, shipment_number: 'PCM-2026-00045', description: 'Fridge', recipient_name: 'Mark', delivery_town: 'Madina', claimed_at: '2026-04-04T08:30:00+00:00' }], total: 5, limit: 50, offset: 0, has_more: false } },
+                    '200': { success: true, message: 'Your packages retrieved.', data: { packages: [{ barcode: 'TRKRNDOBJCW-001', label_index: 1, labels_total: 10, shipment_number: 'PCM-2026-00045', description: 'Fridge', delivery_method: 'bus_handoff', route_label: 'Bus Station', recipient_name: 'Mark', delivery_town: 'Madina', claimed_at: '2026-04-04T08:30:00+00:00' }], total: 5, limit: 50, offset: 0, has_more: false } },
                 }
             },
             {
@@ -4034,7 +4034,7 @@ If the recipient did not receive the SMS code, send <code>skip_verification=true
                 method: 'POST',
                 url: '/api/v1/driver/start-deliveries',
                 name: 'Start Deliveries',
-                description: 'Auto-create a delivery run from all claimed packages. Groups packages into stops by recipient phone or town. The driver then uses the standard delivery flow (arrive → OTP → confirm).',
+                description: 'Auto-create a delivery run from all claimed packages. Direct packages become recipient stops; bus handoff packages consolidate into one generic bus-station stop and the driver records the actual station at handoff time.',
                 auth: true,
                 group: 'driver-packages',
                 userType: 'driver',
@@ -4061,7 +4061,7 @@ If the recipient did not receive the SMS code, send <code>skip_verification=true
                 ],
                 fields: [],
                 exampleResponses: {
-                    '200': { success: true, data: { barcode: 'TRKRNDOBJCW-001', label: { barcode: 'TRKRNDOBJCW-001', shipment_number: 'PCM-2026-00045', description: 'Fridge', recipient_name: 'Mark', delivery_town: 'Madina' }, history: [{ event_type: 'claimed', driver_name: 'Kofi Mensah', driver_phone: '+233...', notes: null, created_at: '2026-04-04T08:30:00+00:00' }] } },
+                    '200': { success: true, data: { barcode: 'TRKRNDOBJCW-001', label: { barcode: 'TRKRNDOBJCW-001', shipment_number: 'PCM-2026-00045', description: 'Fridge', delivery_method: 'bus_handoff', route_label: 'Bus Station', recipient_name: 'Mark', delivery_town: 'Madina' }, history: [{ event_type: 'claimed', driver_name: 'Kofi Mensah', driver_phone: '+233...', notes: null, created_at: '2026-04-04T08:30:00+00:00' }] } },
                     '404': { success: false, message: 'Label not found.' },
                 }
             }
@@ -6595,4 +6595,3 @@ If the recipient did not receive the SMS code, send <code>skip_verification=true
     </script>
 </body>
 </html>
-

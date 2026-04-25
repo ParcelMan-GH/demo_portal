@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
+use App\Models\ShipmentItem;
 use App\Models\Warehouse;
 use App\Services\Warehouse\WarehouseDeliveryService;
 use App\Models\WarehouseReceiptItemLabel;
@@ -134,7 +135,7 @@ class DriverPackageController extends Controller
         $labels = WarehouseReceiptItemLabel::whereIn('id', $claimedLabelIds)
             ->with([
                 'receiptItem.shipmentItem.shipment:id,shipment_number,delivery_recipient_name,delivery_recipient_phone,delivery_town',
-                'receiptItem.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
+                'receiptItem.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town,delivery_method',
             ])
             ->get();
 
@@ -261,16 +262,20 @@ class DriverPackageController extends Controller
     {
         $label->loadMissing([
             'receiptItem.shipmentItem.shipment:id,shipment_number,delivery_recipient_name,delivery_recipient_phone,delivery_town',
-            'receiptItem.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
+            'receiptItem.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town,delivery_method',
         ]);
 
         $item = $label->receiptItem?->shipmentItem;
         $shipment = $item?->shipment;
+        $deliveryMethod = $item?->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT;
 
         // Use per-item delivery if available, otherwise shipment-level
         $recipientName = $item?->delivery_recipient_name ?: $shipment?->delivery_recipient_name;
         $recipientPhone = $item?->delivery_recipient_phone ?: $shipment?->delivery_recipient_phone;
         $deliveryTown = $item?->delivery_town ?: $shipment?->delivery_town;
+        $routeLabel = $deliveryMethod === ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF
+            ? 'Bus Station'
+            : ($recipientName ?: 'Unknown');
 
         return [
             'barcode' => $label->barcode_value,
@@ -280,6 +285,8 @@ class DriverPackageController extends Controller
             'shipment_number' => $shipment?->shipment_number,
             'description' => $item?->description,
             'tracking_code' => $item?->tracking_code,
+            'delivery_method' => $deliveryMethod,
+            'route_label' => $routeLabel,
             'recipient_name' => $recipientName,
             'recipient_phone' => $recipientPhone,
             'delivery_town' => $deliveryTown,
