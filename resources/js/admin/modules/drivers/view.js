@@ -479,15 +479,21 @@ function driverShow() {
                     return;
                 }
 
-                // Update local driver data
-                this.driver.name = this.form.name;
-                this.driver.email = this.form.email;
-                this.driver.phone = this.form.phone;
-                this.driver.vehicle_type = this.form.vehicle_type;
-                this.driver.vehicle_number = this.form.vehicle_number;
-                this.driver.license_number = this.form.license_number;
-                this.driver.task_capabilities = [...this.form.task_capabilities];
-                this.driver.is_active = this.form.is_active;
+                const updatedDriver = data.driver || {};
+
+                // Keep the detail view aligned with server-normalized values.
+                this.driver.name = updatedDriver.name || this.form.name;
+                this.driver.email = updatedDriver.email || this.form.email;
+                this.driver.phone = updatedDriver.phone || this.form.phone;
+                this.driver.vehicle_type = updatedDriver.vehicle_type ?? this.form.vehicle_type;
+                this.driver.vehicle_number = updatedDriver.vehicle_number ?? this.form.vehicle_number;
+                this.driver.license_number = updatedDriver.license_number ?? this.form.license_number;
+                this.driver.task_capabilities = Array.isArray(updatedDriver.task_capabilities)
+                    ? [...updatedDriver.task_capabilities]
+                    : [...this.form.task_capabilities];
+                this.driver.is_active = typeof updatedDriver.is_active === 'boolean'
+                    ? updatedDriver.is_active
+                    : this.form.is_active;
 
                 this.showEditModal = false;
 

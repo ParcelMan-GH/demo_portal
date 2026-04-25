@@ -598,13 +598,12 @@
                                         <input
                                             type="text"
                                             x-model="form.phone"
-                                            :disabled="modalMode === 'view' || modalMode === 'edit'"
+                                            :disabled="modalMode === 'view'"
                                             class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                             placeholder="+233 24 123 4567"
                                             required
                                         >
                                     </div>
-                                    <p x-show="modalMode === 'edit'" class="mt-1 text-xs text-slate-400">Phone number cannot be changed after creation</p>
                                     <template x-if="errors.phone">
                                         <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
                                             <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
