@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PickupAssignment;
 use App\Models\PickupPhoto;
 use App\Models\Shipment;
+use App\Models\ShipmentCharge;
 use App\Models\ShipmentItem;
 use App\Services\DirectDeliveryService;
 use App\Services\PickupAssignmentService;
@@ -78,6 +79,7 @@ class DriverAssignmentController extends Controller
                 'shipment.vendor',
                 'shipment.pickupRegion',
                 'shipment.pickupDistrict',
+                'shipment.charges',
                 'shipment.items.images',
                 'targetWarehouse',
                 'receivedWarehouse',
@@ -180,6 +182,7 @@ class DriverAssignmentController extends Controller
             'shipment.vendor',
             'shipment.pickupRegion',
             'shipment.pickupDistrict',
+            'shipment.charges',
             'shipment.items.images',
             'targetWarehouse',
             'receivedWarehouse',
@@ -215,6 +218,7 @@ class DriverAssignmentController extends Controller
                 'shipment.vendor',
                 'shipment.pickupRegion',
                 'shipment.pickupDistrict',
+                'shipment.charges',
                 'shipment.items.images',
                 'targetWarehouse',
                 'receivedWarehouse',
@@ -260,6 +264,7 @@ class DriverAssignmentController extends Controller
                 'shipment.vendor',
                 'shipment.pickupRegion',
                 'shipment.pickupDistrict',
+                'shipment.charges',
                 'shipment.items.images',
                 'targetWarehouse',
                 'receivedWarehouse',
@@ -312,6 +317,7 @@ class DriverAssignmentController extends Controller
                 'shipment.vendor',
                 'shipment.pickupRegion',
                 'shipment.pickupDistrict',
+                'shipment.charges',
                 'shipment.items.images',
                 'targetWarehouse',
                 'receivedWarehouse',
@@ -359,6 +365,7 @@ class DriverAssignmentController extends Controller
                 'shipment.vendor',
                 'shipment.pickupRegion',
                 'shipment.pickupDistrict',
+                'shipment.charges',
                 'shipment.deliveryRegion',
                 'shipment.deliveryDistrict',
                 'shipment.items.images',
@@ -510,6 +517,7 @@ class DriverAssignmentController extends Controller
                 'location' => $this->transformPickupLocationForDriver($shipment),
                 'instructions' => $shipment->pickup_instructions,
             ],
+            'pickup_fee' => $this->transformPickupFeeForDriver($shipment),
             'items' => $shipment->items->map(function (ShipmentItem $item) use ($confirmationsByItemId, $pickupPhotosByItemId) {
                 $pickupConfirmation = $this->transformPickupItemConfirmationForDriver(
                     $confirmationsByItemId[$item->id] ?? null
@@ -539,6 +547,36 @@ class DriverAssignmentController extends Controller
             'submitted_at' => $shipment->submitted_at,
             'created_at' => $shipment->created_at,
             'updated_at' => $shipment->updated_at,
+        ];
+    }
+
+    private function transformPickupFeeForDriver(Shipment $shipment): ?array
+    {
+        $shipment->loadMissing('charges');
+
+        /** @var \App\Models\ShipmentCharge|null $charge */
+        $charge = $shipment->charges->first(function (ShipmentCharge $charge) {
+            return $charge->shipment_item_id === null
+                && $charge->charge_type === ShipmentCharge::TYPE_PICKUP_FEE
+                && $charge->payer_type === ShipmentCharge::PAYER_VENDOR
+                && $charge->due_stage === ShipmentCharge::STAGE_AT_PICKUP
+                && $charge->status !== ShipmentCharge::STATUS_CANCELLED;
+        });
+
+        if (!$charge) {
+            return null;
+        }
+
+        return [
+            'id' => $charge->id,
+            'amount' => (float) $charge->amount,
+            'currency' => $charge->currency ?: 'GHS',
+            'status' => $charge->status,
+            'is_paid' => $charge->isPaid(),
+            'paid_at' => $charge->paid_at?->toIso8601String(),
+            'payment_method' => $charge->payment_method,
+            'payment_reference' => $charge->payment_reference,
+            'notes' => $charge->notes,
         ];
     }
 
