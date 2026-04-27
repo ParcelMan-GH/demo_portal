@@ -290,7 +290,7 @@ class DriverDeliveryService
         $charges = ShipmentCharge::query()
             ->where('charge_type', ShipmentCharge::TYPE_DELIVERY_FEE)
             ->where('payer_type', ShipmentCharge::PAYER_RECIPIENT)
-            ->where('due_stage', ShipmentCharge::STAGE_AT_DELIVERY)
+            ->whereIn('due_stage', [ShipmentCharge::STAGE_AT_DELIVERY, ShipmentCharge::STAGE_BEFORE_DELIVERY])
             ->whereNotIn('status', [ShipmentCharge::STATUS_CANCELLED])
             ->where(function ($query) use ($stopId, $shipmentIds, $shipmentItemIds) {
                 $hasCondition = false;

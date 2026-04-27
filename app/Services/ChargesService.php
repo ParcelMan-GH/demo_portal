@@ -91,7 +91,10 @@ class ChargesService
         array $data,
         User|Driver|null $actor = null,
     ): array {
-        if (!$charge->isOutstanding()) {
+        $canCorrectPaidPickupFee = $charge->status === ShipmentCharge::STATUS_PAID
+            && $charge->charge_type === ShipmentCharge::TYPE_PICKUP_FEE;
+
+        if (!$charge->isOutstanding() && !$canCorrectPaidPickupFee) {
             return [
                 'success' => false,
                 'message' => 'Only draft or pending charges can be edited.',
@@ -106,15 +109,21 @@ class ChargesService
         if (array_key_exists('notes', $data)) {
             $fields['notes'] = $data['notes'];
         }
-        if (array_key_exists('due_stage', $data)) {
+        if (!$canCorrectPaidPickupFee && array_key_exists('due_stage', $data)) {
             $fields['due_stage'] = $data['due_stage'];
         }
-        if (array_key_exists('payer_type', $data)) {
+        if (!$canCorrectPaidPickupFee && array_key_exists('payer_type', $data)) {
             $fields['payer_type'] = $data['payer_type'];
             $fields['direction']  = ShipmentCharge::directionFor($data['payer_type']);
         }
-        if (array_key_exists('charge_type', $data)) {
+        if (!$canCorrectPaidPickupFee && array_key_exists('charge_type', $data)) {
             $fields['charge_type'] = $data['charge_type'];
+        }
+        if ($canCorrectPaidPickupFee && array_key_exists('payment_method', $data)) {
+            $fields['payment_method'] = $data['payment_method'];
+        }
+        if ($canCorrectPaidPickupFee && array_key_exists('payment_reference', $data)) {
+            $fields['payment_reference'] = $data['payment_reference'];
         }
 
         $charge->update($fields);

@@ -78,7 +78,7 @@
     {{-- Barcode --}}
     <div class="barcode-section">
         <div class="barcode-svg">{!! $barcodeSvg !!}</div>
-        <div class="barcode-text">{{ $labelBarcode ?? $shipmentItem->tracking_code }}</div>
+        <div class="barcode-text">{{ $shipmentItem->tracking_code }}</div>
     </div>
 </div>
 

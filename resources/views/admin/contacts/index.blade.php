@@ -65,12 +65,16 @@
 
         assignDropdownTask: null,
 
-        workerStatsOpen: false,
-        workerStatsData: [],
-        workerStatsLoading: false,
+	        workerStatsOpen: false,
+	        workerStatsData: [],
+	        workerStatsLoading: false,
 
-        autoAssignWarehouse: '',
-        autoAssigning: false,
+	        autoAssignWarehouse: '',
+	        autoAssigning: false,
+
+	        assigningTaskId: null,
+	        assignmentNotice: null,
+	        assignmentNoticeTimeout: null,
 
         init() {
             this.loadData();
@@ -110,29 +114,50 @@
             this.assignDropdownTask = this.assignDropdownTask === taskId ? null : taskId;
         },
 
-        async assignTask(task, workerId) {
-            this.assignDropdownTask = null;
-            try {
-                const url = this.config.assignUrl.replace('__TASK__', task.id);
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrf },
-                    body: JSON.stringify({ user_id: workerId }),
-                });
-                const json = await res.json();
-                if (res.ok && json.success) {
-                    if (json.task) {
-                        this.tasks = this.tasks.map((row) => row.id === task.id ? json.task : row);
-                    }
-                    window.showToast?.(json.message || 'Task assigned successfully', 'success');
-                    this.loadData();
-                } else {
-                    window.showToast?.(json.message || 'Failed to assign', 'error');
-                }
-            } catch (e) {
-                window.showToast?.('Network error', 'error');
-            }
-        },
+	        async assignTask(task, workerId, workerName = '') {
+	            this.assignDropdownTask = null;
+	            this.assigningTaskId = task.id;
+	            const fallbackName = workerName || '';
+	            this.setAssignmentNotice(fallbackName ? `Assigning to ${fallbackName}...` : 'Assigning contact task...', 'info', false);
+	            try {
+	                const url = this.config.assignUrl.replace('__TASK__', task.id);
+	                const res = await fetch(url, {
+	                    method: 'POST',
+	                    headers: {
+	                        'Content-Type': 'application/json',
+	                        'Accept': 'application/json',
+	                        'X-Requested-With': 'XMLHttpRequest',
+	                        'X-CSRF-TOKEN': this.csrf,
+	                    },
+	                    body: JSON.stringify({ user_id: workerId, worker_id: workerId }),
+	                });
+	                const json = await res.json().catch(() => ({}));
+	                if (res.ok && json.success) {
+	                    const updatedTask = json.task || {
+	                        ...task,
+	                        assigned_to_id: workerId,
+	                        assigned_to_name: fallbackName,
+	                        assigned_to: fallbackName,
+	                        status: task.status === 'pending' ? 'assigned' : task.status,
+	                    };
+	                    this.tasks = this.tasks.map((row) => String(row.id) === String(task.id) ? updatedTask : row);
+	                    const message = json.message || 'Task assigned successfully';
+	                    this.setAssignmentNotice(message, 'success');
+	                    window.showToast?.(message, 'success');
+	                } else {
+	                    const message = json.message || `Failed to assign. Server returned ${res.status}.`;
+	                    this.setAssignmentNotice(message, 'error');
+	                    window.showToast?.(message, 'error');
+	                }
+	            } catch (e) {
+	                console.error('Failed to assign contact task', e);
+	                const message = 'Network error while assigning. Please try again.';
+	                this.setAssignmentNotice(message, 'error');
+	                window.showToast?.(message, 'error');
+	            } finally {
+	                this.assigningTaskId = null;
+	            }
+	        },
 
         /* Auto-Assign */
         async autoAssign() {
@@ -342,8 +367,39 @@
             }
         },
 
-        /* Helpers */
-        statusBadgeClass(status) {
+	        /* Helpers */
+	        assignedName(task) {
+	            return task.assigned_to_name || task.assigned_to || '';
+	        },
+
+	        assignedInitial(task) {
+	            const name = this.assignedName(task);
+	            return name ? name.charAt(0).toUpperCase() : '?';
+	        },
+
+	        setAssignmentNotice(message, type = 'success', autoDismiss = true) {
+	            if (this.assignmentNoticeTimeout) {
+	                clearTimeout(this.assignmentNoticeTimeout);
+	                this.assignmentNoticeTimeout = null;
+	            }
+	            this.assignmentNotice = { message, type };
+	            if (autoDismiss && type !== 'error') {
+	                this.assignmentNoticeTimeout = setTimeout(() => {
+	                    this.assignmentNotice = null;
+	                    this.assignmentNoticeTimeout = null;
+	                }, 5000);
+	            }
+	        },
+
+	        clearAssignmentNotice() {
+	            if (this.assignmentNoticeTimeout) {
+	                clearTimeout(this.assignmentNoticeTimeout);
+	                this.assignmentNoticeTimeout = null;
+	            }
+	            this.assignmentNotice = null;
+	        },
+
+	        statusBadgeClass(status) {
             const map = {
                 pending: 'bg-slate-100 text-slate-700 border-slate-200',
                 assigned: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -458,9 +514,20 @@
             </div>
         </div>
 
-        <!-- Toolbar -->
-        <div class="p-6 pb-0">
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+	        <!-- Toolbar -->
+	        <div class="p-6 pb-0">
+	            <div x-show="assignmentNotice" x-transition
+	                 class="mb-4 rounded-2xl border px-4 py-3 text-sm font-medium flex items-start justify-between gap-3"
+	                 :class="assignmentNotice && assignmentNotice.type === 'error'
+	                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+	                    : (assignmentNotice && assignmentNotice.type === 'info'
+	                        ? 'border-blue-200 bg-blue-50 text-blue-700'
+	                        : 'border-emerald-200 bg-emerald-50 text-emerald-700')"
+	                 style="display: none;">
+	                <span x-text="assignmentNotice ? assignmentNotice.message : ''"></span>
+	                <button type="button" @@click="clearAssignmentNotice()" class="shrink-0 text-xs font-semibold opacity-70 hover:opacity-100">Dismiss</button>
+	            </div>
+	            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <!-- Filters -->
                 <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <!-- Search -->
@@ -689,13 +756,21 @@
                                 <td class="py-3 px-3">
                                     <span class="text-sm text-slate-600" x-text="task.warehouse_name || '-'"></span>
                                 </td>
-                                <!-- Assigned To -->
-                                <td class="py-3 px-3">
-                                    <div class="space-y-0.5">
-                                        <span class="text-sm text-slate-600" x-text="task.assigned_to_name || task.assigned_to || 'Unassigned'"></span>
-                                        <template x-if="task.assigned_at">
-                                            <p class="text-[11px] text-slate-400" x-text="'Assigned ' + task.assigned_at"></p>
-                                        </template>
+	                                <!-- Assigned To -->
+	                                <td class="py-3 px-3">
+	                                    <div class="space-y-1">
+	                                        <template x-if="assignedName(task)">
+	                                            <div class="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+	                                                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[10px]" x-text="assignedInitial(task)"></span>
+	                                                <span x-text="assignedName(task)"></span>
+	                                            </div>
+	                                        </template>
+	                                        <template x-if="!assignedName(task)">
+	                                            <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">Unassigned</span>
+	                                        </template>
+	                                        <template x-if="task.assigned_at">
+	                                            <p class="text-[11px] text-slate-400" x-text="'Assigned ' + task.assigned_at"></p>
+	                                        </template>
                                     </div>
                                 </td>
                                 <!-- Status -->
@@ -723,25 +798,38 @@
                                 <td class="py-3 px-3 text-right">
                                     <div class="flex items-center justify-end gap-1.5">
                                         <!-- Assign -->
-                                        <div class="relative">
-                                            <button @@click="toggleAssignDropdown(task.id)"
-                                                    class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors"
-                                                    :class="task.assigned_to_id ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                                                </svg>
-                                                <span x-text="task.assigned_to_id ? 'Reassign' : 'Assign'"></span>
-                                            </button>
-                                            <div x-show="assignDropdownTask === task.id" @@click.away="assignDropdownTask = null" x-transition
-                                                 class="absolute right-0 mt-1 w-48 rounded-xl border border-slate-200/70 bg-white/95 shadow-xl p-1.5 z-50 backdrop-blur-xl max-h-48 overflow-y-auto" style="display: none;">
-                                                @foreach($workers as $worker)
-                                                <button type="button" @@click="assignTask(task, {{ $worker->id }})"
-                                                        class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors">
-                                                    <span class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">{{ strtoupper(substr($worker->name, 0, 1)) }}</span>
-                                                    {{ $worker->name }}
-                                                </button>
-                                                @endforeach
-                                            </div>
+	                                        <div class="relative">
+	                                            <button @@click="toggleAssignDropdown(task.id)"
+	                                                    :disabled="assigningTaskId === task.id"
+	                                                    class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors"
+	                                                    :class="[
+	                                                        task.assigned_to_id ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+	                                                        assigningTaskId === task.id ? 'opacity-60 cursor-wait' : ''
+	                                                    ]">
+	                                                <svg x-show="assigningTaskId !== task.id" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+	                                                </svg>
+	                                                <svg x-show="assigningTaskId === task.id" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" style="display: none;">
+	                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+	                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+	                                                </svg>
+	                                                <span x-text="assigningTaskId === task.id ? 'Assigning...' : (task.assigned_to_id ? 'Reassign' : 'Assign')"></span>
+	                                            </button>
+	                                            <div x-show="assignDropdownTask === task.id" @@click.away="assignDropdownTask = null" x-transition
+	                                                 class="absolute right-0 mt-1 w-48 rounded-xl border border-slate-200/70 bg-white/95 shadow-xl p-1.5 z-50 backdrop-blur-xl max-h-48 overflow-y-auto" style="display: none;">
+	                                                @foreach($workers as $worker)
+	                                                <button type="button" @@click="assignTask(task, {{ $worker->id }}, @js($worker->name))"
+	                                                        :disabled="assigningTaskId === task.id"
+	                                                        class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-60 disabled:cursor-wait"
+	                                                        :class="Number(task.assigned_to_id) === {{ $worker->id }} ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-100'">
+	                                                    <span class="flex min-w-0 items-center gap-2">
+	                                                        <span class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">{{ strtoupper(substr($worker->name, 0, 1)) }}</span>
+	                                                        <span class="truncate">{{ $worker->name }}</span>
+	                                                    </span>
+	                                                    <span x-show="Number(task.assigned_to_id) === {{ $worker->id }}" class="text-[10px] font-bold" style="display: none;">Current</span>
+	                                                </button>
+	                                                @endforeach
+	                                            </div>
                                         </div>
 
                                         <!-- Log Call -->

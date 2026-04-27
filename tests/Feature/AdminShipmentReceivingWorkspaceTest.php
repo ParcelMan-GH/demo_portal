@@ -3,10 +3,12 @@
 use App\Http\Middleware\LogAdminAuditActivity;
 use App\Models\District;
 use App\Models\Driver;
+use App\Models\LabelCustodyEvent;
 use App\Models\PickupAssignment;
 use App\Models\Region;
 use App\Models\Role;
 use App\Models\Shipment;
+use App\Models\ShipmentCharge;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemImage;
 use App\Models\User;
@@ -14,6 +16,8 @@ use App\Models\Vendor;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
+use App\Models\WarehouseReceiptItemLabel;
+use App\Models\WarehouseReceiptItemPhoto;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -311,6 +315,15 @@ function rwBuildSchema(): void
         $table->decimal('amount', 10, 2)->default(0);
         $table->string('currency')->default('GHS');
         $table->string('status')->default('pending');
+        $table->timestamp('paid_at')->nullable();
+        $table->string('payment_method')->nullable();
+        $table->string('payment_reference')->nullable();
+        $table->foreignId('recorded_by_admin_id')->nullable()->constrained('users')->nullOnDelete();
+        $table->foreignId('recorded_by_driver_id')->nullable()->constrained('drivers')->nullOnDelete();
+        $table->unsignedBigInteger('delivery_run_stop_id')->nullable();
+        $table->foreignId('pickup_assignment_id')->nullable()->constrained('pickup_assignments')->nullOnDelete();
+        $table->text('notes')->nullable();
+        $table->text('waive_reason')->nullable();
         $table->timestamps();
         $table->softDeletes();
     });
@@ -370,6 +383,31 @@ function rwBuildSchema(): void
         $table->unsignedBigInteger('size')->default(0);
         $table->string('photo_type')->nullable();
         $table->unsignedBigInteger('created_by_user_id')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('warehouse_receipt_item_labels', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('warehouse_receipt_item_id')->constrained('warehouse_receipt_items')->cascadeOnDelete();
+        $table->string('barcode_value')->unique();
+        $table->unsignedInteger('label_index')->nullable();
+        $table->unsignedInteger('labels_total')->default(1);
+        $table->string('label_type', 20)->default('sealed');
+        $table->timestamp('printed_at')->nullable();
+        $table->unsignedInteger('print_count')->default(0);
+        $table->timestamps();
+    });
+
+    Schema::create('label_custody_events', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('warehouse_receipt_item_label_id')->constrained('warehouse_receipt_item_labels')->cascadeOnDelete();
+        $table->string('event_type', 20);
+        $table->foreignId('driver_id')->nullable()->constrained('drivers')->nullOnDelete();
+        $table->unsignedBigInteger('scanned_by_user_id')->nullable();
+        $table->string('location_note', 255)->nullable();
+        $table->decimal('latitude', 10, 8)->nullable();
+        $table->decimal('longitude', 11, 8)->nullable();
+        $table->text('notes')->nullable();
         $table->timestamps();
     });
 }
@@ -638,6 +676,196 @@ test('post-pickup split works from receiving before receipt starts and returns r
         ->and($firstPhoto->fresh()->shipment_item_id)->toBe($item->id);
 });
 
+test('receiving split switches to multiple drop-offs when vendor photo phones differ', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'single',
+        'delivery_recipient_name' => 'Shared recipient',
+        'delivery_recipient_phone' => '+233240000000',
+        'delivery_region_id' => $location['region']->id,
+        'delivery_district_id' => $location['district']->id,
+        'delivery_town' => 'Madina',
+        'delivery_landmark' => 'Shared landmark',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'description' => 'Mixed phones',
+        'quantity' => 2,
+    ]);
+
+    rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+
+    $firstPhoto = rwAddVendorPhoto($item, 'phone-a.jpg', 1);
+    $firstPhoto->update(['recipient_phone' => '+233240000001']);
+    $secondPhoto = rwAddVendorPhoto($item, 'phone-b.jpg', 2);
+    $secondPhoto->update(['recipient_phone' => '+233240000002']);
+
+    $response = $this->postJson(route('admin.shipments.packages.split', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]), [
+        'photo_ids' => [$secondPhoto->id],
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('data.destination_mode', 'per_item');
+
+    $receivingPackages = collect($response->json('data.receiving_packages'));
+
+    expect($receivingPackages)->toHaveCount(2)
+        ->and($receivingPackages->pluck('delivery_recipient_phone')->all())->toEqualCanonicalizing([
+            '+233240000001',
+            '+233240000002',
+        ])
+        ->and($receivingPackages->pluck('delivery_town')->unique()->values()->all())->toBe(['Madina']);
+
+    $this->assertDatabaseHas('shipments', [
+        'id' => $shipment->id,
+        'destination_mode' => 'per_item',
+        'delivery_recipient_name' => null,
+        'delivery_recipient_phone' => null,
+    ]);
+});
+
+test('receiving split switches to one drop-off when vendor photo phones match', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'description' => 'Same recipient packages',
+        'quantity' => 2,
+        'delivery_recipient_name' => 'Same recipient',
+        'delivery_recipient_phone' => '+233240000009',
+        'delivery_region_id' => $location['region']->id,
+        'delivery_district_id' => $location['district']->id,
+        'delivery_town' => 'Tema',
+    ]);
+
+    rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+
+    $firstPhoto = rwAddVendorPhoto($item, 'same-a.jpg', 1);
+    $firstPhoto->update(['recipient_phone' => '+233240000009']);
+    $secondPhoto = rwAddVendorPhoto($item, 'same-b.jpg', 2);
+    $secondPhoto->update(['recipient_phone' => '+233240000009']);
+
+    $response = $this->postJson(route('admin.shipments.packages.split', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]), [
+        'photo_ids' => [$secondPhoto->id],
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('data.destination_mode', 'single')
+        ->assertJsonPath('data.delivery.recipient_phone', '+233240000009')
+        ->assertJsonPath('data.delivery.town', 'Tema');
+
+    $receivingPackages = collect($response->json('data.receiving_packages'));
+
+    expect($receivingPackages)->toHaveCount(2)
+        ->and($receivingPackages->pluck('delivery_recipient_phone')->unique()->values()->all())->toBe(['+233240000009'])
+        ->and($receivingPackages->pluck('delivery_town')->unique()->values()->all())->toBe(['Tema']);
+
+    $this->assertDatabaseHas('shipments', [
+        'id' => $shipment->id,
+        'destination_mode' => 'single',
+        'delivery_recipient_phone' => '+233240000009',
+        'delivery_town' => 'Tema',
+    ]);
+});
+
+test('receiving split switches to one drop-off when package delivery locations match without phone tags', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'description' => 'Same location packages',
+        'quantity' => 2,
+        'delivery_recipient_name' => 'Location recipient',
+        'delivery_region_id' => $location['region']->id,
+        'delivery_district_id' => $location['district']->id,
+        'delivery_town' => 'Osu',
+        'delivery_landmark' => 'Same shop',
+    ]);
+
+    rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+
+    rwAddVendorPhoto($item, 'location-a.jpg', 1);
+    $secondPhoto = rwAddVendorPhoto($item, 'location-b.jpg', 2);
+
+    $response = $this->postJson(route('admin.shipments.packages.split', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]), [
+        'photo_ids' => [$secondPhoto->id],
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('data.destination_mode', 'single')
+        ->assertJsonPath('data.delivery.recipient_name', 'Location recipient')
+        ->assertJsonPath('data.delivery.town', 'Osu')
+        ->assertJsonPath('data.delivery.landmark', 'Same shop');
+
+    $receivingPackages = collect($response->json('data.receiving_packages'));
+
+    expect($receivingPackages)->toHaveCount(2)
+        ->and($receivingPackages->pluck('delivery_recipient_name')->unique()->values()->all())->toBe(['Location recipient'])
+        ->and($receivingPackages->pluck('delivery_town')->unique()->values()->all())->toBe(['Osu']);
+});
+
+test('drop-off mode switch to multiple copies shared destination into packages', function () {
+    $location = rwCreateLocation();
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'destination_mode' => 'single',
+        'delivery_recipient_name' => 'Shared recipient',
+        'delivery_recipient_phone' => '+233501234567',
+        'delivery_region_id' => $location['region']->id,
+        'delivery_district_id' => $location['district']->id,
+        'delivery_town' => 'Adenta',
+        'delivery_landmark' => 'Near police station',
+    ]);
+    $firstItem = rwCreateShipmentItem($shipment, ['description' => 'First']);
+    $secondItem = rwCreateShipmentItem($shipment, ['description' => 'Second']);
+
+    $response = $this->putJson(route('admin.shipments.update', $shipment), [
+        'destination_mode' => 'per_item',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('data.destination_mode', 'per_item');
+
+    foreach ([$firstItem, $secondItem] as $item) {
+        $item->refresh();
+        expect($item->delivery_recipient_name)->toBe('Shared recipient')
+            ->and($item->delivery_recipient_phone)->toBe('+233501234567')
+            ->and($item->delivery_region_id)->toBe($location['region']->id)
+            ->and($item->delivery_district_id)->toBe($location['district']->id)
+            ->and($item->delivery_town)->toBe('Adenta')
+            ->and($item->delivery_landmark)->toBe('Near police station');
+    }
+
+    $this->assertDatabaseHas('shipments', [
+        'id' => $shipment->id,
+        'destination_mode' => 'per_item',
+        'delivery_recipient_name' => null,
+        'delivery_recipient_phone' => null,
+        'delivery_town' => null,
+    ]);
+});
+
 test('post-pickup receiving split is blocked once warehouse intake has started', function () {
     $location = rwCreateLocation();
     $warehouse = rwCreateWarehouse($location['region'], $location['district']);
@@ -701,6 +929,248 @@ test('post-pickup receiving split is blocked once labels have been printed', fun
         ->assertJsonPath('message', 'Labels have already been printed for this package.');
 
     $this->assertDatabaseCount('shipment_items', 1);
+});
+
+test('post-pickup receiving can add a package and returns receiving package payload', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+
+    rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+
+    $response = $this->postJson(route('admin.shipments.packages.add', $shipment), [
+        'description' => 'Extra carton',
+        'quantity' => 3,
+    ]);
+
+    $newItemId = $response->json('data.receiving_package.shipment_item_id');
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.package.description', 'Extra carton')
+        ->assertJsonPath('data.package.quantity', 3)
+        ->assertJsonPath('data.receiving_package.description', 'Extra carton')
+        ->assertJsonPath('data.receiving_package.vendor_quantity', 3)
+        ->assertJsonPath('data.receiving_package.expected_quantity', 3)
+        ->assertJsonPath('data.receiving_package.received_quantity', 3)
+        ->assertJsonPath('data.receiving_package.can_delete', true);
+
+    $this->assertDatabaseHas('shipment_items', [
+        'id' => $newItemId,
+        'shipment_id' => $shipment->id,
+        'description' => 'Extra carton',
+        'quantity' => 3,
+    ]);
+
+    $this->assertDatabaseHas('warehouse_receipt_items', [
+        'shipment_item_id' => $newItemId,
+        'expected_quantity' => 3,
+        'received_quantity' => 3,
+        'damaged_quantity' => 0,
+        'condition_status' => 'ok',
+    ]);
+});
+
+test('post-pickup receiving can remove a package before warehouse intake activity', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'description' => 'Mistaken split package',
+    ]);
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+    $receipt = rwCreateReceipt($assignment, $warehouse);
+    $receiptItem = rwCreateReceiptItem($receipt, $item, [
+        'received_quantity' => 0,
+        'damaged_quantity' => 0,
+        'barcode_print_count' => 0,
+    ]);
+    $photo = rwAddVendorPhoto($item, 'delete-me.jpg', 1);
+
+    $response = $this->deleteJson(route('admin.shipments.packages.delete', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]));
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.deleted_package_id', $item->id);
+
+    $this->assertDatabaseMissing('warehouse_receipt_items', ['id' => $receiptItem->id]);
+    $this->assertDatabaseMissing('shipment_item_images', ['id' => $photo->id]);
+    $this->assertDatabaseMissing('shipment_items', ['id' => $item->id]);
+});
+
+test('post-pickup receiving remove can undo warehouse intake before labels are printed', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment);
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+    $receipt = rwCreateReceipt($assignment, $warehouse);
+    $receiptItem = rwCreateReceiptItem($receipt, $item, [
+        'received_quantity' => 1,
+        'damaged_quantity' => 0,
+        'barcode_print_count' => 0,
+    ]);
+
+    $response = $this->deleteJson(route('admin.shipments.packages.delete', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]));
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.deleted_package_id', $item->id);
+
+    $this->assertDatabaseMissing('warehouse_receipt_items', ['id' => $receiptItem->id]);
+    $this->assertDatabaseMissing('shipment_items', ['id' => $item->id]);
+});
+
+test('post-pickup receiving remove deletes receipt photos before removing the package', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment);
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+    $receipt = rwCreateReceipt($assignment, $warehouse);
+    $receiptItem = rwCreateReceiptItem($receipt, $item, [
+        'received_quantity' => 0,
+        'damaged_quantity' => 0,
+        'barcode_print_count' => 0,
+    ]);
+    $receiptPhoto = WarehouseReceiptItemPhoto::create([
+        'warehouse_receipt_item_id' => $receiptItem->id,
+        'path' => 'warehouse/receipts/photo.jpg',
+        'original_name' => 'photo.jpg',
+        'size' => 2048,
+        'photo_type' => 'condition',
+        'created_by_user_id' => auth('admin')->id(),
+    ]);
+
+    $response = $this->deleteJson(route('admin.shipments.packages.delete', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]));
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.deleted_package_id', $item->id);
+
+    $this->assertDatabaseMissing('warehouse_receipt_item_photos', ['id' => $receiptPhoto->id]);
+    $this->assertDatabaseMissing('warehouse_receipt_items', ['id' => $receiptItem->id]);
+    $this->assertDatabaseMissing('shipment_items', ['id' => $item->id]);
+});
+
+test('post-pickup receiving remove can delete printed labels still at warehouse', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'tracking_code' => 'TRKPRINTEDRM',
+    ]);
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+    $receipt = rwCreateReceipt($assignment, $warehouse);
+    $receiptItem = rwCreateReceiptItem($receipt, $item, [
+        'received_quantity' => 1,
+        'barcode_value' => 'TRKPRINTEDRM',
+        'barcode_print_count' => 1,
+    ]);
+    $label = WarehouseReceiptItemLabel::create([
+        'warehouse_receipt_item_id' => $receiptItem->id,
+        'barcode_value' => 'TRKPRINTEDRM-001',
+        'label_index' => 1,
+        'labels_total' => 1,
+        'label_type' => 'sealed',
+        'printed_at' => now(),
+        'print_count' => 1,
+    ]);
+
+    $response = $this->deleteJson(route('admin.shipments.packages.delete', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]));
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.deleted_package_id', $item->id);
+
+    $this->assertDatabaseMissing('warehouse_receipt_item_labels', ['id' => $label->id]);
+    $this->assertDatabaseMissing('warehouse_receipt_items', ['id' => $receiptItem->id]);
+    $this->assertDatabaseMissing('shipment_items', ['id' => $item->id]);
+});
+
+test('post-pickup receiving remove is blocked once a printed label is in driver custody', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $driver = rwCreateDriver();
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'tracking_code' => 'TRKCLAIMEDRM',
+    ]);
+    $assignment = rwCreateAssignment($shipment, $driver, $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+    $receipt = rwCreateReceipt($assignment, $warehouse);
+    $receiptItem = rwCreateReceiptItem($receipt, $item, [
+        'received_quantity' => 1,
+        'barcode_value' => 'TRKCLAIMEDRM',
+        'barcode_print_count' => 1,
+    ]);
+    $label = WarehouseReceiptItemLabel::create([
+        'warehouse_receipt_item_id' => $receiptItem->id,
+        'barcode_value' => 'TRKCLAIMEDRM-001',
+        'label_index' => 1,
+        'labels_total' => 1,
+        'label_type' => 'sealed',
+        'printed_at' => now(),
+        'print_count' => 1,
+    ]);
+    LabelCustodyEvent::create([
+        'warehouse_receipt_item_label_id' => $label->id,
+        'event_type' => LabelCustodyEvent::TYPE_CLAIMED,
+        'driver_id' => $driver->id,
+    ]);
+
+    $response = $this->deleteJson(route('admin.shipments.packages.delete', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]));
+
+    $response->assertStatus(422)
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('message', 'This package has labels already claimed by a driver or delivered.');
+
+    $this->assertDatabaseHas('shipment_items', ['id' => $item->id]);
+    $this->assertDatabaseHas('warehouse_receipt_item_labels', ['id' => $label->id]);
 });
 
 test('post-pickup auto-group by phone works from receiving before warehouse intake starts', function () {
@@ -805,6 +1275,40 @@ test('post-pickup auto-group by phone is blocked once warehouse intake has start
         ->assertJsonPath('message', 'Auto-group by phone is only available before warehouse receiving starts.');
 });
 
+test('receiving is available for picked up shipment even when assignment picked up timestamp is missing', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'description' => 'Legacy picked up package',
+    ]);
+
+    rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'status' => 'assigned',
+        'picked_up_at' => null,
+    ]);
+
+    $this->getJson(route('admin.shipments.receiving-data', $shipment))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.can_receive', true)
+        ->assertJsonPath('data.can_auto_group', true)
+        ->assertJsonPath('data.packages.0.shipment_item_id', $item->id);
+
+    $this->postJson(route('admin.shipments.receiving.details', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]), [
+        'description' => 'Legacy package updated at receiving',
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_DIRECT,
+    ])->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.package.description', 'Legacy package updated at receiving');
+});
+
 test('receiving details save updates package details without creating a receipt item', function () {
     $location = rwCreateLocation();
     $warehouse = rwCreateWarehouse($location['region'], $location['district']);
@@ -858,6 +1362,135 @@ test('receiving details save updates package details without creating a receipt 
 
     $this->assertDatabaseCount('warehouse_receipts', 0);
     $this->assertDatabaseCount('warehouse_receipt_items', 0);
+});
+
+test('receiving details save creates package-level delivery fee for recipient collection', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'description' => 'Recipient parcel',
+    ]);
+
+    rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+
+    $response = $this->postJson(route('admin.shipments.receiving.details', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]), [
+        'description' => 'Recipient parcel',
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_DIRECT,
+        'delivery_fee_mode' => 'collect',
+        'delivery_fee_amount' => 35.50,
+        'delivery_fee_notes' => 'Quoted to recipient',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.package.delivery_fee.status', 'collect')
+        ->assertJsonPath('data.package.delivery_fee.amount', 35.5)
+        ->assertJsonPath('data.package.delivery_fee.outstanding_amount', 35.5)
+        ->assertJsonPath('data.package.delivery_fee.notes', 'Quoted to recipient');
+
+    $this->assertDatabaseHas('shipment_charges', [
+        'shipment_id' => $shipment->id,
+        'shipment_item_id' => $item->id,
+        'charge_type' => ShipmentCharge::TYPE_DELIVERY_FEE,
+        'payer_type' => ShipmentCharge::PAYER_RECIPIENT,
+        'direction' => ShipmentCharge::DIRECTION_REVENUE,
+        'due_stage' => ShipmentCharge::STAGE_AT_DELIVERY,
+        'amount' => 35.50,
+        'status' => ShipmentCharge::STATUS_PENDING,
+        'notes' => 'Quoted to recipient',
+    ]);
+
+    $this->assertDatabaseCount('warehouse_receipt_items', 0);
+});
+
+test('receiving details save can mark package delivery fee as already paid', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment);
+
+    rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+
+    $response = $this->postJson(route('admin.shipments.receiving.details', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]), [
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_DIRECT,
+        'delivery_fee_mode' => 'paid',
+        'delivery_fee_amount' => 20,
+        'delivery_fee_payment_method' => 'momo',
+        'delivery_fee_payment_reference' => 'TXN-123',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.package.delivery_fee.status', 'paid')
+        ->assertJsonPath('data.package.delivery_fee.amount', 20)
+        ->assertJsonPath('data.package.delivery_fee.paid_amount', 20)
+        ->assertJsonPath('data.package.delivery_fee.payment_method', 'momo')
+        ->assertJsonPath('data.package.delivery_fee.payment_reference', 'TXN-123');
+
+    $this->assertDatabaseHas('shipment_charges', [
+        'shipment_id' => $shipment->id,
+        'shipment_item_id' => $item->id,
+        'charge_type' => ShipmentCharge::TYPE_DELIVERY_FEE,
+        'payer_type' => ShipmentCharge::PAYER_RECIPIENT,
+        'due_stage' => ShipmentCharge::STAGE_AT_DELIVERY,
+        'amount' => 20,
+        'status' => ShipmentCharge::STATUS_PAID,
+        'payment_method' => 'momo',
+        'payment_reference' => 'TXN-123',
+    ]);
+});
+
+test('charges ledger requires delivery fees to be assigned to a package', function () {
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'description' => 'Fee package',
+    ]);
+
+    $this->postJson(route('admin.shipments.charges.store', $shipment), [
+        'charge_type' => ShipmentCharge::TYPE_DELIVERY_FEE,
+        'payer_type' => ShipmentCharge::PAYER_RECIPIENT,
+        'due_stage' => ShipmentCharge::STAGE_AT_DELIVERY,
+        'amount' => 12,
+    ])->assertStatus(422)
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('message', 'Delivery fees must be assigned to a package.');
+
+    $this->postJson(route('admin.shipments.charges.store', $shipment), [
+        'shipment_item_id' => $item->id,
+        'charge_type' => ShipmentCharge::TYPE_DELIVERY_FEE,
+        'payer_type' => ShipmentCharge::PAYER_RECIPIENT,
+        'due_stage' => ShipmentCharge::STAGE_AT_DELIVERY,
+        'amount' => 12,
+    ])->assertCreated()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('charge.shipment_item_id', $item->id);
+
+    $this->assertDatabaseHas('shipment_charges', [
+        'shipment_id' => $shipment->id,
+        'shipment_item_id' => $item->id,
+        'charge_type' => ShipmentCharge::TYPE_DELIVERY_FEE,
+        'amount' => 12,
+    ]);
 });
 
 test('single-destination receiving details save syncs all receiving package cards from shipment delivery data', function () {
@@ -962,5 +1595,66 @@ test('receiving finalization accepts approval reason for discrepancy receipts', 
         'notes' => 'Finalized after warehouse review',
         'approval_reason' => 'Vendor confirmed one piece was not handed over at pickup.',
         'approved_by_user_id' => auth('admin')->id(),
+    ]);
+});
+
+test('finalized receiving can be edited and finalized again', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'description' => 'Editable carton',
+        'quantity' => 2,
+    ]);
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'status' => 'completed',
+        'picked_up_at' => now(),
+    ]);
+    $receipt = rwCreateReceipt($assignment, $warehouse);
+
+    rwCreateReceiptItem($receipt, $item, [
+        'expected_quantity' => 2,
+        'received_quantity' => 2,
+        'damaged_quantity' => 0,
+        'discrepancy_type' => 'none',
+        'condition_status' => 'ok',
+    ]);
+
+    $this->postJson(route('admin.shipments.receiving.finalize', $shipment))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.receipt.status', WarehouseReceipt::STATUS_FINALIZED);
+
+    $this->postJson(route('admin.shipments.receiving.save', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]), [
+        'received_quantity' => 1,
+        'damaged_quantity' => 0,
+        'condition_status' => 'partial',
+        'description' => 'Editable carton corrected',
+    ])->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.receipt.status', WarehouseReceipt::STATUS_DISCREPANCY_OPEN)
+        ->assertJsonPath('data.package.received_quantity', 1);
+
+    $this->assertDatabaseHas('warehouse_receipts', [
+        'id' => $receipt->id,
+        'status' => WarehouseReceipt::STATUS_DISCREPANCY_OPEN,
+        'finalized_at' => null,
+    ]);
+
+    $this->postJson(route('admin.shipments.receiving.finalize', $shipment), [
+        'approval_reason' => 'Warehouse corrected the count after audit.',
+    ])->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.receipt.status', WarehouseReceipt::STATUS_FINALIZED);
+
+    $this->assertDatabaseHas('warehouse_receipts', [
+        'id' => $receipt->id,
+        'status' => WarehouseReceipt::STATUS_FINALIZED,
+        'approval_reason' => 'Warehouse corrected the count after audit.',
     ]);
 });

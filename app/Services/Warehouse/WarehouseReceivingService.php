@@ -62,7 +62,8 @@ class WarehouseReceivingService
         ?string $conditionStatus = null,
         ?string $notes = null,
         array $photos = [],
-        array $removePhotoIds = []
+        array $removePhotoIds = [],
+        bool $allowAfterFinalization = false,
     ): array {
         if ($shipmentItem->shipment_id !== $assignment->shipment_id) {
             return [
@@ -96,21 +97,32 @@ class WarehouseReceivingService
             $conditionStatus,
             $notes,
             $photos,
-            $removePhotoIds
+            $removePhotoIds,
+            $allowAfterFinalization
         ) {
             $lockedAssignment = PickupAssignment::query()->lockForUpdate()->findOrFail($assignment->id);
-            if ($error = $this->validateReceivingPreconditions($lockedAssignment, $warehouse)) {
+            if ($error = $this->validateReceivingPreconditions($lockedAssignment, $warehouse, $allowAfterFinalization)) {
                 return $error;
             }
 
             $receipt = $this->getOrCreateReceipt($lockedAssignment, $warehouse, $user);
             $receipt = WarehouseReceipt::query()->lockForUpdate()->findOrFail($receipt->id);
 
-            if ($receipt->isFinalized()) {
+            if ($receipt->isFinalized() && ! $allowAfterFinalization) {
                 return [
                     'success' => false,
                     'message' => 'This receipt is already finalized.',
                 ];
+            }
+
+            if ($receipt->isFinalized() && $allowAfterFinalization) {
+                $receipt->update([
+                    'status' => WarehouseReceipt::STATUS_DRAFT,
+                    'finalized_by_user_id' => null,
+                    'approved_by_user_id' => null,
+                    'approval_reason' => null,
+                    'finalized_at' => null,
+                ]);
             }
 
             $expectedQuantity = $this->resolveExpectedQuantity($lockedAssignment, $shipmentItem);
@@ -182,7 +194,7 @@ class WarehouseReceivingService
                 ]);
             }
 
-            $this->refreshReceiptStatus($receipt);
+            $this->refreshReceiptStatus($receipt, true);
 
             $loadedItem = $receiptItem->fresh(['photos', 'shipmentItem.shipment']);
 
@@ -425,7 +437,7 @@ class WarehouseReceivingService
     ): array {
         return DB::transaction(function () use ($assignment, $warehouse, $user, $notes, $approvalReason) {
             $lockedAssignment = PickupAssignment::query()->lockForUpdate()->findOrFail($assignment->id);
-            if ($error = $this->validateReceivingPreconditions($lockedAssignment, $warehouse)) {
+            if ($error = $this->validateReceivingPreconditions($lockedAssignment, $warehouse, true)) {
                 return $error;
             }
 
@@ -434,8 +446,16 @@ class WarehouseReceivingService
 
             if ($receipt->isFinalized()) {
                 return [
-                    'success' => false,
+                    'success' => true,
                     'message' => 'Receipt is already finalized.',
+                    'data' => [
+                        'receipt' => $receipt->fresh(['items.photos']),
+                        'assignment' => $lockedAssignment->fresh([
+                            'driver',
+                            'targetWarehouse',
+                            'receivedWarehouse',
+                        ]),
+                    ],
                 ];
             }
 
@@ -485,16 +505,19 @@ class WarehouseReceivingService
                 ];
             })->all();
 
-            $receiveResult = $this->pickupAssignmentService->receiveAtWarehouse(
-                assignment: $lockedAssignment,
-                receivedByUserId: $user->id,
-                receivedWarehouseId: $warehouse->id,
-                receiveNotes: $notes,
-                trackingMetaByItem: $trackingMetaByItem
-            );
+            $receiveResult = ['success' => true, 'data' => ['assignment' => $lockedAssignment]];
+            if (is_null($lockedAssignment->received_at)) {
+                $receiveResult = $this->pickupAssignmentService->receiveAtWarehouse(
+                    assignment: $lockedAssignment,
+                    receivedByUserId: $user->id,
+                    receivedWarehouseId: $warehouse->id,
+                    receiveNotes: $notes,
+                    trackingMetaByItem: $trackingMetaByItem
+                );
 
-            if (!$receiveResult['success']) {
-                return $receiveResult;
+                if (!$receiveResult['success']) {
+                    return $receiveResult;
+                }
             }
 
             $receipt->update([
@@ -609,9 +632,9 @@ class WarehouseReceivingService
         return 'mixed';
     }
 
-    private function refreshReceiptStatus(WarehouseReceipt $receipt): void
+    private function refreshReceiptStatus(WarehouseReceipt $receipt, bool $allowFinalizedRefresh = false): void
     {
-        if ($receipt->isFinalized()) {
+        if ($receipt->isFinalized() && ! $allowFinalizedRefresh) {
             return;
         }
 
@@ -635,7 +658,7 @@ class WarehouseReceivingService
         return $items->map(fn (WarehouseReceiptItem $item) => $this->serializeReceiptItem($item));
     }
 
-    private function validateReceivingPreconditions(PickupAssignment $assignment, Warehouse $warehouse): ?array
+    private function validateReceivingPreconditions(PickupAssignment $assignment, Warehouse $warehouse, bool $allowAlreadyReceived = false): ?array
     {
         $status = $assignment->status?->value ?? $assignment->getRawOriginal('status');
 
@@ -653,7 +676,7 @@ class WarehouseReceivingService
             ];
         }
 
-        if (!is_null($assignment->received_at)) {
+        if (! $allowAlreadyReceived && !is_null($assignment->received_at)) {
             return [
                 'success' => false,
                 'message' => 'This pickup has already been received at warehouse.',

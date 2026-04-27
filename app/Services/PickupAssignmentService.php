@@ -81,10 +81,14 @@ class PickupAssignmentService
         PushNotificationService $pushService
     ): array
     {
-        if ($assignment->status !== PickupAssignmentStatus::ASSIGNED) {
+        if (
+            $assignment->picked_up_at
+            || $assignment->completed_at
+            || in_array($assignment->status, [PickupAssignmentStatus::COMPLETED, PickupAssignmentStatus::CANCELLED], true)
+        ) {
             return [
                 'success' => false,
-                'message' => 'Assignment can only be edited while in ASSIGNED status.',
+                'message' => 'Assignment can only be edited before pickup is confirmed.',
             ];
         }
 

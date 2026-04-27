@@ -986,7 +986,36 @@ class WarehouseDeliveryService
             return;
         }
 
-        if ($uniqueShipments->isEmpty()) {
+        $billableRunItems = $runItems
+            ->filter(fn (DeliveryRunItem $runItem) => $runItem->shipmentItem !== null)
+            ->values();
+
+        if ($billableRunItems->isEmpty() && $uniqueShipments->isEmpty()) {
+            return;
+        }
+
+        if ($billableRunItems->isNotEmpty()) {
+            $itemCount = $billableRunItems->count();
+            $share = round($inFieldDeliveryFee / $itemCount, 2);
+            $noteSuffix = $itemCount > 1
+                ? " (split from GHS " . number_format($inFieldDeliveryFee, 2) . " across {$itemCount} package(s) delivered at this stop)"
+                : '';
+
+            foreach ($billableRunItems as $runItem) {
+                $shipmentItem = $runItem->shipmentItem;
+                $this->chargesService->addCharge($shipmentItem->shipment, [
+                    'shipment_item_id'      => $shipmentItem->id,
+                    'charge_type'           => ShipmentCharge::TYPE_DELIVERY_FEE,
+                    'payer_type'            => ShipmentCharge::PAYER_RECIPIENT,
+                    'due_stage'             => ShipmentCharge::STAGE_AT_DELIVERY,
+                    'amount'                => $share,
+                    'status'                => ShipmentCharge::STATUS_PAID,
+                    'payment_method'        => 'cash',
+                    'delivery_run_stop_id'  => $stop->id,
+                    'notes'                 => "Driver collected delivery fee on arrival{$noteSuffix}",
+                ], $driver);
+            }
+
             return;
         }
 
@@ -1037,7 +1066,7 @@ class WarehouseDeliveryService
         return ShipmentCharge::query()
             ->where('charge_type', ShipmentCharge::TYPE_DELIVERY_FEE)
             ->where('payer_type', ShipmentCharge::PAYER_RECIPIENT)
-            ->where('due_stage', ShipmentCharge::STAGE_AT_DELIVERY)
+            ->whereIn('due_stage', [ShipmentCharge::STAGE_AT_DELIVERY, ShipmentCharge::STAGE_BEFORE_DELIVERY])
             ->whereIn('status', [ShipmentCharge::STATUS_DRAFT, ShipmentCharge::STATUS_PENDING])
             ->where(function ($query) use ($stopId, $shipmentIds, $shipmentItemIds) {
                 $hasCondition = false;

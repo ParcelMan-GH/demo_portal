@@ -58,6 +58,13 @@ class WarehouseShipmentChargesController extends Controller
             'payment_reference' => ['nullable', 'string', 'max:100'],
         ]);
 
+        if ($validated['charge_type'] === ShipmentCharge::TYPE_DELIVERY_FEE && empty($validated['shipment_item_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Delivery fees must be assigned to a package.',
+            ], 422);
+        }
+
         $charge = $this->charges->addCharge($shipment, $validated, Auth::guard('admin')->user());
 
         return response()->json([

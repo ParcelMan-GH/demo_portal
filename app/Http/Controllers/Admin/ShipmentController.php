@@ -10,6 +10,7 @@ use App\Exports\ShipmentsExport;
 use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Location;
+use App\Models\LabelCustodyEvent;
 use App\Models\PickupItemConfirmation;
 use App\Models\PickupPhoto;
 use App\Models\Region;
@@ -19,6 +20,7 @@ use App\Models\ShipmentItem;
 use App\Models\ShipmentItemImage;
 use App\Models\ShipmentItemTracking;
 use App\Models\Warehouse;
+use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
 use App\Services\StorageService;
 use App\Services\WalkinShipmentService;
@@ -28,6 +30,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ShipmentController extends Controller
@@ -1028,50 +1031,39 @@ class ShipmentController extends Controller
 
         // Handle destination_mode switch
         $newMode = $validated['destination_mode'] ?? null;
-        $oldMode = $shipment->destination_mode->value;
+        $oldMode = $shipment->destination_mode?->value ?? ShipmentDestinationMode::SINGLE->value;
 
         if ($newMode && $newMode !== $oldMode) {
             if ($newMode === 'per_item') {
-                // Single → Per-item: clear shipment-level delivery fields
-                $validated = array_merge($validated, [
-                    'delivery_recipient_name' => null,
-                    'delivery_recipient_phone' => null,
-                    'delivery_region_id' => null,
-                    'delivery_district_id' => null,
-                    'delivery_town' => null,
-                    'delivery_latitude' => null,
-                    'delivery_longitude' => null,
-                    'delivery_gh_post_address' => null,
-                    'delivery_landmark' => null,
-                    'delivery_instructions' => null,
-                    'delivery_preference' => null,
-                    'fulfillment_type' => null,
-                ]);
+                $this->seedPackageDeliveryFromShipment($shipment);
+                $validated = array_merge($validated, $this->emptyShipmentDeliveryAttributes());
             } else {
-                // Per-item → Single: clear all package-level delivery fields
-                $shipment->items()->update([
-                    'delivery_recipient_name' => null,
-                    'delivery_recipient_phone' => null,
-                    'delivery_region_id' => null,
-                    'delivery_district_id' => null,
-                    'delivery_town' => null,
-                    'delivery_latitude' => null,
-                    'delivery_longitude' => null,
-                    'delivery_gh_post_address' => null,
-                    'delivery_landmark' => null,
-                    'delivery_instructions' => null,
-                    'delivery_preference' => null,
-                    'fulfillment_type' => null,
-                ]);
+                $validated = array_merge($this->shipmentDeliverySeedFromItems($shipment), $validated);
+                $shipment->items()->update($this->emptyItemDeliveryAttributes());
             }
         }
 
         $shipment->update($validated);
+        $shipment->load(['pickupRegion', 'pickupDistrict', 'deliveryRegion', 'deliveryDistrict']);
 
         return response()->json([
             'success' => true,
             'message' => 'Shipment updated.',
-            'data' => ['destination_mode' => $shipment->destination_mode->value],
+            'data' => [
+                'destination_mode' => $shipment->destination_mode->value,
+                'delivery' => $this->serializeShipmentDelivery($shipment),
+                'pickup' => [
+                    'contact_name' => $shipment->pickup_contact_name,
+                    'contact_phone' => $shipment->pickup_contact_phone,
+                    'region_id' => $shipment->pickup_region_id,
+                    'region_name' => $shipment->pickupRegion?->name,
+                    'district_id' => $shipment->pickup_district_id,
+                    'district_name' => $shipment->pickupDistrict?->name,
+                    'town' => $shipment->pickup_town,
+                    'landmark' => $shipment->pickup_landmark,
+                    'instructions' => $shipment->pickup_instructions,
+                ],
+            ],
         ]);
     }
 
@@ -1079,9 +1071,42 @@ class ShipmentController extends Controller
     {
         $this->authorizePermission('shipments.edit');
 
+        $shipment = $this->reloadReceivingShipment($shipment);
+        $assignment = $shipment->pickupAssignment;
+        $pickupComplete = $this->isPickupCompleteForReceiving($shipment, $assignment);
+
+        if ($pickupComplete && ! $this->canAddPackageDuringReceiving($assignment, $shipment)) {
+            return response()->json([
+                'success' => false,
+                'message' => $this->receivingAddPackageLockReason($assignment, $shipment) ?? 'Packages can no longer be added for this shipment.',
+            ], 422);
+        }
+
+        if ($pickupComplete && ! $assignment?->targetWarehouse) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No target warehouse found for this pickup.',
+            ], 422);
+        }
+
         $validated = $request->validate([
-            'description' => ['nullable', 'string', 'max:500'],
-            'quantity' => ['nullable', 'integer', 'min:1'],
+            'description' => ['required', 'string', 'max:500'],
+            'quantity' => ['required', 'integer', 'min:1'],
+            'delivery_recipient_name' => ['nullable', 'string', 'max:255'],
+            'delivery_recipient_phone' => ['nullable', 'string', 'max:20'],
+            'delivery_region_id' => ['nullable', 'exists:regions,id'],
+            'delivery_district_id' => ['nullable', 'exists:districts,id'],
+            'delivery_town' => ['nullable', 'string', 'max:255'],
+            'delivery_landmark' => ['nullable', 'string', 'max:255'],
+            'delivery_instructions' => ['nullable', 'string', 'max:1000'],
+            'delivery_method' => ['nullable', 'in:direct,bus_handoff'],
+            'delivery_fee_mode' => ['nullable', 'in:none,collect,paid'],
+            'delivery_fee_amount' => ['nullable', 'numeric', 'min:0', 'max:9999999.99'],
+            'delivery_fee_notes' => ['nullable', 'string', 'max:1000'],
+            'delivery_fee_payment_method' => ['nullable', 'string', 'max:32'],
+            'delivery_fee_payment_reference' => ['nullable', 'string', 'max:100'],
+            'photos' => ['nullable', 'array'],
+            'photos.*' => ['file', 'image', 'max:12288'],
         ]);
 
         $item = $shipment->items()->create([
@@ -1089,10 +1114,47 @@ class ShipmentController extends Controller
             'quantity' => $validated['quantity'] ?? 1,
         ]);
 
+        $this->applyReceivingPackageDetails($shipment, $item, $validated, true);
+        $this->syncReceivingPackageDeliveryFee($shipment, $item, $validated);
+
+        if ($pickupComplete) {
+            $receivingResult = app(WarehouseReceivingService::class)->upsertReceiptItem(
+                assignment: $assignment,
+                shipmentItem: $item,
+                warehouse: $assignment->targetWarehouse,
+                user: Auth::guard('admin')->user(),
+                receivedQuantity: (int) $validated['quantity'],
+                damagedQuantity: 0,
+                conditionStatus: 'ok',
+                notes: null,
+                photos: $request->file('photos', []),
+                removePhotoIds: []
+            );
+
+            if (($receivingResult['success'] ?? false) !== true) {
+                return response()->json($receivingResult, 422);
+            }
+        }
+
+        $shipment = $this->reloadReceivingShipment($shipment);
+        $item = $shipment->items->firstWhere('id', $item->id) ?? $item->fresh(['images', 'deliveryRegion', 'deliveryDistrict']);
+        $assignment = $shipment->pickupAssignment;
+
         return response()->json([
             'success' => true,
             'message' => 'Package added.',
-            'data' => ['package' => ['id' => $item->id, 'description' => $item->description, 'quantity' => $item->quantity, 'photos' => []]],
+            'data' => [
+                'package' => $this->serializeEditorPackage($item),
+                'receiving_package' => $pickupComplete
+                    ? $this->serializeReceivingPackage($shipment, $item, $assignment)
+                    : null,
+                'can_auto_group' => $pickupComplete
+                    ? $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment)
+                    : null,
+                'auto_group_lock_reason' => $pickupComplete
+                    ? $this->receivingAutoGroupLockReason($assignment, $shipment)
+                    : null,
+            ],
         ]);
     }
 
@@ -1131,16 +1193,78 @@ class ShipmentController extends Controller
             return response()->json(['success' => false, 'message' => 'Package not found.'], 404);
         }
 
-        // Delete associated images from storage
-        $storageService = app(StorageService::class);
-        foreach ($item->images as $image) {
-            $storageService->delete($image->path);
-            $image->delete();
+        $shipment = $this->reloadReceivingShipment($shipment);
+        $assignment = $shipment->pickupAssignment;
+        $pickupComplete = $this->isPickupCompleteForReceiving($shipment, $assignment);
+        $receiptItem = $pickupComplete ? $this->findReceiptItemForShipmentItem($assignment, $item) : null;
+
+        if ($pickupComplete && ! $this->canRemovePackageDuringReceiving($assignment, $receiptItem, $item, $shipment)) {
+            return response()->json([
+                'success' => false,
+                'message' => $this->receivingRemoveLockReason($assignment, $receiptItem, $item, $shipment) ?? 'This package can no longer be removed.',
+            ], 422);
         }
 
-        $item->delete();
+        // Delete associated images from storage
+        $storageService = app(StorageService::class);
 
-        return response()->json(['success' => true, 'message' => 'Package deleted.']);
+        $deletedItemId = $item->id;
+
+        DB::transaction(function () use ($item, $receiptItem, $storageService) {
+            ShipmentCharge::query()
+                ->where('shipment_item_id', $item->id)
+                ->whereNotIn('status', [ShipmentCharge::STATUS_CANCELLED])
+                ->update([
+                    'status' => ShipmentCharge::STATUS_CANCELLED,
+                    'paid_at' => null,
+                    'payment_method' => null,
+                    'payment_reference' => null,
+                ]);
+
+            if ($receiptItem) {
+                $receiptItem->loadMissing('photos');
+                foreach ($receiptItem->photos as $photo) {
+                    $storageService->delete($photo->path);
+                    $photo->delete();
+                }
+
+                $receiptItem->delete();
+            }
+
+            $item->loadMissing('images');
+            foreach ($item->images as $image) {
+                $storageService->delete($image->path);
+                $image->delete();
+            }
+
+            $item->delete();
+        });
+
+        $shipment = $this->reloadReceivingShipment($shipment->fresh());
+        if ($pickupComplete) {
+            $this->syncDestinationModeFromVendorPhotoPhones($shipment);
+            $shipment = $this->reloadReceivingShipment($shipment->fresh());
+        }
+        $assignment = $shipment->pickupAssignment;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Package deleted.',
+            'data' => [
+                'deleted_package_id' => $deletedItemId,
+                'destination_mode' => $shipment->destination_mode->value,
+                'delivery' => $this->serializeShipmentDelivery($shipment),
+                'receiving_packages' => $pickupComplete
+                    ? $shipment->items->map(fn (ShipmentItem $candidate) => $this->serializeReceivingPackage($shipment, $candidate, $assignment))->values()
+                    : null,
+                'can_auto_group' => $pickupComplete
+                    ? $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment)
+                    : null,
+                'auto_group_lock_reason' => $pickupComplete
+                    ? $this->receivingAutoGroupLockReason($assignment, $shipment)
+                    : null,
+            ],
+        ]);
     }
 
     public function splitPackage(Request $request, Shipment $shipment, ShipmentItem $item): JsonResponse
@@ -1167,13 +1291,14 @@ class ShipmentController extends Controller
 
         $assignment = $shipment->pickupAssignment;
         $receiptItem = $this->findReceiptItemForShipmentItem($assignment, $item);
-        $splitAllowed = is_null($assignment?->picked_up_at)
-            || $this->canSplitPackageDuringReceiving($assignment, $receiptItem);
+        $pickupComplete = $this->isPickupCompleteForReceiving($shipment, $assignment);
+        $splitAllowed = ! $pickupComplete
+            || $this->canSplitPackageDuringReceiving($assignment, $receiptItem, $shipment);
 
         if (! $splitAllowed) {
             return response()->json([
                 'success' => false,
-                'message' => $this->receivingSplitLockReason($assignment, $receiptItem) ?? 'Package can no longer be split.',
+                'message' => $this->receivingSplitLockReason($assignment, $receiptItem, $shipment) ?? 'Package can no longer be split.',
             ], 422);
         }
 
@@ -1208,6 +1333,12 @@ class ShipmentController extends Controller
             'deliveryDistrict',
         ]);
 
+        if ($pickupComplete) {
+            $this->syncDestinationModeFromVendorPhotoPhones($shipment);
+            $shipment = $this->reloadReceivingShipment($shipment->fresh());
+            $assignment = $shipment->pickupAssignment;
+        }
+
         $sourceItem = $shipment->items->firstWhere('id', $item->id) ?? $item->fresh(['images', 'deliveryRegion', 'deliveryDistrict']);
         $newItem = $shipment->items->firstWhere('id', $newItem->id) ?? $newItem->fresh(['images', 'deliveryRegion', 'deliveryDistrict']);
 
@@ -1217,17 +1348,22 @@ class ShipmentController extends Controller
             'data' => [
                 'package' => $this->serializeEditorPackage($newItem),
                 'source_package' => $this->serializeEditorPackage($sourceItem),
-                'receiving_package' => ! is_null($assignment?->picked_up_at)
+                'destination_mode' => $shipment->destination_mode->value,
+                'delivery' => $this->serializeShipmentDelivery($shipment),
+                'receiving_package' => $pickupComplete
                     ? $this->serializeReceivingPackage($shipment, $newItem, $assignment)
                     : null,
-                'source_receiving_package' => ! is_null($assignment?->picked_up_at)
+                'source_receiving_package' => $pickupComplete
                     ? $this->serializeReceivingPackage($shipment, $sourceItem, $assignment)
                     : null,
-                'can_auto_group' => ! is_null($assignment?->picked_up_at)
-                    ? $this->canAutoGroupByPhoneDuringReceiving($assignment)
+                'receiving_packages' => $pickupComplete
+                    ? $shipment->items->map(fn (ShipmentItem $candidate) => $this->serializeReceivingPackage($shipment, $candidate, $assignment))->values()
                     : null,
-                'auto_group_lock_reason' => ! is_null($assignment?->picked_up_at)
-                    ? $this->receivingAutoGroupLockReason($assignment)
+                'can_auto_group' => $pickupComplete
+                    ? $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment)
+                    : null,
+                'auto_group_lock_reason' => $pickupComplete
+                    ? $this->receivingAutoGroupLockReason($assignment, $shipment)
                     : null,
             ],
         ]);
@@ -1508,15 +1644,14 @@ class ShipmentController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
+                'destination_mode' => $shipment->destination_mode->value,
+                'delivery' => $this->serializeShipmentDelivery($shipment),
                 'packages' => $packages,
-                'can_receive' => ! is_null($assignment->picked_up_at),
-                'receipt' => $receipt ? [
-                    'id' => $receipt->id,
-                    'status' => $receipt->status,
-                ] : null,
+                'can_receive' => $this->isPickupCompleteForReceiving($shipment, $assignment),
+                'receipt' => $this->serializeReceivingReceipt($receipt),
                 'assignment_id' => $assignment->id,
-                'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($assignment),
-                'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($assignment),
+                'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment),
+                'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($assignment, $shipment),
             ],
         ]);
     }
@@ -1530,7 +1665,7 @@ class ShipmentController extends Controller
         }
 
         $assignment = $shipment->pickupAssignment;
-        if (! $assignment || is_null($assignment->picked_up_at)) {
+        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment, $assignment)) {
             return response()->json(['success' => false, 'message' => 'Shipment has not been picked up yet.'], 422);
         }
 
@@ -1544,9 +1679,16 @@ class ShipmentController extends Controller
             'delivery_landmark' => ['nullable', 'string', 'max:255'],
             'delivery_instructions' => ['nullable', 'string', 'max:1000'],
             'delivery_method' => ['nullable', 'in:direct,bus_handoff'],
+            'delivery_fee_mode' => ['nullable', 'in:none,collect,paid'],
+            'delivery_fee_amount' => ['nullable', 'numeric', 'min:0', 'max:9999999.99'],
+            'delivery_fee_notes' => ['nullable', 'string', 'max:1000'],
+            'delivery_fee_payment_method' => ['nullable', 'string', 'max:32'],
+            'delivery_fee_payment_reference' => ['nullable', 'string', 'max:100'],
         ]);
 
         $this->applyReceivingPackageDetails($shipment, $item, $validated, false);
+        $this->syncReceivingPackageDeliveryFee($shipment, $item, $validated);
+        $this->markReceivingReceiptNeedsFinalization($assignment);
 
         return response()->json([
             'success' => true,
@@ -1564,7 +1706,7 @@ class ShipmentController extends Controller
         }
 
         $assignment = $shipment->pickupAssignment;
-        if (! $assignment || is_null($assignment->picked_up_at)) {
+        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment, $assignment)) {
             return response()->json(['success' => false, 'message' => 'Shipment has not been picked up yet.'], 422);
         }
 
@@ -1592,18 +1734,15 @@ class ShipmentController extends Controller
             'delivery_landmark' => ['nullable', 'string', 'max:255'],
             'delivery_instructions' => ['nullable', 'string', 'max:1000'],
             'delivery_method' => ['nullable', 'in:direct,bus_handoff'],
+            'delivery_fee_mode' => ['nullable', 'in:none,collect,paid'],
+            'delivery_fee_amount' => ['nullable', 'numeric', 'min:0', 'max:9999999.99'],
+            'delivery_fee_notes' => ['nullable', 'string', 'max:1000'],
+            'delivery_fee_payment_method' => ['nullable', 'string', 'max:32'],
+            'delivery_fee_payment_reference' => ['nullable', 'string', 'max:100'],
         ]);
 
         $this->applyReceivingPackageDetails($shipment, $item, $validated, true);
-
-        // If already received at warehouse, skip receipt upsert — just save the delivery details
-        if ($assignment->received_at) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Package details updated.',
-                'data' => $this->buildReceivingWorkspaceResponseData($shipment, $item),
-            ]);
-        }
+        $this->syncReceivingPackageDeliveryFee($shipment, $item, $validated);
 
         $receivingService = app(WarehouseReceivingService::class);
         $result = $receivingService->upsertReceiptItem(
@@ -1616,7 +1755,8 @@ class ShipmentController extends Controller
             conditionStatus: $validated['condition_status'] ?? null,
             notes: $validated['notes'] ?? null,
             photos: $request->file('photos', []),
-            removePhotoIds: $validated['remove_photo_ids'] ?? []
+            removePhotoIds: $validated['remove_photo_ids'] ?? [],
+            allowAfterFinalization: (bool) $assignment->received_at
         );
 
         if (($result['success'] ?? false) === true) {
@@ -1703,7 +1843,7 @@ class ShipmentController extends Controller
 
     protected function reloadReceivingShipment(Shipment $shipment): Shipment
     {
-        return $shipment->load([
+        $relations = [
             'items.images',
             'items.deliveryRegion',
             'items.deliveryDistrict',
@@ -1712,23 +1852,75 @@ class ShipmentController extends Controller
             'pickupAssignment.itemConfirmations',
             'pickupAssignment.photos',
             'pickupAssignment.warehouseReceipt.items.photos',
-        ]);
+        ];
+
+        if ($this->receivingCustodyTablesAvailable()) {
+            $relations[] = 'pickupAssignment.warehouseReceipt.items.labels.latestCustody.driver:id,name,phone';
+        }
+
+        return $shipment->load($relations);
     }
 
     protected function findReceiptItemForShipmentItem(?\App\Models\PickupAssignment $assignment, ShipmentItem $item): ?WarehouseReceiptItem
     {
+        $receiptRelations = ['warehouseReceipt.items.photos'];
+
+        if ($this->receivingCustodyTablesAvailable()) {
+            $receiptRelations[] = 'warehouseReceipt.items.labels.latestCustody.driver:id,name,phone';
+        }
+
         if (! $assignment?->relationLoaded('warehouseReceipt')) {
-            $assignment?->load('warehouseReceipt.items.photos');
+            $assignment?->load($receiptRelations);
         } elseif ($assignment->warehouseReceipt && ! $assignment->warehouseReceipt->relationLoaded('items')) {
-            $assignment->warehouseReceipt->load('items.photos');
+            $itemRelations = ['items.photos'];
+
+            if ($this->receivingCustodyTablesAvailable()) {
+                $itemRelations[] = 'items.labels.latestCustody.driver:id,name,phone';
+            }
+
+            $assignment->warehouseReceipt->load($itemRelations);
         }
 
         return $assignment?->warehouseReceipt?->items?->firstWhere('shipment_item_id', $item->id);
     }
 
-    protected function canAutoGroupByPhoneDuringReceiving(?\App\Models\PickupAssignment $assignment): bool
+    protected function receivingCustodyTablesAvailable(): bool
     {
-        if (! $assignment?->picked_up_at) {
+        return Schema::hasTable('warehouse_receipt_item_labels')
+            && Schema::hasTable('label_custody_events');
+    }
+
+    protected function isPickupCompleteForReceiving(Shipment $shipment, ?\App\Models\PickupAssignment $assignment): bool
+    {
+        if (! $assignment) {
+            return false;
+        }
+
+        if ($assignment->picked_up_at || $assignment->completed_at || $assignment->received_at) {
+            return true;
+        }
+
+        if (($assignment->status?->value ?? $assignment->getRawOriginal('status')) === PickupAssignmentStatus::COMPLETED->value) {
+            return true;
+        }
+
+        $status = $shipment->status?->value ?? $shipment->getRawOriginal('status');
+
+        return in_array($status, [
+            ShipmentStatus::PICKED_UP->value,
+            ShipmentStatus::AT_WAREHOUSE->value,
+            ShipmentStatus::SORTED->value,
+            ShipmentStatus::IN_TRANSIT->value,
+            ShipmentStatus::AT_DESTINATION->value,
+            ShipmentStatus::OUT_FOR_DELIVERY->value,
+            ShipmentStatus::HANDED_TO_COURIER->value,
+            ShipmentStatus::DELIVERED->value,
+        ], true);
+    }
+
+    protected function canAutoGroupByPhoneDuringReceiving(?\App\Models\PickupAssignment $assignment, ?Shipment $shipment = null): bool
+    {
+        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
             return false;
         }
 
@@ -1745,13 +1937,13 @@ class ShipmentController extends Controller
         return ! $assignment->warehouseReceipt?->items?->isNotEmpty();
     }
 
-    protected function receivingAutoGroupLockReason(?\App\Models\PickupAssignment $assignment): ?string
+    protected function receivingAutoGroupLockReason(?\App\Models\PickupAssignment $assignment, ?Shipment $shipment = null): ?string
     {
         if (! $assignment) {
             return 'No pickup assignment found for this shipment.';
         }
 
-        if (! $assignment->picked_up_at) {
+        if (! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
             return 'This shipment can only be auto-grouped from Receiving after pickup.';
         }
 
@@ -1772,9 +1964,51 @@ class ShipmentController extends Controller
         return null;
     }
 
-    protected function canSplitPackageDuringReceiving(?\App\Models\PickupAssignment $assignment, ?WarehouseReceiptItem $receiptItem): bool
+    protected function canAddPackageDuringReceiving(?\App\Models\PickupAssignment $assignment, ?Shipment $shipment = null): bool
     {
-        if (! $assignment?->picked_up_at) {
+        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
+            return false;
+        }
+
+        if ($assignment->received_at) {
+            return false;
+        }
+
+        if (! $assignment->relationLoaded('warehouseReceipt')) {
+            $assignment->load('warehouseReceipt');
+        }
+
+        return ! $assignment->warehouseReceipt?->isFinalized();
+    }
+
+    protected function receivingAddPackageLockReason(?\App\Models\PickupAssignment $assignment, ?Shipment $shipment = null): ?string
+    {
+        if (! $assignment) {
+            return 'No pickup assignment found for this shipment.';
+        }
+
+        if (! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
+            return 'Packages can only be added from Receiving after pickup.';
+        }
+
+        if ($assignment->received_at) {
+            return 'Warehouse receiving has already been finalized for this shipment.';
+        }
+
+        if (! $assignment->relationLoaded('warehouseReceipt')) {
+            $assignment->load('warehouseReceipt');
+        }
+
+        if ($assignment->warehouseReceipt?->isFinalized()) {
+            return 'Warehouse receiving has already been finalized for this shipment.';
+        }
+
+        return null;
+    }
+
+    protected function canSplitPackageDuringReceiving(?\App\Models\PickupAssignment $assignment, ?WarehouseReceiptItem $receiptItem, ?Shipment $shipment = null): bool
+    {
+        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
             return false;
         }
 
@@ -1786,9 +2020,9 @@ class ShipmentController extends Controller
             && (int) $receiptItem->barcode_print_count === 0;
     }
 
-    protected function receivingSplitLockReason(?\App\Models\PickupAssignment $assignment, ?WarehouseReceiptItem $receiptItem): ?string
+    protected function receivingSplitLockReason(?\App\Models\PickupAssignment $assignment, ?WarehouseReceiptItem $receiptItem, ?Shipment $shipment = null): ?string
     {
-        if (! $assignment?->picked_up_at) {
+        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
             return 'This package can only be split from Receiving after pickup.';
         }
 
@@ -1805,6 +2039,103 @@ class ShipmentController extends Controller
         }
 
         return null;
+    }
+
+    protected function canRemovePackageDuringReceiving(
+        ?\App\Models\PickupAssignment $assignment,
+        ?WarehouseReceiptItem $receiptItem,
+        ShipmentItem $item,
+        ?Shipment $shipment = null,
+    ): bool {
+        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
+            return false;
+        }
+
+        if ($assignment->received_at) {
+            return false;
+        }
+
+        if (! $assignment->relationLoaded('warehouseReceipt')) {
+            $assignment->load('warehouseReceipt');
+        }
+
+        if ($assignment->warehouseReceipt?->isFinalized()) {
+            return false;
+        }
+
+        if ($this->packageHasPaidCharges($item)) {
+            return false;
+        }
+
+        if (! $receiptItem) {
+            return true;
+        }
+
+        return ! $this->receiptItemHasActiveLabelCustody($receiptItem);
+    }
+
+    protected function receivingRemoveLockReason(
+        ?\App\Models\PickupAssignment $assignment,
+        ?WarehouseReceiptItem $receiptItem,
+        ShipmentItem $item,
+        ?Shipment $shipment = null,
+    ): ?string {
+        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
+            return 'This package can only be removed from Receiving after pickup.';
+        }
+
+        if ($assignment->received_at) {
+            return 'Warehouse receiving has already been finalized for this shipment.';
+        }
+
+        if (! $assignment->relationLoaded('warehouseReceipt')) {
+            $assignment->load('warehouseReceipt');
+        }
+
+        if ($assignment->warehouseReceipt?->isFinalized()) {
+            return 'Warehouse receiving has already been finalized for this shipment.';
+        }
+
+        if ($this->packageHasPaidCharges($item)) {
+            return 'This package has paid charges attached. Cancel or refund the charge before removing it.';
+        }
+
+        if (! $receiptItem) {
+            return null;
+        }
+
+        if ($this->receiptItemHasActiveLabelCustody($receiptItem)) {
+            return 'This package has labels already claimed by a driver or delivered.';
+        }
+
+        return null;
+    }
+
+    protected function receiptItemHasActiveLabelCustody(WarehouseReceiptItem $receiptItem): bool
+    {
+        if (! $this->receivingCustodyTablesAvailable()) {
+            return false;
+        }
+
+        $receiptItem->loadMissing('labels.latestCustody');
+
+        return $receiptItem->labels->contains(function ($label) {
+            $eventType = $label->latestCustody?->event_type;
+
+            return in_array($eventType, [
+                LabelCustodyEvent::TYPE_CLAIMED,
+                LabelCustodyEvent::TYPE_TRANSFERRED,
+                LabelCustodyEvent::TYPE_DELIVERED,
+            ], true);
+        });
+    }
+
+    protected function packageHasPaidCharges(ShipmentItem $item): bool
+    {
+        return ShipmentCharge::query()
+            ->where('shipment_item_id', $item->id)
+            ->where('status', ShipmentCharge::STATUS_PAID)
+            ->exists();
     }
 
     protected function serializeReceivingPackage(
@@ -1866,7 +2197,7 @@ class ShipmentController extends Controller
             'received_quantity' => (int) ($receiptItem?->received_quantity ?? 0),
             'damaged_quantity' => (int) ($receiptItem?->damaged_quantity ?? 0),
             'discrepancy_type' => $receiptItem?->discrepancy_type ?? 'none',
-            'condition_status' => $receiptItem?->condition_status ?? 'ok',
+            'condition_status' => $receiptItem?->condition_status,
             'notes' => $receiptItem?->notes,
             'barcode_value' => $receiptItem?->barcode_value,
             'barcode_print_count' => (int) ($receiptItem?->barcode_print_count ?? 0),
@@ -1880,12 +2211,343 @@ class ShipmentController extends Controller
             'delivery_landmark' => $deliverySource->delivery_landmark,
             'delivery_instructions' => $deliverySource->delivery_instructions,
             'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
+            'delivery_fee' => $this->serializeReceivingPackageDeliveryFee($shipment, $item),
+            'custody' => $this->serializeReceivingPackageCustody($receiptItem),
             'photos' => $receiptItem
                 ? $receivingService->serializeReceiptItem($receiptItem)['photos']
                 : [],
-            'can_split' => $this->canSplitPackageDuringReceiving($assignment, $receiptItem),
-            'split_lock_reason' => $this->receivingSplitLockReason($assignment, $receiptItem),
+            'can_split' => $this->canSplitPackageDuringReceiving($assignment, $receiptItem, $shipment),
+            'split_lock_reason' => $this->receivingSplitLockReason($assignment, $receiptItem, $shipment),
+            'can_delete' => $this->canRemovePackageDuringReceiving($assignment, $receiptItem, $item, $shipment),
+            'delete_lock_reason' => $this->receivingRemoveLockReason($assignment, $receiptItem, $item, $shipment),
         ];
+    }
+
+    protected function serializeReceivingPackageCustody(?WarehouseReceiptItem $receiptItem): array
+    {
+        if (! $receiptItem || ! $this->receivingCustodyTablesAvailable()) {
+            return [
+                'total_labels' => 0,
+                'claimed_labels' => 0,
+                'delivered_labels' => 0,
+                'warehouse_labels' => 0,
+                'drivers' => [],
+                'labels' => [],
+            ];
+        }
+
+        $receiptItem->loadMissing('labels.latestCustody.driver:id,name,phone');
+
+        $labels = $receiptItem->labels
+            ->sortBy('label_index')
+            ->values()
+            ->map(function ($label) {
+                $latest = $label->latestCustody;
+                $isClaimed = $latest && $latest->event_type === LabelCustodyEvent::TYPE_CLAIMED;
+                $isDelivered = $latest && $latest->event_type === LabelCustodyEvent::TYPE_DELIVERED;
+
+                return [
+                    'id' => $label->id,
+                    'barcode' => $label->barcode_value,
+                    'label_index' => (int) $label->label_index,
+                    'labels_total' => (int) $label->labels_total,
+                    'label_type' => $label->label_type,
+                    'status' => $isDelivered ? 'delivered' : ($isClaimed ? 'claimed' : 'at_warehouse'),
+                    'current_driver' => $isClaimed ? [
+                        'id' => $latest->driver_id,
+                        'name' => $latest->driver?->name,
+                        'phone' => $latest->driver?->phone,
+                    ] : null,
+                    'claimed_at' => $isClaimed ? $latest->created_at?->format('M d, H:i') : null,
+                ];
+            });
+
+        $drivers = $labels
+            ->filter(fn ($label) => ! empty($label['current_driver']['id']))
+            ->groupBy(fn ($label) => $label['current_driver']['id'])
+            ->map(function ($driverLabels) {
+                $first = $driverLabels->first()['current_driver'];
+
+                return [
+                    'driver_id' => $first['id'],
+                    'name' => $first['name'] ?: 'Unknown driver',
+                    'phone' => $first['phone'] ?: '',
+                    'count' => $driverLabels->count(),
+                    'barcodes' => $driverLabels->pluck('barcode')->values()->all(),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return [
+            'total_labels' => $labels->count(),
+            'claimed_labels' => $labels->where('status', 'claimed')->count(),
+            'delivered_labels' => $labels->where('status', 'delivered')->count(),
+            'warehouse_labels' => $labels->where('status', 'at_warehouse')->count(),
+            'drivers' => $drivers,
+            'labels' => $labels->all(),
+        ];
+    }
+
+    protected function deliveryFieldKeys(): array
+    {
+        return [
+            'delivery_recipient_name',
+            'delivery_recipient_phone',
+            'delivery_region_id',
+            'delivery_district_id',
+            'delivery_town',
+            'delivery_latitude',
+            'delivery_longitude',
+            'delivery_gh_post_address',
+            'delivery_landmark',
+            'delivery_instructions',
+            'delivery_preference',
+            'fulfillment_type',
+        ];
+    }
+
+    protected function coreDeliveryFieldKeys(): array
+    {
+        return [
+            'delivery_recipient_name',
+            'delivery_recipient_phone',
+            'delivery_region_id',
+            'delivery_district_id',
+            'delivery_town',
+            'delivery_latitude',
+            'delivery_longitude',
+            'delivery_gh_post_address',
+            'delivery_landmark',
+            'delivery_instructions',
+        ];
+    }
+
+    protected function emptyShipmentDeliveryAttributes(): array
+    {
+        return array_fill_keys($this->deliveryFieldKeys(), null);
+    }
+
+    protected function emptyItemDeliveryAttributes(): array
+    {
+        return array_fill_keys($this->deliveryFieldKeys(), null);
+    }
+
+    protected function shipmentDeliveryAttributes(Shipment $shipment): array
+    {
+        return [
+            'delivery_recipient_name' => $shipment->delivery_recipient_name,
+            'delivery_recipient_phone' => $shipment->delivery_recipient_phone,
+            'delivery_region_id' => $shipment->delivery_region_id,
+            'delivery_district_id' => $shipment->delivery_district_id,
+            'delivery_town' => $shipment->delivery_town,
+            'delivery_latitude' => $shipment->delivery_latitude,
+            'delivery_longitude' => $shipment->delivery_longitude,
+            'delivery_gh_post_address' => $shipment->delivery_gh_post_address,
+            'delivery_landmark' => $shipment->delivery_landmark,
+            'delivery_instructions' => $shipment->delivery_instructions,
+            'delivery_preference' => $shipment->delivery_preference,
+            'fulfillment_type' => $shipment->fulfillment_type?->value ?? $shipment->getRawOriginal('fulfillment_type'),
+        ];
+    }
+
+    protected function itemDeliveryAttributes(ShipmentItem $item): array
+    {
+        return [
+            'delivery_recipient_name' => $item->delivery_recipient_name,
+            'delivery_recipient_phone' => $item->delivery_recipient_phone,
+            'delivery_region_id' => $item->delivery_region_id,
+            'delivery_district_id' => $item->delivery_district_id,
+            'delivery_town' => $item->delivery_town,
+            'delivery_latitude' => $item->delivery_latitude,
+            'delivery_longitude' => $item->delivery_longitude,
+            'delivery_gh_post_address' => $item->delivery_gh_post_address,
+            'delivery_landmark' => $item->delivery_landmark,
+            'delivery_instructions' => $item->delivery_instructions,
+            'delivery_preference' => $item->delivery_preference,
+            'fulfillment_type' => $item->fulfillment_type?->value ?? $item->getRawOriginal('fulfillment_type'),
+        ];
+    }
+
+    protected function hasCoreDeliveryDetails(Shipment|ShipmentItem $model): bool
+    {
+        foreach ($this->coreDeliveryFieldKeys() as $key) {
+            if ($model->{$key} !== null && $model->{$key} !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function seedPackageDeliveryFromShipment(Shipment $shipment): void
+    {
+        if (! $this->hasCoreDeliveryDetails($shipment)) {
+            return;
+        }
+
+        $attributes = $this->shipmentDeliveryAttributes($shipment);
+        $shipment->items()->get()->each(function (ShipmentItem $item) use ($attributes) {
+            $updates = [];
+
+            foreach ($attributes as $key => $value) {
+                if (($item->{$key} === null || $item->{$key} === '') && $value !== null && $value !== '') {
+                    $updates[$key] = $value;
+                }
+            }
+
+            if (! empty($updates)) {
+                $item->update($updates);
+            }
+        });
+    }
+
+    protected function shipmentDeliverySeedFromItems(Shipment $shipment): array
+    {
+        $sourceItem = $shipment->items()->get()->first(fn (ShipmentItem $item) => $this->hasCoreDeliveryDetails($item));
+
+        return $sourceItem ? $this->itemDeliveryAttributes($sourceItem) : [];
+    }
+
+    protected function serializeShipmentDelivery(Shipment $shipment): array
+    {
+        return [
+            'recipient_name' => $shipment->delivery_recipient_name,
+            'recipient_phone' => $shipment->delivery_recipient_phone,
+            'region_id' => $shipment->delivery_region_id,
+            'region_name' => $shipment->deliveryRegion?->name,
+            'district_id' => $shipment->delivery_district_id,
+            'district_name' => $shipment->deliveryDistrict?->name,
+            'town' => $shipment->delivery_town,
+            'landmark' => $shipment->delivery_landmark,
+            'instructions' => $shipment->delivery_instructions,
+            'delivery_preference' => $shipment->delivery_preference,
+            'fulfillment_type' => $shipment->fulfillment_type?->value ?? $shipment->getRawOriginal('fulfillment_type'),
+        ];
+    }
+
+    protected function normalizePhotoPhone(?string $phone): ?string
+    {
+        if (! $phone) {
+            return null;
+        }
+
+        return PhoneHelper::format($phone) ?: trim($phone);
+    }
+
+    protected function syncDestinationModeFromVendorPhotoPhones(Shipment $shipment): ?ShipmentDestinationMode
+    {
+        $shipment->loadMissing(['items.images', 'items.deliveryRegion', 'items.deliveryDistrict', 'deliveryRegion', 'deliveryDistrict']);
+
+        $photos = $shipment->items->flatMap(fn (ShipmentItem $item) => $item->images);
+        if ($photos->isEmpty()) {
+            return null;
+        }
+
+        $phones = $photos
+            ->map(fn (ShipmentItemImage $image) => $this->normalizePhotoPhone($image->recipient_phone))
+            ->filter()
+            ->values();
+
+        if ($phones->count() !== $photos->count()) {
+            return $this->syncDestinationModeFromPackageDeliveryDetails($shipment);
+        }
+
+        $uniquePhones = $phones->unique()->values();
+        if ($uniquePhones->count() > 1) {
+            if ($shipment->destination_mode !== ShipmentDestinationMode::PER_ITEM) {
+                $this->seedPackageDeliveryFromShipment($shipment);
+                $shipment->update(array_merge(
+                    ['destination_mode' => ShipmentDestinationMode::PER_ITEM],
+                    $this->emptyShipmentDeliveryAttributes()
+                ));
+            }
+
+            $shipment->items->each(function (ShipmentItem $item) {
+                $itemPhones = $item->images
+                    ->map(fn (ShipmentItemImage $image) => $this->normalizePhotoPhone($image->recipient_phone))
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                if ($itemPhones->count() === 1) {
+                    $item->update(['delivery_recipient_phone' => $itemPhones->first()]);
+                }
+            });
+
+            return ShipmentDestinationMode::PER_ITEM;
+        }
+
+        if ($uniquePhones->count() === 1) {
+            $seed = $shipment->destination_mode === ShipmentDestinationMode::PER_ITEM
+                ? $this->shipmentDeliverySeedFromItems($shipment)
+                : [];
+
+            $shipment->update(array_merge($seed, [
+                'destination_mode' => ShipmentDestinationMode::SINGLE,
+                'delivery_recipient_phone' => $uniquePhones->first(),
+            ]));
+
+            return ShipmentDestinationMode::SINGLE;
+        }
+
+        return $this->syncDestinationModeFromPackageDeliveryDetails($shipment);
+    }
+
+    protected function syncDestinationModeFromPackageDeliveryDetails(Shipment $shipment): ?ShipmentDestinationMode
+    {
+        $items = $shipment->items()->get();
+        if ($items->count() < 2) {
+            return null;
+        }
+
+        $signatures = $items->map(function (ShipmentItem $item) {
+            if (! $this->hasCoreDeliveryDetails($item)) {
+                return null;
+            }
+
+            $phone = $this->normalizePhotoPhone($item->delivery_recipient_phone);
+            if ($phone) {
+                return 'phone:'.$phone;
+            }
+
+            $parts = [
+                $item->delivery_recipient_name,
+                $item->delivery_region_id,
+                $item->delivery_district_id,
+                $item->delivery_town,
+                $item->delivery_latitude,
+                $item->delivery_longitude,
+                $item->delivery_gh_post_address,
+                $item->delivery_landmark,
+            ];
+
+            $signature = collect($parts)
+                ->map(fn ($part) => is_string($part) ? strtolower(trim($part)) : $part)
+                ->filter(fn ($part) => $part !== null && $part !== '')
+                ->implode('|');
+
+            return $signature !== '' ? 'location:'.$signature : null;
+        });
+
+        if ($signatures->contains(null)) {
+            return null;
+        }
+
+        if ($signatures->unique()->count() !== 1) {
+            return null;
+        }
+
+        $seed = $this->shipmentDeliverySeedFromItems($shipment);
+        if (empty($seed)) {
+            return null;
+        }
+
+        $shipment->update(array_merge($seed, [
+            'destination_mode' => ShipmentDestinationMode::SINGLE,
+        ]));
+
+        return ShipmentDestinationMode::SINGLE;
     }
 
     protected function buildReceivingPackageItemUpdates(array $validated, bool $allowQuantity): array
@@ -2001,6 +2663,142 @@ class ShipmentController extends Controller
         }
     }
 
+    protected function syncReceivingPackageDeliveryFee(Shipment $shipment, ShipmentItem $item, array $validated): void
+    {
+        if (! array_key_exists('delivery_fee_mode', $validated)) {
+            return;
+        }
+
+        $mode = $validated['delivery_fee_mode'] ?: 'none';
+        $amount = array_key_exists('delivery_fee_amount', $validated) && $validated['delivery_fee_amount'] !== null
+            ? round((float) $validated['delivery_fee_amount'], 2)
+            : 0.0;
+
+        $outstanding = $this->deliveryFeeChargesForItem($shipment, $item)
+            ->whereIn('status', [ShipmentCharge::STATUS_DRAFT, ShipmentCharge::STATUS_PENDING]);
+
+        if ($mode === 'none' || $amount <= 0) {
+            $outstanding->each(fn (ShipmentCharge $charge) => $charge->update([
+                'status' => ShipmentCharge::STATUS_CANCELLED,
+            ]));
+
+            return;
+        }
+
+        $payload = [
+            'shipment_id' => $shipment->id,
+            'shipment_item_id' => $item->id,
+            'charge_type' => ShipmentCharge::TYPE_DELIVERY_FEE,
+            'payer_type' => ShipmentCharge::PAYER_RECIPIENT,
+            'direction' => ShipmentCharge::DIRECTION_REVENUE,
+            'due_stage' => ShipmentCharge::STAGE_AT_DELIVERY,
+            'amount' => $amount,
+            'currency' => 'GHS',
+            'notes' => $validated['delivery_fee_notes'] ?? null,
+            'recorded_by_admin_id' => Auth::guard('admin')->id(),
+        ];
+
+        if ($mode === 'paid') {
+            $payload['status'] = ShipmentCharge::STATUS_PAID;
+            $payload['payment_method'] = $validated['delivery_fee_payment_method'] ?? 'cash';
+            $payload['payment_reference'] = $validated['delivery_fee_payment_reference'] ?? null;
+        } else {
+            $payload['status'] = ShipmentCharge::STATUS_PENDING;
+            $payload['paid_at'] = null;
+            $payload['payment_method'] = null;
+            $payload['payment_reference'] = null;
+        }
+
+        $charge = $outstanding->first()
+            ?: $this->deliveryFeeChargesForItem($shipment, $item)
+                ->where('status', ShipmentCharge::STATUS_PAID)
+                ->sortByDesc(fn (ShipmentCharge $candidate) => $candidate->paid_at?->getTimestamp() ?? 0)
+                ->first();
+
+        if ($charge && $charge->status === ShipmentCharge::STATUS_PAID && $mode !== 'paid') {
+            return;
+        }
+
+        if ($charge) {
+            if ($mode === 'paid' && ! $charge->paid_at) {
+                $payload['paid_at'] = now();
+            }
+            $charge->update($payload);
+            return;
+        }
+
+        if ($mode === 'paid') {
+            $payload['paid_at'] = now();
+        }
+
+        ShipmentCharge::query()->create($payload);
+    }
+
+    protected function deliveryFeeChargesForItem(Shipment $shipment, ShipmentItem $item)
+    {
+        return ShipmentCharge::query()
+            ->where('shipment_id', $shipment->id)
+            ->where('shipment_item_id', $item->id)
+            ->where('charge_type', ShipmentCharge::TYPE_DELIVERY_FEE)
+            ->where('payer_type', ShipmentCharge::PAYER_RECIPIENT)
+            ->whereNotIn('status', [ShipmentCharge::STATUS_CANCELLED])
+            ->get();
+    }
+
+    protected function serializeReceivingPackageDeliveryFee(Shipment $shipment, ShipmentItem $item): array
+    {
+        $charges = $this->deliveryFeeChargesForItem($shipment, $item);
+
+        if ($charges->isEmpty()) {
+            return [
+                'mode' => 'none',
+                'status' => 'none',
+                'amount' => null,
+                'currency' => 'GHS',
+                'paid_amount' => 0.0,
+                'outstanding_amount' => 0.0,
+                'notes' => null,
+                'payment_method' => 'cash',
+                'payment_reference' => null,
+                'paid_at' => null,
+            ];
+        }
+
+        $paidAmount = (float) $charges->where('status', ShipmentCharge::STATUS_PAID)->sum('amount');
+        $outstandingAmount = (float) $charges
+            ->whereIn('status', [ShipmentCharge::STATUS_DRAFT, ShipmentCharge::STATUS_PENDING])
+            ->sum('amount');
+        $waivedAmount = (float) $charges->where('status', ShipmentCharge::STATUS_WAIVED)->sum('amount');
+        $latest = $charges
+            ->sortByDesc(fn (ShipmentCharge $charge) => $charge->updated_at?->getTimestamp() ?? 0)
+            ->first();
+        $latestPaid = $charges
+            ->where('status', ShipmentCharge::STATUS_PAID)
+            ->sortByDesc(fn (ShipmentCharge $charge) => $charge->paid_at?->getTimestamp() ?? 0)
+            ->first();
+
+        $status = match (true) {
+            $outstandingAmount > 0 && $paidAmount > 0 => 'partially_paid',
+            $outstandingAmount > 0 => 'collect',
+            $paidAmount > 0 => 'paid',
+            $waivedAmount > 0 => 'waived',
+            default => 'none',
+        };
+
+        return [
+            'mode' => $status === 'paid' ? 'paid' : ($status === 'collect' || $status === 'partially_paid' ? 'collect' : 'none'),
+            'status' => $status,
+            'amount' => round($outstandingAmount > 0 ? $outstandingAmount : $paidAmount, 2),
+            'currency' => $latest?->currency ?: 'GHS',
+            'paid_amount' => round($paidAmount, 2),
+            'outstanding_amount' => round($outstandingAmount, 2),
+            'notes' => $latest?->notes,
+            'payment_method' => $latestPaid?->payment_method ?: 'cash',
+            'payment_reference' => $latestPaid?->payment_reference,
+            'paid_at' => $latestPaid?->paid_at?->toIso8601String(),
+        ];
+    }
+
     protected function buildReceivingWorkspaceResponseData(Shipment $shipment, ShipmentItem $item): array
     {
         $shipment = $this->reloadReceivingShipment($shipment);
@@ -2008,9 +2806,12 @@ class ShipmentController extends Controller
         $serializedItem = $shipment->items->firstWhere('id', $item->id) ?? $item;
 
         $data = [
+            'destination_mode' => $shipment->destination_mode->value,
+            'delivery' => $this->serializeShipmentDelivery($shipment),
             'package' => $this->serializeReceivingPackage($shipment, $serializedItem, $assignment),
-            'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($assignment),
-            'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($assignment),
+            'receipt' => $this->serializeReceivingReceipt($assignment?->warehouseReceipt),
+            'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment),
+            'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($assignment, $shipment),
         ];
 
         if ($shipment->destination_mode === ShipmentDestinationMode::SINGLE) {
@@ -2020,6 +2821,41 @@ class ShipmentController extends Controller
         }
 
         return $data;
+    }
+
+    protected function serializeReceivingReceipt(?WarehouseReceipt $receipt): ?array
+    {
+        if (! $receipt) {
+            return null;
+        }
+
+        return [
+            'id' => $receipt->id,
+            'status' => $receipt->status,
+            'finalized_at' => $receipt->finalized_at?->toIso8601String(),
+        ];
+    }
+
+    protected function markReceivingReceiptNeedsFinalization(?\App\Models\PickupAssignment $assignment): void
+    {
+        $receipt = $assignment?->warehouseReceipt;
+        if (! $receipt?->isFinalized()) {
+            return;
+        }
+
+        $hasDiscrepancies = $receipt->items()
+            ->where('discrepancy_type', '!=', 'none')
+            ->exists();
+
+        $receipt->update([
+            'status' => $hasDiscrepancies
+                ? WarehouseReceipt::STATUS_DISCREPANCY_OPEN
+                : WarehouseReceipt::STATUS_DRAFT,
+            'finalized_by_user_id' => null,
+            'approved_by_user_id' => null,
+            'approval_reason' => null,
+            'finalized_at' => null,
+        ]);
     }
 
     protected function mergePickupItemConfirmationsForAutoGroup(int $assignmentId, array $sourceItemIds, int $targetItemId): void
@@ -2117,7 +2953,7 @@ class ShipmentController extends Controller
             return response()->json(['success' => false, 'message' => 'No pickup assignment found.'], 422);
         }
 
-        if (is_null($assignment->picked_up_at)) {
+        if (! $this->isPickupCompleteForReceiving($shipment, $assignment)) {
             return response()->json(['success' => false, 'message' => 'Shipment has not been picked up yet.'], 422);
         }
 
@@ -2161,10 +2997,11 @@ class ShipmentController extends Controller
         ]);
 
         $assignment = $shipment->pickupAssignment;
-        if (! is_null($assignment?->picked_up_at) && ! $this->canAutoGroupByPhoneDuringReceiving($assignment)) {
+        $pickupComplete = $this->isPickupCompleteForReceiving($shipment, $assignment);
+        if ($pickupComplete && ! $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment)) {
             return response()->json([
                 'success' => false,
-                'message' => $this->receivingAutoGroupLockReason($assignment) ?? 'Auto-group by phone is no longer available for this shipment.',
+                'message' => $this->receivingAutoGroupLockReason($assignment, $shipment) ?? 'Auto-group by phone is no longer available for this shipment.',
             ], 422);
         }
 
@@ -2196,6 +3033,7 @@ class ShipmentController extends Controller
             ]);
 
             $assignment = $shipment->pickupAssignment;
+            $pickupComplete = $this->isPickupCompleteForReceiving($shipment, $assignment);
             $sourceItems = $shipment->items->keyBy('id');
             $usedItemIds = collect();
             $groupedItems = [];
@@ -2261,13 +3099,24 @@ class ShipmentController extends Controller
 
             $multipleGroups = count($groupedItems) > 1;
             $newMode = $multipleGroups ? ShipmentDestinationMode::PER_ITEM : ShipmentDestinationMode::SINGLE;
+            $oldMode = $shipment->destination_mode ?? ShipmentDestinationMode::SINGLE;
 
-            $shipmentUpdate = ['destination_mode' => $newMode];
+            if ($newMode === ShipmentDestinationMode::PER_ITEM) {
+                if ($oldMode === ShipmentDestinationMode::SINGLE) {
+                    $this->seedPackageDeliveryFromShipment($shipment);
+                }
 
-            if ($newMode === ShipmentDestinationMode::SINGLE) {
-                $shipmentUpdate['delivery_recipient_phone'] = collect($groupedItems)->pluck('phone')->filter()->first();
+                $shipmentUpdate = array_merge(
+                    ['destination_mode' => $newMode],
+                    $this->emptyShipmentDeliveryAttributes()
+                );
             } else {
-                $shipmentUpdate['delivery_recipient_phone'] = $shipment->delivery_recipient_phone;
+                $shipmentUpdate = array_merge($this->shipmentDeliverySeedFromItems($shipment), [
+                    'destination_mode' => $newMode,
+                    'delivery_recipient_phone' => collect($groupedItems)->pluck('phone')->filter()->first(),
+                ]);
+
+                $shipment->items()->update($this->emptyItemDeliveryAttributes());
             }
 
             $shipment->update($shipmentUpdate);
@@ -2288,7 +3137,8 @@ class ShipmentController extends Controller
                 'message' => count($groupedItems).' package(s) created. Destination mode set to '.$newMode->value.'.',
                 'data' => [
                     'destination_mode' => $newMode->value,
-                    'delivery_recipient_phone' => $shipment->fresh()->delivery_recipient_phone,
+                    'delivery' => $this->serializeShipmentDelivery($shipment),
+                    'delivery_recipient_phone' => $shipment->delivery_recipient_phone,
                     'packages' => $shipment->items->map(fn ($item) => [
                         'id' => $item->id,
                         'description' => $item->description,
@@ -2303,14 +3153,14 @@ class ShipmentController extends Controller
                             'recipient_phone' => $img->recipient_phone,
                         ])->values(),
                     ])->values(),
-                    'receiving_packages' => ! is_null($assignment?->picked_up_at)
+                    'receiving_packages' => $pickupComplete
                         ? $shipment->items->map(fn (ShipmentItem $item) => $this->serializeReceivingPackage($shipment, $item, $assignment))->values()
                         : null,
-                    'can_auto_group' => ! is_null($assignment?->picked_up_at)
-                        ? $this->canAutoGroupByPhoneDuringReceiving($assignment)
+                    'can_auto_group' => $pickupComplete
+                        ? $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment)
                         : null,
-                    'auto_group_lock_reason' => ! is_null($assignment?->picked_up_at)
-                        ? $this->receivingAutoGroupLockReason($assignment)
+                    'auto_group_lock_reason' => $pickupComplete
+                        ? $this->receivingAutoGroupLockReason($assignment, $shipment)
                         : null,
                 ],
             ]);

@@ -35,6 +35,13 @@ class AdminShipmentChargesController extends Controller
         $this->authorizePermission('charges.manage');
 
         $validated = $this->validateChargePayload($request, $shipment);
+        if ($validated['charge_type'] === ShipmentCharge::TYPE_DELIVERY_FEE && empty($validated['shipment_item_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Delivery fees must be assigned to a package.',
+            ], 422);
+        }
+
         $actor = Auth::guard('admin')->user();
 
         $charge = $this->charges->addCharge($shipment, $validated, $actor);
@@ -58,6 +65,8 @@ class AdminShipmentChargesController extends Controller
             'due_stage'   => ['sometimes', Rule::in(ShipmentCharge::DUE_STAGES)],
             'payer_type'  => ['sometimes', Rule::in(ShipmentCharge::PAYERS)],
             'charge_type' => ['sometimes', Rule::in(ShipmentCharge::TYPES)],
+            'payment_method' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'payment_reference' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
 
         $result = $this->charges->updateCharge($charge, $validated, Auth::guard('admin')->user());
