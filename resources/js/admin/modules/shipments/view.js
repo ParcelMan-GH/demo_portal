@@ -509,6 +509,22 @@ function shipmentShow() {
             return `${charge.currency || 'GHS'} ${amount}`;
         },
 
+        pickupFeeStatusLabel() {
+            const charge = this.pickupFeeCharge();
+            if (!charge) return '';
+            if (charge.status === 'paid') return 'Paid';
+            if (charge.status === 'waived') return 'Waived';
+            return 'Unpaid';
+        },
+
+        pickupFeeStatusClass() {
+            const charge = this.pickupFeeCharge();
+            if (!charge) return 'hidden';
+            if (charge.status === 'paid') return 'text-emerald-700 bg-emerald-50 border-emerald-100';
+            if (charge.status === 'waived') return 'text-sky-700 bg-sky-50 border-sky-100';
+            return 'text-amber-700 bg-amber-50 border-amber-100';
+        },
+
         pickupFeeActionLabel() {
             return this.pickupFeeCharge() ? 'Edit Pickup Fee' : 'Set Pickup Fee';
         },
