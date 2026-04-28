@@ -119,14 +119,6 @@ $shipmentConfig = [
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z"/></svg>
                             Tracking History
                         </button>
-                        <button type="button"
-                                x-show="canManageCharges"
-                                @@click="openPickupFeeModal()"
-                                :class="pickupFeeButtonClass()"
-                                class="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl border transition-all backdrop-blur-sm">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6v12m-3-2.818c.696.424 1.626.682 3 .682 2.25 0 3-1.007 3-2.25 0-1.244-.75-2.25-3-2.25s-3-1.006-3-2.25S9.75 6.864 12 6.864c1.374 0 2.304.258 3 .682"/></svg>
-                            <span x-text="pickupFeeButtonLabel()">Set Pickup Fee</span>
-                        </button>
                         @if($canManage)
                         <!-- Fulfillment Type Changer -->
                         <div class="relative" x-data="{ ftOpen: false }" x-show="canChangeFulfillmentType()" x-cloak>
@@ -2700,7 +2692,7 @@ $shipmentConfig = [
                 </div>
 
                 <!-- Pickup details and driver -->
-                <div x-show="!receiving.loading && !receiving.canReceive" x-cloak class="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div x-show="false && !receiving.loading && !receiving.canReceive" x-cloak class="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
                         <div class="flex items-start gap-3">
                             <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm">
@@ -2763,7 +2755,7 @@ $shipmentConfig = [
                 </div>
 
                 <!-- Not picked up yet -->
-                <template x-if="!receiving.loading && !receiving.canReceive">
+                <template x-if="false && !receiving.loading && !receiving.canReceive">
                     <div class="text-center py-16">
                         <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-amber-100 flex items-center justify-center">
                             <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
@@ -2781,8 +2773,12 @@ $shipmentConfig = [
                 </template>
 
 		                <!-- Packages workspace -->
-		                <template x-if="!receiving.loading && receiving.canReceive">
+		                <template x-if="!receiving.loading">
 		                    <div class="space-y-5">
+                                <div x-show="!receiving.canReceive" class="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800" style="display:none">
+                                    <p class="font-bold">Receiving is not active yet.</p>
+                                    <p class="mt-1 text-xs" x-text="receivingRestrictionMessage()"></p>
+                                </div>
                                 <div class="grid gap-5 lg:grid-cols-2">
                                     <!-- Pickup details and driver -->
                                     <div class="h-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -2835,6 +2831,17 @@ $shipmentConfig = [
                                                             x-show="canManage && canEditCurrentAssignment()"
                                                             @@click="openEditAssignment()"
                                                             class="ml-2 text-[10px] font-black text-indigo-600 hover:text-indigo-800">Change</button>
+                                                </p>
+                                            </div>
+                                            <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
+                                                <p class="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400 sm:w-32">Pickup Fee:</p>
+                                                <p class="min-w-0 font-semibold text-slate-900">
+                                                    <span x-text="pickupFeeValueLabel()"></span>
+                                                    <button type="button"
+                                                            x-show="canManageCharges"
+                                                            @@click="openPickupFeeModal()"
+                                                            class="ml-2 text-[10px] font-black text-indigo-600 hover:text-indigo-800"
+                                                            x-text="pickupFeeActionLabel()"></button>
                                                 </p>
                                             </div>
                                             <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
@@ -3726,7 +3733,7 @@ $shipmentConfig = [
 	                                    </button>
 	                                    <button type="button" x-show="!isPerItemMode() || receivingPackageModal.step === 2"
 	                                            @@click="receivePackageFromModal()"
-	                                            :disabled="receivingPackageModal.savingDetails || receivingPackageModal.savingReceive"
+	                                            :disabled="!receiving.canReceive || receivingPackageModal.savingDetails || receivingPackageModal.savingReceive"
 	                                            class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:opacity-50" style="display:none">
 	                                        <svg x-show="receivingPackageModal.savingReceive" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
 	                                        <span x-text="receivingPackageModal.savingReceive ? 'Saving...' : 'Save and Receive'"></span>

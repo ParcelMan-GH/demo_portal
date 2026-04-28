@@ -11,6 +11,7 @@ use App\Models\Shipment;
 use App\Models\ShipmentCharge;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemImage;
+use App\Models\ShipmentItemTracking;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\Warehouse;
@@ -594,7 +595,8 @@ test('pre-pickup package split still works from the packages workspace and clone
         ->assertJsonPath('data.package.delivery_district_id', $location['district']->id)
         ->assertJsonPath('data.package.delivery_town', 'Madina')
         ->assertJsonPath('data.package.delivery_method', ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF)
-        ->assertJsonPath('data.receiving_package', null);
+        ->assertJsonPath('data.receiving_package.delivery_town', 'Madina')
+        ->assertJsonPath('data.receiving_package.can_split', true);
 
     $newItem = ShipmentItem::query()
         ->where('shipment_id', $shipment->id)
@@ -1307,6 +1309,86 @@ test('receiving is available for picked up shipment even when assignment picked 
     ])->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.package.description', 'Legacy package updated at receiving');
+});
+
+test('receiving workspace returns packages before pickup assignment exists', function () {
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'submitted',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'description' => 'Pending pickup package',
+    ]);
+
+    $this->getJson(route('admin.shipments.receiving-data', $shipment))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.can_receive', false)
+        ->assertJsonPath('data.assignment_id', null)
+        ->assertJsonPath('data.packages.0.shipment_item_id', $item->id)
+        ->assertJsonPath('data.packages.0.description', 'Pending pickup package');
+});
+
+test('admin receiving auto-completes pickup when assigned driver has not confirmed', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'submitted',
+        'destination_mode' => 'per_item',
+        'pickup_town' => 'Madina',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'description' => 'Auto pickup package',
+        'quantity' => 2,
+    ]);
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'status' => 'assigned',
+        'picked_up_at' => null,
+        'completed_at' => null,
+    ]);
+
+    $this->getJson(route('admin.shipments.receiving-data', $shipment))
+        ->assertOk()
+        ->assertJsonPath('data.can_receive', true)
+        ->assertJsonPath('data.packages.0.shipment_item_id', $item->id);
+
+    $this->postJson(route('admin.shipments.receiving.save', [
+        'shipment' => $shipment,
+        'item' => $item,
+    ]), [
+        'received_quantity' => 2,
+        'condition_status' => 'ok',
+        'description' => 'Auto pickup package',
+    ])->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.package.received_quantity', 2)
+        ->assertJsonPath('data.can_receive', true);
+
+    $this->assertDatabaseHas('pickup_assignments', [
+        'id' => $assignment->id,
+        'status' => 'completed',
+    ]);
+    expect($assignment->fresh()->picked_up_at)->not->toBeNull()
+        ->and($assignment->fresh()->completed_at)->not->toBeNull();
+
+    $this->assertDatabaseHas('shipments', [
+        'id' => $shipment->id,
+        'status' => 'picked_up',
+    ]);
+    $this->assertDatabaseHas('warehouse_receipt_items', [
+        'shipment_item_id' => $item->id,
+        'received_quantity' => 2,
+    ]);
+
+    $tracking = ShipmentItemTracking::query()
+        ->where('shipment_item_id', $item->id)
+        ->where('status', 'picked_up')
+        ->first();
+
+    expect($tracking)->not->toBeNull()
+        ->and($tracking->location)->toBe('Madina')
+        ->and($tracking->created_by)->toBe('user:'.auth('admin')->id())
+        ->and($tracking->meta['auto_completed_for_receiving'] ?? false)->toBeTrue();
 });
 
 test('receiving details save updates package details without creating a receipt item', function () {

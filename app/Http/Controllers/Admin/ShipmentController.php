@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\InvoiceStatus;
+use App\Enums\ItemStatus;
 use App\Enums\PickupAssignmentStatus;
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentStatus;
@@ -19,6 +20,7 @@ use App\Models\ShipmentCharge;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemImage;
 use App\Models\ShipmentItemTracking;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
@@ -1074,6 +1076,7 @@ class ShipmentController extends Controller
         $shipment = $this->reloadReceivingShipment($shipment);
         $assignment = $shipment->pickupAssignment;
         $pickupComplete = $this->isPickupCompleteForReceiving($shipment, $assignment);
+        $canReceive = $this->canReceiveInAdminWorkspace($assignment);
 
         if ($pickupComplete && ! $this->canAddPackageDuringReceiving($assignment, $shipment)) {
             return response()->json([
@@ -1117,7 +1120,18 @@ class ShipmentController extends Controller
         $this->applyReceivingPackageDetails($shipment, $item, $validated, true);
         $this->syncReceivingPackageDeliveryFee($shipment, $item, $validated);
 
-        if ($pickupComplete) {
+        if ($canReceive) {
+            if (! $pickupComplete) {
+                $assignment = $this->completePickupForAdminReceiving(
+                    $shipment,
+                    $assignment,
+                    Auth::guard('admin')->user(),
+                    'Pickup auto-completed during warehouse receiving because the driver could not confirm pickup from mobile.'
+                );
+                $shipment = $this->reloadReceivingShipment($shipment->fresh());
+                $item = $shipment->items->firstWhere('id', $item->id) ?? $item->fresh();
+            }
+
             $receivingResult = app(WarehouseReceivingService::class)->upsertReceiptItem(
                 assignment: $assignment,
                 shipmentItem: $item,
@@ -1145,13 +1159,15 @@ class ShipmentController extends Controller
             'message' => 'Package added.',
             'data' => [
                 'package' => $this->serializeEditorPackage($item),
-                'receiving_package' => $pickupComplete
+                'receiving_package' => $canReceive
                     ? $this->serializeReceivingPackage($shipment, $item, $assignment)
                     : null,
-                'can_auto_group' => $pickupComplete
+                'can_receive' => $this->canReceiveInAdminWorkspace($assignment),
+                'assignment_id' => $assignment?->id,
+                'can_auto_group' => $canReceive
                     ? $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment)
                     : null,
-                'auto_group_lock_reason' => $pickupComplete
+                'auto_group_lock_reason' => $canReceive
                     ? $this->receivingAutoGroupLockReason($assignment, $shipment)
                     : null,
             ],
@@ -1196,9 +1212,9 @@ class ShipmentController extends Controller
         $shipment = $this->reloadReceivingShipment($shipment);
         $assignment = $shipment->pickupAssignment;
         $pickupComplete = $this->isPickupCompleteForReceiving($shipment, $assignment);
-        $receiptItem = $pickupComplete ? $this->findReceiptItemForShipmentItem($assignment, $item) : null;
+        $receiptItem = $this->findReceiptItemForShipmentItem($assignment, $item);
 
-        if ($pickupComplete && ! $this->canRemovePackageDuringReceiving($assignment, $receiptItem, $item, $shipment)) {
+        if (! $this->canRemovePackageDuringReceiving($assignment, $receiptItem, $item, $shipment)) {
             return response()->json([
                 'success' => false,
                 'message' => $this->receivingRemoveLockReason($assignment, $receiptItem, $item, $shipment) ?? 'This package can no longer be removed.',
@@ -1254,9 +1270,11 @@ class ShipmentController extends Controller
                 'deleted_package_id' => $deletedItemId,
                 'destination_mode' => $shipment->destination_mode->value,
                 'delivery' => $this->serializeShipmentDelivery($shipment),
-                'receiving_packages' => $pickupComplete
-                    ? $shipment->items->map(fn (ShipmentItem $candidate) => $this->serializeReceivingPackage($shipment, $candidate, $assignment))->values()
-                    : null,
+                'receiving_packages' => $shipment->items
+                    ->map(fn (ShipmentItem $candidate) => $this->serializeReceivingPackage($shipment, $candidate, $assignment))
+                    ->values(),
+                'can_receive' => $this->canReceiveInAdminWorkspace($assignment),
+                'assignment_id' => $assignment?->id,
                 'can_auto_group' => $pickupComplete
                     ? $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment)
                     : null,
@@ -1350,15 +1368,13 @@ class ShipmentController extends Controller
                 'source_package' => $this->serializeEditorPackage($sourceItem),
                 'destination_mode' => $shipment->destination_mode->value,
                 'delivery' => $this->serializeShipmentDelivery($shipment),
-                'receiving_package' => $pickupComplete
-                    ? $this->serializeReceivingPackage($shipment, $newItem, $assignment)
-                    : null,
-                'source_receiving_package' => $pickupComplete
-                    ? $this->serializeReceivingPackage($shipment, $sourceItem, $assignment)
-                    : null,
-                'receiving_packages' => $pickupComplete
-                    ? $shipment->items->map(fn (ShipmentItem $candidate) => $this->serializeReceivingPackage($shipment, $candidate, $assignment))->values()
-                    : null,
+                'receiving_package' => $this->serializeReceivingPackage($shipment, $newItem, $assignment),
+                'source_receiving_package' => $this->serializeReceivingPackage($shipment, $sourceItem, $assignment),
+                'receiving_packages' => $shipment->items
+                    ->map(fn (ShipmentItem $candidate) => $this->serializeReceivingPackage($shipment, $candidate, $assignment))
+                    ->values(),
+                'can_receive' => $this->canReceiveInAdminWorkspace($assignment),
+                'assignment_id' => $assignment?->id,
                 'can_auto_group' => $pickupComplete
                     ? $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment)
                     : null,
@@ -1591,23 +1607,12 @@ class ShipmentController extends Controller
             return response()->json(['success' => false, 'message' => 'Pickup already completed.'], 422);
         }
 
-        $now = now();
-        $updates = ['status' => 'completed', 'completed_at' => $now];
-
-        if (! $assignment->en_route_at) {
-            $updates['en_route_at'] = $now;
-        }
-        if (! $assignment->arrived_at) {
-            $updates['arrived_at'] = $now;
-        }
-        if (! $assignment->picked_up_at) {
-            $updates['picked_up_at'] = $now;
-        }
-
-        $assignment->update($updates);
-
-        // Update shipment status
-        $shipment->update(['status' => 'picked_up']);
+        $this->completePickupForAdminReceiving(
+            $shipment,
+            $assignment,
+            Auth::guard('admin')->user(),
+            'Pickup marked completed by admin.'
+        );
 
         return response()->json([
             'success' => true,
@@ -1621,15 +1626,22 @@ class ShipmentController extends Controller
 
         $assignment = $shipment->pickupAssignment;
         if (! $assignment) {
+            $shipment = $this->reloadReceivingShipment($shipment);
+            $packages = $shipment->items
+                ->map(fn (ShipmentItem $item) => $this->serializeReceivingPackage($shipment, $item))
+                ->values();
+
             return response()->json([
-                'success' => false,
-                'message' => 'No pickup assignment found for this shipment.',
+                'success' => true,
                 'data' => [
-                    'packages' => [],
+                    'destination_mode' => $shipment->destination_mode->value,
+                    'delivery' => $this->serializeShipmentDelivery($shipment),
+                    'packages' => $packages,
                     'can_receive' => false,
                     'receipt' => null,
-                    'can_auto_group' => false,
-                    'auto_group_lock_reason' => 'No pickup assignment found for this shipment.',
+                    'assignment_id' => null,
+                    'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving(null, $shipment),
+                    'auto_group_lock_reason' => $this->receivingAutoGroupLockReason(null, $shipment),
                 ],
             ]);
         }
@@ -1647,7 +1659,7 @@ class ShipmentController extends Controller
                 'destination_mode' => $shipment->destination_mode->value,
                 'delivery' => $this->serializeShipmentDelivery($shipment),
                 'packages' => $packages,
-                'can_receive' => $this->isPickupCompleteForReceiving($shipment, $assignment),
+                'can_receive' => $this->canReceiveInAdminWorkspace($assignment),
                 'receipt' => $this->serializeReceivingReceipt($receipt),
                 'assignment_id' => $assignment->id,
                 'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment),
@@ -1665,9 +1677,6 @@ class ShipmentController extends Controller
         }
 
         $assignment = $shipment->pickupAssignment;
-        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment, $assignment)) {
-            return response()->json(['success' => false, 'message' => 'Shipment has not been picked up yet.'], 422);
-        }
 
         $validated = $request->validate([
             'description' => ['nullable', 'string', 'max:500'],
@@ -1688,7 +1697,9 @@ class ShipmentController extends Controller
 
         $this->applyReceivingPackageDetails($shipment, $item, $validated, false);
         $this->syncReceivingPackageDeliveryFee($shipment, $item, $validated);
-        $this->markReceivingReceiptNeedsFinalization($assignment);
+        if ($assignment) {
+            $this->markReceivingReceiptNeedsFinalization($assignment);
+        }
 
         return response()->json([
             'success' => true,
@@ -1706,8 +1717,8 @@ class ShipmentController extends Controller
         }
 
         $assignment = $shipment->pickupAssignment;
-        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment, $assignment)) {
-            return response()->json(['success' => false, 'message' => 'Shipment has not been picked up yet.'], 422);
+        if (! $this->canReceiveInAdminWorkspace($assignment)) {
+            return response()->json(['success' => false, 'message' => 'Assign a pickup driver and target warehouse before receiving packages.'], 422);
         }
 
         $warehouse = $assignment->targetWarehouse;
@@ -1743,6 +1754,19 @@ class ShipmentController extends Controller
 
         $this->applyReceivingPackageDetails($shipment, $item, $validated, true);
         $this->syncReceivingPackageDeliveryFee($shipment, $item, $validated);
+
+        if (! $this->isPickupCompleteForReceiving($shipment, $assignment)) {
+            $assignment = $this->completePickupForAdminReceiving(
+                $shipment,
+                $assignment,
+                Auth::guard('admin')->user(),
+                'Pickup auto-completed during warehouse receiving because the driver could not confirm pickup from mobile.'
+            );
+            $shipment = $this->reloadReceivingShipment($shipment->fresh());
+            $item = $shipment->items->firstWhere('id', $item->id) ?? $item->fresh();
+            $assignment = $shipment->pickupAssignment;
+            $warehouse = $assignment->targetWarehouse;
+        }
 
         $receivingService = app(WarehouseReceivingService::class);
         $result = $receivingService->upsertReceiptItem(
@@ -1918,46 +1942,114 @@ class ShipmentController extends Controller
         ], true);
     }
 
+    protected function canReceiveInAdminWorkspace(?\App\Models\PickupAssignment $assignment): bool
+    {
+        if (! $assignment) {
+            return false;
+        }
+
+        $status = $assignment->status?->value ?? $assignment->getRawOriginal('status');
+        if ($assignment->cancelled_at || $status === PickupAssignmentStatus::CANCELLED->value) {
+            return false;
+        }
+
+        return (bool) $assignment->driver_id && (bool) $assignment->target_warehouse_id;
+    }
+
+    protected function completePickupForAdminReceiving(
+        Shipment $shipment,
+        \App\Models\PickupAssignment $assignment,
+        ?User $user,
+        string $note
+    ): \App\Models\PickupAssignment {
+        if ($this->isPickupCompleteForReceiving($shipment, $assignment)) {
+            return $assignment->fresh(['targetWarehouse', 'warehouseReceipt.items']);
+        }
+
+        return DB::transaction(function () use ($shipment, $assignment, $user, $note) {
+            $now = now();
+            $assignment = \App\Models\PickupAssignment::query()->lockForUpdate()->findOrFail($assignment->id);
+            $shipment = Shipment::query()
+                ->with('items')
+                ->lockForUpdate()
+                ->findOrFail($shipment->id);
+
+            if (! $this->isPickupCompleteForReceiving($shipment, $assignment)) {
+                $updates = [
+                    'status' => PickupAssignmentStatus::COMPLETED,
+                    'completed_at' => $assignment->completed_at ?: $now,
+                ];
+
+                if (! $assignment->en_route_at) {
+                    $updates['en_route_at'] = $now;
+                }
+                if (! $assignment->arrived_at) {
+                    $updates['arrived_at'] = $now;
+                }
+                if (! $assignment->picked_up_at) {
+                    $updates['picked_up_at'] = $now;
+                }
+
+                $assignment->update($updates);
+
+                $pickupLocation = $shipment->pickup_town
+                    ?: $shipment->pickup_gh_post_address
+                    ?: null;
+
+                foreach ($shipment->items as $shipmentItem) {
+                    if (($shipmentItem->status?->value ?? $shipmentItem->getRawOriginal('status')) === ItemStatus::PENDING->value) {
+                        $shipmentItem->update(['status' => ItemStatus::PICKED_UP]);
+                    }
+
+                    ShipmentItemTracking::create([
+                        'shipment_item_id' => $shipmentItem->id,
+                        'status' => ItemStatus::PICKED_UP->value,
+                        'location' => $pickupLocation,
+                        'notes' => $note,
+                        'meta' => [
+                            'pickup_assignment_id' => $assignment->id,
+                            'auto_completed_for_receiving' => true,
+                        ],
+                        'created_by' => $user ? "user:{$user->id}" : null,
+                        'created_at' => $now,
+                    ]);
+                }
+
+                $shipment->update(['status' => ShipmentStatus::PICKED_UP]);
+            }
+
+            return $assignment->fresh(['targetWarehouse', 'warehouseReceipt.items']);
+        });
+    }
+
     protected function canAutoGroupByPhoneDuringReceiving(?\App\Models\PickupAssignment $assignment, ?Shipment $shipment = null): bool
     {
-        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
+        if ($assignment?->received_at) {
             return false;
         }
 
-        if ($assignment->received_at) {
-            return false;
-        }
-
-        if (! $assignment->relationLoaded('warehouseReceipt')) {
+        if ($assignment && ! $assignment->relationLoaded('warehouseReceipt')) {
             $assignment->load('warehouseReceipt.items');
-        } elseif ($assignment->warehouseReceipt && ! $assignment->warehouseReceipt->relationLoaded('items')) {
+        } elseif ($assignment?->warehouseReceipt && ! $assignment->warehouseReceipt->relationLoaded('items')) {
             $assignment->warehouseReceipt->load('items');
         }
 
-        return ! $assignment->warehouseReceipt?->items?->isNotEmpty();
+        return ! $assignment?->warehouseReceipt?->items?->isNotEmpty();
     }
 
     protected function receivingAutoGroupLockReason(?\App\Models\PickupAssignment $assignment, ?Shipment $shipment = null): ?string
     {
-        if (! $assignment) {
-            return 'No pickup assignment found for this shipment.';
-        }
-
-        if (! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
-            return 'This shipment can only be auto-grouped from Receiving after pickup.';
-        }
-
-        if ($assignment->received_at) {
+        if ($assignment?->received_at) {
             return 'Warehouse receiving has already been finalized for this shipment.';
         }
 
-        if (! $assignment->relationLoaded('warehouseReceipt')) {
+        if ($assignment && ! $assignment->relationLoaded('warehouseReceipt')) {
             $assignment->load('warehouseReceipt.items');
-        } elseif ($assignment->warehouseReceipt && ! $assignment->warehouseReceipt->relationLoaded('items')) {
+        } elseif ($assignment?->warehouseReceipt && ! $assignment->warehouseReceipt->relationLoaded('items')) {
             $assignment->warehouseReceipt->load('items');
         }
 
-        if ($assignment->warehouseReceipt?->items?->isNotEmpty()) {
+        if ($assignment?->warehouseReceipt?->items?->isNotEmpty()) {
             return 'Auto-group by phone is only available before warehouse receiving starts.';
         }
 
@@ -2008,12 +2100,12 @@ class ShipmentController extends Controller
 
     protected function canSplitPackageDuringReceiving(?\App\Models\PickupAssignment $assignment, ?WarehouseReceiptItem $receiptItem, ?Shipment $shipment = null): bool
     {
-        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
-            return false;
-        }
-
         if (! $receiptItem) {
             return true;
+        }
+
+        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
+            return false;
         }
 
         return (int) $receiptItem->received_quantity === 0
@@ -2022,12 +2114,12 @@ class ShipmentController extends Controller
 
     protected function receivingSplitLockReason(?\App\Models\PickupAssignment $assignment, ?WarehouseReceiptItem $receiptItem, ?Shipment $shipment = null): ?string
     {
-        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
-            return 'This package can only be split from Receiving after pickup.';
-        }
-
         if (! $receiptItem) {
             return null;
+        }
+
+        if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
+            return 'This package can only be split from Receiving after pickup.';
         }
 
         if ((int) $receiptItem->barcode_print_count > 0) {
@@ -2047,6 +2139,10 @@ class ShipmentController extends Controller
         ShipmentItem $item,
         ?Shipment $shipment = null,
     ): bool {
+        if (! $receiptItem) {
+            return ! $this->packageHasPaidCharges($item);
+        }
+
         if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
             return false;
         }
@@ -2067,10 +2163,6 @@ class ShipmentController extends Controller
             return false;
         }
 
-        if (! $receiptItem) {
-            return true;
-        }
-
         return ! $this->receiptItemHasActiveLabelCustody($receiptItem);
     }
 
@@ -2080,6 +2172,12 @@ class ShipmentController extends Controller
         ShipmentItem $item,
         ?Shipment $shipment = null,
     ): ?string {
+        if (! $receiptItem) {
+            return $this->packageHasPaidCharges($item)
+                ? 'This package has paid charges attached. Cancel or refund the charge before removing it.'
+                : null;
+        }
+
         if (! $assignment || ! $this->isPickupCompleteForReceiving($shipment ?? $assignment->shipment, $assignment)) {
             return 'This package can only be removed from Receiving after pickup.';
         }
@@ -2098,10 +2196,6 @@ class ShipmentController extends Controller
 
         if ($this->packageHasPaidCharges($item)) {
             return 'This package has paid charges attached. Cancel or refund the charge before removing it.';
-        }
-
-        if (! $receiptItem) {
-            return null;
         }
 
         if ($this->receiptItemHasActiveLabelCustody($receiptItem)) {
@@ -2810,6 +2904,8 @@ class ShipmentController extends Controller
             'delivery' => $this->serializeShipmentDelivery($shipment),
             'package' => $this->serializeReceivingPackage($shipment, $serializedItem, $assignment),
             'receipt' => $this->serializeReceivingReceipt($assignment?->warehouseReceipt),
+            'can_receive' => $this->canReceiveInAdminWorkspace($assignment),
+            'assignment_id' => $assignment?->id,
             'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment),
             'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($assignment, $shipment),
         ];
@@ -2998,7 +3094,7 @@ class ShipmentController extends Controller
 
         $assignment = $shipment->pickupAssignment;
         $pickupComplete = $this->isPickupCompleteForReceiving($shipment, $assignment);
-        if ($pickupComplete && ! $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment)) {
+        if (! $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment)) {
             return response()->json([
                 'success' => false,
                 'message' => $this->receivingAutoGroupLockReason($assignment, $shipment) ?? 'Auto-group by phone is no longer available for this shipment.',
@@ -3153,15 +3249,13 @@ class ShipmentController extends Controller
                             'recipient_phone' => $img->recipient_phone,
                         ])->values(),
                     ])->values(),
-                    'receiving_packages' => $pickupComplete
-                        ? $shipment->items->map(fn (ShipmentItem $item) => $this->serializeReceivingPackage($shipment, $item, $assignment))->values()
-                        : null,
-                    'can_auto_group' => $pickupComplete
-                        ? $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment)
-                        : null,
-                    'auto_group_lock_reason' => $pickupComplete
-                        ? $this->receivingAutoGroupLockReason($assignment, $shipment)
-                        : null,
+                    'receiving_packages' => $shipment->items
+                        ->map(fn (ShipmentItem $item) => $this->serializeReceivingPackage($shipment, $item, $assignment))
+                        ->values(),
+                    'can_receive' => $this->canReceiveInAdminWorkspace($assignment),
+                    'assignment_id' => $assignment?->id,
+                    'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment),
+                    'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($assignment, $shipment),
                 ],
             ]);
         });

@@ -502,6 +502,17 @@ function shipmentShow() {
             return `Pickup Fee: ${charge.currency || 'GHS'} ${amount}`;
         },
 
+        pickupFeeValueLabel() {
+            const charge = this.pickupFeeCharge();
+            if (!charge) return 'Not set';
+            const amount = Number(charge.amount || 0).toFixed(2);
+            return `${charge.currency || 'GHS'} ${amount}`;
+        },
+
+        pickupFeeActionLabel() {
+            return this.pickupFeeCharge() ? 'Edit Pickup Fee' : 'Set Pickup Fee';
+        },
+
         pickupFeeButtonClass() {
             const charge = this.pickupFeeCharge();
             if (!charge) return 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/30';
@@ -1108,6 +1119,7 @@ function shipmentShow() {
 
         canFinalizeReceiving() {
             return !this.receiving.saving
+                && this.receiving.canReceive
                 && this.receivingAllPackagesReceived()
                 && !this.receivingIsFinalized();
         },
@@ -1115,7 +1127,20 @@ function shipmentShow() {
         finalizeReceivingButtonLabel() {
             if (this.receiving.saving) return 'Finalizing...';
             if (this.receivingIsFinalized()) return 'Finalized';
+            if (!this.receiving.canReceive) return 'Pickup Required';
             return 'Finalize';
+        },
+
+        receivingRestrictionMessage() {
+            if (!this.assignment) {
+                return 'Assign a pickup driver and target warehouse before receiving packages.';
+            }
+
+            if (!this.assignmentWarehouseName() || this.assignmentWarehouseName() === 'No target warehouse') {
+                return 'Set a target warehouse before receiving packages.';
+            }
+
+            return 'The driver has not confirmed pickup yet. Saving receipt quantities will automatically mark pickup as completed first.';
         },
 
         receivingPendingUnits() {
@@ -1589,6 +1614,14 @@ function shipmentShow() {
         },
 
         applyReceivingMeta(data = {}) {
+            if (Object.prototype.hasOwnProperty.call(data, 'can_receive')) {
+                this.receiving.canReceive = !!data.can_receive;
+            }
+
+            if (Object.prototype.hasOwnProperty.call(data, 'assignment_id')) {
+                this.receiving.assignmentId = data.assignment_id || null;
+            }
+
             if (Object.prototype.hasOwnProperty.call(data, 'can_auto_group')) {
                 this.receiving.canAutoGroup = !!data.can_auto_group;
             }
@@ -2394,6 +2427,11 @@ function shipmentShow() {
         },
 
         async receivePackage(pkg) {
+            if (!this.receiving.canReceive) {
+                window.showToast?.(this.receivingRestrictionMessage(), 'error');
+                return;
+            }
+
             this.receiving.saving = true;
             const url = this.config.receiveSaveEndpoint.replace('__ITEM__', pkg.shipment_item_id);
             try {
@@ -2412,6 +2450,11 @@ function shipmentShow() {
 			        async receivePackageFromModal() {
 		            const modal = this.receivingPackageModal;
 		            if (!modal.pkg || modal.savingDetails || modal.savingReceive) return;
+
+                    if (!this.receiving.canReceive) {
+                        window.showToast?.(this.receivingRestrictionMessage(), 'error');
+                        return;
+                    }
 
                     const wasFinalized = this.receivingIsFinalized();
 
