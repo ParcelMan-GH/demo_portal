@@ -574,7 +574,7 @@ function shipmentShow() {
                     }
 
                     res = await fetch(url, {
-                        method: 'PATCH',
+                        method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': csrf,
