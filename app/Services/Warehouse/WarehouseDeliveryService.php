@@ -137,17 +137,59 @@ class WarehouseDeliveryService
         }
 
         $labels = WarehouseReceiptItemLabel::whereIn('id', $claimedLabelIds)
-            ->with(['receiptItem.shipmentItem.shipment.vendor'])
+            ->with(['receiptItem.labels', 'receiptItem.shipmentItem.shipment.vendor'])
             ->get();
 
-        // Collect unique shipment items (a package may have multiple labels)
-        $allItems = $labels->map(fn ($l) => $l->receiptItem?->shipmentItem)->filter();
-        $shipmentItems = $allItems->unique('id');
+        $labelsByItemId = $labels
+            ->filter(fn ($label) => $label->receiptItem?->shipmentItem)
+            ->groupBy(fn ($label) => (int) $label->receiptItem->shipment_item_id);
 
-        // Filter out items already in an active delivery run
-        $existingRunItemIds = DeliveryRunItem::whereHas('run', fn ($q) => $q->whereNotIn('status', [DeliveryRun::STATUS_COMPLETED, DeliveryRun::STATUS_CANCELLED]))
-            ->pluck('shipment_item_id');
-        $shipmentItems = $shipmentItems->reject(fn ($item) => $existingRunItemIds->contains($item->id));
+        $activeRunStatuses = [DeliveryRun::STATUS_COMPLETED, DeliveryRun::STATUS_CANCELLED];
+        $activeQuantitiesByItemId = DeliveryRunItem::query()
+            ->whereIn('shipment_item_id', $labelsByItemId->keys())
+            ->whereHas('run', fn ($q) => $q->whereNotIn('status', $activeRunStatuses))
+            ->selectRaw('shipment_item_id, COALESCE(SUM(expected_quantity), 0) as active_quantity')
+            ->groupBy('shipment_item_id')
+            ->pluck('active_quantity', 'shipment_item_id');
+
+        $driverActiveQuantitiesByItemId = DeliveryRunItem::query()
+            ->whereIn('shipment_item_id', $labelsByItemId->keys())
+            ->whereHas('run', fn ($q) => $q
+                ->where('assigned_driver_id', $driver->id)
+                ->whereNotIn('status', $activeRunStatuses)
+            )
+            ->selectRaw('shipment_item_id, COALESCE(SUM(expected_quantity), 0) as active_quantity')
+            ->groupBy('shipment_item_id')
+            ->pluck('active_quantity', 'shipment_item_id');
+
+        $allocatedQuantitiesByItemId = collect();
+        $shipmentItems = $labelsByItemId
+            ->map(function (Collection $itemLabels, int $itemId) use ($activeQuantitiesByItemId, $driverActiveQuantitiesByItemId, $allocatedQuantitiesByItemId) {
+                $shipmentItem = $itemLabels->first()?->receiptItem?->shipmentItem;
+                if (! $shipmentItem) {
+                    return null;
+                }
+
+                $receiptLabelCount = (int) ($itemLabels->first()?->receiptItem?->labels?->count() ?? 0);
+                $declaredLabelTotal = (int) $itemLabels->max('labels_total');
+                $totalLabelCapacity = max($receiptLabelCount, $declaredLabelTotal, 1);
+                $claimedLabelCount = $itemLabels->count();
+                $activeQuantity = (int) ($activeQuantitiesByItemId->get($itemId) ?? 0);
+                $driverActiveQuantity = (int) ($driverActiveQuantitiesByItemId->get($itemId) ?? 0);
+                $newClaimedQuantity = max($claimedLabelCount - $driverActiveQuantity, 0);
+                $availableQuantity = max($totalLabelCapacity - $activeQuantity, 0);
+                $allocatedQuantity = min($newClaimedQuantity, $availableQuantity);
+
+                if ($allocatedQuantity <= 0) {
+                    return null;
+                }
+
+                $allocatedQuantitiesByItemId->put($itemId, $allocatedQuantity);
+
+                return $shipmentItem;
+            })
+            ->filter()
+            ->values();
 
         if ($shipmentItems->isEmpty()) {
             return [
@@ -158,11 +200,12 @@ class WarehouseDeliveryService
                     'labels_found' => $labels->count(),
                     'labels_with_receipt_item' => $labels->filter(fn ($l) => $l->receiptItem)->count(),
                     'labels_with_shipment_item' => $labels->filter(fn ($l) => $l->receiptItem?->shipmentItem)->count(),
+                    'active_quantities_by_item_id' => $activeQuantitiesByItemId,
                 ],
             ];
         }
 
-        return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems, $claimedLabelIds) {
+        return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems, $claimedLabelIds, $allocatedQuantitiesByItemId) {
             $run = DeliveryRun::query()->create([
                 'run_number' => $this->generateRunNumber($warehouse),
                 'warehouse_id' => $warehouse->id,
@@ -185,12 +228,16 @@ class WarehouseDeliveryService
             $stopsCount = 0;
 
             if ($busStationItems->isNotEmpty()) {
+                $busStationQuantity = $busStationItems->sum(
+                    fn ($shipmentItem) => (int) ($allocatedQuantitiesByItemId->get($shipmentItem->id) ?? 1)
+                );
+
                 $stop = DeliveryRunStop::query()->create([
                     'delivery_run_id' => $run->id,
                     'recipient_name' => 'Bus Station Handoff',
                     'recipient_phone' => '',
                     'town' => null,
-                    'total_packages' => $busStationItems->count(),
+                    'total_packages' => $busStationQuantity,
                     'status' => DeliveryRunStop::STATUS_PENDING,
                     'delivery_method' => DeliveryRunStop::METHOD_BUS_HANDOFF,
                 ]);
@@ -200,7 +247,7 @@ class WarehouseDeliveryService
                         'delivery_run_id' => $run->id,
                         'delivery_run_stop_id' => $stop->id,
                         'shipment_item_id' => $shipmentItem->id,
-                        'expected_quantity' => (int) ($shipmentItem->quantity ?: 1),
+                        'expected_quantity' => (int) ($allocatedQuantitiesByItemId->get($shipmentItem->id) ?? 1),
                         'status' => DeliveryRunItem::STATUS_PENDING,
                     ]);
                     $shipmentItem->update(['status' => 'out_for_delivery']);
@@ -218,6 +265,7 @@ class WarehouseDeliveryService
 
             foreach ($sortedDirect as $shipmentItem) {
                 $destination = $this->resolveDeliveryDestination($shipmentItem);
+                $allocatedQuantity = (int) ($allocatedQuantitiesByItemId->get($shipmentItem->id) ?? 1);
 
                 $stop = DeliveryRunStop::query()->create([
                     'delivery_run_id' => $run->id,
@@ -230,7 +278,7 @@ class WarehouseDeliveryService
                     'longitude' => $destination['longitude'] ?? null,
                     'gh_post_address' => $destination['gh_post_address'] ?? null,
                     'landmark' => $destination['landmark'] ?? null,
-                    'total_packages' => 1,
+                    'total_packages' => $allocatedQuantity,
                     'status' => DeliveryRunStop::STATUS_PENDING,
                     'delivery_method' => DeliveryRunStop::METHOD_DIRECT,
                 ]);
@@ -239,7 +287,7 @@ class WarehouseDeliveryService
                     'delivery_run_id' => $run->id,
                     'delivery_run_stop_id' => $stop->id,
                     'shipment_item_id' => $shipmentItem->id,
-                    'expected_quantity' => (int) ($shipmentItem->quantity ?: 1),
+                    'expected_quantity' => $allocatedQuantity,
                     'status' => DeliveryRunItem::STATUS_PENDING,
                 ]);
 
@@ -260,7 +308,7 @@ class WarehouseDeliveryService
                     'delivery_run_id' => $run->id,
                     'run_number' => $run->run_number,
                     'stops_count' => $stopsCount,
-                    'packages_count' => $shipmentItems->count(),
+                    'packages_count' => $allocatedQuantitiesByItemId->sum(),
                     'claimed_labels_count' => $claimedLabelIds->count(),
                     'unique_items_count' => $shipmentItems->count(),
                 ],
@@ -974,13 +1022,26 @@ class WarehouseDeliveryService
         $outstandingCharges = $this->outstandingDeliveryFeeChargesForStop($stop->id, $runItems);
 
         if ($outstandingCharges->isNotEmpty()) {
-            $outstandingCharges->each(function (ShipmentCharge $charge) use ($driver, $stop) {
-                $this->chargesService->markPaid($charge, 'cash', null, $driver);
+            $chargeCount = $outstandingCharges->count();
+            $baseShare = round($inFieldDeliveryFee / $chargeCount, 2);
+            $allocated = 0.0;
+
+            $outstandingCharges->values()->each(function (ShipmentCharge $charge, int $index) use ($driver, $stop, $chargeCount, $baseShare, &$allocated, $inFieldDeliveryFee) {
+                $amount = $index === ($chargeCount - 1)
+                    ? round($inFieldDeliveryFee - $allocated, 2)
+                    : $baseShare;
+                $allocated += $amount;
 
                 $charge->update(array_filter([
-                    'delivery_run_stop_id' => $charge->delivery_run_stop_id ?: $stop->id,
-                    'recorded_by_driver_id' => $driver->id,
+                    'amount'                 => $amount,
+                    'delivery_run_stop_id'   => $charge->delivery_run_stop_id ?: $stop->id,
+                    'recorded_by_driver_id'  => $driver->id,
+                    'notes'                  => $chargeCount > 1
+                        ? "Driver collected delivery fee on arrival (split from GHS " . number_format($inFieldDeliveryFee, 2) . " across {$chargeCount} existing charge(s))"
+                        : 'Driver collected delivery fee on arrival',
                 ]));
+
+                $this->chargesService->markPaid($charge, 'cash', null, $driver);
             });
 
             return;

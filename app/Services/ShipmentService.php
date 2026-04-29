@@ -180,6 +180,7 @@ class ShipmentService
             'items.images',
             'items.deliveryRegion',
             'items.deliveryDistrict',
+            'items.deliveryRunItems',
             'invoice',
             'invoices',
             'pickupAssignment.driver',
@@ -480,6 +481,10 @@ class ShipmentService
                 'quantity' => $item->quantity,
                 'status' => $item->status->value,
                 'tracking_code' => $item->tracking_code,
+                'delivered_at' => $item->deliveryRunItems
+                    ->whereNotNull('delivered_at')
+                    ->sortByDesc(fn ($runItem) => $runItem->delivered_at?->getTimestamp() ?? 0)
+                    ->first()?->delivered_at?->toIso8601String(),
                 'fulfillment_type' => $item->fulfillment_type?->value,
                 'delivery' => $itemDelivery,
                 'handoff' => $itemHandoff,

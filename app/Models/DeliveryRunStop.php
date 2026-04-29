@@ -31,6 +31,7 @@ class DeliveryRunStop extends Model
         'longitude',
         'gh_post_address',
         'landmark',
+        'total_packages',
         'status',
         'verification_code_hash',
         'verification_code_expires_at',
@@ -112,4 +113,3 @@ class DeliveryRunStop extends Model
         return $this->status === self::STATUS_HANDED_OFF;
     }
 }
-

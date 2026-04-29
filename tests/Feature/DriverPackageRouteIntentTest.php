@@ -1,10 +1,13 @@
 <?php
 
 use App\Models\Driver;
+use App\Models\DeliveryRunItem;
+use App\Models\DeliveryRunStop;
 use App\Models\LabelCustodyEvent;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\Vendor;
+use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceiptItemLabel;
@@ -17,6 +20,7 @@ function driverPackageRouteIntentBuildSchema(): void
 {
     foreach ([
         'delivery_run_items',
+        'delivery_run_stops',
         'delivery_runs',
         'label_custody_events',
         'warehouse_receipt_item_labels',
@@ -25,6 +29,7 @@ function driverPackageRouteIntentBuildSchema(): void
         'shipment_items',
         'shipments',
         'vendors',
+        'warehouses',
         'drivers',
     ] as $table) {
         Schema::dropIfExists($table);
@@ -46,6 +51,16 @@ function driverPackageRouteIntentBuildSchema(): void
         $table->timestamp('last_login_at')->nullable();
         $table->rememberToken();
         $table->timestamps();
+    });
+
+    Schema::create('warehouses', function (Blueprint $table) {
+        $table->id();
+        $table->string('name');
+        $table->string('code')->nullable();
+        $table->string('address')->nullable();
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+        $table->softDeletes();
     });
 
     Schema::create('vendors', function (Blueprint $table) {
@@ -142,8 +157,31 @@ function driverPackageRouteIntentBuildSchema(): void
 
     Schema::create('delivery_runs', function (Blueprint $table) {
         $table->id();
+        $table->string('run_number')->nullable();
+        $table->unsignedBigInteger('warehouse_id')->nullable();
         $table->string('status')->default('draft');
         $table->unsignedBigInteger('assigned_driver_id')->nullable();
+        $table->timestamp('dispatched_at')->nullable();
+        $table->unsignedBigInteger('created_by_user_id')->nullable();
+        $table->text('notes')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('delivery_run_stops', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('delivery_run_id');
+        $table->string('recipient_name')->nullable();
+        $table->string('recipient_phone')->nullable();
+        $table->unsignedBigInteger('region_id')->nullable();
+        $table->unsignedBigInteger('district_id')->nullable();
+        $table->string('town')->nullable();
+        $table->decimal('latitude', 10, 8)->nullable();
+        $table->decimal('longitude', 11, 8)->nullable();
+        $table->string('gh_post_address')->nullable();
+        $table->string('landmark')->nullable();
+        $table->unsignedInteger('total_packages')->default(0);
+        $table->string('status')->default('pending');
+        $table->string('delivery_method')->default('direct');
         $table->timestamps();
     });
 
@@ -299,4 +337,95 @@ test('driver my packages exposes route intent for bus handoff packages', functio
         ->and($directPackage)->not->toBeNull()
         ->and($directPackage['delivery_method'])->toBe('direct')
         ->and($directPackage['route_label'])->toBe('Mark Asante');
+});
+
+test('starting deliveries uses claimed label count instead of full package quantity', function () {
+    $warehouse = Warehouse::create([
+        'name' => 'Accra Main Office',
+        'code' => 'AMO',
+        'is_active' => true,
+    ]);
+    $vendor = driverPackageRouteIntentCreateVendor();
+
+    $shipment = Shipment::create([
+        'vendor_id' => $vendor->id,
+        'shipment_number' => 'PCM-2026-00992',
+        'status' => 'at_warehouse',
+        'source' => 'vendor_app',
+        'destination_mode' => 'per_item',
+    ]);
+
+    $item = ShipmentItem::create([
+        'shipment_id' => $shipment->id,
+        'description' => '32 Inches Samsung TV',
+        'quantity' => 2,
+        'delivery_recipient_name' => 'George',
+        'delivery_recipient_phone' => '+233205531644',
+        'delivery_town' => 'Lapaz',
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_DIRECT,
+        'status' => 'at_warehouse',
+        'tracking_code' => 'TRKTV12345',
+    ]);
+
+    $receipt = WarehouseReceipt::create();
+    $receiptItem = WarehouseReceiptItem::create([
+        'warehouse_receipt_id' => $receipt->id,
+        'shipment_item_id' => $item->id,
+        'expected_quantity' => 2,
+        'received_quantity' => 2,
+    ]);
+
+    $firstLabel = WarehouseReceiptItemLabel::create([
+        'warehouse_receipt_item_id' => $receiptItem->id,
+        'barcode_value' => 'TRKTV12345-001',
+        'label_index' => 1,
+        'labels_total' => 2,
+        'label_type' => 'unit',
+    ]);
+    $secondLabel = WarehouseReceiptItemLabel::create([
+        'warehouse_receipt_item_id' => $receiptItem->id,
+        'barcode_value' => 'TRKTV12345-002',
+        'label_index' => 2,
+        'labels_total' => 2,
+        'label_type' => 'unit',
+    ]);
+
+    LabelCustodyEvent::create([
+        'warehouse_receipt_item_label_id' => $firstLabel->id,
+        'event_type' => LabelCustodyEvent::TYPE_CLAIMED,
+        'driver_id' => $this->driver->id,
+    ]);
+
+    $this->postJson('/api/v1/driver/start-deliveries', [
+        'warehouse_id' => $warehouse->id,
+    ])->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.packages_count', 1)
+        ->assertJsonPath('data.unique_items_count', 1);
+
+    $firstRunItem = DeliveryRunItem::query()->first();
+    $firstStop = DeliveryRunStop::query()->first();
+
+    expect($firstRunItem)->not->toBeNull()
+        ->and((int) $firstRunItem->expected_quantity)->toBe(1)
+        ->and((int) $firstStop->total_packages)->toBe(1);
+
+    LabelCustodyEvent::create([
+        'warehouse_receipt_item_label_id' => $secondLabel->id,
+        'event_type' => LabelCustodyEvent::TYPE_CLAIMED,
+        'driver_id' => $this->driver->id,
+    ]);
+
+    $this->postJson('/api/v1/driver/start-deliveries', [
+        'warehouse_id' => $warehouse->id,
+    ])->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.packages_count', 1)
+        ->assertJsonPath('data.unique_items_count', 1);
+
+    $runItems = DeliveryRunItem::query()->orderBy('id')->get();
+
+    expect($runItems)->toHaveCount(2)
+        ->and((int) $runItems[0]->expected_quantity)->toBe(1)
+        ->and((int) $runItems[1]->expected_quantity)->toBe(1);
 });
