@@ -191,16 +191,15 @@
                 <!-- Right Controls: Create + Export + View -->
                 <div class="flex flex-wrap items-center justify-end gap-3">
                     <!-- Create Sort Batch -->
-                    <button
-                        type="button"
-                        @@click="createBatchModalOpen = true"
+                    <a
+                        href="{{ route('admin.sort-batches.create') }}"
                         class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-white shadow-sm transition-colors"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
                         New Batch
-                    </button>
+                    </a>
                     <!-- Export -->
                     <div x-data="{ open: false }" class="relative">
                         <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
@@ -550,109 +549,6 @@
         </div>
     </div>
 
-{{-- ════════════════════════════════════════════════════════════════════════ --}}
-{{-- MODAL: Create Sort Batch                                                  --}}
-{{-- ════════════════════════════════════════════════════════════════════════ --}}
-<div x-show="createBatchModalOpen"
-     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-     x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-     @@keydown.escape.window="createBatchModalOpen = false"
-     class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
-    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="createBatchModalOpen = false"></div>
-    <div x-show="createBatchModalOpen"
-         x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95 translate-y-2" x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-         x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100 translate-y-0" x-transition:leave-end="opacity-0 scale-95 translate-y-2"
-         class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl shadow-slate-900/30 overflow-hidden">
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                </div>
-                <div>
-                    <h3 class="text-base font-bold text-white">New Sort Batch</h3>
-                    <p class="text-slate-300 text-xs mt-0.5">Configure warehouse and dispatch mode</p>
-                </div>
-            </div>
-            <button type="button" @@click="createBatchModalOpen = false" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
-        <!-- Body -->
-        <div class="px-6 py-5 space-y-4">
-            <!-- Error -->
-            <div x-show="createBatchError" x-cloak class="flex items-start gap-2 rounded-xl bg-rose-50 border border-rose-200 px-4 py-3">
-                <svg class="w-4 h-4 text-rose-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <p class="text-xs text-rose-700" x-text="createBatchError"></p>
-            </div>
-            <!-- Origin Warehouse -->
-            <div>
-                <label class="block text-xs font-bold text-slate-700 mb-2">Origin Warehouse <span class="text-rose-500">*</span></label>
-                <select x-model="newBatch.origin_warehouse_id" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500/30 focus:border-slate-400 transition-colors">
-                    <option value="">Select origin warehouse…</option>
-                    @foreach($warehouses as $wh)
-                    <option value="{{ $wh->id }}">{{ $wh->name }}{{ $wh->code ? ' (' . $wh->code . ')' : '' }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <!-- Dispatch Mode -->
-            <div>
-                <label class="block text-xs font-bold text-slate-700 mb-2">Dispatch Mode <span class="text-rose-500">*</span></label>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="relative flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all"
-                           :class="newBatch.dispatch_mode === 'transfer' ? 'border-slate-700 bg-slate-50' : 'border-slate-200 bg-white hover:border-slate-300'">
-                        <input type="radio" value="transfer" x-model="newBatch.dispatch_mode" class="sr-only">
-                        <div class="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
-                             :class="newBatch.dispatch_mode === 'transfer' ? 'border-slate-700' : 'border-slate-300'">
-                            <div class="w-2 h-2 rounded-full bg-slate-700 transition-all" :class="newBatch.dispatch_mode === 'transfer' ? 'opacity-100' : 'opacity-0'"></div>
-                        </div>
-                        <span class="text-xs font-semibold" :class="newBatch.dispatch_mode === 'transfer' ? 'text-slate-800' : 'text-slate-500'">Transfer</span>
-                    </label>
-                    <label class="relative flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all"
-                           :class="newBatch.dispatch_mode === 'local_delivery' ? 'border-slate-700 bg-slate-50' : 'border-slate-200 bg-white hover:border-slate-300'">
-                        <input type="radio" value="local_delivery" x-model="newBatch.dispatch_mode" class="sr-only">
-                        <div class="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
-                             :class="newBatch.dispatch_mode === 'local_delivery' ? 'border-slate-700' : 'border-slate-300'">
-                            <div class="w-2 h-2 rounded-full bg-slate-700 transition-all" :class="newBatch.dispatch_mode === 'local_delivery' ? 'opacity-100' : 'opacity-0'"></div>
-                        </div>
-                        <span class="text-xs font-semibold" :class="newBatch.dispatch_mode === 'local_delivery' ? 'text-slate-800' : 'text-slate-500'">Local Delivery</span>
-                    </label>
-                </div>
-            </div>
-            <!-- Destination Warehouse (transfer only) -->
-            <div x-show="newBatch.dispatch_mode === 'transfer'" x-transition>
-                <label class="block text-xs font-bold text-slate-700 mb-2">Destination Warehouse <span class="text-rose-500">*</span></label>
-                <select x-model="newBatch.destination_warehouse_id" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500/30 focus:border-slate-400 transition-colors">
-                    <option value="">Select destination warehouse…</option>
-                    @foreach($warehouses as $wh)
-                    <option value="{{ $wh->id }}">{{ $wh->name }}{{ $wh->code ? ' (' . $wh->code . ')' : '' }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <!-- Local delivery hint -->
-            <div x-show="newBatch.dispatch_mode === 'local_delivery'" x-transition class="flex items-start gap-3 rounded-xl bg-sky-50 border border-sky-200 px-4 py-3">
-                <svg class="w-4 h-4 text-sky-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <p class="text-xs text-sky-700">Items will be delivered directly from the selected warehouse to recipients.</p>
-            </div>
-            <!-- Notes -->
-            <div>
-                <label class="block text-xs font-bold text-slate-700 mb-2">Notes <span class="text-slate-400 font-normal">(optional)</span></label>
-                <textarea x-model="newBatch.notes" rows="2" placeholder="Optional notes about this batch…"
-                          class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500/30 focus:border-slate-400 transition-colors resize-none"></textarea>
-            </div>
-        </div>
-        <!-- Footer -->
-        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-3">
-            <button type="button" @@click="createBatchModalOpen = false" class="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
-            <button type="button" @@click="submitCreateBatch()" :disabled="createBatchLoading"
-                    class="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm">
-                <svg x-show="!createBatchLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                <svg x-show="createBatchLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                Create Batch
-            </button>
-        </div>
-    </div>
-</div>
 </div>
 
 @endsection
@@ -674,16 +570,6 @@ document.addEventListener('alpine:init', () => {
         sortDirection: 'desc',
         perPage: 50,
 
-        // Create batch modal
-        createBatchModalOpen: false,
-        createBatchLoading: false,
-        createBatchError: '',
-        newBatch: {
-            origin_warehouse_id: '',
-            dispatch_mode: 'local_delivery',
-            destination_warehouse_id: '',
-            notes: '',
-        },
         columns: [
             { key: 'batch_number', label: 'Batch #' },
             { key: 'warehouse',    label: 'Warehouse' },
@@ -858,49 +744,6 @@ document.addEventListener('alpine:init', () => {
                 + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
         },
 
-        async submitCreateBatch() {
-            this.createBatchError = '';
-            if (!this.newBatch.origin_warehouse_id) {
-                this.createBatchError = 'Please select an origin warehouse.';
-                return;
-            }
-            if (this.newBatch.dispatch_mode === 'transfer' && !this.newBatch.destination_warehouse_id) {
-                this.createBatchError = 'Please select a destination warehouse for transfer mode.';
-                return;
-            }
-            this.createBatchLoading = true;
-            try {
-                const body = {
-                    origin_warehouse_id: this.newBatch.origin_warehouse_id,
-                    dispatch_mode: this.newBatch.dispatch_mode,
-                    notes: this.newBatch.notes || null,
-                };
-                if (this.newBatch.dispatch_mode === 'transfer') {
-                    body.destination_warehouse_id = this.newBatch.destination_warehouse_id;
-                }
-                const resp = await fetch('{{ route('admin.sort-batches.store') }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                    },
-                    body: JSON.stringify(body),
-                });
-                const json = await resp.json();
-                if (json.success && json.data?.batch) {
-                    this.createBatchModalOpen = false;
-                    this.newBatch = { origin_warehouse_id: '', dispatch_mode: 'local_delivery', destination_warehouse_id: '', notes: '' };
-                    window.location.href = '{{ route('admin.sort-batches.show', ['batch' => '__ID__']) }}'.replace('__ID__', json.data.batch.id);
-                } else {
-                    this.createBatchError = json.message || 'Failed to create sort batch.';
-                }
-            } catch (e) {
-                this.createBatchError = 'An unexpected error occurred.';
-            } finally {
-                this.createBatchLoading = false;
-            }
-        },
     }));
 });
 </script>

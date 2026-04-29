@@ -367,6 +367,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('package-tracking-data', [\App\Http\Controllers\Admin\PackageTrackingController::class, 'data'])->name('package-tracking.data');
 
         Route::get('sort-batches', [AdminSortBatchController::class, 'index'])->name('sort-batches.index');
+        Route::get('sort-batches/create', [AdminSortBatchController::class, 'create'])->name('sort-batches.create');
         Route::get('sort-batches-data', [AdminSortBatchController::class, 'data'])->name('sort-batches.data');
         Route::get('sort-batches-export', [AdminSortBatchController::class, 'export'])->name('sort-batches.export');
         Route::post('sort-batches', [AdminSortBatchController::class, 'store'])->name('sort-batches.store');

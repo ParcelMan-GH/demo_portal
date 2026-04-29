@@ -37,10 +37,10 @@
                     <div class="flex items-center gap-2 flex-wrap justify-end">
                         @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
                         <!-- Add Items -->
-                        <button type="button" @@click="openAddItemsModal()"
+                        <button type="button" @@click="goSortingWorkspace()"
                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/30 text-blue-200 text-xs font-semibold transition-all backdrop-blur-sm">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            Add Items
+                            Sort Items
                         </button>
                         <!-- Seal Batch -->
                         <button type="button" @@click="sealBatch()" :disabled="actionLoading"
@@ -124,7 +124,7 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <p class="text-lg font-bold text-white leading-none">{{ $batch->active_items_count }}</p>
+                                    <p class="text-lg font-bold text-white leading-none" x-text="batchItemsCount">{{ $batch->active_items_count }}</p>
                                     <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Items</p>
                                 </div>
                             </div>
@@ -225,7 +225,7 @@
                 </div>
                 <span class="flex-1 text-xs transition-colors" :class="activeTab === 'items' ? 'font-bold text-blue-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Batch Items</span>
                 <span class="inline-flex items-center justify-center min-w-[1.125rem] h-4 px-1 text-[9px] font-bold rounded-full transition-all"
-                    :class="activeTab === 'items' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'">{{ $batch->active_items_count }}</span>
+                    :class="activeTab === 'items' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'" x-text="batchItemsCount">{{ $batch->active_items_count }}</span>
             </button>
 
             <!-- Divider: Logistics -->
@@ -313,7 +313,7 @@
                             </div>
                             <div class="flex items-center justify-between py-2 border-b border-slate-100">
                                 <span class="text-xs font-medium text-slate-500">Items Count</span>
-                                <span class="text-xs font-semibold text-slate-900">{{ $batch->active_items_count }}</span>
+                                <span class="text-xs font-semibold text-slate-900" x-text="batchItemsCount">{{ $batch->active_items_count }}</span>
                             </div>
                             <div class="flex items-center justify-between py-2 border-b border-slate-100">
                                 <span class="text-xs font-medium text-slate-500">Created At</span>
@@ -409,7 +409,7 @@
                                         </div>
                                         <span class="text-xs font-semibold text-slate-700 group-hover:text-blue-700">View Batch Items</span>
                                     </div>
-                                    <span class="text-[10px] font-bold text-slate-400 group-hover:text-blue-500">{{ $batch->active_items_count }} items</span>
+                                    <span class="text-[10px] font-bold text-slate-400 group-hover:text-blue-500" x-text="batchItemsCount + ' items'">{{ $batch->active_items_count }} items</span>
                                 </button>
 
                                 @if($batch->transportManifest)
@@ -446,150 +446,202 @@
             </div>
 
             <!-- ═══════════════════════════════════════ -->
-            <!-- BATCH ITEMS TAB                         -->
+            <!-- SORTING WORKSPACE                       -->
             <!-- ═══════════════════════════════════════ -->
             <div x-show="activeTab === 'items'" x-cloak>
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <!-- Header -->
-                    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                </svg>
+                <div class="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.8fr)] gap-5">
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-900">Batch Items</h3>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">
+                                        <span x-text="itemsMeta.total"></span> <span x-text="itemsMeta.total === 1 ? 'item' : 'items'"></span> currently selected
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 class="text-sm font-bold text-slate-900">Batch Items</h3>
-                                <p class="text-[11px] text-slate-500 mt-0.5">
-                                    <span x-text="itemsMeta.total"></span> <span x-text="itemsMeta.total === 1 ? 'item' : 'items'"></span> in this batch
-                                </p>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2 flex-wrap">
-                            @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
-                            <button type="button" @@click="openAddItemsModal()"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shadow-sm">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                Add Items
-                            </button>
-                            @endif
                             <div class="relative">
                                 <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                                 </svg>
-                                <input type="text" x-model="itemsSearch" @@input="onItemsSearch()" placeholder="Search items..."
-                                       class="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none w-52 bg-slate-50/50">
+                                <input type="text" x-model="itemsSearch" @@input="onItemsSearch()" placeholder="Search selected packages"
+                                       class="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none w-56 bg-slate-50/50">
+                            </div>
+                        </div>
+
+                        <div x-show="itemsLoading" class="flex items-center justify-center py-16">
+                            <svg class="w-6 h-6 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </div>
+
+                        <div x-show="!itemsLoading && itemsLoaded && items.length === 0" class="flex flex-col items-center justify-center py-16 text-slate-400">
+                            <svg class="w-10 h-10 mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                            </svg>
+                            <p class="text-sm font-medium" x-text="itemsSearch ? 'No selected packages match your search' : 'No packages in this batch'"></p>
+                            <p class="text-xs text-slate-400 mt-1" x-show="!itemsSearch">Use the warehouse package list to add packages directly.</p>
+                        </div>
+
+                        <div x-show="!itemsLoading && items.length > 0" class="divide-y divide-slate-100">
+                            <template x-for="item in items" :key="item.id">
+                                <div class="px-4 py-3 hover:bg-slate-50/70 group">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <template x-if="item.shipment_id">
+                                                    <a :href="shipmentUrl(item.shipment_id)" class="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline" x-text="item.shipment_number"></a>
+                                                </template>
+                                                <span x-show="item.tracking_code" class="font-mono text-[11px] text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded" x-text="item.tracking_code"></span>
+                                                <span class="inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full bg-slate-100 text-[10px] font-semibold text-slate-700" x-text="'Qty ' + (item.quantity || '—')"></span>
+                                            </div>
+                                            <p class="text-xs text-slate-700 mt-1 truncate" x-text="item.description || '—'"></p>
+                                            <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
+                                                <span x-text="item.vendor_name || 'No vendor'"></span>
+                                                <span x-text="item.delivery_recipient_name || 'No recipient'"></span>
+                                                <span x-show="item.delivery_recipient_phone" x-text="item.delivery_recipient_phone"></span>
+                                                <span x-text="item.delivery_town || 'No town'"></span>
+                                            </div>
+                                        </div>
+                                        @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                                        <button type="button" @@click="removeItem(item)"
+                                                :disabled="actionLoading"
+                                                class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-30 flex-shrink-0">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        </button>
+                                        @endif
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div x-show="!itemsLoading && itemsMeta.last_page > 1" class="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
+                            <p class="text-[11px] text-slate-500">
+                                Showing <span class="font-semibold text-slate-700" x-text="itemsMeta.from"></span>
+                                to <span class="font-semibold text-slate-700" x-text="itemsMeta.to"></span>
+                                of <span class="font-semibold text-slate-700" x-text="itemsMeta.total"></span>
+                            </p>
+                            <div class="flex items-center gap-1">
+                                <button @@click="goItemsPage(itemsMeta.current_page - 1)" :disabled="itemsMeta.current_page <= 1" class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">Prev</button>
+                                <button @@click="goItemsPage(itemsMeta.current_page + 1)" :disabled="itemsMeta.current_page >= itemsMeta.last_page" class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">Next</button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Loading -->
-                    <div x-show="itemsLoading" class="flex items-center justify-center py-16">
-                        <svg class="w-6 h-6 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    </div>
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-5 py-4 border-b border-slate-100">
+                            <div class="flex items-center justify-between gap-3 mb-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7h18M3 12h18M3 17h18"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-sm font-bold text-slate-900">Warehouse Packages</h3>
+                                        <p class="text-[11px] text-slate-500 mt-0.5">
+                                            <span x-text="eligibleMeta.total"></span> eligible at {{ $batch->originWarehouse?->name ?? 'warehouse' }}
+                                        </p>
+                                    </div>
+                                </div>
+                                @if($batch->status !== \App\Models\SortBatch::STATUS_OPEN)
+                                <span class="px-2.5 py-1 rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">Read-only</span>
+                                @endif
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="relative flex-1">
+                                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                    </svg>
+                                    <input type="text" x-model="eligibleSearch" @@input="onEligibleSearch()" placeholder="Search tracking, shipment, recipient, phone, town"
+                                           class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300">
+                                </div>
+                                @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                                <button type="button" @@click="addSelectedItems()"
+                                        :disabled="selectedEligibleIds.length === 0 || eligibleLoading"
+                                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                    Add <span x-text="selectedEligibleIds.length || ''"></span>
+                                </button>
+                                @endif
+                            </div>
+                            <div x-show="selectedEligibleIds.length > 0" class="mt-2 flex items-center gap-2">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200">
+                                    <span x-text="selectedEligibleIds.length + ' selected'"></span>
+                                    <button type="button" @@click="selectedEligibleIds = []" class="hover:text-emerald-900">
+                                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    </button>
+                                </span>
+                            </div>
+                        </div>
 
-                    <!-- Empty state -->
-                    <div x-show="!itemsLoading && itemsLoaded && items.length === 0" class="flex flex-col items-center justify-center py-16 text-slate-400">
-                        <svg class="w-10 h-10 mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                        </svg>
-                        <p class="text-sm font-medium" x-text="itemsSearch ? 'No items match your search' : 'No items in this batch'"></p>
-                        <p class="text-xs text-slate-400 mt-1" x-show="!itemsSearch">Items will appear here once they are added during sorting.</p>
-                    </div>
+                        <div x-show="eligibleLoading" class="flex items-center justify-center py-16">
+                            <svg class="w-6 h-6 text-emerald-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                            </svg>
+                        </div>
 
-                    <!-- Table -->
-                    <div x-show="!itemsLoading && items.length > 0" class="overflow-x-auto">
-                        <table class="w-full min-w-[800px] text-xs">
-                            <thead class="bg-slate-50/70 border-b border-slate-200/50">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider w-12">#</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Shipment</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Tracking Code</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                                    <th class="px-4 py-3 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Qty</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Recipient</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Destination</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Added By</th>
-                                    @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
-                                    <th class="px-4 py-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider w-12"></th>
-                                    @endif
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100/70">
-                                <template x-for="item in items" :key="item.id">
-                                    <tr class="hover:bg-slate-50/70 group">
-                                        <td class="px-4 py-2.5 whitespace-nowrap text-slate-400 font-medium" x-text="item.row_number"></td>
-                                        <td class="px-4 py-2.5 whitespace-nowrap">
-                                            <template x-if="item.shipment_id">
-                                                <div>
-                                                    <a :href="shipmentUrl(item.shipment_id)" class="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline" x-text="item.shipment_number"></a>
-                                                    <span x-show="item.vendor_name" class="block text-[10px] text-slate-400 mt-0.5" x-text="item.vendor_name"></span>
-                                                </div>
-                                            </template>
-                                            <template x-if="!item.shipment_id">
-                                                <span class="text-slate-400">—</span>
-                                            </template>
-                                        </td>
-                                        <td class="px-4 py-2.5 whitespace-nowrap">
-                                            <template x-if="item.tracking_code">
-                                                <span class="font-mono text-[11px] text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded" x-text="item.tracking_code"></span>
-                                            </template>
-                                            <template x-if="!item.tracking_code">
-                                                <span class="text-slate-400">—</span>
-                                            </template>
-                                        </td>
-                                        <td class="px-4 py-2.5 text-slate-700 max-w-[200px] truncate" x-text="item.description || '—'"></td>
-                                        <td class="px-4 py-2.5 whitespace-nowrap text-center">
-                                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-[10px] font-semibold text-slate-700" x-text="item.quantity || '—'"></span>
-                                        </td>
-                                        <td class="px-4 py-2.5 whitespace-nowrap">
-                                            <div class="text-xs font-medium text-slate-900" x-text="item.delivery_recipient_name || '—'"></div>
-                                            <div x-show="item.delivery_recipient_phone" class="text-[10px] text-slate-500" x-text="item.delivery_recipient_phone"></div>
-                                        </td>
-                                        <td class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="item.delivery_town || '—'"></td>
-                                        <td class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="item.added_by || '—'"></td>
+                        <div x-show="!eligibleLoading && eligibleItems.length === 0" class="px-4 py-16 text-center">
+                            <p class="text-sm font-medium text-slate-500" x-text="eligibleSearch ? 'No warehouse packages match your search' : 'No eligible warehouse packages'"></p>
+                            <p class="text-xs text-slate-400 mt-1">Packages already in an active sort batch are hidden here.</p>
+                        </div>
+
+                        <div x-show="!eligibleLoading && eligibleItems.length > 0" class="divide-y divide-slate-100 max-h-[640px] overflow-y-auto">
+                            <template x-for="item in eligibleItems" :key="item.warehouse_receipt_item_id">
+                                <div class="px-4 py-3 hover:bg-emerald-50/40 transition-colors"
+                                     :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'bg-emerald-50/70' : ''">
+                                    <div class="flex items-start gap-3">
                                         @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
-                                        <td class="px-4 py-2.5 whitespace-nowrap text-center">
-                                            <button type="button" @@click="removeItem(item)"
-                                                    :disabled="actionLoading"
-                                                    class="w-6 h-6 rounded-lg flex items-center justify-center text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-30">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-                                            </button>
-                                        </td>
+                                        <button type="button" @@click="toggleEligible(item.warehouse_receipt_item_id)"
+                                                class="mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0"
+                                                :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'bg-emerald-600 border-emerald-600' : 'border-slate-300 hover:border-emerald-400'">
+                                            <svg x-show="selectedEligibleIds.includes(item.warehouse_receipt_item_id)" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                        </button>
                                         @endif
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Pagination -->
-                    <div x-show="!itemsLoading && itemsMeta.last_page > 1" class="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
-                        <p class="text-[11px] text-slate-500">
-                            Showing <span class="font-semibold text-slate-700" x-text="itemsMeta.from"></span>
-                            to <span class="font-semibold text-slate-700" x-text="itemsMeta.to"></span>
-                            of <span class="font-semibold text-slate-700" x-text="itemsMeta.total"></span> items
-                        </p>
-                        <div class="flex items-center gap-1">
-                            <button @@click="goItemsPage(itemsMeta.current_page - 1)" :disabled="itemsMeta.current_page <= 1"
-                                    class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                Prev
-                            </button>
-                            <template x-for="p in itemsMeta.last_page" :key="p">
-                                <template x-if="itemsMeta.last_page <= 7 || p === 1 || p === itemsMeta.last_page || Math.abs(p - itemsMeta.current_page) <= 1">
-                                    <button @@click="goItemsPage(p)"
-                                            :class="p === itemsMeta.current_page ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50'"
-                                            class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border transition-colors min-w-[32px]"
-                                            x-text="p"></button>
-                                </template>
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <span class="text-xs font-bold text-slate-900" x-text="item.shipment_number || 'No shipment #'"></span>
+                                                <span x-show="item.tracking_code" class="font-mono text-[11px] text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded" x-text="item.tracking_code"></span>
+                                                <span class="inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full bg-slate-100 text-[10px] font-semibold text-slate-700" x-text="'Qty ' + item.received_quantity"></span>
+                                            </div>
+                                            <p class="text-xs text-slate-700 mt-1 truncate" x-text="item.item_description || '—'"></p>
+                                            <div class="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-slate-500">
+                                                <span class="truncate" x-text="item.vendor_name || 'No vendor'"></span>
+                                                <span class="truncate" x-text="item.destination?.recipient_name || 'No recipient'"></span>
+                                                <span class="truncate" x-text="item.destination?.recipient_phone || 'No phone'"></span>
+                                                <span class="truncate" x-text="item.destination?.town || 'No town'"></span>
+                                            </div>
+                                        </div>
+                                        @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                                        <button type="button" @@click="addOneItem(item)"
+                                                :disabled="eligibleLoading"
+                                                class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-[11px] font-bold text-white disabled:opacity-40 flex-shrink-0">
+                                            Add
+                                        </button>
+                                        @endif
+                                    </div>
+                                </div>
                             </template>
-                            <button @@click="goItemsPage(itemsMeta.current_page + 1)" :disabled="itemsMeta.current_page >= itemsMeta.last_page"
-                                    class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                Next
-                            </button>
+                        </div>
+
+                        <div x-show="!eligibleLoading && eligibleMeta.last_page > 1" class="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
+                            <p class="text-[11px] text-slate-500">
+                                Showing <span class="font-semibold text-slate-700" x-text="eligibleMeta.from"></span>
+                                to <span class="font-semibold text-slate-700" x-text="eligibleMeta.to"></span>
+                                of <span class="font-semibold text-slate-700" x-text="eligibleMeta.total"></span>
+                            </p>
+                            <div class="flex items-center gap-1">
+                                <button @@click="goEligiblePage(eligibleMeta.current_page - 1)" :disabled="eligibleMeta.current_page <= 1" class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">Prev</button>
+                                <button @@click="goEligiblePage(eligibleMeta.current_page + 1)" :disabled="eligibleMeta.current_page >= eligibleMeta.last_page" class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">Next</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -748,145 +800,19 @@
 
 </div>
 
-{{-- ════════════════════════════════════════════════════════════════════════ --}}
-{{-- MODAL: Add Items                                                          --}}
-{{-- ════════════════════════════════════════════════════════════════════════ --}}
-<div x-show="addItemsModalOpen"
-     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-     x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-     @@keydown.escape.window="addItemsModalOpen = false"
-     class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
-    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="addItemsModalOpen = false"></div>
-    <div x-show="addItemsModalOpen"
-         x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95 translate-y-2" x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-         x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100 translate-y-0" x-transition:leave-end="opacity-0 scale-95 translate-y-2"
-         class="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl shadow-slate-900/30 overflow-hidden flex flex-col max-h-[90vh]">
-
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex items-center justify-between flex-shrink-0">
-            <div class="flex items-center gap-3 min-w-0">
-                <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                </div>
-                <div class="min-w-0">
-                    <h3 class="text-base font-bold text-white">Add Items to Batch</h3>
-                    <p class="text-blue-200 text-xs mt-0.5">Select eligible items to sort into this batch</p>
-                </div>
-            </div>
-            <button type="button" @@click="addItemsModalOpen = false" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white flex-shrink-0">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
-
-        <!-- Loading overlay -->
-        <div x-show="addItemsModalLoading" x-cloak x-transition.opacity.duration.100ms
-             class="absolute inset-0 bg-white/70 backdrop-blur-[2px] z-20 flex items-center justify-center">
-            <svg class="w-6 h-6 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-            </svg>
-        </div>
-
-        <!-- Search bar -->
-        <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex-shrink-0">
-            <div class="flex items-center justify-between gap-3">
-                <div class="relative flex-1 max-w-sm">
-                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    <input type="text" x-model.debounce.400ms="eligibleSearch" @@input="loadEligibleItems()"
-                           placeholder="Search shipment, tracking, recipient…"
-                           class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-300 transition-colors">
-                </div>
-                <span x-show="selectedEligibleIds.length > 0"
-                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 ring-1 ring-blue-200">
-                    <span x-text="selectedEligibleIds.length + ' selected'"></span>
-                    <button type="button" @@click="selectedEligibleIds = []" class="hover:text-blue-900">
-                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
-                </span>
-            </div>
-        </div>
-
-        <!-- Items table -->
-        <div class="flex-1 overflow-y-auto">
-            <table class="min-w-full divide-y divide-slate-100 text-xs">
-                <thead class="bg-slate-50/80 sticky top-0 z-10">
-                    <tr>
-                        <th class="px-3 py-2 w-10"><span class="sr-only">Select</span></th>
-                        <th class="px-3 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">Shipment / Item</th>
-                        <th class="px-3 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">Destination</th>
-                        <th class="px-3 py-2 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500">Qty</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-50">
-                    <template x-for="item in eligibleItems" :key="item.warehouse_receipt_item_id">
-                        <tr class="group hover:bg-blue-50/40 transition-colors cursor-pointer"
-                            :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'bg-blue-50/60' : ''"
-                            @@click="selectedEligibleIds.includes(item.warehouse_receipt_item_id)
-                                ? selectedEligibleIds = selectedEligibleIds.filter(id => id !== item.warehouse_receipt_item_id)
-                                : selectedEligibleIds.push(item.warehouse_receipt_item_id)">
-                            <td class="px-3 py-2.5">
-                                <div class="w-4 h-4 rounded border-2 flex items-center justify-center transition-all"
-                                     :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'bg-blue-600 border-blue-600' : 'border-slate-300 group-hover:border-blue-400'">
-                                    <svg x-show="selectedEligibleIds.includes(item.warehouse_receipt_item_id)" class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
-                                    </svg>
-                                </div>
-                            </td>
-                            <td class="px-3 py-2.5">
-                                <p class="font-bold text-slate-900" x-text="item.shipment_number"></p>
-                                <p class="text-slate-500 mt-0.5" x-text="item.item_description"></p>
-                                <span class="text-[10px] text-slate-400 font-mono" x-text="item.tracking_code || '—'"></span>
-                            </td>
-                            <td class="px-3 py-2.5">
-                                <p class="font-medium text-slate-700 truncate" x-text="item.destination?.recipient_name || '—'"></p>
-                                <p class="text-[10px] text-slate-400 truncate" x-text="item.destination?.town || ''"></p>
-                            </td>
-                            <td class="px-3 py-2.5 text-center">
-                                <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 font-bold text-slate-700" x-text="item.received_quantity"></span>
-                            </td>
-                        </tr>
-                    </template>
-                    <tr x-show="!addItemsModalLoading && eligibleItems.length === 0">
-                        <td colspan="4" class="px-4 py-10 text-center">
-                            <p class="text-xs font-medium text-slate-400">No eligible items available</p>
-                            <p class="text-[10px] text-slate-300 mt-0.5">All warehouse receipt items may already be sorted</p>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Footer -->
-        <div class="px-5 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between flex-shrink-0">
-            <p class="text-[10px] text-slate-400">
-                <span x-text="eligibleItems.length + ' item(s) available'"></span>
-            </p>
-            <div class="flex items-center gap-2">
-                <button type="button" @@click="addItemsModalOpen = false" class="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
-                <button type="button"
-                        @@click="addSelectedItems()"
-                        :disabled="selectedEligibleIds.length === 0 || addItemsModalLoading"
-                        class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    Add <span x-text="selectedEligibleIds.length > 0 ? selectedEligibleIds.length + ' Item(s)' : 'Selected'"></span>
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
 @endsection
 
 @push('scripts')
 <script>
 function sortBatchShow() {
     return {
-        activeTab: 'overview',
+        activeTab: 'items',
 
         // Action state
         actionLoading: false,
         actionMessage: '',
         actionSuccess: true,
+        batchItemsCount: {{ (int) $batch->active_items_count }},
 
         // Items tab state
         items: [],
@@ -895,6 +821,7 @@ function sortBatchShow() {
         itemsLoading: false,
         itemsLoaded: false,
         _searchTimeout: null,
+        _eligibleSearchTimeout: null,
         _itemsDataUrl: @json(route('admin.sort-batches.items-data', $batch->id)),
         _eligibleItemsUrl: @json(route('admin.sort-batches.eligible-items', $batch->id)),
         _addItemsUrl: @json(route('admin.sort-batches.add-items', $batch->id)),
@@ -905,16 +832,21 @@ function sortBatchShow() {
         _shipmentShowUrl: @json(route('admin.shipments.show', '__ID__')),
         _deliveryRunShowUrl: @json(route('admin.delivery-runs.show', '__ID__')),
 
-        // Add Items modal state
-        addItemsModalOpen: false,
-        addItemsModalLoading: false,
+        // Warehouse package state
         eligibleItems: [],
+        eligibleMeta: { total: 0, per_page: 20, current_page: 1, last_page: 1, from: 0, to: 0 },
         eligibleSearch: '',
+        eligibleLoading: false,
         selectedEligibleIds: [],
 
         init() {
+            this.fetchItems(1);
+            this.loadEligibleItems(1);
             this.$watch('activeTab', (val) => {
-                if (val === 'items' && !this.itemsLoaded) this.fetchItems(1);
+                if (val === 'items') {
+                    if (!this.itemsLoaded) this.fetchItems(1);
+                    if (!this.eligibleItems.length && !this.eligibleLoading) this.loadEligibleItems(1);
+                }
             });
         },
 
@@ -928,11 +860,12 @@ function sortBatchShow() {
             });
             if (this.itemsSearch) params.set('search', this.itemsSearch);
 
-            fetch(this._itemsDataUrl + '?' + params.toString())
+            return fetch(this._itemsDataUrl + '?' + params.toString())
                 .then(r => r.json())
                 .then(json => {
                     this.items = json.data;
                     this.itemsMeta = json.meta;
+                    this.batchItemsCount = json.meta?.total ?? this.batchItemsCount;
                     this.itemsLoading = false;
                     this.itemsLoaded = true;
                 })
@@ -953,32 +886,63 @@ function sortBatchShow() {
             return this._shipmentShowUrl.replace('__ID__', id);
         },
 
-        // ─── Add Items Modal ──────────────────────────────────────────────────
+        // ─── Warehouse Packages ───────────────────────────────────────────────
 
-        openAddItemsModal() {
-            this.eligibleSearch = '';
-            this.selectedEligibleIds = [];
-            this.eligibleItems = [];
-            this.addItemsModalOpen = true;
-            this.loadEligibleItems();
+        goSortingWorkspace() {
+            this.activeTab = 'items';
+            this.$nextTick(() => {
+                const input = document.querySelector('input[x-model="eligibleSearch"]');
+                input?.focus();
+            });
         },
 
-        loadEligibleItems() {
-            this.addItemsModalLoading = true;
-            const params = new URLSearchParams({ per_page: 100 });
+        loadEligibleItems(page) {
+            this.eligibleLoading = true;
+            const params = new URLSearchParams({
+                page: page || this.eligibleMeta.current_page,
+                per_page: this.eligibleMeta.per_page,
+            });
             if (this.eligibleSearch) params.set('search', this.eligibleSearch);
-            fetch(this._eligibleItemsUrl + '?' + params.toString())
+            return fetch(this._eligibleItemsUrl + '?' + params.toString())
                 .then(r => r.json())
                 .then(json => {
                     this.eligibleItems = json.data || [];
-                    this.addItemsModalLoading = false;
+                    this.eligibleMeta = json.meta || this.eligibleMeta;
+                    this.selectedEligibleIds = this.selectedEligibleIds.filter((id) =>
+                        this.eligibleItems.some((item) => item.warehouse_receipt_item_id === id)
+                    );
+                    this.eligibleLoading = false;
                 })
-                .catch(() => { this.addItemsModalLoading = false; });
+                .catch(() => { this.eligibleLoading = false; });
+        },
+
+        onEligibleSearch() {
+            clearTimeout(this._eligibleSearchTimeout);
+            this._eligibleSearchTimeout = setTimeout(() => this.loadEligibleItems(1), 300);
+        },
+
+        goEligiblePage(p) {
+            if (p < 1 || p > this.eligibleMeta.last_page) return;
+            this.loadEligibleItems(p);
+        },
+
+        toggleEligible(id) {
+            if (this.selectedEligibleIds.includes(id)) {
+                this.selectedEligibleIds = this.selectedEligibleIds.filter((selectedId) => selectedId !== id);
+                return;
+            }
+
+            this.selectedEligibleIds.push(id);
+        },
+
+        addOneItem(item) {
+            this.selectedEligibleIds = [item.warehouse_receipt_item_id];
+            return this.addSelectedItems();
         },
 
         async addSelectedItems() {
             if (!this.selectedEligibleIds.length) return;
-            this.addItemsModalLoading = true;
+            this.eligibleLoading = true;
             try {
                 const resp = await fetch(this._addItemsUrl, {
                     method: 'POST',
@@ -991,23 +955,24 @@ function sortBatchShow() {
                 });
                 const json = await resp.json();
                 if (json.success) {
-                    this.addItemsModalOpen = false;
                     this.selectedEligibleIds = [];
                     this.showAction(true, json.message || 'Items added successfully.');
-                    // Reload the items tab
-                    this.itemsLoaded = false;
-                    if (this.activeTab === 'items') this.fetchItems(1);
-                    else { this.activeTab = 'items'; }
-                    // Reload the page after a short delay so counts/status update
-                    setTimeout(() => window.location.reload(), 1200);
+                    await this.refreshSortingLists();
                 } else {
                     this.showAction(false, json.message || 'Failed to add items.');
-                    this.addItemsModalLoading = false;
+                    this.eligibleLoading = false;
                 }
             } catch (e) {
                 this.showAction(false, 'An unexpected error occurred.');
-                this.addItemsModalLoading = false;
+                this.eligibleLoading = false;
             }
+        },
+
+        async refreshSortingLists() {
+            await Promise.all([
+                this.fetchItems(1),
+                this.loadEligibleItems(this.eligibleMeta.current_page),
+            ]);
         },
 
         // ─── Remove Item ──────────────────────────────────────────────────────
@@ -1027,7 +992,7 @@ function sortBatchShow() {
                 const json = await resp.json();
                 this.showAction(json.success, json.message || (json.success ? 'Item removed.' : 'Failed to remove item.'));
                 if (json.success) {
-                    setTimeout(() => window.location.reload(), 800);
+                    await this.refreshSortingLists();
                 }
             } catch (e) {
                 this.showAction(false, 'An unexpected error occurred.');

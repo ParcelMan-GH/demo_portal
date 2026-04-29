@@ -42,6 +42,13 @@ class AdminSortBatchController extends Controller
         return view('admin.sort-batches.index', compact('warehouses', 'dispatchModes', 'statuses'));
     }
 
+    public function create(): View
+    {
+        $warehouses = Warehouse::orderBy('name')->get(['id', 'name', 'code']);
+
+        return view('admin.sort-batches.create', compact('warehouses'));
+    }
+
     public function data(Request $request): JsonResponse
     {
         $query = SortBatch::with([
@@ -268,11 +275,17 @@ class AdminSortBatchController extends Controller
 
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function (Builder $builder) use ($search) {
-                $builder->whereHas('shipmentItem.shipment', fn (Builder $q) => $q->where('shipment_number', 'like', "%{$search}%"))
+                $builder->whereHas('shipmentItem.shipment', fn (Builder $q) => $q
+                    ->where('shipment_number', 'like', "%{$search}%")
+                    ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                    ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
+                    ->orWhere('delivery_town', 'like', "%{$search}%")
+                    ->orWhereHas('vendor', fn (Builder $vq) => $vq->where('name', 'like', "%{$search}%")))
                     ->orWhereHas('shipmentItem', fn (Builder $q) => $q
                         ->where('description', 'like', "%{$search}%")
                         ->orWhere('tracking_code', 'like', "%{$search}%")
                         ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                        ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                         ->orWhere('delivery_town', 'like', "%{$search}%")
                     );
             });
