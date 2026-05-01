@@ -51,8 +51,8 @@ class DriverDeliveryController extends Controller
             'verification_code' => [$skipVerification ? 'nullable' : 'required', 'digits:4'],
             'skip_verification' => ['nullable', 'in:true,false,1,0'],
             'skip_reason' => [$skipVerification ? 'required' : 'nullable', 'string', 'max:500'],
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'proof_photo' => ['required', 'file', 'image', 'max:12288'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.shipment_item_id' => ['required', 'integer', 'exists:shipment_items,id'],
@@ -66,8 +66,8 @@ class DriverDeliveryController extends Controller
             stop: $stop,
             driver: $driver,
             verificationCode: $validated['verification_code'] ?? null,
-            latitude: (float) $validated['latitude'],
-            longitude: (float) $validated['longitude'],
+            latitude: isset($validated['latitude']) ? (float) $validated['latitude'] : null,
+            longitude: isset($validated['longitude']) ? (float) $validated['longitude'] : null,
             proofPhoto: $request->file('proof_photo'),
             linePayloads: $validated['items'],
             ipAddress: (string) $request->ip(),
@@ -89,8 +89,8 @@ class DriverDeliveryController extends Controller
             'skip_verification' => ['nullable', 'in:true,false,1,0'],
             'skip_reason' => [$skipVerification ? 'required' : 'nullable', 'string', 'max:500'],
             'packages_delivered' => ['required', 'integer', 'min:0'],
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'proof_photo' => ['required', 'file', 'image', 'max:12288'],
             'delivery_notes' => ['nullable', 'string', 'max:1000'],
             // Optional: the delivery fee the driver collected from the recipient
@@ -106,8 +106,8 @@ class DriverDeliveryController extends Controller
             driver: $driver,
             verificationCode: $validated['verification_code'] ?? null,
             packagesDelivered: (int) $validated['packages_delivered'],
-            latitude: (float) $validated['latitude'],
-            longitude: (float) $validated['longitude'],
+            latitude: isset($validated['latitude']) ? (float) $validated['latitude'] : null,
+            longitude: isset($validated['longitude']) ? (float) $validated['longitude'] : null,
             proofPhoto: $request->file('proof_photo'),
             ipAddress: (string) $request->ip(),
             skipVerification: $skipVerification,
@@ -180,4 +180,3 @@ class DriverDeliveryController extends Controller
         return response()->json($result, ($result['success'] ?? false) ? 200 : $errorCode);
     }
 }
-

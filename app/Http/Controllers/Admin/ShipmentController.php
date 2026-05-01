@@ -1868,11 +1868,20 @@ class ShipmentController extends Controller
     protected function reloadReceivingShipment(Shipment $shipment): Shipment
     {
         $relations = [
+            'vendor',
+            'pickupRegion',
+            'pickupDistrict',
             'items.images',
             'items.deliveryRegion',
             'items.deliveryDistrict',
+            'items.tracking',
+            'items.charges',
+            'charges',
+            'currentInvoice',
             'deliveryRegion',
             'deliveryDistrict',
+            'pickupAssignment.driver',
+            'pickupAssignment.targetWarehouse',
             'pickupAssignment.itemConfirmations',
             'pickupAssignment.photos',
             'pickupAssignment.warehouseReceipt.items.photos',
@@ -1880,6 +1889,24 @@ class ShipmentController extends Controller
 
         if ($this->receivingCustodyTablesAvailable()) {
             $relations[] = 'pickupAssignment.warehouseReceipt.items.labels.latestCustody.driver:id,name,phone';
+        }
+
+        if ($this->receivingMovementTablesAvailable()) {
+            $relations[] = 'items.sortBatchItems.sortBatch.originWarehouse';
+            $relations[] = 'items.sortBatchItems.sortBatch.destinationWarehouse';
+            $relations[] = 'items.sortBatchItems.sortBatch.transportManifest.assignedDriver';
+            $relations[] = 'items.sortBatchItems.sortBatch.transportManifest.originWarehouse';
+            $relations[] = 'items.sortBatchItems.sortBatch.transportManifest.destinationWarehouse';
+            $relations[] = 'items.transportManifestItems.manifest.assignedDriver';
+            $relations[] = 'items.transportManifestItems.manifest.originWarehouse';
+            $relations[] = 'items.transportManifestItems.manifest.destinationWarehouse';
+        }
+
+        if ($this->receivingDeliveryTablesAvailable()) {
+            $relations[] = 'items.deliveryRunItems.run.assignedDriver';
+            $relations[] = 'items.deliveryRunItems.run.warehouse';
+            $relations[] = 'items.deliveryRunItems.stop.region';
+            $relations[] = 'items.deliveryRunItems.stop.district';
         }
 
         return $shipment->load($relations);
@@ -1912,6 +1939,21 @@ class ShipmentController extends Controller
     {
         return Schema::hasTable('warehouse_receipt_item_labels')
             && Schema::hasTable('label_custody_events');
+    }
+
+    protected function receivingMovementTablesAvailable(): bool
+    {
+        return Schema::hasTable('sort_batch_items')
+            && Schema::hasTable('sort_batches')
+            && Schema::hasTable('transport_manifest_items')
+            && Schema::hasTable('transport_manifests');
+    }
+
+    protected function receivingDeliveryTablesAvailable(): bool
+    {
+        return Schema::hasTable('delivery_run_items')
+            && Schema::hasTable('delivery_run_stops')
+            && Schema::hasTable('delivery_runs');
     }
 
     protected function isPickupCompleteForReceiving(Shipment $shipment, ?\App\Models\PickupAssignment $assignment): bool
@@ -2242,17 +2284,46 @@ class ShipmentController extends Controller
         $storageService = app(StorageService::class);
 
         $shipment->loadMissing([
+            'vendor',
+            'pickupRegion',
+            'pickupDistrict',
+            'charges',
+            'currentInvoice',
             'deliveryRegion',
             'deliveryDistrict',
             'items.images',
             'items.deliveryRegion',
             'items.deliveryDistrict',
+            'items.tracking',
+            'items.charges',
+            'pickupAssignment.driver',
+            'pickupAssignment.targetWarehouse',
             'pickupAssignment.itemConfirmations',
             'pickupAssignment.photos',
             'pickupAssignment.warehouseReceipt.items.photos',
         ]);
 
-        $item->loadMissing(['images', 'deliveryRegion', 'deliveryDistrict']);
+        $itemRelations = ['images', 'deliveryRegion', 'deliveryDistrict', 'tracking', 'charges'];
+
+        if ($this->receivingMovementTablesAvailable()) {
+            $itemRelations[] = 'sortBatchItems.sortBatch.originWarehouse';
+            $itemRelations[] = 'sortBatchItems.sortBatch.destinationWarehouse';
+            $itemRelations[] = 'sortBatchItems.sortBatch.transportManifest.assignedDriver';
+            $itemRelations[] = 'sortBatchItems.sortBatch.transportManifest.originWarehouse';
+            $itemRelations[] = 'sortBatchItems.sortBatch.transportManifest.destinationWarehouse';
+            $itemRelations[] = 'transportManifestItems.manifest.assignedDriver';
+            $itemRelations[] = 'transportManifestItems.manifest.originWarehouse';
+            $itemRelations[] = 'transportManifestItems.manifest.destinationWarehouse';
+        }
+
+        if ($this->receivingDeliveryTablesAvailable()) {
+            $itemRelations[] = 'deliveryRunItems.run.assignedDriver';
+            $itemRelations[] = 'deliveryRunItems.run.warehouse';
+            $itemRelations[] = 'deliveryRunItems.stop.region';
+            $itemRelations[] = 'deliveryRunItems.stop.district';
+        }
+
+        $item->loadMissing($itemRelations);
 
         $assignment ??= $shipment->pickupAssignment;
         $receiptItem ??= $this->findReceiptItemForShipmentItem($assignment, $item);
@@ -2283,6 +2354,7 @@ class ShipmentController extends Controller
             'shipment_item_id' => $item->id,
             'description' => $item->description,
             'tracking_code' => $item->tracking_code,
+            'item_status' => $item->status?->value ?? $item->getRawOriginal('status'),
             'vendor_quantity' => (int) $item->quantity,
             'driver_confirmed_quantity' => $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : null,
             'expected_quantity' => $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : (int) $item->quantity,
@@ -2307,6 +2379,7 @@ class ShipmentController extends Controller
             'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
             'delivery_fee' => $this->serializeReceivingPackageDeliveryFee($shipment, $item),
             'custody' => $this->serializeReceivingPackageCustody($receiptItem),
+            'details' => $this->serializeReceivingPackageDetails($shipment, $item, $assignment, $receiptItem, $driverConfirmation),
             'photos' => $receiptItem
                 ? $receivingService->serializeReceiptItem($receiptItem)['photos']
                 : [],
@@ -2314,6 +2387,120 @@ class ShipmentController extends Controller
             'split_lock_reason' => $this->receivingSplitLockReason($assignment, $receiptItem, $shipment),
             'can_delete' => $this->canRemovePackageDuringReceiving($assignment, $receiptItem, $item, $shipment),
             'delete_lock_reason' => $this->receivingRemoveLockReason($assignment, $receiptItem, $item, $shipment),
+        ];
+    }
+
+    protected function serializeReceivingPackageDetails(
+        Shipment $shipment,
+        ShipmentItem $item,
+        ?\App\Models\PickupAssignment $assignment,
+        ?WarehouseReceiptItem $receiptItem,
+        ?PickupItemConfirmation $driverConfirmation,
+    ): array {
+        $storageService = app(StorageService::class);
+        $deliveryRunItem = $this->receivingDeliveryTablesAvailable()
+            ? $item->deliveryRunItems?->sortByDesc(fn ($candidate) => $candidate->updated_at?->getTimestamp() ?? $candidate->id)->first()
+            : null;
+        $deliveryStop = $deliveryRunItem?->stop;
+        $deliveryRun = $deliveryRunItem?->run;
+        $manifestItem = $this->receivingMovementTablesAvailable()
+            ? $item->transportManifestItems?->sortByDesc(fn ($candidate) => $candidate->updated_at?->getTimestamp() ?? $candidate->id)->first()
+            : null;
+        $manifest = $manifestItem?->manifest;
+        $sortBatchItem = $this->receivingMovementTablesAvailable()
+            ? $item->sortBatchItems?->whereNull('removed_at')->sortByDesc(fn ($candidate) => $candidate->added_at?->getTimestamp() ?? $candidate->id)->first()
+            : null;
+        $sortBatch = $sortBatchItem?->sortBatch;
+
+        return [
+            'shipment' => [
+                'number' => $shipment->shipment_number,
+                'status' => $shipment->status?->value ?? $shipment->getRawOriginal('status'),
+                'submitted_at' => $shipment->submitted_at?->toIso8601String(),
+                'created_at' => $shipment->created_at?->toIso8601String(),
+                'vendor_name' => $shipment->vendor?->business_name ?: $shipment->vendor?->name,
+                'vendor_phone' => $shipment->vendor?->phone,
+            ],
+            'quantities' => [
+                'vendor_submitted' => (int) $item->quantity,
+                'driver_confirmed' => $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : null,
+                'expected' => $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : (int) $item->quantity,
+                'received' => (int) ($receiptItem?->received_quantity ?? 0),
+                'damaged' => (int) ($receiptItem?->damaged_quantity ?? 0),
+                'remaining' => max(0, ($driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : (int) $item->quantity) - (int) ($receiptItem?->received_quantity ?? 0)),
+            ],
+            'pickup' => [
+                'contact_name' => $shipment->pickup_contact_name,
+                'contact_phone' => $shipment->pickup_contact_phone,
+                'region' => $shipment->pickupRegion?->name,
+                'district' => $shipment->pickupDistrict?->name,
+                'town' => $shipment->pickup_town,
+                'landmark' => $shipment->pickup_landmark,
+                'instructions' => $shipment->pickup_instructions,
+                'latitude' => $shipment->pickup_latitude,
+                'longitude' => $shipment->pickup_longitude,
+                'gh_post_address' => $shipment->pickup_gh_post_address,
+                'driver_name' => $assignment?->driver?->name,
+                'driver_phone' => $assignment?->driver?->phone,
+                'assigned_at' => $assignment?->assigned_at?->toIso8601String(),
+                'picked_up_at' => $assignment?->picked_up_at?->toIso8601String(),
+                'completed_at' => $assignment?->completed_at?->toIso8601String(),
+                'warehouse' => $assignment?->targetWarehouse?->name,
+                'captured_latitude' => $assignment?->pickup_latitude,
+                'captured_longitude' => $assignment?->pickup_longitude,
+            ],
+            'delivery' => [
+                'method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
+                'recipient_name' => $item->delivery_recipient_name ?: $shipment->delivery_recipient_name,
+                'recipient_phone' => $item->delivery_recipient_phone ?: $shipment->delivery_recipient_phone,
+                'region' => $item->deliveryRegion?->name ?: $shipment->deliveryRegion?->name,
+                'district' => $item->deliveryDistrict?->name ?: $shipment->deliveryDistrict?->name,
+                'town' => $item->delivery_town ?: $shipment->delivery_town,
+                'landmark' => $item->delivery_landmark ?: $shipment->delivery_landmark,
+                'instructions' => $item->delivery_instructions ?: $shipment->delivery_instructions,
+                'latitude' => $item->delivery_latitude ?: $shipment->delivery_latitude,
+                'longitude' => $item->delivery_longitude ?: $shipment->delivery_longitude,
+                'gh_post_address' => $item->delivery_gh_post_address ?: $shipment->delivery_gh_post_address,
+            ],
+            'delivery_proof' => [
+                'run_number' => $deliveryRun?->run_number,
+                'run_status' => $deliveryRun?->status,
+                'driver_name' => $deliveryRun?->assignedDriver?->name,
+                'driver_phone' => $deliveryRun?->assignedDriver?->phone,
+                'expected_quantity' => $deliveryRunItem?->expected_quantity,
+                'delivered_quantity' => $deliveryRunItem?->delivered_quantity,
+                'status' => $deliveryRunItem?->status ?: $deliveryStop?->status,
+                'delivered_at' => $deliveryRunItem?->delivered_at?->toIso8601String() ?: $deliveryStop?->delivered_at?->toIso8601String(),
+                'arrived_at' => $deliveryStop?->arrived_at?->toIso8601String(),
+                'latitude' => $deliveryStop?->delivery_latitude,
+                'longitude' => $deliveryStop?->delivery_longitude,
+                'proof_photo_url' => $deliveryStop?->proof_photo_path ? $storageService->getUrl($deliveryStop->proof_photo_path) : null,
+                'failure_reason' => $deliveryStop?->failure_reason,
+                'delivery_notes' => $deliveryStop?->delivery_notes,
+            ],
+            'bus_handoff' => [
+                'station_name' => $deliveryStop?->bus_station_name,
+                'courier_name' => $deliveryStop?->handoff_courier_name,
+                'courier_phone' => $deliveryStop?->handoff_courier_phone,
+                'vehicle_number' => $deliveryStop?->handoff_vehicle_number,
+                'handoff_at' => $deliveryStop?->handoff_at?->toIso8601String(),
+            ],
+            'movement' => [
+                'sort_batch_number' => $sortBatch?->batch_number,
+                'sort_batch_status' => $sortBatch?->status,
+                'sort_batch_added_at' => $sortBatchItem?->added_at?->toIso8601String(),
+                'origin_warehouse' => $sortBatch?->originWarehouse?->name,
+                'destination_warehouse' => $sortBatch?->destinationWarehouse?->name,
+                'manifest_number' => $manifest?->manifest_number,
+                'manifest_status' => $manifest?->status,
+                'manifest_driver_name' => $manifest?->assignedDriver?->name,
+                'manifest_driver_phone' => $manifest?->assignedDriver?->phone,
+                'manifest_dispatched_at' => $manifest?->dispatched_at?->toIso8601String(),
+                'manifest_arrived_at' => $manifest?->arrived_at?->toIso8601String(),
+            ],
+            'pickup_fee' => $this->serializeReceivingPickupFee($shipment),
+            'charges' => $this->serializeReceivingPackageCharges($shipment, $item),
+            'tracking_events' => $this->serializeReceivingPackageTrackingEvents($shipment, $item, $assignment, $receiptItem, $sortBatch, $manifest, $deliveryRun, $deliveryRunItem, $deliveryStop),
         ];
     }
 
@@ -2837,6 +3024,172 @@ class ShipmentController extends Controller
             ->where('payer_type', ShipmentCharge::PAYER_RECIPIENT)
             ->whereNotIn('status', [ShipmentCharge::STATUS_CANCELLED])
             ->get();
+    }
+
+    protected function serializeReceivingPickupFee(Shipment $shipment): array
+    {
+        $charges = ($shipment->relationLoaded('charges') ? $shipment->charges : $shipment->charges()->get())
+            ->where('charge_type', ShipmentCharge::TYPE_PICKUP_FEE)
+            ->whereNotIn('status', [ShipmentCharge::STATUS_CANCELLED]);
+        $latest = $charges->sortByDesc(fn (ShipmentCharge $charge) => $charge->updated_at?->getTimestamp() ?? 0)->first();
+        $paidAmount = (float) $charges->where('status', ShipmentCharge::STATUS_PAID)->sum('amount');
+        $outstandingAmount = (float) $charges
+            ->whereIn('status', [ShipmentCharge::STATUS_DRAFT, ShipmentCharge::STATUS_PENDING])
+            ->sum('amount');
+
+        return [
+            'amount' => round($outstandingAmount > 0 ? $outstandingAmount : $paidAmount, 2),
+            'currency' => $latest?->currency ?: 'GHS',
+            'paid_amount' => round($paidAmount, 2),
+            'outstanding_amount' => round($outstandingAmount, 2),
+            'status' => $outstandingAmount > 0 ? 'due' : ($paidAmount > 0 ? 'paid' : 'none'),
+            'paid_at' => $charges
+                ->where('status', ShipmentCharge::STATUS_PAID)
+                ->sortByDesc(fn (ShipmentCharge $charge) => $charge->paid_at?->getTimestamp() ?? 0)
+                ->first()?->paid_at?->toIso8601String(),
+        ];
+    }
+
+    protected function serializeReceivingPackageCharges(Shipment $shipment, ShipmentItem $item): array
+    {
+        $charges = ($shipment->relationLoaded('charges') ? $shipment->charges : $shipment->charges()->get())
+            ->filter(fn (ShipmentCharge $charge) => $charge->shipment_item_id === null || (int) $charge->shipment_item_id === (int) $item->id)
+            ->whereNotIn('status', [ShipmentCharge::STATUS_CANCELLED])
+            ->sortByDesc(fn (ShipmentCharge $charge) => $charge->updated_at?->getTimestamp() ?? 0)
+            ->values();
+
+        return $charges->map(fn (ShipmentCharge $charge) => [
+            'id' => $charge->id,
+            'type' => $charge->charge_type,
+            'payer' => $charge->payer_type,
+            'due_stage' => $charge->due_stage,
+            'amount' => round((float) $charge->amount, 2),
+            'currency' => $charge->currency ?: 'GHS',
+            'status' => $charge->status,
+            'paid_at' => $charge->paid_at?->toIso8601String(),
+            'payment_method' => $charge->payment_method,
+            'payment_reference' => $charge->payment_reference,
+            'notes' => $charge->notes,
+        ])->all();
+    }
+
+    protected function serializeReceivingPackageTrackingEvents(
+        Shipment $shipment,
+        ShipmentItem $item,
+        ?\App\Models\PickupAssignment $assignment,
+        ?WarehouseReceiptItem $receiptItem,
+        mixed $sortBatch,
+        mixed $manifest,
+        mixed $deliveryRun,
+        mixed $deliveryRunItem,
+        mixed $deliveryStop,
+    ): array {
+        $events = collect();
+
+        $events->push([
+            'label' => 'Submitted by vendor',
+            'status' => $shipment->status?->value ?? $shipment->getRawOriginal('status'),
+            'location' => $shipment->pickup_town ?: $shipment->pickup_gh_post_address,
+            'notes' => $shipment->vendor?->business_name ?: $shipment->vendor?->name,
+            'created_at' => ($shipment->submitted_at ?: $shipment->created_at)?->toIso8601String(),
+        ]);
+
+        if ($assignment?->assigned_at) {
+            $events->push([
+                'label' => 'Pickup driver assigned',
+                'status' => 'assigned',
+                'location' => $assignment->targetWarehouse?->name,
+                'notes' => trim(($assignment->driver?->name ?: '').' '.($assignment->driver?->phone ?: '')) ?: null,
+                'created_at' => $assignment->assigned_at?->toIso8601String(),
+            ]);
+        }
+
+        if ($assignment?->picked_up_at || $assignment?->completed_at) {
+            $events->push([
+                'label' => 'Picked up by driver',
+                'status' => 'picked_up',
+                'location' => $shipment->pickup_town ?: $shipment->pickup_gh_post_address,
+                'notes' => trim(($assignment->driver?->name ?: '').' '.($assignment->driver?->phone ?: '')) ?: null,
+                'created_at' => ($assignment->picked_up_at ?: $assignment->completed_at)?->toIso8601String(),
+            ]);
+        }
+
+        if ($receiptItem?->created_at) {
+            $events->push([
+                'label' => 'Received at warehouse',
+                'status' => 'received',
+                'location' => $assignment?->targetWarehouse?->name,
+                'notes' => $receiptItem->notes,
+                'created_at' => $receiptItem->created_at?->toIso8601String(),
+            ]);
+        }
+
+        if ($sortBatch?->sealed_at) {
+            $events->push([
+                'label' => 'Sorted into batch',
+                'status' => $sortBatch->status,
+                'location' => $sortBatch->destinationWarehouse?->name ?: $sortBatch->originWarehouse?->name,
+                'notes' => $sortBatch->batch_number,
+                'created_at' => $sortBatch->sealed_at?->toIso8601String(),
+            ]);
+        }
+
+        if ($manifest?->dispatched_at || $manifest?->assigned_at) {
+            $events->push([
+                'label' => 'Transport manifest dispatched',
+                'status' => $manifest->status,
+                'location' => $manifest->destinationWarehouse?->name ?: $manifest->originWarehouse?->name,
+                'notes' => $manifest->manifest_number,
+                'created_at' => ($manifest->dispatched_at ?: $manifest->assigned_at)?->toIso8601String(),
+            ]);
+        }
+
+        if ($deliveryRun?->dispatched_at || $deliveryRun?->assigned_at) {
+            $events->push([
+                'label' => 'Out for delivery',
+                'status' => $deliveryRun->status,
+                'location' => $deliveryRun->warehouse?->name,
+                'notes' => trim(($deliveryRun->assignedDriver?->name ?: '').' '.($deliveryRun->assignedDriver?->phone ?: '')) ?: null,
+                'created_at' => ($deliveryRun->dispatched_at ?: $deliveryRun->assigned_at)?->toIso8601String(),
+            ]);
+        }
+
+        if ($deliveryStop?->handoff_at) {
+            $events->push([
+                'label' => 'Handed to bus courier',
+                'status' => 'handed_off',
+                'location' => $deliveryStop->bus_station_name ?: $deliveryStop->town,
+                'notes' => trim(($deliveryStop->handoff_courier_name ?: '').' '.($deliveryStop->handoff_courier_phone ?: '').' '.($deliveryStop->handoff_vehicle_number ?: '')) ?: null,
+                'created_at' => $deliveryStop->handoff_at?->toIso8601String(),
+            ]);
+        }
+
+        if ($deliveryRunItem?->delivered_at || $deliveryStop?->delivered_at) {
+            $events->push([
+                'label' => 'Delivered',
+                'status' => 'delivered',
+                'location' => $deliveryStop?->town,
+                'notes' => $deliveryStop?->delivery_notes,
+                'created_at' => ($deliveryRunItem?->delivered_at ?: $deliveryStop?->delivered_at)?->toIso8601String(),
+            ]);
+        }
+
+        $item->tracking?->each(function (ShipmentItemTracking $tracking) use ($events) {
+            $events->push([
+                'label' => str_replace('_', ' ', ucfirst((string) $tracking->status)),
+                'status' => $tracking->status,
+                'location' => $tracking->location,
+                'notes' => $tracking->notes,
+                'created_at' => $tracking->created_at?->toIso8601String(),
+            ]);
+        });
+
+        return $events
+            ->filter(fn ($event) => ! empty($event['created_at']))
+            ->unique(fn ($event) => implode('|', [$event['label'], $event['status'], $event['created_at']]))
+            ->sortByDesc(fn ($event) => strtotime($event['created_at']) ?: 0)
+            ->values()
+            ->all();
     }
 
     protected function serializeReceivingPackageDeliveryFee(Shipment $shipment, ShipmentItem $item): array

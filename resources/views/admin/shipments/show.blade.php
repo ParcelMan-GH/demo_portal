@@ -2964,7 +2964,10 @@ $shipmentConfig = [
 	                                            <tr class="align-top hover:bg-slate-50/60">
 	                                                <td class="px-4 py-4">
 	                                                    <div class="min-w-0 space-y-1">
-	                                                        <p class="truncate text-[11px] font-bold text-slate-900" x-text="pkg.description || 'No description'"></p>
+	                                                        <button type="button"
+	                                                                @@click="openPackageDetailsModal(pkg)"
+	                                                                class="block max-w-xs truncate text-left text-[11px] font-black text-slate-900 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-orange-700 hover:decoration-orange-300"
+	                                                                x-text="pkg.description || 'No description'"></button>
 	                                                        <p x-show="pkg.tracking_code" class="mt-0.5 text-[10px] font-mono text-slate-400" x-text="pkg.tracking_code"></p>
 	                                                    </div>
 	                                                </td>
@@ -3317,6 +3320,182 @@ $shipmentConfig = [
 	                        </div>
 	                    </div>
 	                </div>
+
+	                {{-- Package Details Modal --}}
+		                <div x-show="packageDetailsModal.open" @@click="closePackageDetailsModal()" x-transition.opacity class="fixed inset-0 z-[188] flex justify-end bg-black/55 backdrop-blur-sm" style="display:none">
+		                    <template x-if="packageDetailsModal.pkg">
+		                        <div @@click.stop x-transition:enter="transition ease-out duration-200"
+		                             x-transition:enter-start="translate-x-full"
+		                             x-transition:enter-end="translate-x-0"
+		                             x-transition:leave="transition ease-in duration-150"
+		                             x-transition:leave-start="translate-x-0"
+		                             x-transition:leave-end="translate-x-full"
+		                             class="flex h-full w-full max-w-2xl flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl">
+		                            <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+		                                <div class="min-w-0">
+		                                    <h3 class="text-lg font-bold text-slate-900">Package Details</h3>
+		                                    <p class="mt-1 truncate text-sm text-slate-500" x-text="packageDetailsModal.packageLabel"></p>
+		                                    <p x-show="packageDetailsModal.pkg.tracking_code" class="mt-1 font-mono text-xs font-bold text-slate-400" x-text="packageDetailsModal.pkg.tracking_code"></p>
+		                                </div>
+		                                <button type="button" @@click="closePackageDetailsModal()" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700">
+		                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+		                                </button>
+		                            </div>
+
+		                            <div class="flex-1 space-y-5 overflow-y-auto bg-slate-50/70 p-6">
+		                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+		                                    <div class="rounded-2xl border border-slate-200 bg-white p-3">
+		                                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Expected</p>
+		                                        <p class="mt-1 text-lg font-black text-slate-900" x-text="packageDetailsModal.pkg.details?.quantities?.expected ?? receivingExpectedQuantity(packageDetailsModal.pkg)"></p>
+		                                    </div>
+		                                    <div class="rounded-2xl border border-slate-200 bg-white p-3">
+		                                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Received</p>
+		                                        <p class="mt-1 text-lg font-black text-emerald-700" x-text="packageDetailsModal.pkg.details?.quantities?.received ?? packageDetailsModal.pkg.received_quantity"></p>
+		                                    </div>
+		                                    <div class="rounded-2xl border border-slate-200 bg-white p-3">
+		                                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Remaining</p>
+		                                        <p class="mt-1 text-lg font-black text-amber-700" x-text="packageDetailsModal.pkg.details?.quantities?.remaining ?? receivingPendingQuantity(packageDetailsModal.pkg)"></p>
+		                                    </div>
+		                                    <div class="rounded-2xl border border-slate-200 bg-white p-3">
+		                                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Condition</p>
+		                                        <p class="mt-1 text-sm font-black" :class="receivingConditionTextClass(packageDetailsModal.pkg.condition_status)" x-text="receivingConditionLabel(packageDetailsModal.pkg.condition_status)"></p>
+		                                    </div>
+		                                </div>
+
+		                                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+		                                    <div class="grid gap-4 sm:grid-cols-2">
+		                                        <div>
+		                                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Vendor Submission</p>
+		                                            <p class="mt-1 text-sm font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.shipment?.vendor_name || 'Unknown vendor'"></p>
+		                                            <p class="mt-0.5 text-xs text-slate-500" x-text="packageDetailsModal.pkg.details?.shipment?.submitted_at ? formatDateTime(packageDetailsModal.pkg.details.shipment.submitted_at) : formatDateTime(packageDetailsModal.pkg.details?.shipment?.created_at)"></p>
+		                                        </div>
+		                                        <div>
+		                                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Status</p>
+		                                            <p class="mt-1 text-sm font-black text-slate-900" x-text="receivingPackageStatusLabel(packageDetailsModal.pkg)"></p>
+		                                            <p class="mt-0.5 text-xs text-slate-500" x-text="'Method: ' + packageDetailsMethodLabel(packageDetailsModal.pkg)"></p>
+		                                        </div>
+		                                    </div>
+		                                </div>
+
+		                                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+		                                    <h4 class="text-xs font-black uppercase tracking-wide text-slate-500">Recipient & Delivery</h4>
+		                                    <div class="mt-3 space-y-3">
+		                                        <div>
+		                                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Recipient</p>
+		                                            <p class="mt-0.5 text-sm font-bold text-slate-900">
+		                                                <span x-text="packageDetailsModal.pkg.delivery_recipient_name || packageDetailsModal.pkg.details?.delivery?.recipient_name || '-'"></span>
+		                                                <span x-show="packageDetailsModal.pkg.delivery_recipient_phone || packageDetailsModal.pkg.details?.delivery?.recipient_phone" class="text-slate-500" x-text="' · ' + (packageDetailsModal.pkg.delivery_recipient_phone || packageDetailsModal.pkg.details?.delivery?.recipient_phone)"></span>
+		                                            </p>
+		                                        </div>
+		                                        <div>
+		                                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Delivery Location</p>
+		                                            <p class="mt-0.5 text-sm font-semibold leading-relaxed text-slate-800" x-text="packageDetailsLocation(packageDetailsModal.pkg.details?.delivery || {})"></p>
+		                                        </div>
+		                                        <div class="grid gap-3 sm:grid-cols-2">
+		                                            <div>
+		                                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Delivery Fee</p>
+		                                                <p class="mt-0.5 text-sm font-bold" :class="receivingDeliveryFeeClass(packageDetailsModal.pkg)" x-text="receivingDeliveryFeeLabel(packageDetailsModal.pkg)"></p>
+		                                            </div>
+		                                            <div>
+		                                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Pickup Fee</p>
+		                                                <p class="mt-0.5 text-sm font-bold text-slate-900" x-text="packageDetailsPickupFee(packageDetailsModal.pkg)"></p>
+		                                            </div>
+		                                        </div>
+		                                    </div>
+		                                </div>
+
+		                                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+		                                    <h4 class="text-xs font-black uppercase tracking-wide text-slate-500">Pickup & Custody</h4>
+		                                    <div class="mt-3 space-y-3 text-sm">
+		                                        <p class="font-semibold text-slate-800" x-text="'Pickup driver: ' + (packageDetailsModal.pkg.details?.pickup?.driver_name || '-') + (packageDetailsModal.pkg.details?.pickup?.driver_phone ? ' · ' + packageDetailsModal.pkg.details.pickup.driver_phone : '')"></p>
+		                                        <p class="font-semibold text-slate-800" x-text="'Current custody: ' + packageCustodySummary(packageDetailsModal.pkg)"></p>
+		                                        <p class="text-slate-600" x-text="'Pickup location: ' + packageDetailsLocation(packageDetailsModal.pkg.details?.pickup || {})"></p>
+		                                        <p x-show="packageDetailsModal.pkg.details?.pickup?.picked_up_at || packageDetailsModal.pkg.details?.pickup?.completed_at" class="text-xs font-semibold text-slate-500" x-text="'Picked up: ' + formatDateTime(packageDetailsModal.pkg.details?.pickup?.picked_up_at || packageDetailsModal.pkg.details?.pickup?.completed_at)"></p>
+		                                    </div>
+		                                </div>
+
+		                                <div x-show="packageDetailsModal.pkg.delivery_method === 'bus_handoff' || packageDetailsModal.pkg.details?.bus_handoff?.station_name" class="rounded-2xl border border-violet-200 bg-white p-4" style="display:none">
+		                                    <h4 class="text-xs font-black uppercase tracking-wide text-violet-700">Bus Handoff</h4>
+		                                    <div class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+		                                        <p><span class="font-black text-slate-400">Station</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.bus_handoff?.station_name || '-'"></span></p>
+		                                        <p><span class="font-black text-slate-400">Courier</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.bus_handoff?.courier_name || '-'"></span></p>
+		                                        <p><span class="font-black text-slate-400">Phone</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.bus_handoff?.courier_phone || '-'"></span></p>
+		                                        <p><span class="font-black text-slate-400">Vehicle</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.bus_handoff?.vehicle_number || '-'"></span></p>
+		                                    </div>
+		                                    <p x-show="packageDetailsModal.pkg.details?.bus_handoff?.handoff_at" class="mt-3 text-xs font-semibold text-slate-500" x-text="'Handed off: ' + formatDateTime(packageDetailsModal.pkg.details?.bus_handoff?.handoff_at)"></p>
+		                                </div>
+
+		                                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+		                                    <h4 class="text-xs font-black uppercase tracking-wide text-slate-500">Delivery Proof</h4>
+		                                    <div class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+		                                        <p><span class="font-black text-slate-400">Run</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.delivery_proof?.run_number || '-'"></span></p>
+		                                        <p><span class="font-black text-slate-400">Driver</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.delivery_proof?.driver_name || '-'"></span></p>
+		                                        <p><span class="font-black text-slate-400">Delivered</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.delivery_proof?.delivered_at ? formatDateTime(packageDetailsModal.pkg.details.delivery_proof.delivered_at) : '-'"></span></p>
+		                                        <p><span class="font-black text-slate-400">Coordinates</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.delivery_proof?.latitude && packageDetailsModal.pkg.details?.delivery_proof?.longitude ? packageDetailsModal.pkg.details.delivery_proof.latitude + ', ' + packageDetailsModal.pkg.details.delivery_proof.longitude : '-'"></span></p>
+		                                    </div>
+		                                </div>
+
+		                                <div x-show="packageDetailsPhotoGroups(packageDetailsModal.pkg).length" class="rounded-2xl border border-slate-200 bg-white p-4" style="display:none">
+		                                    <h4 class="text-xs font-black uppercase tracking-wide text-slate-500">Photos</h4>
+		                                    <div class="mt-3 space-y-4">
+		                                        <template x-for="group in packageDetailsPhotoGroups(packageDetailsModal.pkg)" :key="group.key">
+		                                            <div>
+		                                                <p class="mb-2 text-[10px] font-black uppercase tracking-wide text-slate-400" x-text="group.title"></p>
+		                                                <div class="grid grid-cols-3 gap-2">
+		                                                    <template x-for="photo in group.photos" :key="photo.id || photo.url">
+		                                                        <button type="button" @@click="receivingLightbox = photo.url" class="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 transition hover:border-orange-300">
+		                                                            <img :src="photo.url" class="h-24 w-full object-cover" :alt="photo.original_name || group.title">
+		                                                        </button>
+		                                                    </template>
+		                                                </div>
+		                                            </div>
+		                                        </template>
+		                                    </div>
+		                                </div>
+
+		                                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+		                                    <h4 class="text-xs font-black uppercase tracking-wide text-slate-500">Charges</h4>
+		                                    <div class="mt-3 overflow-hidden rounded-xl border border-slate-100">
+		                                        <table class="w-full text-left text-xs">
+		                                            <thead class="bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-400">
+		                                                <tr><th class="px-3 py-2">Fee</th><th class="px-3 py-2">Payer</th><th class="px-3 py-2 text-right">Amount</th><th class="px-3 py-2">Status</th></tr>
+		                                            </thead>
+		                                            <tbody class="divide-y divide-slate-100">
+		                                                <tr x-show="packageDetailsChargeRows(packageDetailsModal.pkg).length === 0">
+		                                                    <td colspan="4" class="px-3 py-4 text-center font-semibold text-slate-400">No charge records found.</td>
+		                                                </tr>
+		                                                <template x-for="charge in packageDetailsChargeRows(packageDetailsModal.pkg)" :key="charge.id">
+		                                                    <tr>
+		                                                        <td class="px-3 py-2 font-bold text-slate-900" x-text="packageDetailsStatusLabel(charge.type)"></td>
+		                                                        <td class="px-3 py-2 font-semibold text-slate-600" x-text="packageDetailsStatusLabel(charge.payer)"></td>
+		                                                        <td class="px-3 py-2 text-right font-black text-slate-900" x-text="formatMoney(charge.amount, charge.currency)"></td>
+		                                                        <td class="px-3 py-2 font-bold text-slate-600" x-text="packageDetailsStatusLabel(charge.status)"></td>
+		                                                    </tr>
+		                                                </template>
+		                                            </tbody>
+		                                        </table>
+		                                    </div>
+		                                </div>
+
+		                                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+		                                    <h4 class="text-xs font-black uppercase tracking-wide text-slate-500">Tracking History</h4>
+		                                    <div class="mt-4 space-y-3">
+		                                        <p x-show="packageDetailsTimeline(packageDetailsModal.pkg).length === 0" class="text-sm font-semibold text-slate-400">No package tracking history found.</p>
+		                                        <template x-for="(event, index) in packageDetailsTimeline(packageDetailsModal.pkg)" :key="event.label + event.created_at + index">
+		                                            <div class="relative border-l border-slate-200 pl-4">
+		                                                <span class="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full border-2 border-white bg-orange-500"></span>
+		                                                <p class="text-sm font-black text-slate-900" x-text="event.label"></p>
+		                                                <p class="mt-0.5 text-xs font-semibold text-slate-500" x-text="formatDateTime(event.created_at)"></p>
+		                                                <p x-show="event.location" class="mt-1 text-xs text-slate-600" x-text="event.location"></p>
+		                                                <p x-show="event.notes" class="mt-1 text-xs text-slate-500" x-text="event.notes"></p>
+		                                            </div>
+		                                        </template>
+		                                    </div>
+		                                </div>
+		                            </div>
+		                        </div>
+		                    </template>
+		                </div>
 
 	                {{-- Package Custody Modal --}}
 		                <div x-show="packageCustodyModal.open" @@click="closePackageCustodyModal()" x-transition.opacity class="fixed inset-0 z-[188] flex justify-end bg-black/55 backdrop-blur-sm" style="display:none">

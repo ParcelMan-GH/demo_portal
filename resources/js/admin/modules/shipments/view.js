@@ -33,6 +33,7 @@ function shipmentShow() {
         receivingRemoveConfirm: { open: false, pkg: null, title: '', message: '', loading: false },
         sharedDestinationModal: { open: false, packageId: null, pkg: null, saving: false },
         receivingPhotosModal: { open: false, packageId: null, packageLabel: '', pkg: null, files: [], uploading: false },
+        packageDetailsModal: { open: false, pkg: null, packageLabel: '' },
         packageCustodyModal: { open: false, pkg: null, packageLabel: '' },
         receivingAddPackageModal: { open: false, saving: false },
         pickupEditModal: { open: false, saving: false, form: null },
@@ -1469,13 +1470,13 @@ function shipmentShow() {
 
             switch (fee.status || fee.mode || 'none') {
                 case 'paid':
-                    return `Paid ${currency} ${amount.toFixed(2)}`;
+                    return `Delivery fee paid ${currency} ${amount.toFixed(2)}`;
                 case 'collect':
-                    return `Collect ${currency} ${amount.toFixed(2)}`;
+                    return `Delivery fee due ${currency} ${amount.toFixed(2)}`;
                 case 'partially_paid':
-                    return `Collect balance ${currency} ${Number(fee.outstanding_amount || 0).toFixed(2)}`;
+                    return `Delivery fee balance ${currency} ${Number(fee.outstanding_amount || 0).toFixed(2)}`;
                 case 'waived':
-                    return 'Fee waived';
+                    return 'Delivery fee waived';
                 default:
                     return 'No delivery fee';
             }
@@ -1542,6 +1543,71 @@ function shipmentShow() {
 
         packageCustodyCanOpen(pkg) {
             return Number(pkg?.custody?.total_labels || 0) > 0;
+        },
+
+        openPackageDetailsModal(pkg) {
+            this.packageDetailsModal = {
+                open: true,
+                pkg,
+                packageLabel: pkg?.description || pkg?.tracking_code || 'Package details',
+            };
+        },
+
+        closePackageDetailsModal() {
+            this.packageDetailsModal = { open: false, pkg: null, packageLabel: '' };
+        },
+
+        packageDetailsMethodLabel(pkg) {
+            return pkg?.delivery_method === 'bus_handoff' ? 'Bus courier' : 'Direct delivery';
+        },
+
+        packageDetailsStatusLabel(value) {
+            if (!value) return '-';
+            return String(value)
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, (char) => char.toUpperCase());
+        },
+
+        packageDetailsLocation(parts = {}) {
+            return [
+                parts.town,
+                parts.district,
+                parts.region,
+                parts.gh_post_address,
+                parts.landmark ? `Landmark: ${parts.landmark}` : '',
+                parts.latitude && parts.longitude ? `${parts.latitude}, ${parts.longitude}` : '',
+            ].filter(Boolean).join(' • ') || '-';
+        },
+
+        packageDetailsPickupFee(pkg) {
+            const fee = pkg?.details?.pickup_fee || {};
+            const amount = Number(fee.amount || fee.outstanding_amount || fee.paid_amount || 0);
+            if (!amount) return 'No pickup fee';
+            return `${fee.currency || 'GHS'} ${amount.toFixed(2)} • ${this.packageDetailsStatusLabel(fee.status)}`;
+        },
+
+        packageDetailsChargeRows(pkg) {
+            return Array.isArray(pkg?.details?.charges) ? pkg.details.charges : [];
+        },
+
+        packageDetailsTimeline(pkg) {
+            return Array.isArray(pkg?.details?.tracking_events) ? pkg.details.tracking_events : [];
+        },
+
+        packageDetailsPhotoGroups(pkg) {
+            const details = pkg?.details || {};
+            return [
+                { key: 'vendor', title: 'Vendor photos', photos: Array.isArray(pkg?.vendor_photos) ? pkg.vendor_photos : [] },
+                { key: 'driver', title: 'Driver pickup photos', photos: Array.isArray(pkg?.driver_photos) ? pkg.driver_photos : [] },
+                { key: 'receipt', title: 'Receipt photos', photos: Array.isArray(pkg?.photos) ? pkg.photos : [] },
+                {
+                    key: 'proof',
+                    title: 'Delivery proof',
+                    photos: details.delivery_proof?.proof_photo_url
+                        ? [{ id: 'proof', url: details.delivery_proof.proof_photo_url, original_name: 'Delivery proof' }]
+                        : [],
+                },
+            ].filter((group) => group.photos.length > 0);
         },
 
         openPackageCustodyModal(pkg) {
