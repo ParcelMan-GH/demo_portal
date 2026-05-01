@@ -3021,6 +3021,12 @@ $shipmentConfig = [
 	                                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6v12m-3-2.818c.696.424 1.626.682 3 .682 2.25 0 3-1.007 3-2.25 0-1.244-.75-2.25-3-2.25s-3-1.006-3-2.25S9.75 6.864 12 6.864c1.374 0 2.304.258 3 .682"/></svg>
 	                                                            <span x-text="receivingDeliveryFeeLabel(pkg)"></span>
 	                                                        </p>
+	                                                        <p x-show="packageDeliveryStatusLabel(pkg)"
+	                                                           class="flex items-center gap-1.5 font-semibold"
+	                                                           :class="packageDeliveryStatusClass(pkg)">
+	                                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+	                                                            <span x-text="'Status: ' + packageDeliveryStatusLabel(pkg)"></span>
+	                                                        </p>
 	                                                    </div>
 	                                                </td>
 	                                                <td class="px-4 py-4">
@@ -3373,6 +3379,7 @@ $shipmentConfig = [
 		                                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Status</p>
 		                                            <p class="mt-1 text-sm font-black text-slate-900" x-text="receivingPackageStatusLabel(packageDetailsModal.pkg)"></p>
 		                                            <p class="mt-0.5 text-xs text-slate-500" x-text="'Method: ' + packageDetailsMethodLabel(packageDetailsModal.pkg)"></p>
+		                                            <p x-show="packageDeliveryStatusLabel(packageDetailsModal.pkg)" class="mt-0.5 text-xs font-bold" :class="packageDeliveryStatusClass(packageDetailsModal.pkg)" x-text="'Delivery: ' + packageDeliveryStatusLabel(packageDetailsModal.pkg)"></p>
 		                                        </div>
 		                                    </div>
 		                                </div>
@@ -3391,7 +3398,11 @@ $shipmentConfig = [
 		                                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Delivery Location</p>
 		                                            <p class="mt-0.5 text-sm font-semibold leading-relaxed text-slate-800" x-text="packageDetailsLocation(packageDetailsModal.pkg.details?.delivery || {})"></p>
 		                                        </div>
-		                                        <div class="grid gap-3 sm:grid-cols-2">
+		                                        <div class="grid gap-3 sm:grid-cols-3">
+		                                            <div x-show="packageDeliveryStatusLabel(packageDetailsModal.pkg)">
+		                                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Delivery Status</p>
+		                                                <p class="mt-0.5 text-sm font-bold" :class="packageDeliveryStatusClass(packageDetailsModal.pkg)" x-text="packageDeliveryStatusLabel(packageDetailsModal.pkg)"></p>
+		                                            </div>
 		                                            <div>
 		                                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Delivery Fee</p>
 		                                                <p class="mt-0.5 text-sm font-bold" :class="receivingDeliveryFeeClass(packageDetailsModal.pkg)" x-text="receivingDeliveryFeeLabel(packageDetailsModal.pkg)"></p>

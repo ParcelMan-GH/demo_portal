@@ -1490,6 +1490,48 @@ function shipmentShow() {
             return 'text-slate-400';
         },
 
+        packageDeliveryStatusLabel(pkg) {
+            const proof = pkg?.details?.delivery_proof || {};
+            const status = proof.status || proof.run_status || null;
+
+            if (status) {
+                if (status === 'handed_off') return 'Handed off';
+                return this.packageDetailsStatusLabel(status);
+            }
+
+            const custody = pkg?.custody || {};
+            const total = Number(custody.total_labels || 0);
+            const delivered = Number(custody.delivered_labels || 0);
+            const claimed = Number(custody.claimed_labels || 0);
+            const warehouse = Number(custody.warehouse_labels || 0);
+
+            if (total > 0 && delivered === total) return 'Delivered';
+            if (claimed > 0) return 'Assigned to driver';
+            if (warehouse > 0) return 'At warehouse';
+            return '';
+        },
+
+        packageDeliveryStatusClass(pkg) {
+            const proof = pkg?.details?.delivery_proof || {};
+            const status = proof.status || proof.run_status || null;
+
+            if (['delivered', 'completed', 'handed_off'].includes(status)) return 'text-emerald-700';
+            if (['out_for_delivery', 'arrived', 'in_progress', 'dispatched'].includes(status)) return 'text-blue-700';
+            if (['failed', 'cancelled'].includes(status)) return 'text-rose-700';
+            if (status) return 'text-amber-700';
+
+            const custody = pkg?.custody || {};
+            const total = Number(custody.total_labels || 0);
+            const delivered = Number(custody.delivered_labels || 0);
+            const claimed = Number(custody.claimed_labels || 0);
+            const warehouse = Number(custody.warehouse_labels || 0);
+
+            if (total > 0 && delivered === total) return 'text-emerald-700';
+            if (claimed > 0) return 'text-blue-700';
+            if (warehouse > 0) return 'text-slate-600';
+            return 'text-slate-400';
+        },
+
         packageCustodySummary(pkg) {
             const custody = pkg?.custody || {};
             const total = Number(custody.total_labels || 0);
