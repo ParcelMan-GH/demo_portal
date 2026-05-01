@@ -2775,10 +2775,6 @@ $shipmentConfig = [
 		                <!-- Packages workspace -->
 		                <template x-if="!receiving.loading">
 		                    <div class="space-y-5">
-                                <div x-show="!receiving.canReceive" class="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800" style="display:none">
-                                    <p class="font-bold">Receiving is not active yet.</p>
-                                    <p class="mt-1 text-xs" x-text="receivingRestrictionMessage()"></p>
-                                </div>
                                 <div class="grid gap-5 lg:grid-cols-2">
                                     <!-- Pickup details and driver -->
                                     <div class="h-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -3050,7 +3046,7 @@ $shipmentConfig = [
 	                                                                @@click="openReceivingPackageModal(pkg, 1)"
 	                                                                class="inline-flex items-center gap-1 text-[11px] font-black text-slate-700 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-slate-950 hover:decoration-slate-700">
 	                                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.5 7.125L16.875 4.5"/></svg>
-	                                                            <span x-text="receivingPackageIsReceived(pkg) ? 'Edit / Update' : 'Receive'"></span>
+	                                                            <span x-text="receivingPackageActionLabel(pkg)"></span>
 	                                                        </button>
 	                                                        <button type="button"
 	                                                                @@click="openReceivingPhotosModal(pkg)"
@@ -3707,12 +3703,12 @@ $shipmentConfig = [
 	                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25m0-9L3 7.5m9 5.25v9M3 7.5v9l9 5.25"/></svg>
 	                                        </span>
 	                                        <div class="min-w-0">
-	                                            <h3 class="text-base font-bold text-slate-900" x-text="receivingPackageModal.step === 2 ? 'Delivery Details' : 'Intake Details'"></h3>
+	                                            <h3 class="text-base font-bold text-slate-900" x-text="receivingPackageModalTitle()"></h3>
 	                                            <p class="mt-0.5 text-xs text-slate-500" x-show="receivingPackageModal.step === 1">
-	                                                Confirm quantity, condition, photos, and package description.
+	                                                <span x-text="receivingPackageModalIntro()"></span>
 	                                            </p>
 	                                            <p class="mt-0.5 text-xs text-slate-500" x-show="receivingPackageModal.step === 2" style="display:none">
-	                                                Set the recipient, location, delivery method, and fee for this package.
+	                                                <span x-text="receivingPackageModalIntro()"></span>
 	                                            </p>
 	                                            <p class="mt-2 flex flex-wrap items-center gap-2 text-xs">
 	                                                <span class="rounded-lg bg-slate-100 px-2 py-1 font-black text-slate-900" x-text="receivingPackageModal.packageLabel"></span>
@@ -3724,14 +3720,14 @@ $shipmentConfig = [
 	                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
 	                                    </button>
 	                                </div>
-	                                <div x-show="!isPerItemMode()" class="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+	                                <div x-show="!isPerItemMode() && receiving.canReceive" class="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
 	                                    One Drop-off is active. This form only receives the package; destination is managed from Edit Shared Destination.
 	                                </div>
 	                            </div>
 
 	                            <div class="flex-1 overflow-y-auto px-5 py-4">
 	                                <div x-show="receivingPackageModal.step === 1" class="space-y-4">
-	                                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+	                                    <div x-show="receiving.canReceive" class="grid grid-cols-1 gap-3 sm:grid-cols-3" style="display:none">
 	                                        <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
 	                                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Expected</p>
 	                                            <p class="mt-1 text-lg font-bold text-slate-900" x-text="receivingExpectedQuantity(receivingPackageModal.pkg)"></p>
@@ -3750,7 +3746,7 @@ $shipmentConfig = [
 	                                        <input type="text" x-model="receivingPackageModal.pkg.description" placeholder="What's inside?"
 	                                               class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-500/20">
 	                                    </div>
-	                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+	                                    <div x-show="receiving.canReceive" class="grid grid-cols-1 gap-4 sm:grid-cols-3" style="display:none">
 	                                        <div>
 	                                            <label class="mb-1.5 block text-xs font-bold text-slate-700">Received Qty</label>
 	                                            <input type="number" x-model.number="receivingPackageModal.pkg.received_quantity" min="0"
@@ -3771,12 +3767,12 @@ $shipmentConfig = [
 	                                            </select>
 	                                        </div>
 	                                    </div>
-	                                    <div>
+	                                    <div x-show="receiving.canReceive" style="display:none">
 	                                        <label class="mb-1.5 block text-xs font-bold text-slate-700">Receiving Notes</label>
 	                                        <textarea rows="2" x-model="receivingPackageModal.pkg.notes" placeholder="Receiving notes..."
 	                                                  class="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-500/20"></textarea>
 	                                    </div>
-	                                    <div class="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4">
+	                                    <div x-show="receiving.canReceive" class="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4" style="display:none">
 	                                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 	                                            <div>
 	                                                <p class="text-xs font-bold uppercase tracking-wide text-slate-700">Receipt Photos</p>
@@ -3925,7 +3921,7 @@ $shipmentConfig = [
 	                                        <svg x-show="receivingPackageModal.savingDetails" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
 	                                        <span x-text="receivingPackageModal.savingDetails ? 'Saving...' : 'Save Changes'"></span>
 	                                    </button>
-	                                    <button type="button" x-show="!isPerItemMode() || receivingPackageModal.step === 2"
+	                                    <button type="button" x-show="receiving.canReceive && (!isPerItemMode() || receivingPackageModal.step === 2)"
 	                                            @@click="receivePackageFromModal()"
 	                                            :disabled="!receiving.canReceive || receivingPackageModal.savingDetails || receivingPackageModal.savingReceive"
 	                                            class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:opacity-50" style="display:none">

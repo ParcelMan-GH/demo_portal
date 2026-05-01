@@ -1490,6 +1490,26 @@ function shipmentShow() {
             return 'text-slate-400';
         },
 
+        receivingPackageActionLabel(pkg) {
+            if (!this.receiving.canReceive) return 'Edit';
+            return this.receivingPackageIsReceived(pkg) ? 'Edit / Update' : 'Receive';
+        },
+
+        receivingPackageModalTitle() {
+            if (this.receivingPackageModal.step === 2) return 'Delivery Details';
+            return this.receiving.canReceive ? 'Intake Details' : 'Package Details';
+        },
+
+        receivingPackageModalIntro() {
+            if (this.receivingPackageModal.step === 2) {
+                return 'Set the recipient, location, delivery method, and fee for this package.';
+            }
+
+            return this.receiving.canReceive
+                ? 'Confirm quantity, condition, photos, and package description.'
+                : 'Edit package details. Intake fields unlock after pickup is completed.';
+        },
+
         packageDeliveryStatusLabel(pkg) {
             const proof = pkg?.details?.delivery_proof || {};
             const status = proof.status || proof.run_status || null;
@@ -1998,6 +2018,11 @@ function shipmentShow() {
         async uploadReceiptPhotosFromModal() {
             const modal = this.receivingPhotosModal;
             if (!modal.pkg || modal.uploading || !modal.files.length) return;
+
+            if (!this.receiving.canReceive) {
+                window.showToast?.(this.receivingRestrictionMessage(), 'error');
+                return;
+            }
 
             if (!this.receivingPackageIsReceived(modal.pkg)) {
                 modal.pkg._receipt_photo_files = modal.files;
