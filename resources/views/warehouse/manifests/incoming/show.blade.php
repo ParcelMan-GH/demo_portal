@@ -501,9 +501,10 @@
 
             {{-- ── Receiving Tab ──────────────────────────────────────────── --}}
             <div x-show="activeTab === 'receiving'" x-cloak>
+                @include('shared.transport-containers-section', ['manifest' => $manifest, 'allowContainerActions' => false])
 
                 {{-- Header --}}
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-5">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mt-6 mb-5">
                     <div class="flex items-center gap-3">
                         <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-200/60 shrink-0">
                             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

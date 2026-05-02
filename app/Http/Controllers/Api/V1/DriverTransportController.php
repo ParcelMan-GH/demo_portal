@@ -45,13 +45,22 @@ class DriverTransportController extends Controller
     {
         $driver = $request->user();
         $validated = $request->validate([
-            'tracking_code' => ['required', 'string', 'max:100'],
+            'tracking_code' => ['nullable', 'string', 'max:100'],
+            'container_code' => ['nullable', 'string', 'max:100'],
         ]);
+
+        $code = $validated['container_code'] ?? $validated['tracking_code'] ?? null;
+        if (!$code) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Container code is required.',
+            ], 422);
+        }
 
         $result = $this->transportService->driverScanLoad(
             manifest: $manifest,
             driver: $driver,
-            trackingCode: $validated['tracking_code']
+            trackingCode: $code
         );
 
         return $this->transportActionResponse($driver, $manifest, $result, 400);
@@ -85,4 +94,3 @@ class DriverTransportController extends Controller
         return response()->json($result, ($result['success'] ?? false) ? 200 : $errorCode);
     }
 }
-

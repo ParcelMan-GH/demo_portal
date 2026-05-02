@@ -483,6 +483,8 @@ $lineStatusColors = [
         </div>
     </div>
 
+    @include('shared.transport-containers-section', ['manifest' => $manifest])
+
     <!-- Items Table -->
     <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">
         <div class="px-6 py-5 border-b border-slate-200/50">
@@ -522,6 +524,7 @@ $lineStatusColors = [
                                     <th class="px-4 py-2.5 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">RECEIVED</th>
                                     <th class="px-4 py-2.5 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">SCAN OUT</th>
                                     <th class="px-4 py-2.5 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">SCAN IN</th>
+                                    <th class="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">CONTAINER</th>
                                     <th class="px-4 py-2.5 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">LINE STATUS</th>
                                     @if(in_array($manifest->status, ['assigned', 'loading']))
                                     <th class="px-4 py-2.5 text-right text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ACTION</th>
@@ -534,6 +537,8 @@ $lineStatusColors = [
                                     $shipmentItem = $item->shipmentItem;
                                     $shipment     = $shipmentItem?->shipment;
                                     $lineClass    = $lineStatusColors[$item->line_status] ?? 'bg-slate-100 text-slate-700';
+                                    $currentContainer = $manifest->containers
+                                        ->first(fn ($container) => $container->items->contains('transport_manifest_item_id', $item->id));
                                 @endphp
                                 <tr class="hover:bg-slate-50/70">
                                     <td class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-400 font-medium">{{ $index + 1 }}</td>
@@ -578,6 +583,23 @@ $lineStatusColors = [
                                     <td class="px-4 py-2.5 whitespace-nowrap text-center">
                                         <span class="text-xs text-slate-600">{{ $item->scan_in_count ?? '—' }}</span>
                                     </td>
+                                    <td class="px-4 py-2.5 whitespace-nowrap">
+                                        @if(in_array($manifest->status, ['draft', 'assigned', 'loading']))
+                                            <select
+                                                @@change="moveItemToContainer({{ $item->id }}, $event.target.value)"
+                                                :disabled="actionLoading"
+                                                class="w-36 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-700 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:opacity-50"
+                                            >
+                                                @foreach($manifest->containers->sortBy('sequence_number') as $container)
+                                                    <option value="{{ $container->id }}" @selected($currentContainer?->id === $container->id)>
+                                                        {{ $container->container_code }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        @else
+                                            <span class="text-[11px] font-mono font-semibold text-slate-600">{{ $currentContainer?->container_code ?? '—' }}</span>
+                                        @endif
+                                    </td>
                                     <td class="px-4 py-2.5 whitespace-nowrap text-center">
                                         @if($item->line_status)
                                             <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $lineClass }}">
@@ -609,7 +631,7 @@ $lineStatusColors = [
                                 </tr>
                                 @if($item->notes)
                                 <tr class="bg-slate-50/50">
-                                    <td class="px-4 py-1.5" colspan="{{ in_array($manifest->status, ['assigned', 'loading']) ? 11 : 10 }}">
+                                    <td class="px-4 py-1.5" colspan="{{ in_array($manifest->status, ['assigned', 'loading']) ? 12 : 11 }}">
                                         <p class="text-[10px] text-slate-500 italic">
                                             <span class="font-semibold not-italic text-slate-400">Note:</span>
                                             {{ $item->notes }}
@@ -705,6 +727,8 @@ $lineStatusColors = [
         </div>
     </div>
     @endif
+
+    @include('shared.transport-container-modals')
 
     {{-- ── Assign Driver Modal ──────────────────────────────────────── --}}
     <div
@@ -883,11 +907,16 @@ document.addEventListener('alpine:init', () => {
             assignDriverModalOpen: false,
             unassignDriverModalOpen: false,
             dispatchModalOpen: false,
+            createContainerModalOpen: false,
             actionLoading: false,
 
             // Form values
             selectedDriverId: '',
             unassignReason: '',
+            containerForm: {
+                container_type: 'box',
+                notes: '',
+            },
 
             openAssignDriverModal() {
                 this.selectedDriverId = '';
@@ -901,6 +930,11 @@ document.addEventListener('alpine:init', () => {
 
             openDispatchModal() {
                 this.dispatchModalOpen = true;
+            },
+
+            openCreateContainerModal() {
+                this.containerForm = { container_type: 'box', notes: '' };
+                this.createContainerModalOpen = true;
             },
 
             async submitAssignDriver() {
@@ -939,6 +973,114 @@ document.addEventListener('alpine:init', () => {
                     return;
                 }
                 await this._postAction(config.mark_all_loaded_endpoint, {}, null);
+            },
+
+            async submitCreateContainer() {
+                await this._postAction(config.create_container_endpoint, this.containerForm, () => {
+                    this.createContainerModalOpen = false;
+                });
+            },
+
+            async markContainerLoaded(containerId) {
+                if (!window.confirm('Mark this whole container as loaded?')) {
+                    return;
+                }
+                const endpoint = (config.mark_container_loaded_endpoint_template || '').replace('__CONTAINER__', containerId);
+                await this._postAction(endpoint, {}, null);
+            },
+
+            async moveItemToContainer(itemId, containerId) {
+                const endpoint = (config.move_item_container_endpoint_template || '').replace('__ITEM__', itemId);
+                await this._postAction(endpoint, { container_id: Number(containerId) }, null);
+            },
+
+            async deleteContainer(containerId, itemCount, containerCount) {
+                if (Number(containerCount) <= 1) {
+                    window.showToast?.('At least one container must remain on the manifest.', 'warning');
+                    return;
+                }
+                if (Number(itemCount) > 0) {
+                    window.showToast?.('Move all items to another container before deleting this one.', 'warning');
+                    return;
+                }
+                if (!window.confirm('Delete this empty transport container?')) {
+                    return;
+                }
+                const endpoint = (config.delete_container_endpoint_template || '').replace('__CONTAINER__', containerId);
+                await this._deleteAction(endpoint);
+            },
+
+            async printContainerLabel(containerId) {
+                const endpoint = (config.print_container_label_endpoint_template || '').replace('__CONTAINER__', containerId);
+                if (!endpoint) {
+                    window.showToast?.('Missing print endpoint.', 'error');
+                    return;
+                }
+                await this._printLabel(endpoint);
+            },
+
+            async _printLabel(endpoint) {
+                if (this.actionLoading) return;
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                        },
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Unable to generate label.');
+                    }
+
+                    const printWindow = window.open('', '_blank');
+                    if (!printWindow) {
+                        throw new Error('Pop-up blocked. Allow pop-ups to print the container label.');
+                    }
+                    printWindow.document.open();
+                    printWindow.document.write(result.data?.label_html || '');
+                    printWindow.document.close();
+                    printWindow.focus();
+                    setTimeout(() => printWindow.print(), 300);
+                } catch (err) {
+                    console.error(err);
+                    window.showToast?.(err.message || 'Unable to print label.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
+            },
+
+            async _deleteAction(endpoint) {
+                if (!endpoint) {
+                    window.showToast?.('Missing action endpoint.', 'error');
+                    return;
+                }
+                if (this.actionLoading) return;
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                        },
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Action failed.');
+                    }
+                    window.showToast?.(result.message || 'Done.', 'success');
+                    setTimeout(() => window.location.reload(), 800);
+                } catch (err) {
+                    console.error(err);
+                    window.showToast?.(err.message || 'An error occurred.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
             },
 
             async _postAction(endpoint, body, onSuccess) {

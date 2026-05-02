@@ -11,6 +11,8 @@ use App\Models\ShipmentItemTracking;
 use App\Models\SortBatch;
 use App\Models\TransportManifest;
 use App\Models\TransportManifestAssignment;
+use App\Models\TransportContainer;
+use App\Models\TransportContainerItem;
 use App\Models\TransportManifestItem;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -98,6 +100,8 @@ class WarehouseTransportService
                     'line_status' => TransportManifestItem::LINE_PENDING,
                 ]);
             }
+
+            $this->ensureDefaultContainer($manifest->fresh('items'), $user);
 
             return [
                 'success' => true,
@@ -315,6 +319,8 @@ class WarehouseTransportService
             $manifest->update(['status' => TransportManifest::STATUS_LOADING]);
         }
 
+        $this->ensureDefaultContainer($manifest->fresh('items'));
+
         return [
             'success' => true,
             'message' => 'Loading started.',
@@ -331,11 +337,27 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Manifest is not in loading state.'];
         }
 
-        return DB::transaction(function () use ($manifest, $trackingCode) {
-            $manifest = TransportManifest::query()->lockForUpdate()->findOrFail($manifest->id);
+        return DB::transaction(function () use ($manifest, $driver, $trackingCode) {
+            $manifest = TransportManifest::query()
+                ->with('items')
+                ->lockForUpdate()
+                ->findOrFail($manifest->id);
 
             if ($manifest->status === TransportManifest::STATUS_ASSIGNED) {
                 $manifest->update(['status' => TransportManifest::STATUS_LOADING]);
+            }
+
+            $this->ensureDefaultContainer($manifest);
+
+            $container = TransportContainer::query()
+                ->where('transport_manifest_id', $manifest->id)
+                ->where('container_code', $trackingCode)
+                ->with('items.manifestItem')
+                ->lockForUpdate()
+                ->first();
+
+            if ($container) {
+                return $this->markContainerLoaded($container, $driver);
             }
 
             $line = TransportManifestItem::query()
@@ -356,6 +378,30 @@ class WarehouseTransportService
                 'loaded_at' => now(),
                 'line_status' => TransportManifestItem::LINE_LOADED,
             ]);
+
+            $containerItem = TransportContainerItem::query()
+                ->where('transport_manifest_item_id', $line->id)
+                ->with('container.items.manifestItem')
+                ->first();
+
+            if ($containerItem?->container) {
+                $allContainerItemsLoaded = $containerItem->container->items->every(function (TransportContainerItem $item) {
+                    $manifestLine = $item->manifestItem;
+
+                    return $manifestLine
+                        && (int) $manifestLine->loaded_quantity >= (int) $manifestLine->expected_quantity;
+                });
+
+                if ($allContainerItemsLoaded) {
+                    $containerItem->container->update([
+                        'status' => TransportContainer::STATUS_LOADED,
+                        'loaded_at' => $containerItem->container->loaded_at ?? now(),
+                        'loaded_by_driver_id' => $driver->id,
+                    ]);
+
+                    $containerItem->container->items()->update(['status' => TransportContainerItem::STATUS_LOADED]);
+                }
+            }
 
             return [
                 'success' => true,
@@ -408,6 +454,8 @@ class WarehouseTransportService
                 ]))),
             ]);
 
+            $this->syncLineContainerLoadState($lockedLine);
+
             return [
                 'success' => true,
                 'message' => 'Manifest item marked as loaded.',
@@ -451,6 +499,7 @@ class WarehouseTransportService
                         'Marked loaded by admin ' . $user->name . '.',
                     ]))),
                 ]);
+                $this->syncLineContainerLoadState($line);
                 $updated++;
             }
 
@@ -460,6 +509,232 @@ class WarehouseTransportService
                     ? '1 manifest item marked as loaded.'
                     : "{$updated} manifest items marked as loaded.",
                 'data' => ['updated_count' => $updated],
+            ];
+        });
+    }
+
+    public function createContainer(TransportManifest $manifest, Warehouse $warehouse, User $user, string $containerType = 'box', ?string $notes = null): array
+    {
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            return ['success' => false, 'message' => 'Cannot modify another warehouse manifest.'];
+        }
+
+        if (!in_array($manifest->status, [
+            TransportManifest::STATUS_DRAFT,
+            TransportManifest::STATUS_ASSIGNED,
+            TransportManifest::STATUS_LOADING,
+        ], true)) {
+            return ['success' => false, 'message' => 'Containers can only be created before transport departure.'];
+        }
+
+        return DB::transaction(function () use ($manifest, $user, $containerType, $notes) {
+            $lockedManifest = TransportManifest::query()
+                ->with('containers')
+                ->lockForUpdate()
+                ->findOrFail($manifest->id);
+
+            $nextSequence = ((int) $lockedManifest->containers->max('sequence_number')) + 1;
+
+            $container = TransportContainer::query()->create([
+                'transport_manifest_id' => $lockedManifest->id,
+                'container_code' => $this->generateContainerCode($lockedManifest, $nextSequence),
+                'container_type' => $containerType ?: 'box',
+                'sequence_number' => $nextSequence,
+                'status' => TransportContainer::STATUS_OPEN,
+                'expected_package_count' => 0,
+                'sealed_by_user_id' => $user->id,
+                'notes' => $notes,
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Transport container created.',
+                'data' => ['container' => $container],
+            ];
+        });
+    }
+
+    public function moveItemToContainer(
+        TransportManifest $manifest,
+        TransportManifestItem $line,
+        TransportContainer $container,
+        Warehouse $warehouse,
+        User $user
+    ): array {
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            return ['success' => false, 'message' => 'Cannot modify another warehouse manifest.'];
+        }
+
+        if ((int) $line->transport_manifest_id !== (int) $manifest->id || (int) $container->transport_manifest_id !== (int) $manifest->id) {
+            return ['success' => false, 'message' => 'Container or item does not belong to this manifest.'];
+        }
+
+        if (!in_array($manifest->status, [
+            TransportManifest::STATUS_DRAFT,
+            TransportManifest::STATUS_ASSIGNED,
+            TransportManifest::STATUS_LOADING,
+        ], true)) {
+            return ['success' => false, 'message' => 'Items can only be moved before transport departure.'];
+        }
+
+        if (in_array($container->status, [
+            TransportContainer::STATUS_LOADED,
+            TransportContainer::STATUS_IN_TRANSIT,
+            TransportContainer::STATUS_RECEIVED,
+            TransportContainer::STATUS_RECONCILED,
+        ], true)) {
+            return ['success' => false, 'message' => 'Cannot move items into a loaded or received container.'];
+        }
+
+        return DB::transaction(function () use ($line, $container, $user) {
+            $lockedLine = TransportManifestItem::query()
+                ->with('shipmentItem')
+                ->lockForUpdate()
+                ->findOrFail($line->id);
+
+            $lockedContainer = TransportContainer::query()
+                ->lockForUpdate()
+                ->findOrFail($container->id);
+
+            TransportContainerItem::query()
+                ->where('transport_manifest_item_id', $lockedLine->id)
+                ->delete();
+
+            TransportContainerItem::query()->create([
+                'transport_container_id' => $lockedContainer->id,
+                'transport_manifest_item_id' => $lockedLine->id,
+                'shipment_item_id' => $lockedLine->shipment_item_id,
+                'label_barcode' => $lockedLine->shipmentItem?->tracking_code,
+                'expected_quantity' => (int) $lockedLine->expected_quantity,
+                'status' => TransportContainerItem::STATUS_PACKED,
+            ]);
+
+            TransportContainer::query()
+                ->where('transport_manifest_id', $lockedContainer->transport_manifest_id)
+                ->get()
+                ->each(function (TransportContainer $manifestContainer) {
+                    $manifestContainer->update([
+                        'expected_package_count' => $manifestContainer->items()->count(),
+                    ]);
+                });
+
+            $lockedContainer->update([
+                'status' => TransportContainer::STATUS_SEALED,
+                'sealed_at' => $lockedContainer->sealed_at ?? now(),
+                'sealed_by_user_id' => $user->id,
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Manifest item moved to container.',
+            ];
+        });
+    }
+
+    public function adminMarkContainerLoaded(TransportManifest $manifest, TransportContainer $container, Warehouse $warehouse, User $user): array
+    {
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            return ['success' => false, 'message' => 'Cannot load another warehouse manifest.'];
+        }
+
+        if ((int) $container->transport_manifest_id !== (int) $manifest->id) {
+            return ['success' => false, 'message' => 'Container not found on this manifest.'];
+        }
+
+        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+            return ['success' => false, 'message' => 'Manifest is not in loading state.'];
+        }
+
+        return DB::transaction(function () use ($manifest, $container, $user) {
+            $lockedManifest = TransportManifest::query()->lockForUpdate()->findOrFail($manifest->id);
+            if ($lockedManifest->status === TransportManifest::STATUS_ASSIGNED) {
+                $lockedManifest->update(['status' => TransportManifest::STATUS_LOADING]);
+            }
+
+            $lockedContainer = TransportContainer::query()
+                ->with('items.manifestItem')
+                ->lockForUpdate()
+                ->findOrFail($container->id);
+
+            if ($lockedContainer->items->isEmpty()) {
+                return ['success' => false, 'message' => 'Cannot load an empty container.'];
+            }
+
+            $now = now();
+            foreach ($lockedContainer->items as $containerItem) {
+                $line = $containerItem->manifestItem;
+                if (!$line) {
+                    continue;
+                }
+
+                $line->update([
+                    'scan_out_count' => max((int) $line->scan_out_count, 1),
+                    'loaded_quantity' => (int) $line->expected_quantity,
+                    'loaded_at' => $line->loaded_at ?? $now,
+                    'line_status' => TransportManifestItem::LINE_LOADED,
+                    'notes' => trim(implode("\n", array_filter([
+                        $line->notes,
+                        'Container ' . $lockedContainer->container_code . ' marked loaded by admin ' . $user->name . '.',
+                    ]))),
+                ]);
+
+                $containerItem->update(['status' => TransportContainerItem::STATUS_LOADED]);
+            }
+
+            $lockedContainer->update([
+                'status' => TransportContainer::STATUS_LOADED,
+                'loaded_at' => $lockedContainer->loaded_at ?? $now,
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Transport container marked as loaded.',
+            ];
+        });
+    }
+
+    public function deleteContainer(TransportManifest $manifest, TransportContainer $container, Warehouse $warehouse): array
+    {
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            return ['success' => false, 'message' => 'Cannot modify another warehouse manifest.'];
+        }
+
+        if ((int) $container->transport_manifest_id !== (int) $manifest->id) {
+            return ['success' => false, 'message' => 'Container not found on this manifest.'];
+        }
+
+        if (!in_array($manifest->status, [
+            TransportManifest::STATUS_DRAFT,
+            TransportManifest::STATUS_ASSIGNED,
+            TransportManifest::STATUS_LOADING,
+        ], true)) {
+            return ['success' => false, 'message' => 'Containers can only be deleted before transport departure.'];
+        }
+
+        return DB::transaction(function () use ($manifest, $container) {
+            $lockedManifest = TransportManifest::query()
+                ->withCount('containers')
+                ->lockForUpdate()
+                ->findOrFail($manifest->id);
+
+            if ((int) $lockedManifest->containers_count <= 1) {
+                return ['success' => false, 'message' => 'At least one container must remain on the manifest.'];
+            }
+
+            $lockedContainer = TransportContainer::query()
+                ->withCount('items')
+                ->lockForUpdate()
+                ->findOrFail($container->id);
+
+            if ((int) $lockedContainer->items_count > 0) {
+                return ['success' => false, 'message' => 'Move all items to another container before deleting this one.'];
+            }
+
+            $lockedContainer->delete();
+
+            return [
+                'success' => true,
+                'message' => 'Transport container deleted.',
             ];
         });
     }
@@ -474,15 +749,29 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Manifest is not ready to depart.'];
         }
 
-        $notLoadedCount = $manifest->items()->where('loaded_quantity', '<=', 0)->count();
+        $this->ensureDefaultContainer($manifest->fresh('items'));
+
+        $notLoadedCount = $manifest->containers()
+            ->whereHas('items')
+            ->whereNotIn('status', [
+                TransportContainer::STATUS_LOADED,
+                TransportContainer::STATUS_IN_TRANSIT,
+                TransportContainer::STATUS_RECEIVED,
+                TransportContainer::STATUS_RECONCILED,
+            ])
+            ->count();
         if ($notLoadedCount > 0) {
-            return ['success' => false, 'message' => 'All manifest items must be scanned before departure.'];
+            return ['success' => false, 'message' => 'All transport containers must be loaded before departure.'];
         }
 
         $manifest->update([
             'status' => TransportManifest::STATUS_IN_TRANSIT,
             'dispatched_at' => $manifest->dispatched_at ?? now(),
         ]);
+
+        $manifest->containers()
+            ->where('status', TransportContainer::STATUS_LOADED)
+            ->update(['status' => TransportContainer::STATUS_IN_TRANSIT]);
 
         return [
             'success' => true,
@@ -509,6 +798,113 @@ class WarehouseTransportService
             'success' => true,
             'message' => 'Arrival recorded successfully.',
         ];
+    }
+
+    public function ensureDefaultContainer(TransportManifest $manifest, ?User $user = null): TransportContainer
+    {
+        $existing = $manifest->containers()->orderBy('sequence_number')->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $manifest->loadMissing('items.shipmentItem');
+
+        $container = TransportContainer::query()->create([
+            'transport_manifest_id' => $manifest->id,
+            'container_code' => $this->generateContainerCode($manifest, 1),
+            'container_type' => 'loose',
+            'sequence_number' => 1,
+            'status' => TransportContainer::STATUS_SEALED,
+            'expected_package_count' => $manifest->items->count(),
+            'sealed_at' => now(),
+            'sealed_by_user_id' => $user?->id ?? $manifest->created_by_user_id,
+            'notes' => 'Default loose-items container.',
+        ]);
+
+        foreach ($manifest->items as $line) {
+            TransportContainerItem::query()->create([
+                'transport_container_id' => $container->id,
+                'transport_manifest_item_id' => $line->id,
+                'shipment_item_id' => $line->shipment_item_id,
+                'label_barcode' => $line->shipmentItem?->tracking_code,
+                'expected_quantity' => (int) $line->expected_quantity,
+                'status' => TransportContainerItem::STATUS_PACKED,
+            ]);
+        }
+
+        return $container->fresh('items.manifestItem');
+    }
+
+    private function markContainerLoaded(TransportContainer $container, Driver $driver): array
+    {
+        if ($container->status === TransportContainer::STATUS_LOADED) {
+            return [
+                'success' => true,
+                'message' => 'Container is already loaded.',
+            ];
+        }
+
+        $now = now();
+        foreach ($container->items as $containerItem) {
+            $line = $containerItem->manifestItem;
+            if (!$line) {
+                continue;
+            }
+
+            $line->update([
+                'scan_out_count' => max((int) $line->scan_out_count, 1),
+                'loaded_quantity' => (int) $line->expected_quantity,
+                'loaded_at' => $line->loaded_at ?? $now,
+                'line_status' => TransportManifestItem::LINE_LOADED,
+            ]);
+
+            $containerItem->update(['status' => TransportContainerItem::STATUS_LOADED]);
+        }
+
+        $container->update([
+            'status' => TransportContainer::STATUS_LOADED,
+            'loaded_at' => $container->loaded_at ?? $now,
+            'loaded_by_driver_id' => $driver->id,
+        ]);
+
+        return [
+            'success' => true,
+            'message' => 'Container loaded successfully.',
+        ];
+    }
+
+    private function syncLineContainerLoadState(TransportManifestItem $line): void
+    {
+        $containerItem = TransportContainerItem::query()
+            ->where('transport_manifest_item_id', $line->id)
+            ->with('container.items.manifestItem')
+            ->first();
+
+        if (!$containerItem?->container) {
+            return;
+        }
+
+        $containerItem->update(['status' => TransportContainerItem::STATUS_LOADED]);
+
+        $allLoaded = $containerItem->container->items->every(function (TransportContainerItem $item) {
+            $manifestLine = $item->manifestItem;
+
+            return $manifestLine
+                && (int) $manifestLine->loaded_quantity >= (int) $manifestLine->expected_quantity;
+        });
+
+        if ($allLoaded) {
+            $containerItem->container->update([
+                'status' => TransportContainer::STATUS_LOADED,
+                'loaded_at' => $containerItem->container->loaded_at ?? now(),
+            ]);
+            $containerItem->container->items()->update(['status' => TransportContainerItem::STATUS_LOADED]);
+        }
+    }
+
+    private function generateContainerCode(TransportManifest $manifest, int $sequence): string
+    {
+        return preg_replace('/[^A-Z0-9-]/', '', strtoupper($manifest->manifest_number)) . '-C' . str_pad((string) $sequence, 2, '0', STR_PAD_LEFT);
     }
 
     private function generateManifestNumber(Warehouse $origin, ?Warehouse $destination): string

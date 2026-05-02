@@ -611,6 +611,8 @@
 
             {{-- ── Items Tab ────────────────────────────────────────────── --}}
             <div x-show="activeTab === 'items'" x-cloak>
+                @include('shared.transport-containers-section', ['manifest' => $manifest])
+
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-5">
                     <div class="flex items-center gap-3">
                         <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 shrink-0">
@@ -627,7 +629,7 @@
                 </div>
 
                 {{-- Search --}}
-                <div class="mb-4">
+                <div class="mt-6 mb-4">
                     <div class="relative flex-1 max-w-xs">
                         <input type="text" x-model="itemSearch" @@input="itemPage = 1"
                             placeholder="Search item, shipment, vendor..."
@@ -687,6 +689,7 @@
                                         </svg>
                                     </div>
                                 </th>
+                                <th class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">CONTAINER</th>
                                 <th @@click="sortItems('line_status')" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                                     <div class="flex items-center justify-center">
                                         STATUS
@@ -703,7 +706,7 @@
                         <tbody class="bg-transparent divide-y divide-slate-100/50">
                             {{-- Empty state --}}
                             <tr x-show="filteredItems().length === 0" x-cloak>
-                                <td colspan="8" class="px-4 py-8 text-center text-gray-500 text-xs">
+                                <td colspan="9" class="px-4 py-8 text-center text-gray-500 text-xs">
                                     <span x-text="itemSearch ? 'No items match your search.' : 'No items in this manifest.'"></span>
                                 </td>
                             </tr>
@@ -722,6 +725,19 @@
                                     <td class="px-4 py-2.5 text-center text-xs font-semibold text-slate-800" x-text="item.expected_quantity"></td>
                                     <td class="px-4 py-2.5 text-center text-xs font-semibold text-slate-800" x-text="item.loaded_quantity"></td>
                                     <td class="px-4 py-2.5 text-center text-xs font-semibold text-slate-800" x-text="item.received_quantity"></td>
+                                    <td class="px-4 py-2.5 text-xs text-slate-700 min-w-[170px]">
+                                        <select
+                                            x-show="canMoveContainers"
+                                            @@change="moveItemToContainer(item.id, $event.target.value)"
+                                            :disabled="actionLoading"
+                                            class="w-40 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-700 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:opacity-50"
+                                        >
+                                            <template x-for="container in containers" :key="container.id">
+                                                <option :value="container.id" :selected="Number(item.container_id) === Number(container.id)" x-text="container.container_code"></option>
+                                            </template>
+                                        </select>
+                                        <span x-show="!canMoveContainers" class="text-[11px] font-mono font-semibold text-slate-600" x-text="item.container_code || '-'"></span>
+                                    </td>
                                     <td class="px-4 py-2.5 text-center">
                                         <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm shadow-sm"
                                             :class="itemStatusClass(item.line_status)"
@@ -1147,11 +1163,19 @@
             </div>
         </div>
     </div>
+
+    @include('shared.transport-container-modals')
 </div>
 
 @push('scripts')
 <script>
     window.__manifestItems = @json($itemsData);
+    window.__manifestContainers = @json($manifest->containers->sortBy('sequence_number')->values()->map(fn ($container) => [
+        'id' => $container->id,
+        'container_code' => $container->container_code,
+        'container_type' => $container->container_type,
+        'status' => $container->status,
+    ]));
 </script>
 <script>
 document.addEventListener('alpine:init', () => {
@@ -1162,6 +1186,7 @@ document.addEventListener('alpine:init', () => {
             try { config = JSON.parse(container.getAttribute('data-transport-manifest-show-config')) || {}; } catch (e) { console.error('Invalid manifest show config', e); }
         }
         config.items = window.__manifestItems || [];
+        config.containers = window.__manifestContainers || [];
 
         function csrfToken() {
             return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -1173,7 +1198,14 @@ document.addEventListener('alpine:init', () => {
             actionLoading: false,
             showUnassignModal: false,
             showAssignModal: false,
+            createContainerModalOpen: false,
             unassignReason: '',
+            containerForm: {
+                container_type: 'box',
+                notes: '',
+            },
+            containers: config.containers,
+            canMoveContainers: ['draft', 'assigned', 'loading'].includes('{{ $manifest->status }}'),
 
             // Items table state
             itemSearch: '',
@@ -1234,6 +1266,134 @@ document.addEventListener('alpine:init', () => {
                     this.itemSortDir = 'asc';
                 }
                 this.itemPage = 1;
+            },
+
+            openCreateContainerModal() {
+                this.containerForm = { container_type: 'box', notes: '' };
+                this.createContainerModalOpen = true;
+            },
+
+            async postAction(endpoint, payload = {}, successMessage = 'Done.') {
+                if (!endpoint) {
+                    window.showToast?.('Missing action endpoint.', 'error');
+                    return;
+                }
+                if (this.actionLoading) return;
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) throw new Error(result.message || successMessage);
+                    window.showToast?.(result.message || successMessage, 'success');
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to complete action.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
+            },
+
+            async submitCreateContainer() {
+                await this.postAction(config.create_container_endpoint, this.containerForm, 'Transport container created.');
+                this.createContainerModalOpen = false;
+            },
+
+            async markContainerLoaded(containerId) {
+                if (!window.confirm('Mark this whole container as loaded?')) {
+                    return;
+                }
+                const endpoint = (config.mark_container_loaded_endpoint_template || '').replace('__CONTAINER__', containerId);
+                await this.postAction(endpoint, {}, 'Transport container marked loaded.');
+            },
+
+            async moveItemToContainer(itemId, containerId) {
+                const endpoint = (config.move_item_container_endpoint_template || '').replace('__ITEM__', itemId);
+                await this.postAction(endpoint, { container_id: Number(containerId) }, 'Manifest item moved to container.');
+            },
+
+            async deleteContainer(containerId, itemCount, containerCount) {
+                if (Number(containerCount) <= 1) {
+                    window.showToast?.('At least one container must remain on the manifest.', 'warning');
+                    return;
+                }
+                if (Number(itemCount) > 0) {
+                    window.showToast?.('Move all items to another container before deleting this one.', 'warning');
+                    return;
+                }
+                if (!window.confirm('Delete this empty transport container?')) {
+                    return;
+                }
+                const endpoint = (config.delete_container_endpoint_template || '').replace('__CONTAINER__', containerId);
+                if (!endpoint) {
+                    window.showToast?.('Missing action endpoint.', 'error');
+                    return;
+                }
+                if (this.actionLoading) return;
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'DELETE',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                        },
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) throw new Error(result.message || 'Unable to delete container.');
+                    window.showToast?.(result.message || 'Transport container deleted.', 'success');
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to delete container.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
+            },
+
+            async printContainerLabel(containerId) {
+                const endpoint = (config.print_container_label_endpoint_template || '').replace('__CONTAINER__', containerId);
+                if (!endpoint) {
+                    window.showToast?.('Missing print endpoint.', 'error');
+                    return;
+                }
+                if (this.actionLoading) return;
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                        },
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) throw new Error(result.message || 'Unable to generate label.');
+
+                    const printWindow = window.open('', '_blank');
+                    if (!printWindow) throw new Error('Pop-up blocked. Allow pop-ups to print the container label.');
+                    printWindow.document.open();
+                    printWindow.document.write(result.data?.label_html || '');
+                    printWindow.document.close();
+                    printWindow.focus();
+                    setTimeout(() => printWindow.print(), 300);
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to print label.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
             },
 
             async assignDriver() {

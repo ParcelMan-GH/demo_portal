@@ -45,6 +45,8 @@ class DriverTransportService
                 'destinationWarehouse:id,name,code,address,latitude,longitude,contact_phone',
                 'items.shipmentItem.shipment:id,shipment_number',
                 'items.shipmentItem:id,shipment_id,description,tracking_code',
+                'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
+                'containers.items.manifestItem.shipmentItem.shipment:id,shipment_number',
             ]);
 
         if (!empty($validated['status'])) {
@@ -71,7 +73,17 @@ class DriverTransportService
             ->offset($offset)
             ->limit($limit)
             ->get()
-            ->map(fn (TransportManifest $manifest) => $this->transformManifest($manifest))
+            ->map(function (TransportManifest $manifest) {
+                if ($manifest->containers->isEmpty()) {
+                    $this->warehouseTransportService->ensureDefaultContainer($manifest);
+                    $manifest->load([
+                        'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
+                        'containers.items.manifestItem.shipmentItem.shipment:id,shipment_number',
+                    ]);
+                }
+
+                return $this->transformManifest($manifest);
+            })
             ->values()
             ->all();
 
@@ -108,7 +120,17 @@ class DriverTransportService
             'destinationWarehouse:id,name,code,address,latitude,longitude,contact_phone',
             'items.shipmentItem.shipment:id,shipment_number',
             'items.shipmentItem:id,shipment_id,description,tracking_code',
+            'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
+            'containers.items.manifestItem.shipmentItem.shipment:id,shipment_number',
         ]);
+
+        if ($manifest->containers->isEmpty()) {
+            $this->warehouseTransportService->ensureDefaultContainer($manifest);
+            $manifest->load([
+                'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
+                'containers.items.manifestItem.shipmentItem.shipment:id,shipment_number',
+            ]);
+        }
 
         return [
             'success' => true,
@@ -165,10 +187,39 @@ class DriverTransportService
                     'notes' => $line->notes,
                 ];
             })->values(),
+            'containers' => $manifest->containers->sortBy('sequence_number')->map(function ($container) {
+                $items = $container->items;
+
+                return [
+                    'id' => $container->id,
+                    'container_code' => $container->container_code,
+                    'container_type' => $container->container_type,
+                    'sequence_number' => (int) $container->sequence_number,
+                    'status' => $container->status,
+                    'package_count' => (int) ($container->expected_package_count ?: $items->count()),
+                    'item_quantity' => (int) $items->sum(fn ($item) => (int) $item->expected_quantity),
+                    'loaded_at' => $container->loaded_at,
+                    'sealed_at' => $container->sealed_at,
+                    'notes' => $container->notes,
+                    'items' => $items->map(function ($containerItem) {
+                        $line = $containerItem->manifestItem;
+                        $shipmentItem = $line?->shipmentItem;
+
+                        return [
+                            'shipment_item_id' => $containerItem->shipment_item_id,
+                            'manifest_item_id' => $containerItem->transport_manifest_item_id,
+                            'shipment_number' => $shipmentItem?->shipment?->shipment_number,
+                            'description' => $shipmentItem?->description,
+                            'tracking_code' => $shipmentItem?->tracking_code,
+                            'expected_quantity' => (int) $containerItem->expected_quantity,
+                            'status' => $containerItem->status,
+                        ];
+                    })->values(),
+                ];
+            })->values(),
             'notes' => $manifest->notes,
             'created_at' => $manifest->created_at,
             'updated_at' => $manifest->updated_at,
         ];
     }
 }
-

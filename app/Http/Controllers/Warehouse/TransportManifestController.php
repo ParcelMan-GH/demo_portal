@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\ShipmentItem;
 use App\Models\SortBatch;
+use App\Models\TransportContainer;
 use App\Models\TransportManifest;
+use App\Models\TransportManifestItem;
+use App\Services\Warehouse\BarcodeService;
 use App\Services\Warehouse\WarehousePortalService;
 use App\Services\Warehouse\WarehouseTransportReceivingService;
 use App\Services\Warehouse\WarehouseTransportService;
@@ -21,7 +24,8 @@ class TransportManifestController extends Controller
     public function __construct(
         private WarehousePortalService $portalService,
         private WarehouseTransportService $transportService,
-        private WarehouseTransportReceivingService $receivingService
+        private WarehouseTransportReceivingService $receivingService,
+        private BarcodeService $barcodeService
     ) {
     }
 
@@ -55,6 +59,8 @@ class TransportManifestController extends Controller
             abort(404);
         }
 
+        $this->transportService->ensureDefaultContainer($manifest->fresh('items'));
+
         $manifest->load([
             'originWarehouse',
             'destinationWarehouse',
@@ -62,6 +68,7 @@ class TransportManifestController extends Controller
             'sortBatch',
             'createdBy',
             'items.shipmentItem.shipment.vendor',
+            'containers.items.manifestItem.shipmentItem.shipment.vendor',
         ]);
 
         $transportDrivers = Driver::query()
@@ -70,9 +77,15 @@ class TransportManifestController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']);
 
-        $itemsData = $manifest->items->map(function ($line) {
+        $containerItems = $manifest->containers
+            ->flatMap(fn (TransportContainer $container) => $container->items->mapWithKeys(fn ($containerItem) => [
+                $containerItem->transport_manifest_item_id => $container,
+            ]));
+
+        $itemsData = $manifest->items->map(function ($line) use ($containerItems) {
             $shipmentItem = $line->shipmentItem;
             $shipment = $shipmentItem?->shipment;
+            $container = $containerItems->get($line->id);
             return [
                 'id' => $line->id,
                 'description' => $shipmentItem?->description ?? '-',
@@ -80,6 +93,8 @@ class TransportManifestController extends Controller
                 'shipment_item_id' => $line->shipment_item_id,
                 'shipment_number' => $shipment?->shipment_number ?? '-',
                 'vendor_name' => $shipment?->vendor?->name ?? '',
+                'container_id' => $container?->id,
+                'container_code' => $container?->container_code,
                 'expected_quantity' => (int) $line->expected_quantity,
                 'loaded_quantity' => (int) $line->loaded_quantity,
                 'received_quantity' => (int) $line->received_quantity,
@@ -94,6 +109,11 @@ class TransportManifestController extends Controller
             'assign_driver_endpoint' => route('warehouse.manifests.transport.assign-driver', ['manifest' => $manifest]),
             'dispatch_endpoint' => route('warehouse.manifests.transport.dispatch', ['manifest' => $manifest]),
             'unassign_driver_endpoint' => route('warehouse.manifests.transport.unassign-driver', ['manifest' => $manifest]),
+            'create_container_endpoint' => route('warehouse.manifests.transport.containers.store', ['manifest' => $manifest]),
+            'mark_container_loaded_endpoint_template' => route('warehouse.manifests.transport.containers.mark-loaded', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
+            'delete_container_endpoint_template' => route('warehouse.manifests.transport.containers.destroy', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
+            'print_container_label_endpoint_template' => route('warehouse.manifests.transport.containers.print-label', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
+            'move_item_container_endpoint_template' => route('warehouse.manifests.transport.items.move-container', ['manifest' => $manifest, 'item' => '__ITEM__']),
         ];
 
         $assignmentHistory = $manifest->assignments()
@@ -215,6 +235,116 @@ class TransportManifestController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
+    public function createContainer(Request $request, TransportManifest $manifest): JsonResponse
+    {
+        $this->authorizePermission('warehouse.manifest.manage');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'container_type' => ['nullable', 'string', 'max:40'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $result = $this->transportService->createContainer(
+            $manifest,
+            $warehouse,
+            Auth::guard('admin')->user(),
+            $validated['container_type'] ?? 'box',
+            $validated['notes'] ?? null
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function moveItemToContainer(Request $request, TransportManifest $manifest, TransportManifestItem $item): JsonResponse
+    {
+        $this->authorizePermission('warehouse.manifest.manage');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'container_id' => ['required', 'integer', 'exists:transport_containers,id'],
+        ]);
+
+        $container = TransportContainer::query()->findOrFail((int) $validated['container_id']);
+        $result = $this->transportService->moveItemToContainer(
+            $manifest,
+            $item,
+            $container,
+            $warehouse,
+            Auth::guard('admin')->user()
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function markContainerLoaded(TransportManifest $manifest, TransportContainer $container): JsonResponse
+    {
+        $this->authorizePermission('warehouse.transport.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            abort(404);
+        }
+
+        $result = $this->transportService->adminMarkContainerLoaded(
+            $manifest,
+            $container,
+            $warehouse,
+            Auth::guard('admin')->user()
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function deleteContainer(TransportManifest $manifest, TransportContainer $container): JsonResponse
+    {
+        $this->authorizePermission('warehouse.manifest.manage');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            abort(404);
+        }
+
+        $result = $this->transportService->deleteContainer($manifest, $container, $warehouse);
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function printContainerLabel(TransportManifest $manifest, TransportContainer $container): JsonResponse
+    {
+        $this->authorizePermission('warehouse.manifest.manage');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            abort(404);
+        }
+
+        if ((int) $container->transport_manifest_id !== (int) $manifest->id) {
+            return response()->json(['success' => false, 'message' => 'Container not found on this manifest.'], 404);
+        }
+
+        $manifest->loadMissing(['originWarehouse', 'destinationWarehouse']);
+        $container->loadMissing('items');
+        $barcodeSvg = $this->barcodeService->renderCode128Svg($container->container_code, 70, 2, 10, true);
+        $labelHtml = view('shared.transport-container-label', [
+            'manifest' => $manifest,
+            'container' => $container,
+            'barcodeSvg' => $barcodeSvg,
+        ])->render();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Container label generated.',
+            'data' => [
+                'container_code' => $container->container_code,
+                'label_html' => $labelHtml,
+            ],
+        ]);
+    }
+
     public function incomingIndex(): View
     {
         $this->authorizePermission('warehouse.receiving.manage');
@@ -282,6 +412,7 @@ class TransportManifestController extends Controller
             'sortBatch',
             'createdBy',
             'items.shipmentItem.shipment.vendor',
+            'containers.items.manifestItem.shipmentItem.shipment.vendor',
         ]);
 
         $config = [
@@ -383,4 +514,3 @@ class TransportManifestController extends Controller
         ]);
     }
 }
-

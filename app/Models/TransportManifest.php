@@ -79,6 +79,11 @@ class TransportManifest extends Model
         return $this->hasMany(TransportManifestItem::class);
     }
 
+    public function containers(): HasMany
+    {
+        return $this->hasMany(TransportContainer::class);
+    }
+
     public function warehouseReceipt(): HasOne
     {
         return $this->hasOne(WarehouseReceipt::class);
@@ -89,4 +94,3 @@ class TransportManifest extends Model
         return $this->hasMany(TransportManifestAssignment::class);
     }
 }
-

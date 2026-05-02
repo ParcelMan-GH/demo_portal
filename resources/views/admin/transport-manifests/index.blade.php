@@ -11,7 +11,7 @@
     <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">
         <!-- Card Header -->
         <div class="px-6 py-5 border-b border-slate-200/50">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div class="flex items-center gap-3">
                     <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100">
                         <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -23,8 +23,20 @@
                         <p class="mt-0.5 text-sm text-slate-500">View and track all inter-warehouse transport manifests</p>
                     </div>
                 </div>
-                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="meta.total + ' Total Manifests'">
-                </span>
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="meta.total + ' Total Manifests'">
+                    </span>
+                    <button
+                        type="button"
+                        @@click="openCreateManifestModal()"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Create Manifest
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -504,6 +516,67 @@
             </div>
         </div>
     </div>
+
+    <div
+        x-show="createManifestModalOpen"
+        x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+    >
+        <div
+            @@click.outside="createManifestModalOpen = false"
+            x-transition
+            class="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        >
+            <div class="border-b border-slate-100 px-5 py-4">
+                <h3 class="text-base font-bold text-slate-900">Create Transport Manifest</h3>
+                <p class="mt-1 text-xs text-slate-500">Select a sealed transfer batch that has not yet been converted into a transport manifest.</p>
+            </div>
+
+            <div class="space-y-4 px-5 py-4">
+                @if($transferBatches->isEmpty())
+                    <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
+                        <p class="text-sm font-semibold text-slate-700">No sealed transfer batches available.</p>
+                        <p class="mt-1 text-xs text-slate-500">Create and seal a transfer sort batch first, then return here.</p>
+                    </div>
+                @else
+                    <div>
+                        <label class="mb-1.5 block text-xs font-semibold text-slate-700">Transfer Batch</label>
+                        <select
+                            x-model="createManifestForm.sort_batch_id"
+                            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                        >
+                            <option value="">Choose sealed batch...</option>
+                            @foreach($transferBatches as $batch)
+                                <option value="{{ $batch->id }}">
+                                    {{ $batch->batch_number ?? '#' . $batch->id }}
+                                    · {{ $batch->originWarehouse?->name ?? 'Origin missing' }}
+                                    → {{ $batch->destinationWarehouse?->name ?? 'Destination missing' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                        <p class="text-xs font-semibold text-blue-800">What happens next</p>
+                        <p class="mt-1 text-xs text-blue-700">The manifest will be created from the selected batch, and a default loose container will be created for the batch items.</p>
+                    </div>
+                @endif
+            </div>
+
+            <div class="flex items-center justify-end gap-3 border-t border-slate-100 px-5 py-4">
+                <button type="button" @@click="createManifestModalOpen = false" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50">Cancel</button>
+                <button
+                    type="button"
+                    @@click="submitCreateManifest()"
+                    :disabled="actionLoading || !createManifestForm.sort_batch_id"
+                    class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    <span x-show="!actionLoading">Create Manifest</span>
+                    <span x-show="actionLoading">Creating...</span>
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 @endsection
@@ -514,6 +587,11 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('transportManifestsTable', () => ({
         manifests: [],
         loading: false,
+        actionLoading: false,
+        createManifestModalOpen: false,
+        createManifestForm: {
+            sort_batch_id: '',
+        },
         search: '',
         statusFilter: '',
         statusFilterName: '',
@@ -559,6 +637,54 @@ document.addEventListener('alpine:init', () => {
         init() {
             this.loadData();
             this.initDateRange();
+        },
+
+        csrfToken() {
+            return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        },
+
+        openCreateManifestModal() {
+            this.createManifestForm = { sort_batch_id: '' };
+            this.createManifestModalOpen = true;
+        },
+
+        async submitCreateManifest() {
+            if (!this.createManifestForm.sort_batch_id || this.actionLoading) return;
+
+            this.actionLoading = true;
+            try {
+                const response = await fetch('{{ route('admin.transport-manifests.store') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': this.csrfToken(),
+                    },
+                    body: JSON.stringify({
+                        sort_batch_id: Number(this.createManifestForm.sort_batch_id),
+                    }),
+                });
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || 'Failed to create transport manifest.');
+                }
+
+                window.showToast?.(result.message || 'Transport manifest created.', 'success');
+                const manifestId = result.data?.manifest?.id;
+                if (manifestId) {
+                    window.location.href = '{{ route('admin.transport-manifests.show', ['manifest' => '__ID__']) }}'.replace('__ID__', manifestId);
+                    return;
+                }
+
+                this.createManifestModalOpen = false;
+                await this.loadData();
+            } catch (err) {
+                console.error(err);
+                window.showToast?.(err.message || 'Unable to create manifest.', 'error');
+            } finally {
+                this.actionLoading = false;
+            }
         },
 
         initDateRange() {

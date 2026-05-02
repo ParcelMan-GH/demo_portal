@@ -7,6 +7,8 @@ use App\Enums\ShipmentStatus;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemTracking;
+use App\Models\TransportContainer;
+use App\Models\TransportContainerItem;
 use App\Models\TransportManifest;
 use App\Models\TransportManifestItem;
 use App\Models\User;
@@ -64,6 +66,18 @@ class WarehouseTransportReceivingService
                 'notes' => $notes,
             ]);
 
+            TransportContainerItem::query()
+                ->where('transport_manifest_item_id', $line->id)
+                ->update([
+                    'received_quantity' => $receivedQuantity,
+                    'status' => match ($resolvedStatus) {
+                        TransportManifestItem::LINE_RECEIVED => TransportContainerItem::STATUS_RECEIVED,
+                        TransportManifestItem::LINE_DAMAGED => TransportContainerItem::STATUS_DAMAGED,
+                        TransportManifestItem::LINE_EXCESS => TransportContainerItem::STATUS_EXTRA,
+                        default => TransportContainerItem::STATUS_MISSING,
+                    },
+                ]);
+
             return [
                 'success' => true,
                 'message' => 'Manifest line received.',
@@ -103,6 +117,12 @@ class WarehouseTransportReceivingService
                 'received_at' => now(),
                 'received_by_user_id' => $user->id,
                 'notes' => $notes ?: $manifest->notes,
+            ]);
+
+            $manifest->containers()->update([
+                'status' => TransportContainer::STATUS_RECEIVED,
+                'received_at' => now(),
+                'received_by_user_id' => $user->id,
             ]);
 
             $now = now();
@@ -243,4 +263,3 @@ class WarehouseTransportReceivingService
         }
     }
 }
-

@@ -357,11 +357,17 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('transport-manifests', [AdminTransportManifestController::class, 'index'])->name('transport-manifests.index');
         Route::get('transport-manifests-data', [AdminTransportManifestController::class, 'data'])->name('transport-manifests.data');
         Route::get('transport-manifests-export', [AdminTransportManifestController::class, 'export'])->name('transport-manifests.export');
+        Route::post('transport-manifests', [AdminTransportManifestController::class, 'store'])->name('transport-manifests.store');
         Route::get('transport-manifests/{manifest}', [AdminTransportManifestController::class, 'show'])->name('transport-manifests.show');
         Route::post('transport-manifests/{manifest}/assign-driver', [AdminTransportManifestController::class, 'assignDriver'])->name('transport-manifests.assign-driver');
         Route::post('transport-manifests/{manifest}/unassign-driver', [AdminTransportManifestController::class, 'unassignDriver'])->name('transport-manifests.unassign-driver');
         Route::post('transport-manifests/{manifest}/dispatch', [AdminTransportManifestController::class, 'dispatch'])->name('transport-manifests.dispatch');
         Route::post('transport-manifests/{manifest}/items/{item}/mark-loaded', [AdminTransportManifestController::class, 'markItemLoaded'])->name('transport-manifests.items.mark-loaded');
+        Route::post('transport-manifests/{manifest}/items/{item}/move-container', [AdminTransportManifestController::class, 'moveItemToContainer'])->name('transport-manifests.items.move-container');
+        Route::post('transport-manifests/{manifest}/containers', [AdminTransportManifestController::class, 'createContainer'])->name('transport-manifests.containers.store');
+        Route::post('transport-manifests/{manifest}/containers/{container}/mark-loaded', [AdminTransportManifestController::class, 'markContainerLoaded'])->name('transport-manifests.containers.mark-loaded');
+        Route::post('transport-manifests/{manifest}/containers/{container}/print-label', [AdminTransportManifestController::class, 'printContainerLabel'])->name('transport-manifests.containers.print-label');
+        Route::delete('transport-manifests/{manifest}/containers/{container}', [AdminTransportManifestController::class, 'deleteContainer'])->name('transport-manifests.containers.destroy');
         Route::post('transport-manifests/{manifest}/mark-all-loaded', [AdminTransportManifestController::class, 'markAllLoaded'])->name('transport-manifests.mark-all-loaded');
 
         // Sort Batches (admin read visibility)
@@ -503,6 +509,11 @@ Route::prefix('warehouse')
         Route::post('manifests/transport/{manifest}/assign-driver', [WarehouseTransportManifestController::class, 'assignDriver'])->name('manifests.transport.assign-driver');
         Route::post('manifests/transport/{manifest}/dispatch', [WarehouseTransportManifestController::class, 'dispatch'])->name('manifests.transport.dispatch');
         Route::post('manifests/transport/{manifest}/unassign-driver', [WarehouseTransportManifestController::class, 'unassignDriver'])->name('manifests.transport.unassign-driver');
+        Route::post('manifests/transport/{manifest}/items/{item}/move-container', [WarehouseTransportManifestController::class, 'moveItemToContainer'])->name('manifests.transport.items.move-container');
+        Route::post('manifests/transport/{manifest}/containers', [WarehouseTransportManifestController::class, 'createContainer'])->name('manifests.transport.containers.store');
+        Route::post('manifests/transport/{manifest}/containers/{container}/mark-loaded', [WarehouseTransportManifestController::class, 'markContainerLoaded'])->name('manifests.transport.containers.mark-loaded');
+        Route::post('manifests/transport/{manifest}/containers/{container}/print-label', [WarehouseTransportManifestController::class, 'printContainerLabel'])->name('manifests.transport.containers.print-label');
+        Route::delete('manifests/transport/{manifest}/containers/{container}', [WarehouseTransportManifestController::class, 'deleteContainer'])->name('manifests.transport.containers.destroy');
         Route::get('manifests/transport/{manifest}', [WarehouseTransportManifestController::class, 'outboundShow'])->name('manifests.transport.show');
 
         Route::get('manifests/incoming', [WarehouseTransportManifestController::class, 'incomingIndex'])->name('manifests.incoming.index');

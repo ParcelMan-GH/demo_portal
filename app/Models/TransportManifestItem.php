@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TransportManifestItem extends Model
 {
@@ -50,5 +51,9 @@ class TransportManifestItem extends Model
     {
         return $this->belongsTo(ShipmentItem::class);
     }
-}
 
+    public function containerItems(): HasMany
+    {
+        return $this->hasMany(TransportContainerItem::class, 'transport_manifest_item_id');
+    }
+}
