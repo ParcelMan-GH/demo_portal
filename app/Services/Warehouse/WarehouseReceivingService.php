@@ -365,13 +365,11 @@ class WarehouseReceivingService
 
             $labels = [];
             for ($i = 1; $i <= $labelCount; $i++) {
-                $barcodeValue = $labelCount === 1
-                    ? $parentBarcode
-                    : $parentBarcode . '-' . str_pad($i, 3, '0', STR_PAD_LEFT);
+                $barcodeValue = $parentBarcode . '-' . str_pad($i, 3, '0', STR_PAD_LEFT);
 
                 $label = $receiptItem->labels()->create([
                     'barcode_value' => $barcodeValue,
-                    'label_index' => $labelCount === 1 ? null : $i,
+                    'label_index' => $i,
                     'labels_total' => $labelCount,
                     'label_type' => $labelType,
                     'printed_at' => now(),

@@ -1141,6 +1141,46 @@ test('post-pickup receiving remove can delete printed labels still at warehouse'
     $this->assertDatabaseMissing('shipment_items', ['id' => $item->id]);
 });
 
+test('single generated label uses indexed barcode suffix', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+    ]);
+    $item = rwCreateShipmentItem($shipment, [
+        'tracking_code' => 'TRKSINGLE01',
+    ]);
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'status' => 'completed',
+        'picked_up_at' => now(),
+        'completed_at' => now(),
+    ]);
+    $receipt = rwCreateReceipt($assignment, $warehouse);
+    rwCreateReceiptItem($receipt, $item, [
+        'expected_quantity' => 1,
+        'received_quantity' => 1,
+    ]);
+
+    $result = app(\App\Services\Warehouse\WarehouseReceivingService::class)->generateLabels(
+        assignment: $assignment,
+        shipmentItem: $item,
+        warehouse: $warehouse,
+        user: auth('admin')->user(),
+        labelCount: 1,
+    );
+
+    expect($result['success'])->toBeTrue()
+        ->and($result['data']['labels'][0]['barcode_value'])->toBe('TRKSINGLE01-001')
+        ->and($result['data']['labels'][0]['label_index'])->toBe(1)
+        ->and($result['data']['labels'][0]['labels_total'])->toBe(1);
+
+    $this->assertDatabaseHas('warehouse_receipt_item_labels', [
+        'barcode_value' => 'TRKSINGLE01-001',
+        'label_index' => 1,
+        'labels_total' => 1,
+    ]);
+});
+
 test('post-pickup receiving remove is blocked once a printed label is in driver custody', function () {
     $location = rwCreateLocation();
     $warehouse = rwCreateWarehouse($location['region'], $location['district']);
