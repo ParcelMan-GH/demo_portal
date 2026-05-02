@@ -336,9 +336,10 @@ class AdminDeliveryRunController extends Controller
 
         $admin = Auth::guard('admin')->user();
         $now = now();
+        $notes = $validated['notes'] ?? null;
 
         if ($validated['action'] === 'delivered') {
-            $item->update(['status' => \App\Models\DeliveryRunItem::STATUS_DELIVERED, 'notes' => $validated['notes']]);
+            $item->update(['status' => \App\Models\DeliveryRunItem::STATUS_DELIVERED, 'notes' => $notes]);
 
             if ($item->shipmentItem) {
                 $item->shipmentItem->update(['status' => \App\Enums\ItemStatus::DELIVERED]);
@@ -359,7 +360,7 @@ class AdminDeliveryRunController extends Controller
                 }
             }
         } else {
-            $item->update(['status' => \App\Models\DeliveryRunItem::STATUS_FAILED, 'notes' => $validated['notes']]);
+            $item->update(['status' => \App\Models\DeliveryRunItem::STATUS_FAILED, 'notes' => $notes]);
             if ($item->shipmentItem) {
                 $item->shipmentItem->update(['status' => \App\Enums\ItemStatus::AT_DESTINATION]);
             }
@@ -381,6 +382,8 @@ class AdminDeliveryRunController extends Controller
             if ($allDelivered) {
                 app(\App\Services\VendorCommissionService::class)->createEarningsForStop($stop);
             }
+
+            $this->refreshRunStatusAfterStopResolution($run);
         }
 
         $recipName = $item->shipmentItem?->delivery_recipient_name ?? 'Item';
@@ -388,7 +391,12 @@ class AdminDeliveryRunController extends Controller
             ? "{$recipName}'s package confirmed as delivered."
             : "{$recipName}'s package marked as failed.";
 
-        return response()->json(['success' => true, 'message' => $msg, 'all_resolved' => $allResolved]);
+        return response()->json([
+            'success' => true,
+            'message' => $msg,
+            'all_resolved' => $allResolved,
+            'run_status' => $run->fresh()->status,
+        ]);
     }
 
     public function updateStopDeliveryMethod(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
@@ -413,6 +421,44 @@ class AdminDeliveryRunController extends Controller
         $user = Auth::guard('admin')->user();
         if (!$user || !$user->hasPermission($permission)) {
             abort(403, 'Unauthorized action.');
+        }
+    }
+
+    private function refreshRunStatusAfterStopResolution(DeliveryRun $run): void
+    {
+        if ($run->status === DeliveryRun::STATUS_CANCELLED) {
+            return;
+        }
+
+        $run->unsetRelation('stops');
+        $run->load('stops');
+
+        $totalStops = $run->stops->count();
+
+        if ($totalStops === 0) {
+            return;
+        }
+
+        $completedStops = $run->stops
+            ->whereIn('status', [
+                DeliveryRunStop::STATUS_DELIVERED,
+                DeliveryRunStop::STATUS_FAILED,
+            ])
+            ->count();
+
+        if ($completedStops === $totalStops) {
+            $run->update([
+                'status' => DeliveryRun::STATUS_COMPLETED,
+                'completed_at' => $run->completed_at ?? now(),
+            ]);
+
+            return;
+        }
+
+        if ($completedStops > 0) {
+            $run->update([
+                'status' => DeliveryRun::STATUS_PARTIALLY_DELIVERED,
+            ]);
         }
     }
 }
