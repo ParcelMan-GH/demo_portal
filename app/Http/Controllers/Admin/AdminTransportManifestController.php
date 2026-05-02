@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\SortBatch;
 use App\Models\TransportContainer;
+use App\Models\TransportLoadingException;
 use App\Models\TransportManifest;
 use App\Models\TransportManifestItem;
 use App\Models\Warehouse;
@@ -200,6 +201,10 @@ class AdminTransportManifestController extends Controller
             'receivedBy',
             'items.shipmentItem.shipment',
             'containers.items.manifestItem.shipmentItem.shipment',
+            'loadingExceptions.driver:id,name,phone',
+            'loadingExceptions.container:id,container_code,container_type',
+            'loadingExceptions.manifestItem.shipmentItem:id,description,tracking_code',
+            'loadingExceptions.reviewedBy:id,name',
             'warehouseReceipt.startedBy',
             'warehouseReceipt.finalizedBy',
         ]);
@@ -222,6 +227,8 @@ class AdminTransportManifestController extends Controller
             'delete_container_endpoint_template' => route('admin.transport-manifests.containers.destroy', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
             'print_container_label_endpoint_template' => route('admin.transport-manifests.containers.print-label', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
             'move_item_container_endpoint_template' => route('admin.transport-manifests.items.move-container', ['manifest' => $manifest, 'item' => '__ITEM__']),
+            'approve_scan_issue_endpoint_template' => route('admin.transport-manifests.scan-issues.approve', ['manifest' => $manifest, 'exception' => '__ISSUE__']),
+            'reject_scan_issue_endpoint_template' => route('admin.transport-manifests.scan-issues.reject', ['manifest' => $manifest, 'exception' => '__ISSUE__']),
         ];
 
         return view('admin.transport-manifests.show', compact('manifest', 'statusLabel', 'transportDrivers', 'manifestConfig'));
@@ -391,6 +398,52 @@ class AdminTransportManifestController extends Controller
         }
 
         $result = $this->transportService->deleteContainer($manifest, $container, $warehouse);
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function approveScanIssue(Request $request, TransportManifest $manifest, TransportLoadingException $exception): JsonResponse
+    {
+        $validated = $request->validate([
+            'admin_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $result = $this->transportService->adminReviewLoadingException(
+            $manifest,
+            $exception,
+            $warehouse,
+            Auth::guard('admin')->user(),
+            true,
+            $validated['admin_note'] ?? null
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function rejectScanIssue(Request $request, TransportManifest $manifest, TransportLoadingException $exception): JsonResponse
+    {
+        $validated = $request->validate([
+            'admin_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $result = $this->transportService->adminReviewLoadingException(
+            $manifest,
+            $exception,
+            $warehouse,
+            Auth::guard('admin')->user(),
+            false,
+            $validated['admin_note'] ?? null
+        );
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }

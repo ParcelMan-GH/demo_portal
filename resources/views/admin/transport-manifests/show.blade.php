@@ -485,6 +485,8 @@ $lineStatusColors = [
 
     @include('shared.transport-containers-section', ['manifest' => $manifest])
 
+    @include('shared.transport-loading-exceptions-section', ['manifest' => $manifest])
+
     <!-- Items Table -->
     <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">
         <div class="px-6 py-5 border-b border-slate-200/50">
@@ -1017,6 +1019,18 @@ document.addEventListener('alpine:init', () => {
                     return;
                 }
                 await this._printLabel(endpoint);
+            },
+
+            async reviewScanIssue(issueId, accept) {
+                const template = accept
+                    ? config.approve_scan_issue_endpoint_template
+                    : config.reject_scan_issue_endpoint_template;
+                const endpoint = (template || '').replace('__ISSUE__', issueId);
+                const action = accept ? 'accept' : 'reject';
+                if (!window.confirm(`Are you sure you want to ${action} this scan issue?`)) {
+                    return;
+                }
+                await this._postAction(endpoint, {}, null);
             },
 
             async _printLabel(endpoint) {

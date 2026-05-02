@@ -93,4 +93,9 @@ class TransportManifest extends Model
     {
         return $this->hasMany(TransportManifestAssignment::class);
     }
+
+    public function loadingExceptions(): HasMany
+    {
+        return $this->hasMany(TransportLoadingException::class);
+    }
 }

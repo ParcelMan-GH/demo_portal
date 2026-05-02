@@ -58,4 +58,9 @@ class TransportContainer extends Model
     {
         return $this->belongsTo(Driver::class, 'loaded_by_driver_id');
     }
+
+    public function loadingExceptions(): HasMany
+    {
+        return $this->hasMany(TransportLoadingException::class);
+    }
 }

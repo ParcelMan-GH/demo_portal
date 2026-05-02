@@ -47,6 +47,7 @@ class DriverTransportService
                 'items.shipmentItem:id,shipment_id,description,tracking_code',
                 'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
                 'containers.items.manifestItem.shipmentItem.shipment:id,shipment_number',
+                'loadingExceptions:id,transport_manifest_id,transport_container_id,transport_manifest_item_id,driver_id,reason,note,proof_photo_path,status,auto_accepted,created_at,reviewed_at',
             ]);
 
         if (!empty($validated['status'])) {
@@ -79,6 +80,7 @@ class DriverTransportService
                     $manifest->load([
                         'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
                         'containers.items.manifestItem.shipmentItem.shipment:id,shipment_number',
+                        'loadingExceptions:id,transport_manifest_id,transport_container_id,transport_manifest_item_id,driver_id,reason,note,proof_photo_path,status,auto_accepted,created_at,reviewed_at',
                     ]);
                 }
 
@@ -122,6 +124,7 @@ class DriverTransportService
             'items.shipmentItem:id,shipment_id,description,tracking_code',
             'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
             'containers.items.manifestItem.shipmentItem.shipment:id,shipment_number',
+            'loadingExceptions:id,transport_manifest_id,transport_container_id,transport_manifest_item_id,driver_id,reason,note,proof_photo_path,status,auto_accepted,created_at,reviewed_at',
         ]);
 
         if ($manifest->containers->isEmpty()) {
@@ -129,6 +132,7 @@ class DriverTransportService
             $manifest->load([
                 'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
                 'containers.items.manifestItem.shipmentItem.shipment:id,shipment_number',
+                'loadingExceptions:id,transport_manifest_id,transport_container_id,transport_manifest_item_id,driver_id,reason,note,proof_photo_path,status,auto_accepted,created_at,reviewed_at',
             ]);
         }
 
@@ -215,6 +219,20 @@ class DriverTransportService
                             'status' => $containerItem->status,
                         ];
                     })->values(),
+                ];
+            })->values(),
+            'loading_issues' => $manifest->loadingExceptions->map(function ($issue) {
+                return [
+                    'id' => $issue->id,
+                    'container_id' => $issue->transport_container_id,
+                    'manifest_item_id' => $issue->transport_manifest_item_id,
+                    'reason' => $issue->reason,
+                    'note' => $issue->note,
+                    'proof_photo_url' => $issue->proof_photo_url,
+                    'status' => $issue->status,
+                    'auto_accepted' => (bool) $issue->auto_accepted,
+                    'created_at' => $issue->created_at,
+                    'reviewed_at' => $issue->reviewed_at,
                 ];
             })->values(),
             'notes' => $manifest->notes,

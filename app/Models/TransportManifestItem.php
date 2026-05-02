@@ -56,4 +56,9 @@ class TransportManifestItem extends Model
     {
         return $this->hasMany(TransportContainerItem::class, 'transport_manifest_item_id');
     }
+
+    public function loadingExceptions(): HasMany
+    {
+        return $this->hasMany(TransportLoadingException::class, 'transport_manifest_item_id');
+    }
 }

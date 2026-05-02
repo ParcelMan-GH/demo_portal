@@ -110,6 +110,7 @@ Route::prefix('v1/driver')->group(function () {
         Route::get('transports/{manifest}', [DriverTransportController::class, 'show']);
         Route::post('transports/{manifest}/start-loading', [DriverTransportController::class, 'startLoading']);
         Route::post('transports/{manifest}/scan-load', [DriverTransportController::class, 'scanLoad']);
+        Route::post('transports/{manifest}/scan-issue', [DriverTransportController::class, 'scanIssue']);
         Route::post('transports/{manifest}/depart', [DriverTransportController::class, 'depart']);
         Route::post('transports/{manifest}/arrive', [DriverTransportController::class, 'arrive']);
 

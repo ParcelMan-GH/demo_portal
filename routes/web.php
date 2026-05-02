@@ -368,6 +368,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('transport-manifests/{manifest}/containers/{container}/mark-loaded', [AdminTransportManifestController::class, 'markContainerLoaded'])->name('transport-manifests.containers.mark-loaded');
         Route::post('transport-manifests/{manifest}/containers/{container}/print-label', [AdminTransportManifestController::class, 'printContainerLabel'])->name('transport-manifests.containers.print-label');
         Route::delete('transport-manifests/{manifest}/containers/{container}', [AdminTransportManifestController::class, 'deleteContainer'])->name('transport-manifests.containers.destroy');
+        Route::post('transport-manifests/{manifest}/scan-issues/{exception}/approve', [AdminTransportManifestController::class, 'approveScanIssue'])->name('transport-manifests.scan-issues.approve');
+        Route::post('transport-manifests/{manifest}/scan-issues/{exception}/reject', [AdminTransportManifestController::class, 'rejectScanIssue'])->name('transport-manifests.scan-issues.reject');
         Route::post('transport-manifests/{manifest}/mark-all-loaded', [AdminTransportManifestController::class, 'markAllLoaded'])->name('transport-manifests.mark-all-loaded');
 
         // Sort Batches (admin read visibility)

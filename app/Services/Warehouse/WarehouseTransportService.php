@@ -13,10 +13,13 @@ use App\Models\TransportManifest;
 use App\Models\TransportManifestAssignment;
 use App\Models\TransportContainer;
 use App\Models\TransportContainerItem;
+use App\Models\TransportLoadingException;
 use App\Models\TransportManifestItem;
+use App\Models\PlatformSetting;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -406,6 +409,148 @@ class WarehouseTransportService
             return [
                 'success' => true,
                 'message' => 'Item loaded successfully.',
+            ];
+        });
+    }
+
+    public function driverReportScanIssue(TransportManifest $manifest, Driver $driver, array $data, UploadedFile $proofPhoto): array
+    {
+        if ((int) $manifest->assigned_driver_id !== (int) $driver->id) {
+            return ['success' => false, 'message' => 'Manifest not found.'];
+        }
+
+        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+            return ['success' => false, 'message' => 'Manifest is not in loading state.'];
+        }
+
+        return DB::transaction(function () use ($manifest, $driver, $data, $proofPhoto) {
+            $lockedManifest = TransportManifest::query()
+                ->lockForUpdate()
+                ->findOrFail($manifest->id);
+
+            if ($lockedManifest->status === TransportManifest::STATUS_ASSIGNED) {
+                $lockedManifest->update(['status' => TransportManifest::STATUS_LOADING]);
+            }
+
+            $targetType = $data['target_type'];
+            $container = null;
+            $line = null;
+
+            if ($targetType === 'container') {
+                $container = TransportContainer::query()
+                    ->where('transport_manifest_id', $lockedManifest->id)
+                    ->with('items.manifestItem')
+                    ->lockForUpdate()
+                    ->whereKey((int) $data['container_id'])
+                    ->first();
+
+                if (!$container) {
+                    return ['success' => false, 'message' => 'Load group not found on this manifest.'];
+                }
+
+                if ($container->items->isEmpty()) {
+                    return ['success' => false, 'message' => 'Cannot report loading for an empty load group.'];
+                }
+            } else {
+                $line = TransportManifestItem::query()
+                    ->where('transport_manifest_id', $lockedManifest->id)
+                    ->lockForUpdate()
+                    ->whereKey((int) $data['manifest_item_id'])
+                    ->first();
+
+                if (!$line) {
+                    return ['success' => false, 'message' => 'Manifest item not found on this transport.'];
+                }
+            }
+
+            $autoAccept = (bool) PlatformSetting::getValue('transport.scan_issue_auto_accept', false);
+            $path = $proofPhoto->store('transport-loading-exceptions/' . $lockedManifest->id, 'public');
+            $now = now();
+
+            $exception = TransportLoadingException::query()->create([
+                'transport_manifest_id' => $lockedManifest->id,
+                'transport_container_id' => $container?->id,
+                'transport_manifest_item_id' => $line?->id,
+                'driver_id' => $driver->id,
+                'reason' => $data['reason'],
+                'note' => $data['note'] ?? null,
+                'proof_photo_path' => $path,
+                'status' => $autoAccept ? TransportLoadingException::STATUS_ACCEPTED : TransportLoadingException::STATUS_PENDING,
+                'auto_accepted' => $autoAccept,
+                'reviewed_at' => $autoAccept ? $now : null,
+                'admin_note' => $autoAccept ? 'Auto-accepted by platform setting.' : null,
+            ]);
+
+            if ($autoAccept) {
+                if ($container) {
+                    $this->markContainerLoadedFromException($container, $driver, $exception);
+                } elseif ($line) {
+                    $this->markLineLoadedFromException($line, $driver, $exception);
+                }
+            }
+
+            return [
+                'success' => true,
+                'message' => $autoAccept
+                    ? 'Scan issue accepted and load marked.'
+                    : 'Scan issue submitted for admin review.',
+                'data' => [
+                    'scan_issue' => $exception->fresh(['container', 'manifestItem.shipmentItem', 'driver']),
+                    'auto_accepted' => $autoAccept,
+                ],
+            ];
+        });
+    }
+
+    public function adminReviewLoadingException(
+        TransportManifest $manifest,
+        TransportLoadingException $exception,
+        Warehouse $warehouse,
+        User $user,
+        bool $accept,
+        ?string $adminNote = null
+    ): array {
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            return ['success' => false, 'message' => 'Cannot review another warehouse manifest.'];
+        }
+
+        if ((int) $exception->transport_manifest_id !== (int) $manifest->id) {
+            return ['success' => false, 'message' => 'Scan issue not found on this manifest.'];
+        }
+
+        return DB::transaction(function () use ($manifest, $exception, $user, $accept, $adminNote) {
+            $lockedException = TransportLoadingException::query()
+                ->with(['container.items.manifestItem', 'manifestItem', 'driver'])
+                ->lockForUpdate()
+                ->findOrFail($exception->id);
+
+            if ($lockedException->status !== TransportLoadingException::STATUS_PENDING) {
+                return ['success' => false, 'message' => 'This scan issue has already been reviewed.'];
+            }
+
+            if ($accept) {
+                $lockedManifest = TransportManifest::query()->lockForUpdate()->findOrFail($manifest->id);
+                if ($lockedManifest->status === TransportManifest::STATUS_ASSIGNED) {
+                    $lockedManifest->update(['status' => TransportManifest::STATUS_LOADING]);
+                }
+
+                if ($lockedException->container) {
+                    $this->markContainerLoadedFromException($lockedException->container, $lockedException->driver, $lockedException);
+                } elseif ($lockedException->manifestItem) {
+                    $this->markLineLoadedFromException($lockedException->manifestItem, $lockedException->driver, $lockedException);
+                }
+            }
+
+            $lockedException->update([
+                'status' => $accept ? TransportLoadingException::STATUS_ACCEPTED : TransportLoadingException::STATUS_REJECTED,
+                'reviewed_by_user_id' => $user->id,
+                'reviewed_at' => now(),
+                'admin_note' => $adminNote,
+            ]);
+
+            return [
+                'success' => true,
+                'message' => $accept ? 'Scan issue accepted and load marked.' : 'Scan issue rejected.',
             ];
         });
     }
@@ -871,6 +1016,65 @@ class WarehouseTransportService
             'success' => true,
             'message' => 'Container loaded successfully.',
         ];
+    }
+
+    private function markContainerLoadedFromException(TransportContainer $container, ?Driver $driver, TransportLoadingException $exception): void
+    {
+        $container->loadMissing('items.manifestItem');
+        $now = now();
+
+        foreach ($container->items as $containerItem) {
+            $line = $containerItem->manifestItem;
+            if (!$line) {
+                continue;
+            }
+
+            $line->update([
+                'scan_out_count' => max((int) $line->scan_out_count, 1),
+                'loaded_quantity' => (int) $line->expected_quantity,
+                'loaded_at' => $line->loaded_at ?? $now,
+                'line_status' => TransportManifestItem::LINE_LOADED,
+                'notes' => trim(implode("\n", array_filter([
+                    $line->notes,
+                    'Loaded from scan issue #' . $exception->id . '.',
+                ]))),
+            ]);
+
+            $containerItem->update(['status' => TransportContainerItem::STATUS_LOADED]);
+        }
+
+        $container->update([
+            'status' => TransportContainer::STATUS_LOADED,
+            'loaded_at' => $container->loaded_at ?? $now,
+            'loaded_by_driver_id' => $driver?->id ?? $container->loaded_by_driver_id,
+        ]);
+    }
+
+    private function markLineLoadedFromException(TransportManifestItem $line, ?Driver $driver, TransportLoadingException $exception): void
+    {
+        $line->update([
+            'scan_out_count' => max((int) $line->scan_out_count, 1),
+            'loaded_quantity' => (int) $line->expected_quantity,
+            'loaded_at' => $line->loaded_at ?? now(),
+            'line_status' => TransportManifestItem::LINE_LOADED,
+            'notes' => trim(implode("\n", array_filter([
+                $line->notes,
+                'Loaded from scan issue #' . $exception->id . '.',
+            ]))),
+        ]);
+
+        $this->syncLineContainerLoadState($line);
+
+        $containerItem = TransportContainerItem::query()
+            ->where('transport_manifest_item_id', $line->id)
+            ->with('container')
+            ->first();
+
+        if ($containerItem?->container && $containerItem->container->status === TransportContainer::STATUS_LOADED) {
+            $containerItem->container->update([
+                'loaded_by_driver_id' => $driver?->id ?? $containerItem->container->loaded_by_driver_id,
+            ]);
+        }
     }
 
     private function syncLineContainerLoadState(TransportManifestItem $line): void

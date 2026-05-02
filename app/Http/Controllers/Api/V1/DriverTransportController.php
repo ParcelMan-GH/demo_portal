@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\TransportLoadingException;
 use App\Models\TransportManifest;
 use App\Services\DriverTransportService;
 use App\Services\Warehouse\WarehouseTransportService;
@@ -61,6 +62,34 @@ class DriverTransportController extends Controller
             manifest: $manifest,
             driver: $driver,
             trackingCode: $code
+        );
+
+        return $this->transportActionResponse($driver, $manifest, $result, 400);
+    }
+
+    public function scanIssue(Request $request, TransportManifest $manifest): JsonResponse
+    {
+        $driver = $request->user();
+        $validated = $request->validate([
+            'target_type' => ['required', 'string', 'in:container,item'],
+            'container_id' => ['required_if:target_type,container', 'nullable', 'integer', 'exists:transport_containers,id'],
+            'manifest_item_id' => ['required_if:target_type,item', 'nullable', 'integer', 'exists:transport_manifest_items,id'],
+            'reason' => ['required', 'string', 'in:' . implode(',', [
+                TransportLoadingException::REASON_LABEL_DAMAGED,
+                TransportLoadingException::REASON_LABEL_MISSING,
+                TransportLoadingException::REASON_CAMERA_CANNOT_READ,
+                TransportLoadingException::REASON_ITEM_PRESENT_NO_LABEL,
+                TransportLoadingException::REASON_OTHER,
+            ])],
+            'note' => ['nullable', 'string', 'max:1000'],
+            'proof_photo' => ['required', 'image', 'max:5120'],
+        ]);
+
+        $result = $this->transportService->driverReportScanIssue(
+            manifest: $manifest,
+            driver: $driver,
+            data: $validated,
+            proofPhoto: $request->file('proof_photo')
         );
 
         return $this->transportActionResponse($driver, $manifest, $result, 400);
