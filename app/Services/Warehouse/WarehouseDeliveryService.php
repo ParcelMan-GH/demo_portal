@@ -113,12 +113,28 @@ class WarehouseDeliveryService
     public function createRunFromClaims(
         Driver $driver,
         Warehouse $warehouse,
-        ?User $admin = null
+        ?User $admin = null,
+        ?array $barcodes = null
     ): array {
+        $barcodes = $barcodes === null
+            ? null
+            : collect($barcodes)
+                ->map(fn ($barcode) => trim((string) $barcode))
+                ->filter()
+                ->unique()
+                ->values();
+
+        if ($barcodes !== null && $barcodes->isEmpty()) {
+            return ['success' => false, 'message' => 'Select at least one available package.'];
+        }
+
         // Get all labels currently claimed by this driver (reliable per-label check)
         $driverClaimedLabelIds = LabelCustodyEvent::query()
             ->where('driver_id', $driver->id)
             ->where('event_type', LabelCustodyEvent::TYPE_CLAIMED)
+            ->when($barcodes !== null, function ($query) use ($barcodes) {
+                $query->whereHas('label', fn ($labelQuery) => $labelQuery->whereIn('barcode_value', $barcodes));
+            })
             ->distinct()
             ->pluck('warehouse_receipt_item_label_id');
 
@@ -133,7 +149,7 @@ class WarehouseDeliveryService
         }
 
         if ($claimedLabelIds->isEmpty()) {
-            return ['success' => false, 'message' => 'Driver has no claimed packages.'];
+            return ['success' => false, 'message' => 'No available claimed packages found.'];
         }
 
         $labels = WarehouseReceiptItemLabel::whereIn('id', $claimedLabelIds)
@@ -152,6 +168,13 @@ class WarehouseDeliveryService
             ->groupBy('shipment_item_id')
             ->pluck('active_quantity', 'shipment_item_id');
 
+        $deliveredQuantitiesByItemId = DeliveryRunItem::query()
+            ->whereIn('shipment_item_id', $labelsByItemId->keys())
+            ->where('status', DeliveryRunItem::STATUS_DELIVERED)
+            ->selectRaw('shipment_item_id, COALESCE(SUM(expected_quantity), 0) as delivered_quantity')
+            ->groupBy('shipment_item_id')
+            ->pluck('delivered_quantity', 'shipment_item_id');
+
         $driverActiveQuantitiesByItemId = DeliveryRunItem::query()
             ->whereIn('shipment_item_id', $labelsByItemId->keys())
             ->whereHas('run', fn ($q) => $q
@@ -164,7 +187,7 @@ class WarehouseDeliveryService
 
         $allocatedQuantitiesByItemId = collect();
         $shipmentItems = $labelsByItemId
-            ->map(function (Collection $itemLabels, int $itemId) use ($activeQuantitiesByItemId, $driverActiveQuantitiesByItemId, $allocatedQuantitiesByItemId) {
+            ->map(function (Collection $itemLabels, int $itemId) use ($activeQuantitiesByItemId, $deliveredQuantitiesByItemId, $driverActiveQuantitiesByItemId, $allocatedQuantitiesByItemId) {
                 $shipmentItem = $itemLabels->first()?->receiptItem?->shipmentItem;
                 if (! $shipmentItem) {
                     return null;
@@ -175,9 +198,10 @@ class WarehouseDeliveryService
                 $totalLabelCapacity = max($receiptLabelCount, $declaredLabelTotal, 1);
                 $claimedLabelCount = $itemLabels->count();
                 $activeQuantity = (int) ($activeQuantitiesByItemId->get($itemId) ?? 0);
+                $deliveredQuantity = (int) ($deliveredQuantitiesByItemId->get($itemId) ?? 0);
                 $driverActiveQuantity = (int) ($driverActiveQuantitiesByItemId->get($itemId) ?? 0);
                 $newClaimedQuantity = max($claimedLabelCount - $driverActiveQuantity, 0);
-                $availableQuantity = max($totalLabelCapacity - $activeQuantity, 0);
+                $availableQuantity = max($totalLabelCapacity - max($activeQuantity, $deliveredQuantity), 0);
                 $allocatedQuantity = min($newClaimedQuantity, $availableQuantity);
 
                 if ($allocatedQuantity <= 0) {

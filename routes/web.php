@@ -361,6 +361,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('transport-manifests/{manifest}/assign-driver', [AdminTransportManifestController::class, 'assignDriver'])->name('transport-manifests.assign-driver');
         Route::post('transport-manifests/{manifest}/unassign-driver', [AdminTransportManifestController::class, 'unassignDriver'])->name('transport-manifests.unassign-driver');
         Route::post('transport-manifests/{manifest}/dispatch', [AdminTransportManifestController::class, 'dispatch'])->name('transport-manifests.dispatch');
+        Route::post('transport-manifests/{manifest}/items/{item}/mark-loaded', [AdminTransportManifestController::class, 'markItemLoaded'])->name('transport-manifests.items.mark-loaded');
+        Route::post('transport-manifests/{manifest}/mark-all-loaded', [AdminTransportManifestController::class, 'markAllLoaded'])->name('transport-manifests.mark-all-loaded');
 
         // Sort Batches (admin read visibility)
         Route::get('package-tracking', [\App\Http\Controllers\Admin\PackageTrackingController::class, 'index'])->name('package-tracking.index');

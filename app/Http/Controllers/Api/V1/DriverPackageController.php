@@ -150,18 +150,61 @@ class DriverPackageController extends Controller
             ])
             ->get();
 
-        // Check which items are already in active delivery runs
-        $activeRunItemIds = \App\Models\DeliveryRunItem::query()
+        // Check which labels cannot be started again: labels already covered
+        // by active run quantity, plus delivered quantity from completed runs
+        // whose custody event is still claimed.
+        $shipmentItemIds = $labels
+            ->map(fn ($label) => $label->receiptItem?->shipment_item_id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $activeQuantitiesByItemId = \App\Models\DeliveryRunItem::query()
+            ->whereIn('shipment_item_id', $shipmentItemIds)
             ->whereHas('run', fn ($q) => $q->whereNotIn('status', ['completed', 'cancelled']))
-            ->pluck('shipment_item_id');
+            ->selectRaw('shipment_item_id, COALESCE(SUM(expected_quantity), 0) as active_quantity')
+            ->groupBy('shipment_item_id')
+            ->pluck('active_quantity', 'shipment_item_id');
+
+        $deliveredQuantitiesByItemId = \App\Models\DeliveryRunItem::query()
+            ->whereIn('shipment_item_id', $shipmentItemIds)
+            ->where('status', \App\Models\DeliveryRunItem::STATUS_DELIVERED)
+            ->selectRaw('shipment_item_id, COALESCE(SUM(expected_quantity), 0) as delivered_quantity')
+            ->groupBy('shipment_item_id')
+            ->pluck('delivered_quantity', 'shipment_item_id');
+
+        $unavailableLabelIds = collect();
+        $labels
+            ->groupBy(fn ($label) => (int) $label->receiptItem?->shipment_item_id)
+            ->each(function ($itemLabels, int $itemId) use ($activeQuantitiesByItemId, $deliveredQuantitiesByItemId, $unavailableLabelIds) {
+                if ($itemId <= 0) {
+                    return;
+                }
+
+                $unavailableQuantity = max(
+                    (int) ($activeQuantitiesByItemId->get($itemId) ?? 0),
+                    (int) ($deliveredQuantitiesByItemId->get($itemId) ?? 0)
+                );
+
+                if ($unavailableQuantity <= 0) {
+                    return;
+                }
+
+                $itemLabels
+                    ->sortBy(fn ($label) => str_pad((string) ($label->label_index ?? 0), 10, '0', STR_PAD_LEFT)
+                        . '|'
+                        . str_pad((string) $label->id, 10, '0', STR_PAD_LEFT))
+                    ->take($unavailableQuantity)
+                    ->pluck('id')
+                    ->each(fn ($labelId) => $unavailableLabelIds->push($labelId));
+            });
 
 
-        $packages = $labels->map(function ($label) use ($claimedAtMap, $activeRunItemIds) {
+        $packages = $labels->map(function ($label) use ($claimedAtMap, $unavailableLabelIds) {
             $data = $this->transformLabel($label);
             $event = $claimedAtMap->get($label->id);
             $data['claimed_at'] = $event?->created_at?->toIso8601String();
-            $itemId = $label->receiptItem?->shipment_item_id;
-            $data['in_delivery_run'] = $itemId ? $activeRunItemIds->contains($itemId) : false;
+            $data['in_delivery_run'] = $unavailableLabelIds->contains($label->id);
             return $data;
         })->values();
 
@@ -314,6 +357,8 @@ class DriverPackageController extends Controller
 
         $validated = $request->validate([
             'warehouse_id' => ['nullable', 'exists:warehouses,id'],
+            'barcodes' => ['nullable', 'array'],
+            'barcodes.*' => ['string', 'max:100'],
         ]);
 
         // Resolve warehouse — try from the driver's last pickup assignment, or from request
@@ -340,7 +385,12 @@ class DriverPackageController extends Controller
         $warehouse = Warehouse::findOrFail($warehouseId);
 
         $deliveryService = app(WarehouseDeliveryService::class);
-        $result = $deliveryService->createRunFromClaims($driver, $warehouse);
+        $result = $deliveryService->createRunFromClaims(
+            $driver,
+            $warehouse,
+            null,
+            $validated['barcodes'] ?? null
+        );
 
         $statusCode = $result['success'] ? 200 : 422;
         return response()->json($result, $statusCode);

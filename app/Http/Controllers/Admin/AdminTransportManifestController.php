@@ -6,6 +6,7 @@ use App\Exports\DriversExport;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\TransportManifest;
+use App\Models\TransportManifestItem;
 use App\Models\Warehouse;
 use App\Services\Warehouse\WarehouseTransportService;
 use App\Support\GenericPdfExporter;
@@ -175,6 +176,8 @@ class AdminTransportManifestController extends Controller
             'assign_driver_endpoint'   => route('admin.transport-manifests.assign-driver', $manifest),
             'unassign_driver_endpoint' => route('admin.transport-manifests.unassign-driver', $manifest),
             'dispatch_endpoint'        => route('admin.transport-manifests.dispatch', $manifest),
+            'mark_all_loaded_endpoint' => route('admin.transport-manifests.mark-all-loaded', $manifest),
+            'mark_item_loaded_endpoint_template' => route('admin.transport-manifests.items.mark-loaded', ['manifest' => $manifest, 'item' => '__ITEM__']),
         ];
 
         return view('admin.transport-manifests.show', compact('manifest', 'statusLabel', 'transportDrivers', 'manifestConfig'));
@@ -236,6 +239,39 @@ class AdminTransportManifestController extends Controller
         }
 
         $result = $this->transportService->dispatch($manifest, $warehouse, Auth::guard('admin')->user());
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function markItemLoaded(TransportManifest $manifest, TransportManifestItem $item): JsonResponse
+    {
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $result = $this->transportService->adminMarkItemLoaded(
+            $manifest,
+            $item,
+            $warehouse,
+            Auth::guard('admin')->user()
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function markAllLoaded(TransportManifest $manifest): JsonResponse
+    {
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $result = $this->transportService->adminMarkAllItemsLoaded(
+            $manifest,
+            $warehouse,
+            Auth::guard('admin')->user()
+        );
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }

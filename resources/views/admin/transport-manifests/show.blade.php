@@ -190,7 +190,7 @@ $lineStatusColors = [
     </div>
 
     <!-- Actions Panel (shown only when actions are available) -->
-    @if(in_array($manifest->status, ['draft', 'assigned']))
+    @if(in_array($manifest->status, ['draft', 'assigned', 'loading']))
     <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100 px-6 py-4">
         <div class="flex flex-wrap items-center gap-3">
             <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-2">Actions</span>
@@ -234,6 +234,20 @@ $lineStatusColors = [
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
                 </svg>
                 Dispatch
+            </button>
+            @endif
+
+            {{-- Mark all loaded: admin override for assigned/loading manifests --}}
+            @if(in_array($manifest->status, ['assigned', 'loading']) && $manifest->assigned_driver_id && $manifest->items->isNotEmpty())
+            <button
+                type="button"
+                @@click="markAllLoaded()"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-sm transition-colors"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Mark All Loaded
             </button>
             @endif
 
@@ -509,6 +523,9 @@ $lineStatusColors = [
                                     <th class="px-4 py-2.5 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">SCAN OUT</th>
                                     <th class="px-4 py-2.5 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">SCAN IN</th>
                                     <th class="px-4 py-2.5 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">LINE STATUS</th>
+                                    @if(in_array($manifest->status, ['assigned', 'loading']))
+                                    <th class="px-4 py-2.5 text-right text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ACTION</th>
+                                    @endif
                                 </tr>
                             </thead>
                             <tbody class="bg-transparent divide-y divide-slate-100/50">
@@ -570,10 +587,29 @@ $lineStatusColors = [
                                             <span class="text-xs text-slate-400">—</span>
                                         @endif
                                     </td>
+                                    @if(in_array($manifest->status, ['assigned', 'loading']))
+                                    <td class="px-4 py-2.5 whitespace-nowrap text-right">
+                                        @if($item->line_status === 'loaded' || (int) $item->loaded_quantity >= (int) $item->expected_quantity)
+                                            <span class="text-[10px] font-semibold text-emerald-600">Loaded</span>
+                                        @else
+                                            <button
+                                                type="button"
+                                                @@click="markItemLoaded({{ $item->id }})"
+                                                :disabled="actionLoading"
+                                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-semibold transition-colors disabled:opacity-50"
+                                            >
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                </svg>
+                                                Mark Loaded
+                                            </button>
+                                        @endif
+                                    </td>
+                                    @endif
                                 </tr>
                                 @if($item->notes)
                                 <tr class="bg-slate-50/50">
-                                    <td class="px-4 py-1.5" colspan="10">
+                                    <td class="px-4 py-1.5" colspan="{{ in_array($manifest->status, ['assigned', 'loading']) ? 11 : 10 }}">
                                         <p class="text-[10px] text-slate-500 italic">
                                             <span class="font-semibold not-italic text-slate-400">Note:</span>
                                             {{ $item->notes }}
@@ -889,7 +925,27 @@ document.addEventListener('alpine:init', () => {
                 });
             },
 
+            async markItemLoaded(itemId) {
+                const endpoint = (config.mark_item_loaded_endpoint_template || '').replace('__ITEM__', itemId);
+                if (!endpoint) {
+                    window.showToast?.('Missing item load endpoint.', 'error');
+                    return;
+                }
+                await this._postAction(endpoint, {}, null);
+            },
+
+            async markAllLoaded() {
+                if (!window.confirm('Mark every item on this manifest as loaded?')) {
+                    return;
+                }
+                await this._postAction(config.mark_all_loaded_endpoint, {}, null);
+            },
+
             async _postAction(endpoint, body, onSuccess) {
+                if (!endpoint) {
+                    window.showToast?.('Missing action endpoint.', 'error');
+                    return;
+                }
                 if (this.actionLoading) return;
                 this.actionLoading = true;
                 try {

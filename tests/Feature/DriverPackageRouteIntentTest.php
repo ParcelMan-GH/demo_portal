@@ -162,6 +162,7 @@ function driverPackageRouteIntentBuildSchema(): void
         $table->string('status')->default('draft');
         $table->unsignedBigInteger('assigned_driver_id')->nullable();
         $table->timestamp('dispatched_at')->nullable();
+        $table->timestamp('completed_at')->nullable();
         $table->unsignedBigInteger('created_by_user_id')->nullable();
         $table->text('notes')->nullable();
         $table->timestamps();
@@ -428,4 +429,134 @@ test('starting deliveries uses claimed label count instead of full package quant
     expect($runItems)->toHaveCount(2)
         ->and((int) $runItems[0]->expected_quantity)->toBe(1)
         ->and((int) $runItems[1]->expected_quantity)->toBe(1);
+});
+
+test('starting deliveries does not reuse delivered packages still held in custody', function () {
+    $warehouse = Warehouse::create([
+        'name' => 'Accra Main Office',
+        'code' => 'AMO',
+        'is_active' => true,
+    ]);
+    $vendor = driverPackageRouteIntentCreateVendor();
+
+    $shipment = Shipment::create([
+        'vendor_id' => $vendor->id,
+        'shipment_number' => 'PCM-2026-00993',
+        'status' => 'at_warehouse',
+        'source' => 'vendor_app',
+        'destination_mode' => 'per_item',
+    ]);
+
+    $oldItem = ShipmentItem::create([
+        'shipment_id' => $shipment->id,
+        'description' => 'Old Package',
+        'quantity' => 1,
+        'delivery_recipient_name' => 'Ama',
+        'delivery_recipient_phone' => '+233541112223',
+        'delivery_town' => 'Madina',
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_DIRECT,
+        'status' => 'out_for_delivery',
+        'tracking_code' => 'TRKOLD1234',
+    ]);
+
+    $newItem = ShipmentItem::create([
+        'shipment_id' => $shipment->id,
+        'description' => 'New Package',
+        'quantity' => 1,
+        'delivery_recipient_name' => 'Kojo',
+        'delivery_recipient_phone' => '+233541112224',
+        'delivery_town' => 'Osu',
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_DIRECT,
+        'status' => 'at_warehouse',
+        'tracking_code' => 'TRKNEW1234',
+    ]);
+
+    $receipt = WarehouseReceipt::create();
+    $oldReceiptItem = WarehouseReceiptItem::create([
+        'warehouse_receipt_id' => $receipt->id,
+        'shipment_item_id' => $oldItem->id,
+        'expected_quantity' => 1,
+        'received_quantity' => 1,
+    ]);
+    $newReceiptItem = WarehouseReceiptItem::create([
+        'warehouse_receipt_id' => $receipt->id,
+        'shipment_item_id' => $newItem->id,
+        'expected_quantity' => 1,
+        'received_quantity' => 1,
+    ]);
+
+    $oldLabel = WarehouseReceiptItemLabel::create([
+        'warehouse_receipt_item_id' => $oldReceiptItem->id,
+        'barcode_value' => 'TRKOLD1234-001',
+        'label_index' => 1,
+        'labels_total' => 1,
+        'label_type' => 'sealed',
+    ]);
+    $newLabel = WarehouseReceiptItemLabel::create([
+        'warehouse_receipt_item_id' => $newReceiptItem->id,
+        'barcode_value' => 'TRKNEW1234-001',
+        'label_index' => 1,
+        'labels_total' => 1,
+        'label_type' => 'sealed',
+    ]);
+
+    LabelCustodyEvent::create([
+        'warehouse_receipt_item_label_id' => $oldLabel->id,
+        'event_type' => LabelCustodyEvent::TYPE_CLAIMED,
+        'driver_id' => $this->driver->id,
+    ]);
+    LabelCustodyEvent::create([
+        'warehouse_receipt_item_label_id' => $newLabel->id,
+        'event_type' => LabelCustodyEvent::TYPE_CLAIMED,
+        'driver_id' => $this->driver->id,
+    ]);
+
+    $oldRun = \App\Models\DeliveryRun::create([
+        'run_number' => 'DR-2026-AMO-0001',
+        'warehouse_id' => $warehouse->id,
+        'assigned_driver_id' => $this->driver->id,
+        'status' => \App\Models\DeliveryRun::STATUS_COMPLETED,
+        'dispatched_at' => now(),
+        'completed_at' => now(),
+    ]);
+    $oldStop = DeliveryRunStop::create([
+        'delivery_run_id' => $oldRun->id,
+        'recipient_name' => 'Ama',
+        'recipient_phone' => '+233541112223',
+        'town' => 'Madina',
+        'total_packages' => 1,
+        'status' => DeliveryRunStop::STATUS_DELIVERED,
+        'delivery_method' => DeliveryRunStop::METHOD_DIRECT,
+    ]);
+    DeliveryRunItem::create([
+        'delivery_run_id' => $oldRun->id,
+        'delivery_run_stop_id' => $oldStop->id,
+        'shipment_item_id' => $oldItem->id,
+        'expected_quantity' => 1,
+        'delivered_quantity' => 1,
+        'status' => DeliveryRunItem::STATUS_DELIVERED,
+        'delivered_at' => now(),
+    ]);
+
+    $packagesResponse = $this->getJson('/api/v1/driver/my-packages');
+    $packagesResponse->assertOk();
+
+    $packages = collect($packagesResponse->json('data.packages'))->keyBy('barcode');
+    expect($packages->get('TRKOLD1234-001')['in_delivery_run'])->toBeTrue()
+        ->and($packages->get('TRKNEW1234-001')['in_delivery_run'])->toBeFalse();
+
+    $this->postJson('/api/v1/driver/start-deliveries', [
+        'warehouse_id' => $warehouse->id,
+        'barcodes' => ['TRKOLD1234-001', 'TRKNEW1234-001'],
+    ])->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.packages_count', 1)
+        ->assertJsonPath('data.unique_items_count', 1);
+
+    $newRunItems = DeliveryRunItem::query()
+        ->where('delivery_run_id', '!=', $oldRun->id)
+        ->get();
+
+    expect($newRunItems)->toHaveCount(1)
+        ->and((int) $newRunItems->first()->shipment_item_id)->toBe($newItem->id);
 });

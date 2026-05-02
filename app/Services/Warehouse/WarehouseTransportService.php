@@ -364,6 +364,106 @@ class WarehouseTransportService
         });
     }
 
+    public function adminMarkItemLoaded(TransportManifest $manifest, TransportManifestItem $line, Warehouse $warehouse, User $user): array
+    {
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            return ['success' => false, 'message' => 'Cannot load another warehouse manifest.'];
+        }
+
+        if ((int) $line->transport_manifest_id !== (int) $manifest->id) {
+            return ['success' => false, 'message' => 'Item not found on this manifest.'];
+        }
+
+        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+            return ['success' => false, 'message' => 'Manifest is not in loading state.'];
+        }
+
+        return DB::transaction(function () use ($manifest, $line, $user) {
+            $lockedManifest = TransportManifest::query()->lockForUpdate()->findOrFail($manifest->id);
+
+            if ($lockedManifest->status === TransportManifest::STATUS_ASSIGNED) {
+                $lockedManifest->update(['status' => TransportManifest::STATUS_LOADING]);
+            }
+
+            $lockedLine = TransportManifestItem::query()
+                ->where('transport_manifest_id', $lockedManifest->id)
+                ->lockForUpdate()
+                ->findOrFail($line->id);
+
+            if ((int) $lockedLine->loaded_quantity >= (int) $lockedLine->expected_quantity && $lockedLine->line_status === TransportManifestItem::LINE_LOADED) {
+                return [
+                    'success' => true,
+                    'message' => 'Manifest item is already loaded.',
+                ];
+            }
+
+            $lockedLine->update([
+                'scan_out_count' => max((int) $lockedLine->scan_out_count, 1),
+                'loaded_quantity' => (int) $lockedLine->expected_quantity,
+                'loaded_at' => $lockedLine->loaded_at ?? now(),
+                'line_status' => TransportManifestItem::LINE_LOADED,
+                'notes' => trim(implode("\n", array_filter([
+                    $lockedLine->notes,
+                    'Marked loaded by admin ' . $user->name . '.',
+                ]))),
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Manifest item marked as loaded.',
+            ];
+        });
+    }
+
+    public function adminMarkAllItemsLoaded(TransportManifest $manifest, Warehouse $warehouse, User $user): array
+    {
+        if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
+            return ['success' => false, 'message' => 'Cannot load another warehouse manifest.'];
+        }
+
+        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+            return ['success' => false, 'message' => 'Manifest is not in loading state.'];
+        }
+
+        return DB::transaction(function () use ($manifest, $user) {
+            $lockedManifest = TransportManifest::query()
+                ->with('items')
+                ->lockForUpdate()
+                ->findOrFail($manifest->id);
+
+            if ($lockedManifest->status === TransportManifest::STATUS_ASSIGNED) {
+                $lockedManifest->update(['status' => TransportManifest::STATUS_LOADING]);
+            }
+
+            $updated = 0;
+            foreach ($lockedManifest->items as $line) {
+                if ((int) $line->loaded_quantity >= (int) $line->expected_quantity && $line->line_status === TransportManifestItem::LINE_LOADED) {
+                    continue;
+                }
+
+                $line->update([
+                    'scan_out_count' => max((int) $line->scan_out_count, 1),
+                    'loaded_quantity' => (int) $line->expected_quantity,
+                    'loaded_at' => $line->loaded_at ?? now(),
+                    'line_status' => TransportManifestItem::LINE_LOADED,
+                    'notes' => trim(implode("\n", array_filter([
+                        $line->notes,
+                        'Marked loaded by admin ' . $user->name . '.',
+                    ]))),
+                ]);
+                $updated++;
+            }
+
+            return [
+                'success' => true,
+                'message' => $updated === 1
+                    ? '1 manifest item marked as loaded.'
+                    : "{$updated} manifest items marked as loaded.",
+                'data' => ['updated_count' => $updated],
+            ];
+        });
+    }
+
     public function driverDepart(TransportManifest $manifest, Driver $driver): array
     {
         if ((int) $manifest->assigned_driver_id !== (int) $driver->id) {
