@@ -1150,6 +1150,10 @@ class ShipmentController extends Controller
             }
         }
 
+        if ($assignment && $this->isPickupCompleteForReceiving($shipment, $assignment)) {
+            $this->ensurePickupConfirmationForAdminCreatedPackage($assignment, $item);
+        }
+
         $shipment = $this->reloadReceivingShipment($shipment);
         $item = $shipment->items->firstWhere('id', $item->id) ?? $item->fresh(['images', 'deliveryRegion', 'deliveryDistrict']);
         $assignment = $shipment->pickupAssignment;
@@ -1352,6 +1356,7 @@ class ShipmentController extends Controller
         ]);
 
         if ($pickupComplete) {
+            $this->ensurePickupConfirmationForAdminCreatedPackage($assignment, $newItem);
             $this->syncDestinationModeFromVendorPhotoPhones($shipment);
             $shipment = $this->reloadReceivingShipment($shipment->fresh());
             $assignment = $shipment->pickupAssignment;
@@ -3356,6 +3361,28 @@ class ShipmentController extends Controller
 
             $confirmation->delete();
         }
+    }
+
+    protected function ensurePickupConfirmationForAdminCreatedPackage(
+        ?\App\Models\PickupAssignment $assignment,
+        ShipmentItem $item,
+    ): void {
+        if (! $assignment || ! $this->isPickupCompleteForReceiving($item->shipment, $assignment)) {
+            return;
+        }
+
+        PickupItemConfirmation::query()->updateOrCreate([
+            'pickup_assignment_id' => $assignment->id,
+            'shipment_item_id' => $item->id,
+        ], [
+            'expected_quantity' => (int) $item->quantity,
+            'confirmed_quantity' => (int) $item->quantity,
+            'notes' => 'Package added by admin during warehouse receiving after pickup was completed.',
+            'confirmed_at' => $assignment->picked_up_at
+                ?: $assignment->completed_at
+                ?: $assignment->received_at
+                ?: now(),
+        ]);
     }
 
     protected function reassignAutoGroupDependencies(

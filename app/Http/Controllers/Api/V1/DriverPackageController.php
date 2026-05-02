@@ -7,6 +7,7 @@ use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
 use App\Models\ShipmentItem;
 use App\Models\Warehouse;
+use App\Models\WarehouseReceipt;
 use App\Services\Warehouse\WarehouseDeliveryService;
 use App\Models\WarehouseReceiptItemLabel;
 use Illuminate\Http\JsonResponse;
@@ -29,13 +30,23 @@ class DriverPackageController extends Controller
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $label = WarehouseReceiptItemLabel::where('barcode_value', $validated['barcode'])->first();
+        $label = WarehouseReceiptItemLabel::with('receiptItem.receipt')
+            ->where('barcode_value', $validated['barcode'])
+            ->first();
 
         if (!$label) {
             return response()->json([
                 'success' => false,
                 'message' => 'Label not found. Check the barcode and try again.',
             ], 404);
+        }
+
+        $receipt = $label->receiptItem?->receipt;
+        if (!$receipt || $receipt->status !== WarehouseReceipt::STATUS_FINALIZED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This package is not ready for driver pickup. Warehouse receiving has not been finalized yet.',
+            ], 409);
         }
 
         // Check if already claimed by another driver

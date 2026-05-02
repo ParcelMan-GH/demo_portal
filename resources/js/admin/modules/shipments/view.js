@@ -1937,13 +1937,27 @@ function shipmentShow() {
 	            return this.prepareReceivingPackage(clone);
 	        },
 
+	        prepareReceivingPackageForIntake(pkg) {
+	            const prepared = this.cloneReceivingPackage(pkg);
+	            const observed = this.receivingObservedQuantity(prepared);
+	            const expected = this.receivingExpectedQuantity(prepared);
+
+	            if (this.receiving.canReceive && observed === 0 && expected > 0) {
+	                prepared.received_quantity = expected;
+	                prepared.damaged_quantity = 0;
+	                prepared.condition_status ||= 'ok';
+	            }
+
+	            return prepared;
+	        },
+
 	        openReceivingPackageModal(pkg, step = 1) {
 	            this.receivingPackageModal = {
 	                open: true,
 	                step: this.isPerItemMode() ? step : 1,
 	                packageId: pkg.shipment_item_id,
 	                packageLabel: pkg.description || pkg.tracking_code || 'Package details',
-	                pkg: this.cloneReceivingPackage(pkg),
+	                pkg: this.prepareReceivingPackageForIntake(pkg),
 	                savingDetails: false,
 	                savingReceive: false,
 	            };

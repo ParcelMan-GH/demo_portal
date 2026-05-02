@@ -638,7 +638,7 @@ test('post-pickup split works from receiving before receipt starts and returns r
         'delivery_instructions' => 'Leave with office admin',
     ]);
 
-    rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
         'picked_up_at' => now(),
     ]);
 
@@ -676,6 +676,13 @@ test('post-pickup split works from receiving before receipt starts and returns r
 
     expect($secondPhoto->fresh()->shipment_item_id)->toBe($newItem->id)
         ->and($firstPhoto->fresh()->shipment_item_id)->toBe($item->id);
+
+    $this->assertDatabaseHas('pickup_item_confirmations', [
+        'pickup_assignment_id' => $assignment->id,
+        'shipment_item_id' => $newItem->id,
+        'expected_quantity' => 1,
+        'confirmed_quantity' => 1,
+    ]);
 });
 
 test('receiving split switches to multiple drop-offs when vendor photo phones differ', function () {
@@ -941,7 +948,7 @@ test('post-pickup receiving can add a package and returns receiving package payl
         'destination_mode' => 'per_item',
     ]);
 
-    rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
         'picked_up_at' => now(),
     ]);
 
@@ -975,6 +982,13 @@ test('post-pickup receiving can add a package and returns receiving package payl
         'received_quantity' => 3,
         'damaged_quantity' => 0,
         'condition_status' => 'ok',
+    ]);
+
+    $this->assertDatabaseHas('pickup_item_confirmations', [
+        'pickup_assignment_id' => $assignment->id,
+        'shipment_item_id' => $newItemId,
+        'expected_quantity' => 3,
+        'confirmed_quantity' => 3,
     ]);
 });
 
