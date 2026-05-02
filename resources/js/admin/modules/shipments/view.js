@@ -1125,9 +1125,16 @@ function shipmentShow() {
             const packages = this.receiving.packages || [];
             if (packages.length === 0) return false;
 
-            return packages.every((pkg) => {
-                return this.receivingObservedQuantity(pkg) >= this.receivingExpectedQuantity(pkg);
-            });
+            return packages.every((pkg) => this.receivingPackageHasReceipt(pkg));
+        },
+
+        receivingPackageHasReceipt(pkg) {
+            if (pkg?.receipt_item_id) return true;
+            if (pkg?.barcode_value) return true;
+            if (Array.isArray(pkg?.photos) && pkg.photos.length > 0) return true;
+            if (Number(pkg?.received_quantity ?? 0) > 0) return true;
+            if (Number(pkg?.damaged_quantity ?? 0) > 0) return true;
+            return Boolean(pkg?.discrepancy_type && pkg.discrepancy_type !== 'none');
         },
 
         receivingIsFinalized() {
@@ -1145,6 +1152,7 @@ function shipmentShow() {
             if (this.receiving.saving) return 'Finalizing...';
             if (this.receivingIsFinalized()) return 'Finalized';
             if (!this.receiving.canReceive) return 'Pickup Required';
+            if (!this.receivingAllPackagesReceived()) return 'Receive All First';
             return 'Finalize';
         },
 

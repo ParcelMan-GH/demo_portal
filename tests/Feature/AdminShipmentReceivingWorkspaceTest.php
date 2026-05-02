@@ -1364,18 +1364,22 @@ test('admin receiving auto-completes pickup when assigned driver has not confirm
     $this->getJson(route('admin.shipments.receiving-data', $shipment))
         ->assertOk()
         ->assertJsonPath('data.can_receive', true)
-        ->assertJsonPath('data.packages.0.shipment_item_id', $item->id);
+        ->assertJsonPath('data.packages.0.shipment_item_id', $item->id)
+        ->assertJsonPath('data.packages.0.receipt_item_id', null);
 
-    $this->postJson(route('admin.shipments.receiving.save', [
+    $response = $this->postJson(route('admin.shipments.receiving.save', [
         'shipment' => $shipment,
         'item' => $item,
     ]), [
         'received_quantity' => 2,
         'condition_status' => 'ok',
         'description' => 'Auto pickup package',
-    ])->assertOk()
+    ]);
+
+    $response->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.package.received_quantity', 2)
+        ->assertJsonPath('data.package.receipt_item_id', fn ($id) => is_int($id))
         ->assertJsonPath('data.can_receive', true);
 
     $this->assertDatabaseHas('pickup_assignments', [

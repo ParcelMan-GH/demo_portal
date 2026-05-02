@@ -2365,6 +2365,7 @@ class ShipmentController extends Controller
             'expected_quantity' => $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : (int) $item->quantity,
             'vendor_photos' => $vendorPhotos,
             'driver_photos' => $driverPhotos,
+            'receipt_item_id' => $receiptItem?->id,
             'received_quantity' => (int) ($receiptItem?->received_quantity ?? 0),
             'damaged_quantity' => (int) ($receiptItem?->damaged_quantity ?? 0),
             'discrepancy_type' => $receiptItem?->discrepancy_type ?? 'none',
