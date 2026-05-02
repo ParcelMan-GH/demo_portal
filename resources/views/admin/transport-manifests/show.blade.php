@@ -614,7 +614,17 @@ $lineStatusColors = [
                                     @if(in_array($manifest->status, ['assigned', 'loading']))
                                     <td class="px-4 py-2.5 whitespace-nowrap text-right">
                                         @if($item->line_status === 'loaded' || (int) $item->loaded_quantity >= (int) $item->expected_quantity)
-                                            <span class="text-[10px] font-semibold text-emerald-600">Loaded</span>
+                                            <button
+                                                type="button"
+                                                @@click="markItemNotLoaded({{ $item->id }})"
+                                                :disabled="actionLoading"
+                                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-semibold transition-colors disabled:opacity-50"
+                                            >
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                </svg>
+                                                Mark Not Loaded
+                                            </button>
                                         @else
                                             <button
                                                 type="button"
@@ -970,6 +980,18 @@ document.addEventListener('alpine:init', () => {
                 await this._postAction(endpoint, {}, null);
             },
 
+            async markItemNotLoaded(itemId) {
+                const endpoint = (config.mark_item_not_loaded_endpoint_template || '').replace('__ITEM__', itemId);
+                if (!endpoint) {
+                    window.showToast?.('Missing item unload endpoint.', 'error');
+                    return;
+                }
+                if (!window.confirm('Mark this item as not loaded?')) {
+                    return;
+                }
+                await this._postAction(endpoint, {}, null);
+            },
+
             async markAllLoaded() {
                 if (!window.confirm('Mark every item on this manifest as loaded?')) {
                     return;
@@ -988,6 +1010,14 @@ document.addEventListener('alpine:init', () => {
                     return;
                 }
                 const endpoint = (config.mark_container_loaded_endpoint_template || '').replace('__CONTAINER__', containerId);
+                await this._postAction(endpoint, {}, null);
+            },
+
+            async markContainerNotLoaded(containerId) {
+                if (!window.confirm('Mark this load group as not loaded?')) {
+                    return;
+                }
+                const endpoint = (config.mark_container_not_loaded_endpoint_template || '').replace('__CONTAINER__', containerId);
                 await this._postAction(endpoint, {}, null);
             },
 

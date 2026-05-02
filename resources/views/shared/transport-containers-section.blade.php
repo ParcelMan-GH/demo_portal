@@ -104,6 +104,20 @@
                                     </button>
                                 @endif
 
+                                @if($canMarkContainersLoaded && $container->status === 'loaded')
+                                    <button
+                                        type="button"
+                                        @@click="markContainerNotLoaded({{ $container->id }})"
+                                        :disabled="actionLoading || {{ $container->items->isEmpty() ? 'true' : 'false' }}"
+                                        class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[11px] font-semibold transition-colors disabled:opacity-50"
+                                    >
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                        Mark Not Loaded
+                                    </button>
+                                @endif
+
                                 @if($canManageContainers)
                                     <button
                                         type="button"

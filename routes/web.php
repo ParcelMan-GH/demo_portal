@@ -363,9 +363,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('transport-manifests/{manifest}/unassign-driver', [AdminTransportManifestController::class, 'unassignDriver'])->name('transport-manifests.unassign-driver');
         Route::post('transport-manifests/{manifest}/dispatch', [AdminTransportManifestController::class, 'dispatch'])->name('transport-manifests.dispatch');
         Route::post('transport-manifests/{manifest}/items/{item}/mark-loaded', [AdminTransportManifestController::class, 'markItemLoaded'])->name('transport-manifests.items.mark-loaded');
+        Route::post('transport-manifests/{manifest}/items/{item}/mark-not-loaded', [AdminTransportManifestController::class, 'markItemNotLoaded'])->name('transport-manifests.items.mark-not-loaded');
         Route::post('transport-manifests/{manifest}/items/{item}/move-container', [AdminTransportManifestController::class, 'moveItemToContainer'])->name('transport-manifests.items.move-container');
         Route::post('transport-manifests/{manifest}/containers', [AdminTransportManifestController::class, 'createContainer'])->name('transport-manifests.containers.store');
         Route::post('transport-manifests/{manifest}/containers/{container}/mark-loaded', [AdminTransportManifestController::class, 'markContainerLoaded'])->name('transport-manifests.containers.mark-loaded');
+        Route::post('transport-manifests/{manifest}/containers/{container}/mark-not-loaded', [AdminTransportManifestController::class, 'markContainerNotLoaded'])->name('transport-manifests.containers.mark-not-loaded');
         Route::post('transport-manifests/{manifest}/containers/{container}/print-label', [AdminTransportManifestController::class, 'printContainerLabel'])->name('transport-manifests.containers.print-label');
         Route::delete('transport-manifests/{manifest}/containers/{container}', [AdminTransportManifestController::class, 'deleteContainer'])->name('transport-manifests.containers.destroy');
         Route::post('transport-manifests/{manifest}/scan-issues/{exception}/approve', [AdminTransportManifestController::class, 'approveScanIssue'])->name('transport-manifests.scan-issues.approve');

@@ -222,8 +222,10 @@ class AdminTransportManifestController extends Controller
             'dispatch_endpoint'        => route('admin.transport-manifests.dispatch', $manifest),
             'mark_all_loaded_endpoint' => route('admin.transport-manifests.mark-all-loaded', $manifest),
             'mark_item_loaded_endpoint_template' => route('admin.transport-manifests.items.mark-loaded', ['manifest' => $manifest, 'item' => '__ITEM__']),
+            'mark_item_not_loaded_endpoint_template' => route('admin.transport-manifests.items.mark-not-loaded', ['manifest' => $manifest, 'item' => '__ITEM__']),
             'create_container_endpoint' => route('admin.transport-manifests.containers.store', $manifest),
             'mark_container_loaded_endpoint_template' => route('admin.transport-manifests.containers.mark-loaded', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
+            'mark_container_not_loaded_endpoint_template' => route('admin.transport-manifests.containers.mark-not-loaded', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
             'delete_container_endpoint_template' => route('admin.transport-manifests.containers.destroy', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
             'print_container_label_endpoint_template' => route('admin.transport-manifests.containers.print-label', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
             'move_item_container_endpoint_template' => route('admin.transport-manifests.items.move-container', ['manifest' => $manifest, 'item' => '__ITEM__']),
@@ -327,6 +329,23 @@ class AdminTransportManifestController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
+    public function markItemNotLoaded(TransportManifest $manifest, TransportManifestItem $item): JsonResponse
+    {
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $result = $this->transportService->adminMarkItemNotLoaded(
+            $manifest,
+            $item,
+            $warehouse,
+            Auth::guard('admin')->user()
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
     public function createContainer(Request $request, TransportManifest $manifest): JsonResponse
     {
         $validated = $request->validate([
@@ -381,6 +400,23 @@ class AdminTransportManifestController extends Controller
         }
 
         $result = $this->transportService->adminMarkContainerLoaded(
+            $manifest,
+            $container,
+            $warehouse,
+            Auth::guard('admin')->user()
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function markContainerNotLoaded(TransportManifest $manifest, TransportContainer $container): JsonResponse
+    {
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $result = $this->transportService->adminMarkContainerNotLoaded(
             $manifest,
             $container,
             $warehouse,
