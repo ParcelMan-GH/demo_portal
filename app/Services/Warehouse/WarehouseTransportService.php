@@ -360,6 +360,13 @@ class WarehouseTransportService
                 ->first();
 
             if ($container) {
+                if ($this->isLooseTransportContainer($container)) {
+                    return [
+                        'success' => false,
+                        'message' => 'Loose items must be loaded by scanning each package label.',
+                    ];
+                }
+
                 return $this->markContainerLoaded($container, $driver);
             }
 
