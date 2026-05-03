@@ -375,17 +375,24 @@ class WarehouseTransportService
                 return ['success' => false, 'message' => 'Tracking code not found in this manifest.'];
             }
 
+            $containerItem = TransportContainerItem::query()
+                ->where('transport_manifest_item_id', $line->id)
+                ->with('container.items.manifestItem')
+                ->first();
+
+            if ($containerItem?->container && !$this->isLooseTransportContainer($containerItem->container)) {
+                return [
+                    'success' => false,
+                    'message' => 'This package is packed in ' . $containerItem->container->container_code . '. Scan the load group label instead.',
+                ];
+            }
+
             $line->update([
                 'scan_out_count' => ((int) $line->scan_out_count) + 1,
                 'loaded_quantity' => (int) $line->expected_quantity,
                 'loaded_at' => now(),
                 'line_status' => TransportManifestItem::LINE_LOADED,
             ]);
-
-            $containerItem = TransportContainerItem::query()
-                ->where('transport_manifest_item_id', $line->id)
-                ->with('container.items.manifestItem')
-                ->first();
 
             if ($containerItem?->container) {
                 $allContainerItemsLoaded = $containerItem->container->items->every(function (TransportContainerItem $item) {
@@ -454,12 +461,25 @@ class WarehouseTransportService
             } else {
                 $line = TransportManifestItem::query()
                     ->where('transport_manifest_id', $lockedManifest->id)
+                    ->with('containerItems.container')
                     ->lockForUpdate()
                     ->whereKey((int) $data['manifest_item_id'])
                     ->first();
 
                 if (!$line) {
                     return ['success' => false, 'message' => 'Manifest item not found on this transport.'];
+                }
+
+                $packedContainer = $line->containerItems
+                    ->map(fn (TransportContainerItem $item) => $item->container)
+                    ->filter()
+                    ->first();
+
+                if ($packedContainer && !$this->isLooseTransportContainer($packedContainer)) {
+                    return [
+                        'success' => false,
+                        'message' => 'This package is packed in ' . $packedContainer->container_code . '. Report the scan issue on the load group instead.',
+                    ];
                 }
             }
 
@@ -1241,6 +1261,11 @@ class WarehouseTransportService
             'loaded_at' => null,
             'loaded_by_driver_id' => null,
         ]);
+    }
+
+    private function isLooseTransportContainer(TransportContainer $container): bool
+    {
+        return strtolower((string) $container->container_type) === 'loose';
     }
 
     private function generateContainerCode(TransportManifest $manifest, int $sequence): string
