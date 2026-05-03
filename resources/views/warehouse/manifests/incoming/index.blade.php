@@ -1,11 +1,14 @@
-@extends('warehouse.layouts.app')
+@extends($layoutName ?? 'warehouse.layouts.app')
 
-@section('title', 'Incoming Manifests')
-@section('page-title', 'Incoming Manifests')
+@section('title', $pageTitle ?? 'Incoming Manifests')
+@section('page-title', $pageTitle ?? 'Incoming Manifests')
+@section('breadcrumb-parent', 'Logistics')
+@section('breadcrumb-current', $pageTitle ?? 'Incoming Manifests')
 
 @php
     $config = [
-        'endpoint' => route('warehouse.manifests.incoming.data'),
+        'endpoint' => $dataEndpoint ?? route('warehouse.manifests.incoming.data'),
+        'showDestinationWarehouse' => $showDestinationWarehouse ?? false,
         'statuses' => [
             ['value' => 'draft', 'label' => 'Draft'],
             ['value' => 'assigned', 'label' => 'Assigned'],
@@ -83,6 +86,7 @@
                         <tr>
                             <th x-show="visibleColumns.manifest_number" @@click="sort('manifest_number')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">MANIFEST #</th>
                             <th x-show="visibleColumns.origin_warehouse" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ORIGIN</th>
+                            <th x-show="visibleColumns.destination_warehouse" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">DESTINATION</th>
                             <th x-show="visibleColumns.driver_name" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">DRIVER</th>
                             <th x-show="visibleColumns.status" @@click="sort('status')" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">STATUS</th>
                             <th x-show="visibleColumns.items_count" @@click="sort('items_count')" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">ITEMS</th>
@@ -99,6 +103,7 @@
                             <tr class="hover:bg-slate-50/70">
                                 <td x-show="visibleColumns.manifest_number" class="px-4 py-2.5 text-xs font-semibold text-slate-900" x-text="row.manifest_number || '-'"></td>
                                 <td x-show="visibleColumns.origin_warehouse" class="px-4 py-2.5 text-xs text-slate-700" x-text="row.origin_warehouse || '-'"></td>
+                                <td x-show="visibleColumns.destination_warehouse" class="px-4 py-2.5 text-xs text-slate-700" x-text="row.destination_warehouse || '-'"></td>
                                 <td x-show="visibleColumns.driver_name" class="px-4 py-2.5 text-xs text-slate-700">
                                     <p class="font-medium" x-text="row.driver_name || '-'"></p>
                                 </td>
@@ -148,4 +153,3 @@
     </div>
 </div>
 @endsection
-

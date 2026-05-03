@@ -19,22 +19,31 @@ function registerWarehouseIncomingManifestsPage() {
     const config = getConfig();
     if (!config || !config.endpoint) return;
 
+    const columns = [
+        { key: 'manifest_number', label: 'Manifest #' },
+        { key: 'origin_warehouse', label: 'Origin Warehouse' },
+    ];
+
+    if (config.showDestinationWarehouse) {
+        columns.push({ key: 'destination_warehouse', label: 'Destination Warehouse' });
+    }
+
+    columns.push(
+        { key: 'driver_name', label: 'Driver' },
+        { key: 'status', label: 'Status' },
+        { key: 'items_count', label: 'Items' },
+        { key: 'arrived_at', label: 'Arrived At' },
+        { key: 'received_at', label: 'Received At' },
+        { key: 'actions', label: 'Actions', sortable: false },
+    );
+
     const pageConfig = {
         endpoint: config.endpoint,
         defaultSort: 'created_at',
         exportFileName: 'warehouse-incoming-manifests',
         printTitle: 'Warehouse Incoming Manifests',
         statuses: config.statuses || [],
-        columns: [
-            { key: 'manifest_number', label: 'Manifest #' },
-            { key: 'origin_warehouse', label: 'Origin Warehouse' },
-            { key: 'driver_name', label: 'Driver' },
-            { key: 'status', label: 'Status' },
-            { key: 'items_count', label: 'Items' },
-            { key: 'arrived_at', label: 'Arrived At' },
-            { key: 'received_at', label: 'Received At' },
-            { key: 'actions', label: 'Actions', sortable: false },
-        ],
+        columns,
     };
 
     Alpine.data('warehouseIncomingManifestsPage', () => {
@@ -71,4 +80,3 @@ if (window.Alpine) {
 } else {
     document.addEventListener('alpine:init', registerWarehouseIncomingManifestsPage);
 }
-

@@ -1,7 +1,9 @@
-@extends('warehouse.layouts.app')
+@extends($layoutName ?? 'warehouse.layouts.app')
 
 @section('title', 'Incoming Manifest Details')
 @section('page-title', 'Incoming Manifest Details')
+@section('breadcrumb-parent', 'Incoming Manifests')
+@section('breadcrumb-current', $manifest->manifest_number)
 
 @php
     $items = $manifest->items;
@@ -77,11 +79,11 @@
 
             <div class="relative px-6 lg:px-8 py-6">
                 <div class="mb-6">
-                    <a href="{{ route('warehouse.manifests.incoming.index') }}" class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium transition-all backdrop-blur-sm hover:shadow-md">
+                    <a href="{{ $indexRoute ?? route('warehouse.manifests.incoming.index') }}" class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium transition-all backdrop-blur-sm hover:shadow-md">
                         <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                         </svg>
-                        <span class="text-xs">Back to Incoming Manifests</span>
+                        <span class="text-xs">{{ $backLabel ?? 'Back to Incoming Manifests' }}</span>
                     </a>
                 </div>
 
@@ -487,7 +489,7 @@
                                 <button
                                     type="button"
                                     @@click="showFinalizeModal = true"
-                                    :disabled="isFinalized() || loading"
+                                    :disabled="isFinalized() || !canReceive() || loading"
                                     class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white text-xs font-bold rounded-xl shadow-lg shadow-slate-900/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     Finalize Receipt
@@ -518,13 +520,13 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide"
-                            :class="isFinalized() ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'"
-                            x-text="isFinalized() ? 'Finalized' : 'In Progress'"></span>
+                            :class="isFinalized() ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : (canReceive() ? 'bg-slate-100 text-slate-600' : 'bg-amber-50 text-amber-700 border border-amber-200')"
+                            x-text="isFinalized() ? 'Finalized' : (canReceive() ? 'In Progress' : 'Waiting for Arrival')"></span>
                         <button
                             type="button"
                             x-show="!isFinalized()"
                             @@click="showFinalizeModal = true"
-                            :disabled="loading"
+                            :disabled="!canReceive() || loading"
                             class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-slate-800 to-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:from-slate-700 hover:to-slate-800 shadow-lg shadow-slate-900/25 disabled:opacity-50 transition-all">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             Finalize Receipt
@@ -567,6 +569,14 @@
                 <div x-show="isFinalized()" class="mb-4 flex items-center gap-3 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
                     <svg class="w-5 h-5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <p class="text-xs font-semibold text-emerald-700">This manifest receipt has been finalized. Items are read-only.</p>
+                </div>
+
+                {{-- Waiting for arrival banner --}}
+                <div x-show="!isFinalized() && !canReceive()" class="mb-4 flex items-center gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+                    <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/>
+                    </svg>
+                    <p class="text-xs font-semibold text-amber-700">Receiving is locked until the driver marks this manifest as arrived at the destination warehouse.</p>
                 </div>
 
                 {{-- Items Grid --}}
@@ -654,7 +664,7 @@
                                 <div class="px-4 py-3">
                                     <button type="button"
                                         @@click="openReceiveModal(row.shipment_item_id)"
-                                        :disabled="isFinalized() || loading"
+                                        :disabled="isFinalized() || !canReceive() || loading"
                                         class="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                         :class="row.received_at ? 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200' : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25'">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -940,7 +950,7 @@
                     Cancel
                 </button>
                 <button type="button" @@click="finalizeReceipt()"
-                    :disabled="loading"
+                    :disabled="!canReceive() || loading"
                     class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                     <svg x-show="loading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <span x-text="loading ? 'Finalizing...' : 'Finalize Receipt'"></span>

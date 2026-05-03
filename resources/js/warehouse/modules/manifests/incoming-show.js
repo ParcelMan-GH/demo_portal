@@ -27,6 +27,10 @@ function registerWarehouseIncomingManifestShowPage() {
             return (this.manifestStatus || '').toLowerCase() === 'received';
         },
 
+        canReceive() {
+            return (this.manifestStatus || '').toLowerCase() === 'arrived';
+        },
+
         receivedCount() {
             return this.items.filter((i) => i.received_at).length;
         },
@@ -73,6 +77,10 @@ function registerWarehouseIncomingManifestShowPage() {
 
         openReceiveModal(itemId) {
             if (this.isFinalized()) return;
+            if (!this.canReceive()) {
+                window.showToast?.('Manifest must be marked arrived before receiving.', 'warning');
+                return;
+            }
             const idx = this.items.findIndex((i) => Number(i.shipment_item_id) === Number(itemId));
             if (idx < 0) return;
             this.receiveModal = { open: true, itemId, itemIndex: idx };
@@ -85,6 +93,11 @@ function registerWarehouseIncomingManifestShowPage() {
         async saveItem(itemId) {
             if (this.isFinalized()) {
                 window.showToast?.('Manifest receipt is finalized and cannot be changed.', 'warning');
+                return;
+            }
+
+            if (!this.canReceive()) {
+                window.showToast?.('Manifest must be marked arrived before receiving.', 'warning');
                 return;
             }
 
@@ -134,6 +147,12 @@ function registerWarehouseIncomingManifestShowPage() {
         async finalizeReceipt() {
             if (this.isFinalized()) {
                 this.showFinalizeModal = false;
+                return;
+            }
+
+            if (!this.canReceive()) {
+                this.showFinalizeModal = false;
+                window.showToast?.('Manifest must be marked arrived before finalizing receipt.', 'warning');
                 return;
             }
 

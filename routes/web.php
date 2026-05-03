@@ -358,6 +358,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('transport-manifests-data', [AdminTransportManifestController::class, 'data'])->name('transport-manifests.data');
         Route::get('transport-manifests-export', [AdminTransportManifestController::class, 'export'])->name('transport-manifests.export');
         Route::post('transport-manifests', [AdminTransportManifestController::class, 'store'])->name('transport-manifests.store');
+        Route::get('transport-manifests/incoming', [AdminTransportManifestController::class, 'incomingIndex'])->name('transport-manifests.incoming.index');
+        Route::get('transport-manifests/incoming-data', [AdminTransportManifestController::class, 'incomingData'])->name('transport-manifests.incoming.data');
+        Route::get('transport-manifests/incoming/{manifest}', [AdminTransportManifestController::class, 'incomingShow'])->name('transport-manifests.incoming.show');
+        Route::post('transport-manifests/incoming/{manifest}/items/{shipmentItem}/scan-receive', [AdminTransportManifestController::class, 'scanIncomingItem'])->name('transport-manifests.incoming.items.scan');
+        Route::post('transport-manifests/incoming/{manifest}/finalize-receipt', [AdminTransportManifestController::class, 'finalizeIncoming'])->name('transport-manifests.incoming.finalize');
         Route::get('transport-manifests/{manifest}', [AdminTransportManifestController::class, 'show'])->name('transport-manifests.show');
         Route::post('transport-manifests/{manifest}/assign-driver', [AdminTransportManifestController::class, 'assignDriver'])->name('transport-manifests.assign-driver');
         Route::post('transport-manifests/{manifest}/unassign-driver', [AdminTransportManifestController::class, 'unassignDriver'])->name('transport-manifests.unassign-driver');

@@ -33,12 +33,8 @@ class WarehouseTransportReceivingService
             return ['success' => false, 'message' => 'Cannot receive items for another warehouse manifest.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_ARRIVED, TransportManifest::STATUS_RECEIVED], true)) {
+        if ($manifest->status !== TransportManifest::STATUS_ARRIVED) {
             return ['success' => false, 'message' => 'Manifest has not arrived for receiving.'];
-        }
-
-        if ($manifest->status === TransportManifest::STATUS_RECEIVED) {
-            return ['success' => false, 'message' => 'Manifest already finalized as received.'];
         }
 
         if ($receivedQuantity < 0) {

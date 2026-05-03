@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Exports\DriversExport;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
+use App\Models\PlatformSetting;
+use App\Models\ShipmentItem;
 use App\Models\SortBatch;
 use App\Models\TransportContainer;
 use App\Models\TransportLoadingException;
@@ -12,11 +14,14 @@ use App\Models\TransportManifest;
 use App\Models\TransportManifestItem;
 use App\Models\Warehouse;
 use App\Services\Warehouse\BarcodeService;
+use App\Services\Warehouse\PackageContactService;
+use App\Services\Warehouse\WarehouseTransportReceivingService;
 use App\Services\Warehouse\WarehouseTransportService;
 use App\Support\GenericPdfExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -24,6 +29,7 @@ class AdminTransportManifestController extends Controller
 {
     public function __construct(
         private WarehouseTransportService $transportService,
+        private WarehouseTransportReceivingService $receivingService,
         private BarcodeService $barcodeService
     )
     {
@@ -236,6 +242,188 @@ class AdminTransportManifestController extends Controller
         ];
 
         return view('admin.transport-manifests.show', compact('manifest', 'statusLabel', 'transportDrivers', 'manifestConfig'));
+    }
+
+    public function incomingIndex(): View
+    {
+        $warehouse = null;
+
+        return view('warehouse.manifests.incoming.index', [
+            'warehouse' => $warehouse,
+            'layoutName' => 'admin.layouts.app',
+            'pageTitle' => 'Incoming Transport Manifests',
+            'dataEndpoint' => route('admin.transport-manifests.incoming.data'),
+            'showDestinationWarehouse' => true,
+        ]);
+    }
+
+    public function incomingData(Request $request): JsonResponse
+    {
+        $query = TransportManifest::query()
+            ->with([
+                'originWarehouse:id,name,code',
+                'destinationWarehouse:id,name,code',
+                'assignedDriver:id,name,phone',
+                'items:id,transport_manifest_id',
+            ]);
+
+        if ($search = trim((string) $request->input('search'))) {
+            $query->where(function ($builder) use ($search) {
+                $builder->where('manifest_number', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhereHas('originWarehouse', fn ($originQuery) => $originQuery->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                    ->orWhereHas('destinationWarehouse', fn ($destinationQuery) => $destinationQuery->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                    ->orWhereHas('assignedDriver', fn ($driverQuery) => $driverQuery->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        $sort = $request->input('sort', 'created_at');
+        $direction = $request->input('direction', 'desc') === 'asc' ? 'asc' : 'desc';
+        if (in_array($sort, ['manifest_number', 'status', 'assigned_at', 'arrived_at', 'received_at', 'created_at'], true)) {
+            $query->orderBy($sort, $direction);
+        } else {
+            $query->latest('id');
+        }
+
+        $total = $query->count();
+        $perPage = min(max((int) $request->input('per_page', 10), 1), 100);
+        $page = max((int) $request->input('page', 1), 1);
+        $offset = ($page - 1) * $perPage;
+
+        $rows = $query->skip($offset)->take($perPage)->get()->map(function (TransportManifest $manifest) {
+            return [
+                'id' => $manifest->id,
+                'manifest_number' => $manifest->manifest_number,
+                'status' => $manifest->status,
+                'origin_warehouse' => $manifest->originWarehouse?->name,
+                'destination_warehouse' => $manifest->destinationWarehouse?->name,
+                'driver_name' => $manifest->assignedDriver?->name,
+                'items_count' => $manifest->items->count(),
+                'arrived_at' => optional($manifest->arrived_at)?->format('Y-m-d H:i:s'),
+                'received_at' => optional($manifest->received_at)?->format('Y-m-d H:i:s'),
+                'view_url' => route('admin.transport-manifests.incoming.show', $manifest),
+            ];
+        })->values();
+
+        return response()->json([
+            'data' => $rows,
+            'meta' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => (int) ceil($total / $perPage) ?: 1,
+                'from' => $total > 0 ? $offset + 1 : 0,
+                'to' => min($offset + $perPage, $total),
+            ],
+        ]);
+    }
+
+    public function incomingShow(TransportManifest $manifest): View
+    {
+        $warehouse = $manifest->destinationWarehouse;
+        if (!$warehouse) {
+            abort(404);
+        }
+
+        $manifest->load([
+            'originWarehouse',
+            'destinationWarehouse',
+            'assignedDriver',
+            'sortBatch',
+            'createdBy',
+            'items.shipmentItem.shipment.vendor',
+            'containers.items.manifestItem.shipmentItem.shipment.vendor',
+            'containers.items.manifestItem.shipmentItem.warehouseReceiptItems.labels',
+            'containers.items.manifestItem.labelScans:id,transport_manifest_item_id,barcode_value,scanned_at',
+        ]);
+
+        $config = [
+            'scan_receive_endpoint' => route('admin.transport-manifests.incoming.items.scan', ['manifest' => $manifest, 'shipmentItem' => '__ITEM__']),
+            'finalize_endpoint' => route('admin.transport-manifests.incoming.finalize', ['manifest' => $manifest]),
+        ];
+
+        return view('warehouse.manifests.incoming.show', [
+            'warehouse' => $warehouse,
+            'manifest' => $manifest,
+            'manifestConfig' => $config,
+            'layoutName' => 'admin.layouts.app',
+            'indexRoute' => route('admin.transport-manifests.incoming.index'),
+            'backLabel' => 'Back to Incoming Manifests',
+        ]);
+    }
+
+    public function scanIncomingItem(Request $request, TransportManifest $manifest, ShipmentItem $shipmentItem): JsonResponse
+    {
+        if ($manifest->status !== TransportManifest::STATUS_ARRIVED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Manifest must be marked arrived before receiving items.',
+            ], 422);
+        }
+
+        $warehouse = $manifest->destinationWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no destination warehouse.'], 422);
+        }
+
+        $validated = $request->validate([
+            'received_quantity' => ['required', 'integer', 'min:0'],
+            'line_status' => ['nullable', 'in:pending,loaded,received,short,excess,damaged'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $result = $this->receivingService->scanReceive(
+            manifest: $manifest,
+            shipmentItem: $shipmentItem,
+            warehouse: $warehouse,
+            user: Auth::guard('admin')->user(),
+            receivedQuantity: (int) $validated['received_quantity'],
+            lineStatus: $validated['line_status'] ?? null,
+            notes: $validated['notes'] ?? null
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function finalizeIncoming(Request $request, TransportManifest $manifest): JsonResponse
+    {
+        if ($manifest->status !== TransportManifest::STATUS_ARRIVED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Manifest must be marked arrived before finalizing receipt.',
+            ], 422);
+        }
+
+        $warehouse = $manifest->destinationWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no destination warehouse.'], 422);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string', 'max:3000'],
+        ]);
+
+        $result = $this->receivingService->finalizeReceipt(
+            manifest: $manifest,
+            warehouse: $warehouse,
+            user: Auth::guard('admin')->user(),
+            notes: $validated['notes'] ?? null
+        );
+
+        if ($result['success'] && PlatformSetting::getValue('contact_queue.auto_queue_on_transport_receive', false)) {
+            try {
+                $itemIds = $manifest->items()->pluck('shipment_item_id')->toArray();
+                app(PackageContactService::class)->createTasksForWarehouseItems($warehouse, $itemIds);
+            } catch (\Throwable $e) {
+                Log::warning('Auto-queue on admin transport receive failed: ' . $e->getMessage());
+            }
+        }
+
+        return response()->json($result, $result['success'] ? 200 : 422);
     }
 
     /**
