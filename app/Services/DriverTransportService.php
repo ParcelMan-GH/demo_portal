@@ -242,6 +242,8 @@ class DriverTransportService
                             'tracking_code' => $shipmentItem?->tracking_code,
                             'label_barcode' => $containerItem->label_barcode,
                             'labels' => $labels,
+                            'label_count' => $labels->count(),
+                            'labels_ready' => $labels->isNotEmpty(),
                             'expected_quantity' => (int) $containerItem->expected_quantity,
                             'loaded_quantity' => (int) ($line?->loaded_quantity ?? 0),
                             'scan_out_count' => (int) ($line?->scan_out_count ?? 0),

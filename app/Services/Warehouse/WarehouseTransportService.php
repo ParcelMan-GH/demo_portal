@@ -443,9 +443,17 @@ class WarehouseTransportService
             $scannedCount = TransportManifestLabelScan::query()
                 ->where('transport_manifest_item_id', $line->id)
                 ->count();
-            $expectedCount = max((int) $line->expected_quantity, 1);
-            $loadedCount = min($scannedCount, $expectedCount);
-            $isFullyLoaded = $loadedCount >= $expectedCount;
+            $printedLabelCount = WarehouseReceiptItemLabel::query()
+                ->whereHas('receiptItem', function (Builder $query) use ($line) {
+                    $query->where('shipment_item_id', $line->shipment_item_id);
+                })
+                ->count();
+            $expectedScanCount = max($printedLabelCount, 1);
+            $expectedQuantity = max((int) $line->expected_quantity, 1);
+            $isFullyLoaded = $scannedCount >= $expectedScanCount;
+            $loadedCount = $isFullyLoaded
+                ? $expectedQuantity
+                : ($expectedScanCount === $expectedQuantity ? min($scannedCount, $expectedQuantity) : 0);
 
             $line->update([
                 'scan_out_count' => $scannedCount,
@@ -477,7 +485,7 @@ class WarehouseTransportService
                 'success' => true,
                 'message' => $isFullyLoaded
                     ? 'Package labels loaded successfully.'
-                    : "Label loaded. {$loadedCount}/{$expectedCount} labels scanned.",
+                    : "Label loaded. {$scannedCount}/{$expectedScanCount} labels scanned.",
             ];
         });
     }
