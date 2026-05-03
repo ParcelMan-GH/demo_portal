@@ -38,6 +38,11 @@ class WarehouseReceiptItemLabel extends Model
         return $this->hasOne(LabelCustodyEvent::class, 'warehouse_receipt_item_label_id')->latestOfMany();
     }
 
+    public function transportScans(): HasMany
+    {
+        return $this->hasMany(TransportManifestLabelScan::class, 'warehouse_receipt_item_label_id');
+    }
+
     /**
      * Get the current driver holding this label (if claimed and not released/delivered/returned).
      */

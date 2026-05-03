@@ -15,9 +15,11 @@ use App\Models\TransportContainer;
 use App\Models\TransportContainerItem;
 use App\Models\TransportLoadingException;
 use App\Models\TransportManifestItem;
+use App\Models\TransportManifestLabelScan;
 use App\Models\PlatformSetting;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Models\WarehouseReceiptItemLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -370,7 +372,13 @@ class WarehouseTransportService
                 return $this->markContainerLoaded($container, $driver);
             }
 
-            $line = TransportManifestItem::query()
+            $label = WarehouseReceiptItemLabel::query()
+                ->with('receiptItem:id,shipment_item_id')
+                ->where('barcode_value', $trackingCode)
+                ->lockForUpdate()
+                ->first();
+
+            $baseCodeLine = TransportManifestItem::query()
                 ->where('transport_manifest_id', $manifest->id)
                 ->whereHas('shipmentItem', function (Builder $query) use ($trackingCode) {
                     $query->where('tracking_code', $trackingCode);
@@ -378,8 +386,30 @@ class WarehouseTransportService
                 ->lockForUpdate()
                 ->first();
 
+            if (!$label) {
+                if ($baseCodeLine) {
+                    return [
+                        'success' => false,
+                        'message' => 'Scan the printed package label barcode, not the package tracking code.',
+                    ];
+                }
+
+                return ['success' => false, 'message' => 'Label code not found in this manifest.'];
+            }
+
+            $shipmentItemId = $label->receiptItem?->shipment_item_id;
+            if (!$shipmentItemId) {
+                return ['success' => false, 'message' => 'Label is not linked to a package item.'];
+            }
+
+            $line = TransportManifestItem::query()
+                ->where('transport_manifest_id', $manifest->id)
+                ->where('shipment_item_id', $shipmentItemId)
+                ->lockForUpdate()
+                ->first();
+
             if (!$line) {
-                return ['success' => false, 'message' => 'Tracking code not found in this manifest.'];
+                return ['success' => false, 'message' => 'Label code not found in this manifest.'];
             }
 
             $containerItem = TransportContainerItem::query()
@@ -394,35 +424,60 @@ class WarehouseTransportService
                 ];
             }
 
+            $existingScan = TransportManifestLabelScan::query()
+                ->where('transport_manifest_id', $manifest->id)
+                ->where('warehouse_receipt_item_label_id', $label->id)
+                ->first();
+
+            if (!$existingScan) {
+                TransportManifestLabelScan::query()->create([
+                    'transport_manifest_id' => $manifest->id,
+                    'transport_manifest_item_id' => $line->id,
+                    'warehouse_receipt_item_label_id' => $label->id,
+                    'driver_id' => $driver->id,
+                    'barcode_value' => $label->barcode_value,
+                    'scanned_at' => now(),
+                ]);
+            }
+
+            $scannedCount = TransportManifestLabelScan::query()
+                ->where('transport_manifest_item_id', $line->id)
+                ->count();
+            $expectedCount = max((int) $line->expected_quantity, 1);
+            $loadedCount = min($scannedCount, $expectedCount);
+            $isFullyLoaded = $loadedCount >= $expectedCount;
+
             $line->update([
-                'scan_out_count' => ((int) $line->scan_out_count) + 1,
-                'loaded_quantity' => (int) $line->expected_quantity,
-                'loaded_at' => now(),
-                'line_status' => TransportManifestItem::LINE_LOADED,
+                'scan_out_count' => $scannedCount,
+                'loaded_quantity' => $loadedCount,
+                'loaded_at' => $isFullyLoaded ? ($line->loaded_at ?? now()) : null,
+                'line_status' => $isFullyLoaded ? TransportManifestItem::LINE_LOADED : TransportManifestItem::LINE_PENDING,
             ]);
 
             if ($containerItem?->container) {
-                $allContainerItemsLoaded = $containerItem->container->items->every(function (TransportContainerItem $item) {
-                    $manifestLine = $item->manifestItem;
+                if ($isFullyLoaded) {
+                    $this->syncLineContainerLoadState($line);
 
-                    return $manifestLine
-                        && (int) $manifestLine->loaded_quantity >= (int) $manifestLine->expected_quantity;
-                });
-
-                if ($allContainerItemsLoaded) {
+                    if ($containerItem->container->fresh()?->status === TransportContainer::STATUS_LOADED) {
+                        $containerItem->container->update([
+                            'loaded_by_driver_id' => $driver->id,
+                        ]);
+                    }
+                } else {
+                    $containerItem->update(['status' => TransportContainerItem::STATUS_PACKED]);
                     $containerItem->container->update([
-                        'status' => TransportContainer::STATUS_LOADED,
-                        'loaded_at' => $containerItem->container->loaded_at ?? now(),
-                        'loaded_by_driver_id' => $driver->id,
+                        'status' => TransportContainer::STATUS_SEALED,
+                        'loaded_at' => null,
+                        'loaded_by_driver_id' => null,
                     ]);
-
-                    $containerItem->container->items()->update(['status' => TransportContainerItem::STATUS_LOADED]);
                 }
             }
 
             return [
                 'success' => true,
-                'message' => 'Item loaded successfully.',
+                'message' => $isFullyLoaded
+                    ? 'Package labels loaded successfully.'
+                    : "Label loaded. {$loadedCount}/{$expectedCount} labels scanned.",
             ];
         });
     }
@@ -664,6 +719,10 @@ class WarehouseTransportService
             if ((int) $lockedLine->received_quantity > 0 || $lockedLine->received_at) {
                 return ['success' => false, 'message' => 'Cannot undo loading after this item has been received.'];
             }
+
+            TransportManifestLabelScan::query()
+                ->where('transport_manifest_item_id', $lockedLine->id)
+                ->delete();
 
             $lockedLine->update([
                 'scan_out_count' => 0,
@@ -954,6 +1013,10 @@ class WarehouseTransportService
                 if (!$line) {
                     continue;
                 }
+
+                TransportManifestLabelScan::query()
+                    ->where('transport_manifest_item_id', $line->id)
+                    ->delete();
 
                 $line->update([
                     'scan_out_count' => 0,

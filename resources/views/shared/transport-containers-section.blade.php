@@ -146,6 +146,16 @@
                                             $shipment = $shipmentItem?->shipment;
                                             $isLooseContainer = strtolower((string) $container->container_type) === 'loose';
                                             $labelCode = $containerItem->label_barcode ?: $shipmentItem?->tracking_code;
+                                            $scannedCodes = $line?->labelScans?->pluck('barcode_value')->filter() ?? collect();
+                                            $lineFullyLoaded = $line && (int) $line->loaded_quantity >= (int) $line->expected_quantity;
+                                            $printedLabelCodes = $shipmentItem?->warehouseReceiptItems
+                                                ? $shipmentItem->warehouseReceiptItems
+                                                    ->flatMap(fn ($receiptItem) => $receiptItem->labels)
+                                                    ->sortBy(fn ($label) => [(int) ($label->label_index ?? 0), (int) $label->id])
+                                                    ->pluck('barcode_value')
+                                                    ->filter()
+                                                    ->values()
+                                                : collect();
                                         @endphp
                                         <div class="py-2.5 first:pt-0 last:pb-0 flex items-start justify-between gap-3">
                                             <div class="min-w-0">
@@ -153,12 +163,21 @@
                                                 <p class="text-[11px] text-slate-500 mt-0.5">
                                                     {{ $shipment?->shipment_number ?? 'No shipment' }}
                                                 </p>
-                                                @if($isLooseContainer && $labelCode)
-                                                    <div class="mt-1">
-                                                        <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-700">
-                                                            {{ $labelCode }}
-                                                        </span>
+                                                @if($isLooseContainer && $printedLabelCodes->isNotEmpty())
+                                                    <div class="mt-1.5 flex flex-wrap gap-1">
+                                                        @foreach($printedLabelCodes as $printedLabelCode)
+                                                            @php $isScanned = $lineFullyLoaded || $scannedCodes->contains($printedLabelCode); @endphp
+                                                            <span @class([
+                                                                'inline-flex items-center rounded-md px-2 py-0.5 font-mono text-[10px] font-semibold',
+                                                                'bg-emerald-50 text-emerald-700' => $isScanned,
+                                                                'bg-slate-100 text-slate-700' => !$isScanned,
+                                                            ])>
+                                                                {{ $printedLabelCode }}
+                                                            </span>
+                                                        @endforeach
                                                     </div>
+                                                @elseif($isLooseContainer && $labelCode)
+                                                    <p class="text-[10px] text-amber-600 mt-0.5">Printed labels not found. Reprint package labels before driver loading.</p>
                                                 @elseif(!$isLooseContainer && $labelCode)
                                                     <p class="text-[10px] text-slate-400 mt-0.5 font-mono">{{ $labelCode }}</p>
                                                 @endif

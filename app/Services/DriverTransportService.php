@@ -47,6 +47,8 @@ class DriverTransportService
                 'items.shipmentItem:id,shipment_id,description,tracking_code',
                 'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
                 'containers.items.manifestItem.shipmentItem.shipment:id,shipment_number',
+                'containers.items.manifestItem.shipmentItem.warehouseReceiptItems.labels',
+                'containers.items.manifestItem.labelScans:id,transport_manifest_item_id,barcode_value,scanned_at',
                 'loadingExceptions:id,transport_manifest_id,transport_container_id,transport_manifest_item_id,driver_id,reason,note,proof_photo_path,status,auto_accepted,created_at,reviewed_at',
             ]);
 
@@ -80,6 +82,8 @@ class DriverTransportService
                     $manifest->load([
                         'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
                         'containers.items.manifestItem.shipmentItem.shipment:id,shipment_number',
+                        'containers.items.manifestItem.shipmentItem.warehouseReceiptItems.labels',
+                        'containers.items.manifestItem.labelScans:id,transport_manifest_item_id,barcode_value,scanned_at',
                         'loadingExceptions:id,transport_manifest_id,transport_container_id,transport_manifest_item_id,driver_id,reason,note,proof_photo_path,status,auto_accepted,created_at,reviewed_at',
                     ]);
                 }
@@ -124,6 +128,8 @@ class DriverTransportService
             'items.shipmentItem:id,shipment_id,description,tracking_code',
             'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
             'containers.items.manifestItem.shipmentItem.shipment:id,shipment_number',
+            'containers.items.manifestItem.shipmentItem.warehouseReceiptItems.labels',
+            'containers.items.manifestItem.labelScans:id,transport_manifest_item_id,barcode_value,scanned_at',
             'loadingExceptions:id,transport_manifest_id,transport_container_id,transport_manifest_item_id,driver_id,reason,note,proof_photo_path,status,auto_accepted,created_at,reviewed_at',
         ]);
 
@@ -132,6 +138,8 @@ class DriverTransportService
             $manifest->load([
                 'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
                 'containers.items.manifestItem.shipmentItem.shipment:id,shipment_number',
+                'containers.items.manifestItem.shipmentItem.warehouseReceiptItems.labels',
+                'containers.items.manifestItem.labelScans:id,transport_manifest_item_id,barcode_value,scanned_at',
                 'loadingExceptions:id,transport_manifest_id,transport_container_id,transport_manifest_item_id,driver_id,reason,note,proof_photo_path,status,auto_accepted,created_at,reviewed_at',
             ]);
         }
@@ -208,6 +216,23 @@ class DriverTransportService
                     'items' => $items->map(function ($containerItem) {
                         $line = $containerItem->manifestItem;
                         $shipmentItem = $line?->shipmentItem;
+                        $scannedCodes = $line?->labelScans?->pluck('barcode_value')->filter()->values() ?? collect();
+                        $lineFullyLoaded = $line && (int) $line->loaded_quantity >= (int) $line->expected_quantity;
+                        $labels = $shipmentItem?->warehouseReceiptItems
+                            ? $shipmentItem->warehouseReceiptItems
+                                ->flatMap(fn ($receiptItem) => $receiptItem->labels)
+                                ->sortBy(fn ($label) => [(int) ($label->label_index ?? 0), (int) $label->id])
+                                ->map(fn ($label) => [
+                                    'id' => $label->id,
+                                    'barcode' => $label->barcode_value,
+                                    'label_index' => $label->label_index,
+                                    'labels_total' => $label->labels_total,
+                                    'label_type' => $label->label_type,
+                                    'loaded' => $lineFullyLoaded || $scannedCodes->contains($label->barcode_value),
+                                    'scanned_at' => optional($line?->labelScans?->firstWhere('barcode_value', $label->barcode_value))->scanned_at,
+                                ])
+                                ->values()
+                            : collect();
 
                         return [
                             'shipment_item_id' => $containerItem->shipment_item_id,
@@ -215,7 +240,12 @@ class DriverTransportService
                             'shipment_number' => $shipmentItem?->shipment?->shipment_number,
                             'description' => $shipmentItem?->description,
                             'tracking_code' => $shipmentItem?->tracking_code,
+                            'label_barcode' => $containerItem->label_barcode,
+                            'labels' => $labels,
                             'expected_quantity' => (int) $containerItem->expected_quantity,
+                            'loaded_quantity' => (int) ($line?->loaded_quantity ?? 0),
+                            'scan_out_count' => (int) ($line?->scan_out_count ?? 0),
+                            'loaded_at' => $line?->loaded_at,
                             'status' => $containerItem->status,
                         ];
                     })->values(),

@@ -98,4 +98,9 @@ class TransportManifest extends Model
     {
         return $this->hasMany(TransportLoadingException::class);
     }
+
+    public function labelScans(): HasMany
+    {
+        return $this->hasMany(TransportManifestLabelScan::class);
+    }
 }

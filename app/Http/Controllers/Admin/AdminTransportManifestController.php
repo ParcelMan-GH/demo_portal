@@ -201,6 +201,8 @@ class AdminTransportManifestController extends Controller
             'receivedBy',
             'items.shipmentItem.shipment',
             'containers.items.manifestItem.shipmentItem.shipment',
+            'containers.items.manifestItem.shipmentItem.warehouseReceiptItems.labels',
+            'containers.items.manifestItem.labelScans:id,transport_manifest_item_id,barcode_value,scanned_at',
             'loadingExceptions.driver:id,name,phone',
             'loadingExceptions.container:id,container_code,container_type',
             'loadingExceptions.manifestItem.shipmentItem:id,description,tracking_code',
