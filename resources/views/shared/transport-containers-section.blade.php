@@ -144,16 +144,24 @@
                                             $line = $containerItem->manifestItem;
                                             $shipmentItem = $line?->shipmentItem;
                                             $shipment = $shipmentItem?->shipment;
+                                            $isLooseContainer = strtolower((string) $container->container_type) === 'loose';
+                                            $labelCode = $containerItem->label_barcode ?: $shipmentItem?->tracking_code;
                                         @endphp
                                         <div class="py-2.5 first:pt-0 last:pb-0 flex items-start justify-between gap-3">
                                             <div class="min-w-0">
                                                 <p class="text-xs font-semibold text-slate-900 truncate">{{ $shipmentItem?->description ?? 'Manifest item #' . $containerItem->transport_manifest_item_id }}</p>
                                                 <p class="text-[11px] text-slate-500 mt-0.5">
                                                     {{ $shipment?->shipment_number ?? 'No shipment' }}
-                                                    @if($containerItem->label_barcode)
-                                                        · {{ $containerItem->label_barcode }}
-                                                    @endif
                                                 </p>
+                                                @if($isLooseContainer && $labelCode)
+                                                    <div class="mt-1">
+                                                        <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-700">
+                                                            {{ $labelCode }}
+                                                        </span>
+                                                    </div>
+                                                @elseif(!$isLooseContainer && $labelCode)
+                                                    <p class="text-[10px] text-slate-400 mt-0.5 font-mono">{{ $labelCode }}</p>
+                                                @endif
                                             </div>
                                             <div class="text-right shrink-0">
                                                 <p class="text-xs font-bold text-slate-800">{{ $containerItem->expected_quantity }}</p>
