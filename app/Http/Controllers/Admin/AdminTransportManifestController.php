@@ -336,6 +336,8 @@ class AdminTransportManifestController extends Controller
             'sortBatch',
             'createdBy',
             'items.shipmentItem.shipment.vendor',
+            'items.shipmentItem.warehouseReceiptItems.labels',
+            'items.labelScans:id,transport_manifest_item_id,barcode_value,scanned_at',
             'containers.items.manifestItem.shipmentItem.shipment.vendor',
             'containers.items.manifestItem.shipmentItem.warehouseReceiptItems.labels',
             'containers.items.manifestItem.labelScans:id,transport_manifest_item_id,barcode_value,scanned_at',

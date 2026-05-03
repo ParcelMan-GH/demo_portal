@@ -41,6 +41,24 @@ function registerWarehouseIncomingManifestShowPage() {
             ).length;
         },
 
+        physicalPackageTotal() {
+            return this.items.reduce((sum, item) => sum + Number(item.physical_package_count || 0), 0);
+        },
+
+        itemQuantityTotal() {
+            return this.items.reduce((sum, item) => sum + Number(item.expected_quantity || 0), 0);
+        },
+
+        packageUnitLabel(count) {
+            const total = Number(count || 0);
+            return `${total} physical package${total === 1 ? '' : 's'}`;
+        },
+
+        itemUnitLabel(count) {
+            const total = Number(count || 0);
+            return `${total} item${total === 1 ? '' : 's'}`;
+        },
+
         statusClass(status) {
             switch ((status || '').toLowerCase()) {
                 case 'received':

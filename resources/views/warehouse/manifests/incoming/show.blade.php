@@ -41,12 +41,31 @@
         ['label' => 'Received', 'value' => $manifest->received_at, 'dot' => 'bg-emerald-500'],
     ];
 
-    $itemsData = $items->map(function ($line) {
+    $physicalPackageTotal = 0;
+    $itemsData = $items->map(function ($line) use (&$physicalPackageTotal) {
+        $labels = $line->shipmentItem?->warehouseReceiptItems
+            ?->flatMap(fn ($receiptItem) => $receiptItem->labels)
+            ->filter()
+            ->unique('id')
+            ->values() ?? collect();
+        $physicalPackageCount = max($labels->count(), 1);
+        $loadedPackageCount = $line->labelScans?->count() ?: ((int) $line->loaded_quantity > 0 ? $physicalPackageCount : 0);
+        $physicalPackageTotal += $physicalPackageCount;
+
         return [
             'shipment_item_id' => $line->shipment_item_id,
             'shipment_number' => $line->shipmentItem?->shipment?->shipment_number,
             'description' => $line->shipmentItem?->description,
             'tracking_code' => $line->shipmentItem?->tracking_code,
+            'physical_package_count' => $physicalPackageCount,
+            'loaded_package_count' => min($loadedPackageCount, $physicalPackageCount),
+            'labels' => $labels->map(fn ($label) => [
+                'id' => $label->id,
+                'barcode_value' => $label->barcode_value,
+                'label_index' => $label->label_index,
+                'labels_total' => $label->labels_total,
+                'label_type' => $label->label_type,
+            ])->values(),
             'expected_quantity' => (int) $line->expected_quantity,
             'loaded_quantity' => (int) $line->loaded_quantity,
             'received_quantity' => (int) $line->received_quantity,
@@ -541,8 +560,8 @@
                             <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                         </div>
                         <div>
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total Items</p>
-                            <p class="text-lg font-bold text-slate-900 leading-tight" x-text="items.length"></p>
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Physical Packages</p>
+                            <p class="text-lg font-bold text-slate-900 leading-tight" x-text="physicalPackageTotal()"></p>
                         </div>
                     </div>
                     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex items-center gap-3">
@@ -550,17 +569,17 @@
                             <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                         <div>
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Received</p>
-                            <p class="text-lg font-bold text-slate-900 leading-tight" x-text="receivedCount()"></p>
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Item Qty</p>
+                            <p class="text-lg font-bold text-slate-900 leading-tight" x-text="itemQuantityTotal()"></p>
                         </div>
                     </div>
                     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500/20 to-amber-600/10 flex items-center justify-center flex-shrink-0">
-                            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.999L13.732 4.001c-.77-1.333-2.694-1.333-3.464 0L3.34 16.001C2.57 17.334 3.536 19 5.072 19z"/></svg>
+                        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                         <div>
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Discrepancies</p>
-                            <p class="text-lg font-bold text-slate-900 leading-tight" x-text="discrepancyCount()"></p>
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Received Lines</p>
+                            <p class="text-lg font-bold text-slate-900 leading-tight" x-text="receivedCount()"></p>
                         </div>
                     </div>
                 </div>
@@ -613,18 +632,40 @@
                                     </div>
                                 </div>
 
+                                {{-- Physical Package Summary --}}
+                                <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/40">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Physical Packages</p>
+                                            <p class="mt-1 text-sm font-bold text-slate-900" x-text="packageUnitLabel(row.physical_package_count)"></p>
+                                            <p class="mt-0.5 text-xs text-slate-500" x-text="'Contains ' + itemUnitLabel(row.expected_quantity)"></p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Loaded</p>
+                                            <p class="mt-1 text-sm font-bold" :class="Number(row.loaded_package_count) >= Number(row.physical_package_count) ? 'text-emerald-600' : 'text-amber-600'">
+                                                <span x-text="row.loaded_package_count || 0"></span>/<span x-text="row.physical_package_count || 0"></span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 flex flex-wrap gap-1.5" x-show="row.labels && row.labels.length">
+                                        <template x-for="label in row.labels" :key="label.id">
+                                            <span class="inline-flex items-center rounded-lg bg-white px-2 py-1 text-[10px] font-bold text-slate-600 border border-slate-200 font-mono" x-text="label.barcode_value"></span>
+                                        </template>
+                                    </div>
+                                </div>
+
                                 {{-- Quantity Comparison Strip --}}
                                 <div class="grid grid-cols-3 divide-x divide-slate-100 bg-slate-50/50 border-b border-slate-100">
                                     <div class="px-3 py-2.5 text-center">
-                                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Expected</p>
+                                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Item Qty</p>
                                         <p class="text-base font-bold text-slate-800 mt-0.5" x-text="row.expected_quantity"></p>
                                     </div>
                                     <div class="px-3 py-2.5 text-center">
-                                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Loaded</p>
+                                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Loaded Qty</p>
                                         <p class="text-base font-bold mt-0.5" :class="Number(row.loaded_quantity) !== Number(row.expected_quantity) ? 'text-amber-600' : 'text-slate-800'" x-text="row.loaded_quantity"></p>
                                     </div>
                                     <div class="px-3 py-2.5 text-center">
-                                        <p class="text-[9px] font-bold uppercase tracking-wider" :class="row.received_at ? 'text-emerald-500' : 'text-slate-400'">Received</p>
+                                        <p class="text-[9px] font-bold uppercase tracking-wider" :class="row.received_at ? 'text-emerald-500' : 'text-slate-400'">Received Qty</p>
                                         <p class="text-base font-bold mt-0.5" :class="row.received_at ? (Number(row.received_quantity) === Number(row.expected_quantity) ? 'text-emerald-600' : 'text-amber-600') : 'text-slate-300'" x-text="row.received_quantity || '—'"></p>
                                     </div>
                                 </div>
@@ -675,7 +716,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </template>
                                         </svg>
-                                        <span x-text="row.received_at ? 'Edit Receipt' : 'Receive Item'"></span>
+                                        <span x-text="row.received_at ? 'Edit Receipt' : 'Receive Package'"></span>
                                     </button>
                                 </div>
                             </div>
@@ -709,7 +750,7 @@
                                     </svg>
                                 </div>
                                 <div class="min-w-0">
-                                    <h3 class="text-base font-bold text-slate-900">Receive Item</h3>
+                                    <h3 class="text-base font-bold text-slate-900">Receive Package</h3>
                                     <p class="text-xs text-slate-500 truncate" x-text="items[receiveModal.itemIndex]?.description || 'Item'"></p>
                                 </div>
                             </div>
@@ -718,18 +759,40 @@
                             </button>
                         </div>
 
+                        {{-- Physical package context --}}
+                        <div class="px-6 py-4 border-b border-slate-200 bg-slate-50/60">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Receiving Physical Packages</p>
+                                    <p class="mt-1 text-sm font-bold text-slate-900" x-text="packageUnitLabel(items[receiveModal.itemIndex]?.physical_package_count)"></p>
+                                    <p class="mt-0.5 text-xs text-slate-500" x-text="'Contains ' + itemUnitLabel(items[receiveModal.itemIndex]?.expected_quantity)"></p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Loaded</p>
+                                    <p class="mt-1 text-sm font-bold text-emerald-600">
+                                        <span x-text="items[receiveModal.itemIndex]?.loaded_package_count || 0"></span>/<span x-text="items[receiveModal.itemIndex]?.physical_package_count || 0"></span>
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="mt-3 flex flex-wrap gap-1.5" x-show="items[receiveModal.itemIndex]?.labels?.length">
+                                <template x-for="label in items[receiveModal.itemIndex]?.labels || []" :key="label.id">
+                                    <span class="inline-flex items-center rounded-lg bg-white px-2 py-1 text-[10px] font-bold text-slate-600 border border-slate-200 font-mono" x-text="label.barcode_value"></span>
+                                </template>
+                            </div>
+                        </div>
+
                         {{-- Reference Quantities --}}
                         <div class="grid grid-cols-3 divide-x divide-slate-100 bg-slate-50 border-b border-slate-200">
                             <div class="px-4 py-3 text-center">
-                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Expected</p>
+                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Item Qty</p>
                                 <p class="text-xl font-bold text-slate-800 mt-0.5" x-text="items[receiveModal.itemIndex]?.expected_quantity ?? 0"></p>
                             </div>
                             <div class="px-4 py-3 text-center">
-                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Loaded</p>
+                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Loaded Qty</p>
                                 <p class="text-xl font-bold text-slate-800 mt-0.5" x-text="items[receiveModal.itemIndex]?.loaded_quantity ?? 0"></p>
                             </div>
                             <div class="px-4 py-3 text-center">
-                                <p class="text-[9px] font-bold text-emerald-500 uppercase tracking-wider">Received</p>
+                                <p class="text-[9px] font-bold text-emerald-500 uppercase tracking-wider">Received Qty</p>
                                 <p class="text-xl font-bold text-emerald-600 mt-0.5" x-text="items[receiveModal.itemIndex]?.received_quantity || 0"></p>
                             </div>
                         </div>
@@ -739,11 +802,12 @@
 
                             {{-- Received Quantity --}}
                             <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Received Quantity</label>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Received Item Quantity</label>
                                 <input type="number" min="0"
                                     x-model.number="items[receiveModal.itemIndex].received_quantity"
                                     class="w-full rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                                     placeholder="0">
+                                <p class="mt-1.5 text-xs text-slate-500" x-text="'Enter the item quantity inside the physical package(s), not the number of labels.'"></p>
                             </div>
 
                             {{-- Line Status --}}
