@@ -459,13 +459,22 @@ class ShipmentService
 
             $itemHandoff = null;
             if (in_array($item->status, [ItemStatus::HANDED_TO_COURIER, ItemStatus::DELIVERED], true)) {
-                $stop = \App\Models\DeliveryRunStop::where('delivery_method', 'bus_handoff')
+                $stop = \App\Models\DeliveryRunStop::with('run.assignedDriver')
+                    ->where('delivery_method', 'bus_handoff')
                     ->whereIn('status', ['handed_off', 'delivered'])
                     ->whereHas('items', fn ($q) => $q->where('shipment_item_id', $item->id))
                     ->first();
                 if ($stop) {
+                    $handoffDriver = $this->getHandoffDriver($stop);
+
                     $itemHandoff = [
                         'bus_station' => $stop->bus_station_name,
+                        'driver_name' => $handoffDriver?->name,
+                        'driver_phone' => $handoffDriver?->phone,
+                        'rider_name' => $handoffDriver?->name,
+                        'rider_phone' => $handoffDriver?->phone,
+                        'sent_by_name' => $handoffDriver?->name,
+                        'sent_by_phone' => $handoffDriver?->phone,
                         'courier_name' => $stop->handoff_courier_name,
                         'courier_phone' => $stop->handoff_courier_phone,
                         'vehicle_number' => $stop->handoff_vehicle_number,
@@ -798,7 +807,8 @@ class ShipmentService
             return null;
         }
 
-        $stop = \App\Models\DeliveryRunStop::where('delivery_method', 'bus_handoff')
+        $stop = \App\Models\DeliveryRunStop::with('run.assignedDriver')
+            ->where('delivery_method', 'bus_handoff')
             ->whereIn('status', ['handed_off', 'delivered'])
             ->whereHas('items', fn ($q) => $q->whereHas('shipmentItem', fn ($sq) => $sq->where('shipment_id', $shipment->id)))
             ->first();
@@ -807,15 +817,34 @@ class ShipmentService
             return null;
         }
 
+        $handoffDriver = $this->getHandoffDriver($stop);
+
         return [
             'status' => $stop->status,
             'bus_station' => $stop->bus_station_name,
+            'driver_name' => $handoffDriver?->name,
+            'driver_phone' => $handoffDriver?->phone,
+            'rider_name' => $handoffDriver?->name,
+            'rider_phone' => $handoffDriver?->phone,
+            'sent_by_name' => $handoffDriver?->name,
+            'sent_by_phone' => $handoffDriver?->phone,
             'courier_name' => $stop->handoff_courier_name,
             'courier_phone' => $stop->handoff_courier_phone,
             'vehicle_number' => $stop->handoff_vehicle_number,
             'handed_off_at' => $stop->handoff_at?->toIso8601String(),
             'proof_photo_url' => $this->getProofPhotoUrlForVendor($stop),
         ];
+    }
+
+    private function getHandoffDriver(\App\Models\DeliveryRunStop $stop): ?\App\Models\Driver
+    {
+        if (!$stop->relationLoaded('run')) {
+            $stop->loadMissing('run.assignedDriver');
+        } elseif ($stop->run && !$stop->run->relationLoaded('assignedDriver')) {
+            $stop->run->loadMissing('assignedDriver');
+        }
+
+        return $stop->run?->assignedDriver;
     }
 
     private function getProofPhotoUrlForVendor(\App\Models\DeliveryRunStop $stop): ?string
