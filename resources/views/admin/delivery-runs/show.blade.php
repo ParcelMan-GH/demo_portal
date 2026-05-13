@@ -970,7 +970,7 @@ $itemStatusColors = [
 
 @push('head-scripts')
 <script>
-window.adminDeliveryRunPage = () => {
+function adminDeliveryRunPage() {
     const csrfToken = () =>
         document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
@@ -1130,6 +1130,8 @@ window.adminDeliveryRunPage = () => {
             this.proofViewer.index = (this.proofViewer.index - 1 + this.proofViewer.photos.length) % this.proofViewer.photos.length;
         },
     };
-};
+}
+
+window.adminDeliveryRunPage = adminDeliveryRunPage;
 </script>
 @endpush
