@@ -813,13 +813,13 @@ $itemStatusColors = [
                                                     :class="action === 'delivered' ? 'bg-emerald-600' : 'bg-rose-600'"
                                                     class="inline-flex items-center px-3 py-1.5 rounded-lg text-white text-[11px] font-semibold disabled:opacity-50">
                                                         <span x-show="!submitting">Save</span>
-                                                        <span x-show="submitting">Saving…</span>
+                                                        <span x-show="submitting">Saving...</span>
                                                     </button>
                                                     <button @@click="action = null" class="text-[11px] text-slate-500 hover:text-slate-700">Cancel</button>
                                                 </div>
                                             </template>
-                                        @endif
                                         </div>
+                                    @endif
                                     </div>
                                     @endforeach
                                 </div>
