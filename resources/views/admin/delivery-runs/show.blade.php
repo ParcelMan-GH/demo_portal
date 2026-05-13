@@ -119,6 +119,7 @@ $itemStatusColors = [
             driverSearch: '',
             driverDropdownOpen: false,
             drivers: [],
+            currentDriverId: @js($run->assigned_driver_id),
             proofViewer: {
                 open: false,
                 title: '',
@@ -147,8 +148,9 @@ $itemStatusColors = [
             },
             filteredDrivers() {
                 const query = String(this.driverSearch || '').trim().toLowerCase();
-                if (!query) return this.drivers;
-                return this.drivers.filter((driver) => {
+                const availableDrivers = this.drivers.filter((driver) => Number(driver.id) !== Number(this.currentDriverId));
+                if (!query) return availableDrivers;
+                return availableDrivers.filter((driver) => {
                     return [driver.name, driver.phone, driver.vehicle_type, driver.vehicle_number, driver.meta]
                         .filter(Boolean)
                         .some((value) => String(value).toLowerCase().includes(query));
