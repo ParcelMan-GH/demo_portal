@@ -95,7 +95,153 @@ $itemStatusColors = [
 @endphp
 
 @section('content')
-    <div class="space-y-6" x-data="typeof window.adminDeliveryRunPage === 'function' ? window.adminDeliveryRunPage() : (typeof window.adminDeliveryRunPageFallback === 'function' ? window.adminDeliveryRunPageFallback() : {})">
+    <div
+        class="space-y-6"
+        data-assign-driver-url="{{ $deliveryRunRoutes['assignDriverUrl'] }}"
+        data-dispatch-url="{{ $deliveryRunRoutes['dispatchUrl'] }}"
+        data-resend-code-url-template="{{ $deliveryRunRoutes['resendCodeUrlTemplate'] }}"
+        x-data="{
+            actionLoading: false,
+            showAssignModal: false,
+            showDispatchConfirm: false,
+            showNotesModal: false,
+            selectedDriverId: '',
+            proofViewer: {
+                open: false,
+                title: '',
+                subtitle: '',
+                run: '',
+                stopNumber: null,
+                photos: [],
+                index: 0,
+            },
+            csrfToken() {
+                return document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '';
+            },
+            confirmDispatch() {
+                this.showDispatchConfirm = true;
+            },
+            async assignDriver() {
+                if (!this.selectedDriverId) {
+                    window.showToast?.('Please select a rider first.', 'warning');
+                    return;
+                }
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(this.$root.dataset.assignDriverUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': this.csrfToken(),
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ driver_id: Number(this.selectedDriverId) }),
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to assign rider.');
+                    }
+                    window.showToast?.(result.message || 'Rider assigned successfully.', 'success');
+                    this.showAssignModal = false;
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to assign rider.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
+            },
+            async dispatchRun() {
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(this.$root.dataset.dispatchUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': this.csrfToken(),
+                        },
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to dispatch run.');
+                    }
+                    window.showToast?.(result.message || 'Delivery run dispatched successfully.', 'success');
+                    this.showDispatchConfirm = false;
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to dispatch delivery run.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
+            },
+            async resendCode(stopId) {
+                this.actionLoading = true;
+                try {
+                    const url = this.$root.dataset.resendCodeUrlTemplate.replace('__STOP__', stopId);
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': this.csrfToken(),
+                        },
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to resend OTP.');
+                    }
+                    window.showToast?.(result.message || 'OTP code resent successfully.', 'success');
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to resend OTP.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
+            },
+            openProofPhoto(payload) {
+                const normalizePhoto = (photo) => {
+                    const value = (typeof photo === 'string' || typeof photo === 'number') ? String(photo).trim() : '';
+                    return value;
+                };
+                const photos = Array.isArray(payload?.photos)
+                    ? payload.photos.map(normalizePhoto).filter((photo) => photo)
+                    : [];
+                const fallbackPhoto = typeof payload?.url === 'string' ? payload.url.trim() : '';
+                const imageList = photos.length ? photos : (fallbackPhoto ? [fallbackPhoto] : []);
+                if (!imageList.length) {
+                    return;
+                }
+                this.proofViewer = {
+                    open: true,
+                    title: payload?.title || 'Proof photo',
+                    subtitle: payload?.subtitle || '',
+                    run: payload?.run || '',
+                    stopNumber: payload?.stopNumber || null,
+                    photos: imageList,
+                    index: 0,
+                };
+            },
+            closeProofPhoto() {
+                this.proofViewer.open = false;
+            },
+            currentProofPhoto() {
+                if (!this.proofViewer.open || !this.proofViewer.photos.length) return null;
+                return this.proofViewer.photos[this.proofViewer.index] || null;
+            },
+            nextProofPhoto() {
+                if (!this.proofViewer.photos.length || this.proofViewer.photos.length === 1) return;
+                this.proofViewer.index = (this.proofViewer.index + 1) % this.proofViewer.photos.length;
+            },
+            previousProofPhoto() {
+                if (!this.proofViewer.photos.length || this.proofViewer.photos.length === 1) return;
+                this.proofViewer.index = (this.proofViewer.index - 1 + this.proofViewer.photos.length) % this.proofViewer.photos.length;
+            },
+        }"
+    >
 
     <!-- Hero / Header Card -->
     <section class="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-950 shadow-xl shadow-slate-300/20">
