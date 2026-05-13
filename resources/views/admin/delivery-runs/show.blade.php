@@ -1037,7 +1037,7 @@ $itemStatusColors = [
             <div class="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
                 <p class="whitespace-pre-line text-base font-semibold leading-8 text-slate-800">{{ $run->notes }}</p>
             </div>
-            <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6">
+            <div class="flex items-center justify-end gap-3 rounded-b-[2rem] border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6">
                 <button @@click="showNotesModal = false"
                     class="inline-flex h-12 items-center justify-center whitespace-nowrap rounded-2xl bg-slate-900 px-6 text-sm font-black text-white shadow-lg shadow-slate-900/15 transition hover:bg-slate-800">
                     Done
@@ -1129,7 +1129,7 @@ $itemStatusColors = [
 	                </div>
 	            </div>
             <!-- Modal Footer -->
-            <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6">
+            <div class="flex items-center justify-end gap-3 rounded-b-[2rem] border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6">
                 <button @@click="showAssignModal = false"
                     class="inline-flex h-12 items-center justify-center whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 transition hover:bg-slate-100 sm:h-14 sm:px-7">
                     Cancel
