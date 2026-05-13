@@ -7,6 +7,14 @@
 @php
 use App\Models\Driver;
 $deliveryDrivers = $deliveryDrivers ?? Driver::where('is_active', true)->orderBy('name')->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']);
+$deliveryDriverOptions = $deliveryDrivers->map(fn ($driver) => [
+    'id' => $driver->id,
+    'name' => $driver->name,
+    'phone' => $driver->phone,
+    'vehicle_type' => $driver->vehicle_type,
+    'vehicle_number' => $driver->vehicle_number,
+    'meta' => collect([$driver->phone, $driver->vehicle_type, $driver->vehicle_number])->filter()->implode(' / '),
+])->values();
 $deliveryRunRoutes = $deliveryRunRoutes ?? [
     'indexUrl' => route('admin.delivery-runs.index'),
     'sortBatchUrl' => $run->sortBatch ? route('admin.sort-batches.show', $run->sortBatch) : null,
@@ -100,12 +108,17 @@ $itemStatusColors = [
         data-assign-driver-url="{{ $deliveryRunRoutes['assignDriverUrl'] }}"
         data-dispatch-url="{{ $deliveryRunRoutes['dispatchUrl'] }}"
         data-resend-code-url-template="{{ $deliveryRunRoutes['resendCodeUrlTemplate'] }}"
+        data-driver-options='@json($deliveryDriverOptions)'
         x-data="{
             actionLoading: false,
             showAssignModal: false,
             showDispatchConfirm: false,
             showNotesModal: false,
             selectedDriverId: '',
+            selectedDriverLabel: '',
+            driverSearch: '',
+            driverDropdownOpen: false,
+            drivers: [],
             proofViewer: {
                 open: false,
                 title: '',
@@ -115,8 +128,37 @@ $itemStatusColors = [
                 photos: [],
                 index: 0,
             },
+            init() {
+                try {
+                    this.drivers = JSON.parse(this.$root.dataset.driverOptions || '[]');
+                } catch (error) {
+                    this.drivers = [];
+                }
+            },
             csrfToken() {
                 return document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '';
+            },
+            openAssignRiderModal() {
+                this.selectedDriverId = '';
+                this.selectedDriverLabel = '';
+                this.driverSearch = '';
+                this.driverDropdownOpen = false;
+                this.showAssignModal = true;
+            },
+            filteredDrivers() {
+                const query = String(this.driverSearch || '').trim().toLowerCase();
+                if (!query) return this.drivers;
+                return this.drivers.filter((driver) => {
+                    return [driver.name, driver.phone, driver.vehicle_type, driver.vehicle_number, driver.meta]
+                        .filter(Boolean)
+                        .some((value) => String(value).toLowerCase().includes(query));
+                });
+            },
+            selectDriver(driver) {
+                this.selectedDriverId = driver.id;
+                this.selectedDriverLabel = driver.name;
+                this.driverSearch = driver.meta ? `${driver.name} / ${driver.meta}` : driver.name;
+                this.driverDropdownOpen = false;
             },
             confirmDispatch() {
                 this.showDispatchConfirm = true;
@@ -319,7 +361,7 @@ $itemStatusColors = [
                         @if($canAssignDriver || $canDispatch)
                             <div class="mt-5 flex flex-wrap gap-3">
                                 @if($canAssignDriver)
-                                    <button @@click="showAssignModal = true"
+                                    <button @@click="openAssignRiderModal()"
                                         class="inline-flex h-12 items-center gap-2 rounded-2xl bg-orange-600 px-5 text-sm font-black text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
@@ -1010,7 +1052,7 @@ $itemStatusColors = [
          class="fixed inset-0 z-[220] flex min-h-dvh w-screen items-center justify-center overflow-y-auto p-3 sm:p-4"
          @@keydown.escape.window="showAssignModal = false">
         <div class="fixed inset-0 min-h-dvh bg-slate-950/60 backdrop-blur-sm" @@click="showAssignModal = false"></div>
-        <div class="relative my-auto flex max-h-[92dvh] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl" @@click.stop>
+	        <div class="relative my-auto flex max-h-[92dvh] w-full max-w-xl flex-col overflow-visible rounded-[2rem] border border-slate-200 bg-white shadow-2xl" @@click.stop="driverDropdownOpen = false">
             <!-- Modal Header -->
             <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-6">
                 <div class="flex min-w-0 items-start gap-4">
@@ -1032,31 +1074,60 @@ $itemStatusColors = [
                 </button>
             </div>
             <!-- Modal Body -->
-            <div class="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-                <div>
-                    <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">
-                        Select Rider <span class="text-red-500">*</span>
-                    </label>
-                    <div class="relative">
-                        <select x-model="selectedDriverId"
-                            class="h-16 w-full appearance-none rounded-2xl border-2 border-slate-200 bg-white px-5 pr-12 text-base font-black text-slate-950 outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-100">
-                            <option value="">Choose a rider...</option>
-                            @foreach($deliveryDrivers as $driver)
-                                <option value="{{ $driver->id }}">
-                                    {{ $driver->name }}
-                                    @if($driver->phone) &mdash; {{ $driver->phone }}@endif
-                                    @if($driver->vehicle_type) ({{ $driver->vehicle_type }}@if($driver->vehicle_number) {{ $driver->vehicle_number }}@endif)@endif
-                                </option>
-                            @endforeach
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
-                            <svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-            </div>
+	            <div class="flex-1 overflow-visible px-5 py-5 sm:px-6">
+	                <div>
+	                    <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">
+	                        Select Rider <span class="text-red-500">*</span>
+	                    </label>
+	                    <div class="relative" @@click.stop @@click.outside="driverDropdownOpen = false">
+	                        <div class="relative">
+	                            <input
+	                                x-ref="driverSearchInput"
+	                                type="search"
+	                                x-model="driverSearch"
+	                                @@focus="driverDropdownOpen = true"
+	                                @@input="driverDropdownOpen = true; selectedDriverId = ''; selectedDriverLabel = ''"
+	                                placeholder="Search rider name, phone, vehicle..."
+	                                class="h-14 w-full rounded-2xl border-2 border-slate-200 bg-white px-4 pr-12 text-base font-black text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 sm:text-sm"
+	                                :class="driverDropdownOpen ? 'rounded-b-none border-orange-500 ring-4 ring-orange-100' : ''"
+	                            >
+	                            <svg class="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 transition-transform" :class="driverDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6"/>
+	                            </svg>
+	                        </div>
+
+	                        <div
+	                            x-show="driverDropdownOpen"
+	                            x-cloak
+	                            x-transition.opacity.duration.100ms
+	                            class="absolute left-0 right-0 z-40 -mt-0.5 overflow-hidden rounded-b-2xl border-2 border-t-0 border-orange-500 bg-white shadow-xl shadow-orange-900/10"
+	                            style="display: none;"
+	                        >
+	                            <div class="max-h-72 overflow-y-auto border-t border-orange-100">
+	                                <template x-for="driver in filteredDrivers()" :key="driver.id">
+	                                    <button
+	                                        type="button"
+	                                        @@click="selectDriver(driver)"
+	                                        class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-orange-50"
+	                                        :class="Number(selectedDriverId) === Number(driver.id) ? 'bg-orange-50' : ''"
+	                                    >
+	                                        <div class="min-w-0">
+	                                            <p class="truncate text-sm font-black text-slate-900" x-text="driver.name"></p>
+	                                            <p class="mt-0.5 truncate text-xs font-semibold text-slate-500" x-text="driver.meta || 'No vehicle details'"></p>
+	                                        </div>
+	                                        <svg x-show="Number(selectedDriverId) === Number(driver.id)" class="h-4 w-4 shrink-0 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+	                                        </svg>
+	                                    </button>
+	                                </template>
+	                                <div x-show="filteredDrivers().length === 0" class="px-4 py-6 text-center text-sm font-semibold text-slate-400">
+	                                    No matching riders.
+	                                </div>
+	                            </div>
+	                        </div>
+	                    </div>
+	                </div>
+	            </div>
             <!-- Modal Footer -->
             <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6">
                 <button @@click="showAssignModal = false"
