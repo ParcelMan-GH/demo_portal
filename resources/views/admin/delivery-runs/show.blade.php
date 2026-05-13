@@ -95,7 +95,7 @@ $itemStatusColors = [
 @endphp
 
 @section('content')
-    <div class="space-y-6" x-data="adminDeliveryRunPage()">
+    <div class="space-y-6" x-data="typeof window.adminDeliveryRunPage === 'function' ? window.adminDeliveryRunPage() : (typeof window.adminDeliveryRunPageFallback === 'function' ? window.adminDeliveryRunPageFallback() : {})">
 
     <!-- Hero / Header Card -->
     <section class="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-950 shadow-xl shadow-slate-300/20">
@@ -970,6 +970,78 @@ $itemStatusColors = [
 
 @push('head-scripts')
 <script>
+function adminDeliveryRunPageFallback() {
+    const normalizePhoto = (photo) => {
+        const value = (typeof photo === 'string' || typeof photo === 'number') ? String(photo).trim() : '';
+        return value;
+    };
+
+    return {
+        actionLoading: false,
+        showAssignModal: false,
+        showDispatchConfirm: false,
+        showNotesModal: false,
+        proofViewer: {
+            open: false,
+            title: '',
+            subtitle: '',
+            run: '',
+            stopNumber: null,
+            photos: [],
+            index: 0,
+        },
+        selectedDriverId: '',
+
+        confirmDispatch() {
+            this.showDispatchConfirm = true;
+        },
+
+        async assignDriver() { this.actionLoading = false; },
+        async dispatchRun() { this.actionLoading = false; },
+        async resendCode() { this.actionLoading = false; },
+
+        openProofPhoto(payload) {
+            const photos = Array.isArray(payload?.photos)
+                ? payload.photos.map(normalizePhoto).filter((photo) => photo)
+                : [];
+            const fallbackPhoto = typeof payload?.url === 'string' ? payload.url.trim() : '';
+            const imageList = photos.length ? photos : (fallbackPhoto ? [fallbackPhoto] : []);
+            if (!imageList.length) {
+                return;
+            }
+
+            this.proofViewer = {
+                open: true,
+                title: payload?.title || 'Proof photo',
+                subtitle: payload?.subtitle || '',
+                run: payload?.run || '',
+                stopNumber: payload?.stopNumber || null,
+                photos: imageList,
+                index: 0,
+            };
+        },
+
+        closeProofPhoto() {
+            this.proofViewer.open = false;
+        },
+
+        currentProofPhoto() {
+            if (!this.proofViewer.open || !this.proofViewer.photos.length) return null;
+            return this.proofViewer.photos[this.proofViewer.index] || null;
+        },
+
+        nextProofPhoto() {
+            if (!this.proofViewer.photos.length || this.proofViewer.photos.length === 1) return;
+            this.proofViewer.index = (this.proofViewer.index + 1) % this.proofViewer.photos.length;
+        },
+
+        previousProofPhoto() {
+            if (!this.proofViewer.photos.length || this.proofViewer.photos.length === 1) return;
+            this.proofViewer.index = (this.proofViewer.index - 1 + this.proofViewer.photos.length) % this.proofViewer.photos.length;
+        },
+    };
+}
+
 function adminDeliveryRunPage() {
     const csrfToken = () =>
         document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -981,25 +1053,7 @@ function adminDeliveryRunPage() {
     };
 
     return {
-        actionLoading:       false,
-        showAssignModal:     false,
-        showDispatchConfirm: false,
-        showNotesModal:      false,
-        proofViewer: {
-            open: false,
-            title: '',
-            subtitle: '',
-            run: '',
-            stopNumber: null,
-            photos: [],
-            index: 0,
-        },
-        selectedDriverId:    '',
-
-        confirmDispatch() {
-            this.showDispatchConfirm = true;
-        },
-
+        ...adminDeliveryRunPageFallback(),
         async assignDriver() {
             if (!this.selectedDriverId) {
                 window.showToast?.('Please select a rider first.', 'warning');
@@ -1083,55 +1137,10 @@ function adminDeliveryRunPage() {
                 this.actionLoading = false;
             }
         },
-
-        openProofPhoto(payload) {
-            const normalizePhoto = (photo) => {
-                const value = (typeof photo === 'string' || typeof photo === 'number') ? String(photo).trim() : '';
-                return value;
-            };
-
-            const photos = Array.isArray(payload?.photos)
-                ? payload.photos.map(normalizePhoto).filter((photo) => photo)
-                : [];
-            const fallbackPhoto = typeof payload?.url === 'string' ? payload.url.trim() : '';
-            const imageList = photos.length ? photos : (fallbackPhoto ? [fallbackPhoto] : []);
-
-            if (!imageList.length) {
-                return;
-            }
-
-            this.proofViewer = {
-                open: true,
-                title: payload.title || 'Proof photo',
-                subtitle: payload.subtitle || '',
-                run: payload.run || '',
-                stopNumber: payload.stopNumber || null,
-                photos: imageList,
-                index: 0,
-            };
-        },
-
-        closeProofPhoto() {
-            this.proofViewer.open = false;
-        },
-
-        currentProofPhoto() {
-            if (!this.proofViewer.open || !this.proofViewer.photos.length) return null;
-            return this.proofViewer.photos[this.proofViewer.index] || null;
-        },
-
-        nextProofPhoto() {
-            if (!this.proofViewer.photos.length || this.proofViewer.photos.length === 1) return;
-            this.proofViewer.index = (this.proofViewer.index + 1) % this.proofViewer.photos.length;
-        },
-
-        previousProofPhoto() {
-            if (!this.proofViewer.photos.length || this.proofViewer.photos.length === 1) return;
-            this.proofViewer.index = (this.proofViewer.index - 1 + this.proofViewer.photos.length) % this.proofViewer.photos.length;
-        },
     };
 }
 
-window.adminDeliveryRunPage = adminDeliveryRunPage;
+window.adminDeliveryRunPageFallback = window.adminDeliveryRunPageFallback || adminDeliveryRunPageFallback;
+window.adminDeliveryRunPage = window.adminDeliveryRunPage || adminDeliveryRunPage;
 </script>
 @endpush
