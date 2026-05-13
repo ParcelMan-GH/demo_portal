@@ -1,4 +1,6 @@
 import Alpine from 'alpinejs';
+import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/browser';
+import { DecodeHintType } from '@zxing/library';
 import { initWarehouseLayout } from './modules/layout/index.js';
 
 import './modules/dashboard/index.js';
@@ -15,5 +17,10 @@ import './modules/manifests/incoming-show.js';
 import './modules/deliveries/runs.js';
 
 window.Alpine = Alpine;
+window.ZXingBrowser = {
+    BrowserMultiFormatReader,
+    BarcodeFormat,
+    DecodeHintType,
+};
 initWarehouseLayout();
 Alpine.start();

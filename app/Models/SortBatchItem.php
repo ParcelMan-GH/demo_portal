@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SortBatchItem extends Model
 {
@@ -45,5 +46,9 @@ class SortBatchItem extends Model
     {
         return $this->belongsTo(User::class, 'added_by_user_id');
     }
-}
 
+    public function recipientPaymentTask(): HasOne
+    {
+        return $this->hasOne(RecipientPaymentTask::class);
+    }
+}

@@ -4,11 +4,13 @@ namespace App\Services\Warehouse;
 
 use App\Enums\ItemStatus;
 use App\Enums\ShipmentStatus;
+use App\Models\DeliveryRun;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemTracking;
 use App\Models\SortBatch;
 use App\Models\SortBatchItem;
+use App\Models\TransportManifest;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceiptItem;
@@ -16,16 +18,19 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class WarehouseSortingService
 {
+    public function __construct(private RecipientPaymentService $recipientPaymentService) {}
+
     public function eligibleItemsQuery(Warehouse $warehouse): Builder
     {
         return WarehouseReceiptItem::query()
             ->with([
                 'receipt:id,warehouse_id,status,pickup_assignment_id',
                 'receipt.pickupAssignment:id,shipment_id',
-                'shipmentItem:id,shipment_id,description,quantity,tracking_code,status,delivery_recipient_name,delivery_recipient_phone,delivery_region_id,delivery_district_id,delivery_town,delivery_landmark',
+                'shipmentItem:id,shipment_id,description,quantity,tracking_code,status,delivery_method,delivery_recipient_name,delivery_recipient_phone,delivery_region_id,delivery_district_id,delivery_town,delivery_landmark',
                 'shipmentItem.shipment:id,vendor_id,shipment_number,destination_mode,delivery_recipient_name,delivery_recipient_phone,delivery_region_id,delivery_district_id,delivery_town,delivery_landmark',
                 'shipmentItem.shipment.vendor:id,name',
                 'shipmentItem.shipment.deliveryRegion:id,name',
@@ -38,6 +43,28 @@ class WarehouseSortingService
                     ->where('status', 'finalized');
             })
             ->where('received_quantity', '>', 0)
+            ->whereHas('shipmentItem', function (Builder $query) {
+                $query->whereIn('status', $this->sortableWarehouseItemStatuses());
+
+                if (Schema::hasTable('delivery_run_items') && Schema::hasTable('delivery_runs')) {
+                    $query->whereDoesntHave('deliveryRunItems', function (Builder $deliveryQuery) {
+                        $deliveryQuery->whereHas('run', function (Builder $runQuery) {
+                            $runQuery->where('status', '!=', DeliveryRun::STATUS_CANCELLED);
+                        });
+                    });
+                }
+
+                if (Schema::hasTable('transport_manifest_items') && Schema::hasTable('transport_manifests')) {
+                    $query->whereDoesntHave('transportManifestItems', function (Builder $manifestItemQuery) {
+                        $manifestItemQuery->whereHas('manifest', function (Builder $manifestQuery) {
+                            $manifestQuery->whereNotIn('status', [
+                                TransportManifest::STATUS_RECEIVED,
+                                TransportManifest::STATUS_CANCELLED,
+                            ]);
+                        });
+                    });
+                }
+            })
             ->whereDoesntHave('sortBatchItems', function (Builder $query) {
                 $query->whereNull('removed_at');
             });
@@ -138,6 +165,100 @@ class WarehouseSortingService
     }
 
     /**
+     * @param iterable<int, array{warehouse_receipt_item_id:int, destination_warehouse_id:int}> $routes
+     */
+    public function autoRouteReceiptItemsToDestinationBatches(iterable $routes, Warehouse $warehouse, User $user): array
+    {
+        $routes = collect($routes)
+            ->map(fn (array $route) => [
+                'warehouse_receipt_item_id' => (int) ($route['warehouse_receipt_item_id'] ?? 0),
+                'destination_warehouse_id' => (int) ($route['destination_warehouse_id'] ?? 0),
+            ])
+            ->filter(fn (array $route) => $route['warehouse_receipt_item_id'] > 0)
+            ->filter(fn (array $route) => $route['destination_warehouse_id'] > 0)
+            ->filter(fn (array $route) => $route['destination_warehouse_id'] !== (int) $warehouse->id)
+            ->groupBy('destination_warehouse_id');
+
+        if ($routes->isEmpty()) {
+            return [
+                'success' => true,
+                'message' => 'No transfer routing selected.',
+                'data' => ['batches' => []],
+            ];
+        }
+
+        $results = [];
+
+        foreach ($routes as $destinationWarehouseId => $groupedRoutes) {
+            $destinationWarehouse = Warehouse::query()
+                ->whereKey((int) $destinationWarehouseId)
+                ->where('is_active', true)
+                ->first();
+
+            if (!$destinationWarehouse) {
+                $results[] = [
+                    'success' => false,
+                    'message' => 'Destination warehouse is inactive or missing.',
+                    'destination_warehouse_id' => (int) $destinationWarehouseId,
+                ];
+                continue;
+            }
+
+            $batch = SortBatch::query()
+                ->where('origin_warehouse_id', $warehouse->id)
+                ->where('destination_warehouse_id', $destinationWarehouse->id)
+                ->where('dispatch_mode', SortBatch::DISPATCH_TRANSFER)
+                ->where('status', SortBatch::STATUS_OPEN)
+                ->orderByDesc('id')
+                ->first();
+
+            if (!$batch) {
+                $created = $this->createBatch(
+                    originWarehouse: $warehouse,
+                    destinationWarehouse: $destinationWarehouse,
+                    user: $user,
+                    dispatchMode: SortBatch::DISPATCH_TRANSFER,
+                    notes: 'Auto-created transfer batch from receiving.'
+                );
+
+                if (!$created['success']) {
+                    $results[] = [
+                        'success' => false,
+                        'message' => $created['message'],
+                        'destination_warehouse_id' => $destinationWarehouse->id,
+                    ];
+                    continue;
+                }
+
+                $batch = $created['data']['batch'];
+            }
+
+            $added = $this->addItems(
+                batch: $batch,
+                warehouse: $warehouse,
+                user: $user,
+                warehouseReceiptItemIds: $groupedRoutes->pluck('warehouse_receipt_item_id')->all()
+            );
+
+            $results[] = [
+                'success' => $added['success'],
+                'message' => $added['message'],
+                'batch_id' => $batch->id,
+                'batch_number' => $batch->batch_number,
+                'destination_warehouse_id' => $destinationWarehouse->id,
+                'destination_warehouse_name' => $destinationWarehouse->name,
+                'item_count' => $groupedRoutes->count(),
+            ];
+        }
+
+        return [
+            'success' => collect($results)->every(fn (array $result) => $result['success']),
+            'message' => 'Transfer routing processed.',
+            'data' => ['batches' => $results],
+        ];
+    }
+
+    /**
      * @param array<int, int|string> $warehouseReceiptItemIds
      */
     public function addItems(SortBatch $batch, Warehouse $warehouse, User $user, array $warehouseReceiptItemIds): array
@@ -204,6 +325,14 @@ class WarehouseSortingService
                     ];
                 }
 
+                $sortability = $this->sortableWarehouseItemState($shipmentItem);
+                if (!$sortability['eligible']) {
+                    return [
+                        'success' => false,
+                        'message' => "Item #{$shipmentItem->id} cannot be added to this batch. {$sortability['reason']}",
+                    ];
+                }
+
                 $alreadyInActiveBatch = SortBatchItem::query()
                     ->where('shipment_item_id', $shipmentItem->id)
                     ->whereNull('removed_at')
@@ -261,6 +390,7 @@ class WarehouseSortingService
                     'created_at' => now(),
                 ]);
 
+                $this->recipientPaymentService->ensureTaskForSortBatchItem($sortBatchItem);
                 $this->syncShipmentSortedStatus($shipmentItem->shipment);
 
                 unset($sortBatchItem);
@@ -306,6 +436,7 @@ class WarehouseSortingService
             }
 
             $sortBatchItem->update(['removed_at' => now()]);
+            $this->recipientPaymentService->cancelTaskForSortBatchItem($sortBatchItem);
 
             $stillInAnyOpenBatch = SortBatchItem::query()
                 ->where('shipment_item_id', $shipmentItem->id)
@@ -365,17 +496,53 @@ class WarehouseSortingService
             ];
         }
 
-        $batch->update([
-            'status' => SortBatch::STATUS_SEALED,
-            'sealed_by_user_id' => $user->id,
-            'sealed_at' => now(),
-        ]);
+        return DB::transaction(function () use ($batch, $user) {
+            $activeItems = $batch->activeItems()
+                ->with('shipmentItem')
+                ->lockForUpdate()
+                ->get();
 
-        return [
-            'success' => true,
-            'message' => 'Sort batch sealed successfully.',
-            'data' => ['batch' => $batch->fresh('activeItems')],
-        ];
+            $missingDeliveryPrices = collect();
+
+            foreach ($activeItems as $sortBatchItem) {
+                if (! $sortBatchItem->shipmentItem || ! $this->isSortableWarehouseItem($sortBatchItem->shipmentItem, true)) {
+                    return [
+                        'success' => false,
+                        'message' => 'This batch contains a package that is no longer idle at the warehouse. Remove it before sealing.',
+                    ];
+                }
+
+                $paymentTask = $this->recipientPaymentService->ensureTaskForSortBatchItem($sortBatchItem);
+                $deliveryFee = $paymentTask?->shipmentCharge
+                    ?: $this->recipientPaymentService->deliveryFeeChargeForItem($sortBatchItem->shipmentItem);
+
+                if ($paymentTask?->negotiated_amount === null && $deliveryFee?->amount === null) {
+                    $missingDeliveryPrices->push($sortBatchItem->shipmentItem->tracking_code ?: 'Item #' . $sortBatchItem->shipmentItem->id);
+                }
+            }
+
+            if ($missingDeliveryPrices->isNotEmpty()) {
+                $sample = $missingDeliveryPrices->take(3)->implode(', ');
+                $extra = $missingDeliveryPrices->count() > 3 ? ' +' . ($missingDeliveryPrices->count() - 3) . ' more' : '';
+
+                return [
+                    'success' => false,
+                    'message' => 'Set delivery prices for all packages before sealing. Missing: ' . $sample . $extra . '.',
+                ];
+            }
+
+            $batch->update([
+                'status' => SortBatch::STATUS_SEALED,
+                'sealed_by_user_id' => $user->id,
+                'sealed_at' => now(),
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Sort batch sealed successfully.',
+                'data' => ['batch' => $batch->fresh('activeItems')],
+            ];
+        });
     }
 
     public function reopenBatch(SortBatch $batch, Warehouse $warehouse, User $user): array
@@ -394,6 +561,13 @@ class WarehouseSortingService
             ];
         }
 
+        if ($message = $this->reopenLockReason($batch)) {
+            return [
+                'success' => false,
+                'message' => $message,
+            ];
+        }
+
         $batch->update([
             'status' => SortBatch::STATUS_OPEN,
             'sealed_by_user_id' => null,
@@ -405,6 +579,223 @@ class WarehouseSortingService
             'message' => 'Sort batch reopened successfully.',
             'data' => ['batch' => $batch->fresh('activeItems')],
         ];
+    }
+
+    /**
+     * @return array{deletable: bool, reason: ?string}
+     */
+    public function deleteState(SortBatch $batch): array
+    {
+        if ($this->batchHasTransportManifest($batch)) {
+            return [
+                'deletable' => false,
+                'reason' => 'This batch already has a transport manifest.',
+            ];
+        }
+
+        if ($this->batchHasDeliveryRun($batch)) {
+            return [
+                'deletable' => false,
+                'reason' => 'This batch already has a delivery run.',
+            ];
+        }
+
+        return [
+            'deletable' => true,
+            'reason' => null,
+        ];
+    }
+
+    public function deleteBatch(SortBatch $batch, Warehouse $warehouse, User $user): array
+    {
+        if ((int) $batch->origin_warehouse_id !== (int) $warehouse->id) {
+            return [
+                'success' => false,
+                'message' => 'Cannot delete a batch from another warehouse.',
+            ];
+        }
+
+        $deleteState = $this->deleteState($batch);
+        if (!$deleteState['deletable']) {
+            return [
+                'success' => false,
+                'message' => $deleteState['reason'] ?? 'This batch cannot be deleted.',
+            ];
+        }
+
+        return DB::transaction(function () use ($batch, $warehouse, $user) {
+            $batch = SortBatch::query()
+                ->lockForUpdate()
+                ->findOrFail($batch->id);
+
+            $deleteState = $this->deleteState($batch);
+            if (!$deleteState['deletable']) {
+                return [
+                    'success' => false,
+                    'message' => $deleteState['reason'] ?? 'This batch cannot be deleted.',
+                ];
+            }
+
+            $activeItems = $batch->activeItems()
+                ->with('shipmentItem.shipment')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($activeItems as $sortBatchItem) {
+                $shipmentItem = $sortBatchItem->shipmentItem;
+
+                $sortBatchItem->update(['removed_at' => now()]);
+
+                if (!$shipmentItem) {
+                    continue;
+                }
+
+                $currentStatus = $shipmentItem->status?->value ?? $shipmentItem->getRawOriginal('status');
+                if ($currentStatus === ItemStatus::SORTED->value) {
+                    $shipmentItem->update(['status' => ItemStatus::AT_WAREHOUSE]);
+                }
+
+                ShipmentItemTracking::create([
+                    'shipment_item_id' => $shipmentItem->id,
+                    'status' => $shipmentItem->fresh()->status?->value ?? ItemStatus::AT_WAREHOUSE->value,
+                    'location' => $warehouse->name,
+                    'notes' => 'Item removed because sort batch ' . $batch->batch_number . ' was deleted.',
+                    'meta' => [
+                        'sort_batch_id' => $batch->id,
+                        'sort_batch_number' => $batch->batch_number,
+                        'deleted_batch' => true,
+                    ],
+                    'created_by' => "user:{$user->id}",
+                    'created_at' => now(),
+                ]);
+
+                $this->syncShipmentSortedStatus($shipmentItem->shipment);
+            }
+
+            $batchNumber = $batch->batch_number;
+            $batch->delete();
+
+            return [
+                'success' => true,
+                'message' => "Sort batch {$batchNumber} deleted.",
+            ];
+        });
+    }
+
+    private function batchHasTransportManifest(SortBatch $batch): bool
+    {
+        return Schema::hasTable('transport_manifests')
+            && $batch->transportManifest()->exists();
+    }
+
+    private function batchHasDeliveryRun(SortBatch $batch): bool
+    {
+        return Schema::hasTable('delivery_runs')
+            && $batch->deliveryRun()->exists();
+    }
+
+    private function reopenLockReason(SortBatch $batch): ?string
+    {
+        $batch->loadMissing(['transportManifest:id,sort_batch_id,status', 'deliveryRun:id,sort_batch_id,status']);
+
+        if ($batch->transportManifest?->status === TransportManifest::STATUS_RECEIVED) {
+            return 'This batch cannot be reopened because its transport manifest has been completed.';
+        }
+
+        if ($batch->deliveryRun?->status === DeliveryRun::STATUS_COMPLETED) {
+            return 'This batch cannot be reopened because its delivery run has been completed.';
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{eligible: bool, reason: ?string}
+     */
+    public function sortableWarehouseItemState(ShipmentItem $shipmentItem, bool $allowSorted = false): array
+    {
+        $status = $shipmentItem->status?->value ?? $shipmentItem->getRawOriginal('status');
+        $allowedStatuses = $this->sortableWarehouseItemStatuses();
+
+        if ($allowSorted) {
+            $allowedStatuses[] = ItemStatus::SORTED->value;
+        }
+
+        if (!in_array($status, $allowedStatuses, true)) {
+            return [
+                'eligible' => false,
+                'reason' => 'Status is ' . $this->formatItemStatus($status) . '.',
+            ];
+        }
+
+        $hasActiveDeliveryRun = Schema::hasTable('delivery_run_items') && Schema::hasTable('delivery_runs')
+            ? $shipmentItem->deliveryRunItems()
+                ->whereHas('run', function (Builder $query) {
+                    $query->where('status', '!=', DeliveryRun::STATUS_CANCELLED);
+                })
+                ->exists()
+            : false;
+
+        if ($hasActiveDeliveryRun) {
+            return [
+                'eligible' => false,
+                'reason' => 'Already linked to a delivery run.',
+            ];
+        }
+
+        $hasActiveManifest = Schema::hasTable('transport_manifest_items') && Schema::hasTable('transport_manifests')
+            ? $shipmentItem->transportManifestItems()
+                ->whereHas('manifest', function (Builder $query) {
+                    $query->whereNotIn('status', [
+                        TransportManifest::STATUS_RECEIVED,
+                        TransportManifest::STATUS_CANCELLED,
+                    ]);
+                })
+                ->exists()
+            : false;
+
+        if ($hasActiveManifest) {
+            return [
+                'eligible' => false,
+                'reason' => 'Already linked to an active transport manifest.',
+            ];
+        }
+
+        return [
+            'eligible' => true,
+            'reason' => null,
+        ];
+    }
+
+    private function isSortableWarehouseItem(ShipmentItem $shipmentItem, bool $allowSorted = false): bool
+    {
+        return $this->sortableWarehouseItemState($shipmentItem, $allowSorted)['eligible'];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function sortableWarehouseItemStatuses(): array
+    {
+        return [
+            ItemStatus::AT_WAREHOUSE->value,
+            ItemStatus::AT_DESTINATION->value,
+        ];
+    }
+
+    private function formatItemStatus(mixed $status): string
+    {
+        if ($status instanceof ItemStatus) {
+            return $status->label();
+        }
+
+        $status = (string) $status;
+
+        if ($status === '') {
+            return 'unknown';
+        }
+
+        return ItemStatus::tryFrom($status)?->label() ?? ucfirst(str_replace('_', ' ', $status));
     }
 
     private function generateBatchNumber(
@@ -506,6 +897,10 @@ class WarehouseSortingService
                 'vendor_name' => $shipment?->vendor?->name,
                 'item_description' => $shipmentItem?->description,
                 'tracking_code' => $shipmentItem?->tracking_code,
+                'delivery_method' => $shipmentItem?->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
+                'delivery_method_label' => $shipmentItem?->delivery_method === ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF
+                    ? 'Bus Courier'
+                    : 'Direct Delivery',
                 'fulfillment_type' => $shipmentItem?->fulfillment_type?->value ?? $shipment?->fulfillment_type?->value ?? 'warehouse',
                 'received_quantity' => (int) $receiptItem->received_quantity,
                 'damaged_quantity' => (int) $receiptItem->damaged_quantity,

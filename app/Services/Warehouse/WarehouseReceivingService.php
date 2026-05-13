@@ -138,6 +138,8 @@ class WarehouseReceivingService
                 $damagedQuantity
             );
 
+            $shipmentItem = $this->ensureShipmentItemTrackingCode($shipmentItem);
+
             $receiptItem = WarehouseReceiptItem::query()->updateOrCreate(
                 [
                     'warehouse_receipt_id' => $receipt->id,
@@ -252,12 +254,7 @@ class WarehouseReceivingService
                 ];
             }
 
-            if (empty($shipmentItem->tracking_code)) {
-                $shipmentItem->update([
-                    'tracking_code' => ShipmentItem::generateTrackingCode(),
-                ]);
-                $shipmentItem->refresh();
-            }
+            $shipmentItem = $this->ensureShipmentItemTrackingCode($shipmentItem);
 
             $barcodeValue = $shipmentItem->tracking_code;
             $barcodeSvg = $this->barcodeService->renderCode128Svg($barcodeValue);
@@ -344,11 +341,7 @@ class WarehouseReceivingService
                 return ['success' => false, 'message' => 'Save this package first before printing labels.'];
             }
 
-            // Ensure tracking code exists
-            if (empty($shipmentItem->tracking_code)) {
-                $shipmentItem->update(['tracking_code' => ShipmentItem::generateTrackingCode()]);
-                $shipmentItem->refresh();
-            }
+            $shipmentItem = $this->ensureShipmentItemTrackingCode($shipmentItem);
 
             $parentBarcode = $shipmentItem->tracking_code;
 
@@ -488,6 +481,23 @@ class WarehouseReceivingService
                     ];
                 }
             }
+
+            $receipt->loadMissing('items.shipmentItem');
+            $receipt->items->each(function (WarehouseReceiptItem $item) {
+                if (! $item->shipmentItem) {
+                    return;
+                }
+
+                $shipmentItem = $this->ensureShipmentItemTrackingCode($item->shipmentItem);
+
+                if (empty($item->barcode_value)) {
+                    $item->update([
+                        'barcode_value' => $shipmentItem->tracking_code,
+                        'barcode_format' => 'code128',
+                    ]);
+                }
+            });
+            $receipt->refresh()->load('items.photos', 'items.shipmentItem');
 
             $trackingMetaByItem = $receipt->items->mapWithKeys(function (WarehouseReceiptItem $item) use ($receipt) {
                 return [
@@ -646,6 +656,16 @@ class WarehouseReceivingService
                 ? WarehouseReceipt::STATUS_DISCREPANCY_OPEN
                 : WarehouseReceipt::STATUS_DRAFT,
         ]);
+    }
+
+    private function ensureShipmentItemTrackingCode(ShipmentItem $shipmentItem): ShipmentItem
+    {
+        if (empty($shipmentItem->tracking_code)) {
+            $shipmentItem->update(['tracking_code' => ShipmentItem::generateTrackingCode()]);
+            $shipmentItem->refresh();
+        }
+
+        return $shipmentItem;
     }
 
     /**

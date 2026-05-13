@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Helpers\PhoneHelper;
 use App\Models\Role;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -30,6 +31,12 @@ class UpdateAdminRequest extends FormRequest
                 'is_active' => filter_var($this->is_active, FILTER_VALIDATE_BOOLEAN),
             ]);
         }
+
+        if ($this->filled('phone')) {
+            $this->merge([
+                'phone' => PhoneHelper::format((string) $this->input('phone')) ?? $this->input('phone'),
+            ]);
+        }
     }
 
     /**
@@ -42,6 +49,11 @@ class UpdateAdminRequest extends FormRequest
         return [
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'email', Rule::unique('users')->ignore($adminId)],
+            'phone' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
+                if (!PhoneHelper::isValid((string) $value)) {
+                    $fail('Please enter a valid Ghana phone number.');
+                }
+            }, Rule::unique('users', 'phone')->ignore($adminId)],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'role_id' => ['nullable', 'exists:roles,id'],
             'roles' => ['nullable', 'array', 'max:1'],
@@ -119,6 +131,8 @@ class UpdateAdminRequest extends FormRequest
             'name.max' => 'Name cannot exceed 255 characters.',
             'email.email' => 'Please enter a valid email address.',
             'email.unique' => 'This email address is already in use.',
+            'phone.required' => 'Phone number is required.',
+            'phone.unique' => 'This phone number is already in use.',
             'password.min' => 'Password must be at least 8 characters.',
             'password.confirmed' => 'Password confirmation does not match.',
         ];

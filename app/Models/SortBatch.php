@@ -78,6 +78,11 @@ class SortBatch extends Model
         return $this->hasOne(DeliveryRun::class);
     }
 
+    public function recipientPaymentTasks(): HasMany
+    {
+        return $this->hasMany(RecipientPaymentTask::class);
+    }
+
     public function isOpen(): bool
     {
         return $this->status === self::STATUS_OPEN;

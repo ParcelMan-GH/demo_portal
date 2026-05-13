@@ -124,7 +124,7 @@ class WarehouseController extends Controller
         $warehouseUsers = $warehouse->users()
             ->with('roles:id,name')
             ->orderByDesc('created_at')
-            ->get(['id', 'warehouse_id', 'name', 'email', 'is_active', 'last_login_at', 'created_at']);
+            ->get(['id', 'warehouse_id', 'name', 'email', 'phone', 'is_active', 'last_login_at', 'created_at']);
 
         $userRoles = Role::active()
             ->warehouseRoles()
@@ -528,7 +528,8 @@ class WarehouseController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
@@ -553,7 +554,7 @@ class WarehouseController extends Controller
 
         $sortField = $request->input('sort', 'created_at');
         $sortDirection = $request->input('direction', 'desc');
-        $allowedSorts = ['name', 'email', 'created_at', 'last_login_at'];
+        $allowedSorts = ['name', 'email', 'phone', 'created_at', 'last_login_at'];
 
         if (in_array($sortField, $allowedSorts, true)) {
             $query->orderBy($sortField, $sortDirection === 'asc' ? 'asc' : 'desc');
@@ -570,6 +571,7 @@ class WarehouseController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'phone' => $user->phone,
                 'roles' => $user->roles->map(fn($role) => ['id' => $role->id, 'name' => $role->name]),
                 'is_active' => $user->is_active,
                 'creator' => $user->creator?->name ?? 'System',
@@ -620,7 +622,8 @@ class WarehouseController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
@@ -647,6 +650,7 @@ class WarehouseController extends Controller
             return [
                 'Name' => $user->name,
                 'Email' => $user->email,
+                'Phone' => $user->phone,
                 'Roles' => $user->roles->pluck('name')->implode(', '),
                 'Status' => $user->is_active ? 'Active' : 'Inactive',
                 'Warehouse' => $user->warehouse?->name ?? 'Unassigned',
@@ -681,4 +685,3 @@ class WarehouseController extends Controller
         }
     }
 }
-

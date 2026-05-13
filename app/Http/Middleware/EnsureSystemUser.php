@@ -24,7 +24,7 @@ class EnsureSystemUser
             return redirect()->route('admin.login');
         }
 
-        if (!empty($user->warehouse_id)) {
+        if (!$user->isSuperAdmin() && !empty($user->warehouse_id)) {
             if ($request->expectsJson()) {
                 return response()->json(['message' => 'System admin routes are not available for warehouse users.'], 403);
             }
@@ -37,4 +37,3 @@ class EnsureSystemUser
         return $next($request);
     }
 }
-

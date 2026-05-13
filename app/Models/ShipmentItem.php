@@ -77,14 +77,27 @@ class ShipmentItem extends Model
     {
         parent::boot();
 
-        // Generate tracking code when item is picked up
+        static::creating(function ($item) {
+            if (empty($item->tracking_code) && static::statusNeedsTrackingCode($item->status)) {
+                $item->tracking_code = static::generateTrackingCode();
+            }
+        });
+
+        // Generate tracking code when item enters package movement.
         static::updating(function ($item) {
             if ($item->isDirty('status') &&
-                $item->status === ItemStatus::PICKED_UP &&
+                static::statusNeedsTrackingCode($item->status) &&
                 empty($item->tracking_code)) {
                 $item->tracking_code = static::generateTrackingCode();
             }
         });
+    }
+
+    protected static function statusNeedsTrackingCode(mixed $status): bool
+    {
+        $value = $status instanceof ItemStatus ? $status->value : $status;
+
+        return filled($value) && $value !== ItemStatus::PENDING->value;
     }
 
     /**
@@ -163,6 +176,11 @@ class ShipmentItem extends Model
     public function charges(): HasMany
     {
         return $this->hasMany(ShipmentCharge::class);
+    }
+
+    public function recipientPaymentTasks(): HasMany
+    {
+        return $this->hasMany(RecipientPaymentTask::class);
     }
 
     public function getDeliveryLocationTypeAttribute(): string

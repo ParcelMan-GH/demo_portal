@@ -35,7 +35,19 @@ function shipmentShow() {
         receivingPhotosModal: { open: false, packageId: null, packageLabel: '', pkg: null, files: [], uploading: false },
         packageDetailsModal: { open: false, pkg: null, packageLabel: '' },
         packageCustodyModal: { open: false, pkg: null, packageLabel: '' },
-        receivingAddPackageModal: { open: false, saving: false },
+        receivingAddPackageModal: {
+            open: false,
+            saving: false,
+            delivery_fee: {
+                mode: 'none',
+                status: 'none',
+                amount: '',
+                currency: 'GHS',
+                notes: '',
+                payment_method: 'cash',
+                payment_reference: '',
+            },
+        },
         pickupEditModal: { open: false, saving: false, form: null },
         receiving: { loading: false, saving: false, detailsSaving: false, dropOffSaving: false, autoGrouping: false, completingPickup: false, canReceive: false, canAutoGroup: false, autoGroupLockReason: '', packages: [], receipt: null, assignmentId: null },
         finalizeNotes: '',
@@ -1102,21 +1114,29 @@ function shipmentShow() {
             return (Number.isFinite(received) ? received : 0) + (Number.isFinite(damaged) ? damaged : 0);
         },
 
-        receivingPackageCount() {
-            if (Array.isArray(this.receiving.packages) && this.receiving.packages.length > 0) {
-                return this.receiving.packages.length;
-            }
+	        receivingPackageCount() {
+	            if (Array.isArray(this.receiving.packages) && this.receiving.packages.length > 0) {
+	                return this.receiving.packages.length;
+	            }
 
-            if (Array.isArray(this.shipment?.items)) {
-                return this.shipment.items.length;
-            }
+	            if (Array.isArray(this.shipment?.items)) {
+	                return this.shipment.items.length;
+	            }
 
-            return 0;
+	            return 0;
+	        },
+
+        receivingReceivedPackageCount() {
+            return (this.receiving.packages || []).filter((pkg) => this.receivingPackageIsReceived(pkg)).length;
         },
 
-        receivingReceivedUnits() {
-            return (this.receiving.packages || []).reduce((total, pkg) => {
-                const received = Number(pkg?.received_quantity ?? 0);
+        receivingPendingPackageCount() {
+            return Math.max(this.receivingPackageCount() - this.receivingReceivedPackageCount(), 0);
+        },
+
+	        receivingReceivedUnits() {
+	            return (this.receiving.packages || []).reduce((total, pkg) => {
+	                const received = Number(pkg?.received_quantity ?? 0);
                 return total + (Number.isFinite(received) ? received : 0);
             }, 0);
         },
@@ -2204,9 +2224,9 @@ function shipmentShow() {
 	            this.receiving.loading = false;
 	        },
 
-        openReceivingAddPackageModal() {
-            const draft = {
-                open: true,
+        receivingAddPackageDraft(overrides = {}) {
+            return {
+                open: false,
                 description: '',
                 quantity: 1,
                 delivery_recipient_name: '',
@@ -2237,7 +2257,12 @@ function shipmentShow() {
                 _town_selected_display: null,
                 _receipt_photo_files: [],
                 saving: false,
+                ...overrides,
             };
+        },
+
+        openReceivingAddPackageModal() {
+            const draft = this.receivingAddPackageDraft({ open: true });
 
             this.receivingAddPackageModal = draft;
         },
@@ -2249,7 +2274,7 @@ function shipmentShow() {
                 clearTimeout(this.receivingAddPackageModal._town_debounce);
             }
 
-            this.receivingAddPackageModal = { open: false, saving: false };
+            this.receivingAddPackageModal = this.receivingAddPackageDraft();
         },
 
         async addReceivingPackage() {
@@ -2511,8 +2536,8 @@ function shipmentShow() {
             }
 
             const photos = (pkg.vendor_photos || []).filter((photo) => photo && photo.id);
-            if (!photos.length) {
-                window.showToast?.('There are no vendor photos available to split on this package.', 'error');
+            if (photos.length < 2) {
+                window.showToast?.('A package needs at least two vendor photos before it can be split.', 'error');
                 return;
             }
 

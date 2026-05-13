@@ -64,6 +64,7 @@ document.addEventListener('alpine:init', () => {
             { key: 'name', label: 'Name' },
             { key: 'role', label: 'Role' },
             { key: 'email', label: 'Email' },
+            { key: 'phone', label: 'Phone' },
             { key: 'created_at', label: 'Created At' },
             { key: 'last_login_at', label: 'Last Login' },
             { key: 'actions', label: 'Actions' },
@@ -72,6 +73,7 @@ document.addEventListener('alpine:init', () => {
             name: true,
             role: true,
             email: true,
+            phone: true,
             created_at: true,
             last_login_at: true,
             actions: true,
@@ -90,6 +92,7 @@ document.addEventListener('alpine:init', () => {
         formData: {
             name: '',
             email: '',
+            phone: '',
             role_id: '',
             is_active: '1',
             password: '',
@@ -124,6 +127,7 @@ document.addEventListener('alpine:init', () => {
             this.formData = {
                 name: '',
                 email: '',
+                phone: '',
                 role_id: '',
                 is_active: '1',
                 password: '',
@@ -140,6 +144,7 @@ document.addEventListener('alpine:init', () => {
             this.formData = {
                 name: user.name,
                 email: user.email,
+                phone: user.phone || '',
                 role_id: (user.roles && user.roles.length) ? String(user.roles[0].id) : '',
                 is_active: user.is_active ? '1' : '0',
                 password: '',
@@ -215,6 +220,7 @@ document.addEventListener('alpine:init', () => {
                 const body = {
                     name: this.formData.name,
                     email: this.formData.email,
+                    phone: this.formData.phone,
                     role_id: this.formData.role_id || null,
                 };
 

@@ -26,6 +26,14 @@
             line-height: 1.5;
         }
 
+        :where(a[href], button:not(:disabled), [role="button"]:not([aria-disabled="true"]), [onclick], [x-on\:click], [\@click], [wire\:click], [data-action], [data-clickable], [data-bs-toggle], [data-toggle], [data-modal-target], [data-dropdown-toggle], summary, label[for], select:not(:disabled), input[type="button"]:not(:disabled), input[type="submit"]:not(:disabled), input[type="reset"]:not(:disabled), input[type="checkbox"]:not(:disabled), input[type="radio"]:not(:disabled), input[type="file"]:not(:disabled), .cursor-pointer) {
+            cursor: pointer;
+        }
+
+        :where(button:disabled, select:disabled, input:disabled, textarea:disabled, [aria-disabled="true"], .cursor-not-allowed) {
+            cursor: not-allowed;
+        }
+
         .container { display: flex; height: 100vh; }
 
         /* Sidebar */
@@ -937,4 +945,3 @@
             background: rgba(97, 175, 254, 0.3);
             color: #0066b8;
         }
-

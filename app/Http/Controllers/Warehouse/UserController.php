@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Warehouse;
 
 use App\Exports\UsersExport;
+use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
 use App\Models\Role;
@@ -74,6 +75,7 @@ class UserController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
                     ->orWhereHas('roles', function ($roleQuery) use ($search) {
                         $roleQuery->where('roles.name', 'like', "%{$search}%");
                     });
@@ -98,7 +100,7 @@ class UserController extends Controller
 
         $sortBy = $request->input('sort', 'created_at');
         $sortDirection = $request->input('direction', 'desc') === 'asc' ? 'asc' : 'desc';
-        $allowedSorts = ['name', 'email', 'created_at', 'last_login_at'];
+        $allowedSorts = ['name', 'email', 'phone', 'created_at', 'last_login_at'];
         if (in_array($sortBy, $allowedSorts, true)) {
             $query->orderBy($sortBy, $sortDirection);
         }
@@ -115,6 +117,7 @@ class UserController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'phone' => $user->phone,
                 'avatar' => strtoupper(substr($user->name, 0, 1)),
                 'roles' => $user->roles->map(fn ($role) => ['id' => $role->id, 'name' => $role->name])->values(),
                 'is_active' => $user->is_active,
@@ -151,9 +154,18 @@ class UserController extends Controller
         $actor = Auth::guard('admin')->user();
         $warehouse = $this->portalService->resolveWarehouse($actor);
 
+        $request->merge([
+            'phone' => PhoneHelper::format((string) $request->input('phone')) ?? $request->input('phone'),
+        ]);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'phone' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
+                if (!PhoneHelper::isValid((string) $value)) {
+                    $fail('Please enter a valid Ghana phone number.');
+                }
+            }, 'unique:users,phone'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role_id' => ['required', 'integer', Rule::exists('roles', 'id')],
             'is_active' => ['nullable', 'boolean'],
@@ -164,6 +176,7 @@ class UserController extends Controller
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
+            'phone' => $validated['phone'],
             'password' => Hash::make($validated['password']),
             'warehouse_id' => $warehouse->id,
             'created_by_user_id' => $actor->id,
@@ -187,9 +200,18 @@ class UserController extends Controller
         $warehouse = $this->portalService->resolveWarehouse($actor);
         $this->assertWarehouseScopedUser($user, $warehouse);
 
+        $request->merge([
+            'phone' => PhoneHelper::format((string) $request->input('phone')) ?? $request->input('phone'),
+        ]);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'phone' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
+                if (!PhoneHelper::isValid((string) $value)) {
+                    $fail('Please enter a valid Ghana phone number.');
+                }
+            }, Rule::unique('users', 'phone')->ignore($user->id)],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'role_id' => ['nullable', 'integer', Rule::exists('roles', 'id')],
             'is_active' => ['nullable', 'boolean'],
@@ -198,6 +220,7 @@ class UserController extends Controller
         $payload = [
             'name' => $validated['name'],
             'email' => $validated['email'],
+            'phone' => $validated['phone'],
         ];
 
         if (array_key_exists('is_active', $validated)) {

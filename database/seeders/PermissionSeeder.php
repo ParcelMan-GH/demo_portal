@@ -91,6 +91,20 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouse', 'action' => 'contacts_manage', 'name' => 'warehouse.contacts.manage', 'description' => 'Manage package contact queue and log calls', 'sort_order' => 136],
             ['module' => 'warehouse', 'action' => 'charges_view', 'name' => 'warehouse.charges.view', 'description' => 'View shipment charges at this warehouse', 'sort_order' => 137],
             ['module' => 'warehouse', 'action' => 'charges_manage', 'name' => 'warehouse.charges.manage', 'description' => 'Add / edit / mark paid / waive charges on shipments at this warehouse', 'sort_order' => 138],
+            ['module' => 'warehouse', 'action' => 'recipient_payments_view', 'name' => 'warehouse.recipient_payments.view', 'description' => 'View recipient payment queues in the warehouse portal', 'sort_order' => 1390],
+            ['module' => 'warehouse', 'action' => 'recipient_payments_process', 'name' => 'warehouse.recipient_payments.process', 'description' => 'Process assigned recipient payments in the warehouse portal', 'sort_order' => 1391],
+            ['module' => 'warehouse', 'action' => 'recipient_payments_assign', 'name' => 'warehouse.recipient_payments.assign', 'description' => 'Assign recipient payment tasks in the warehouse portal', 'sort_order' => 1392],
+            ['module' => 'warehouse', 'action' => 'recipient_payments_reconcile', 'name' => 'warehouse.recipient_payments.reconcile', 'description' => 'Review warehouse recipient payment sessions and reconciliation', 'sort_order' => 1393],
+            ['module' => 'warehouse', 'action' => 'recipient_payments_override', 'name' => 'warehouse.recipient_payments.override', 'description' => 'Override recipient payment dispatch blocks in the warehouse portal', 'sort_order' => 1394],
+            ['module' => 'warehouse', 'action' => 'recipient_payments_manage_wallets', 'name' => 'warehouse.recipient_payments.manage_wallets', 'description' => 'Manage approved recipient payment wallets in the warehouse portal', 'sort_order' => 1395],
+
+            // Recipient Payments
+            ['module' => 'recipient_payments', 'action' => 'view', 'name' => 'recipient_payments.view', 'description' => 'View recipient payment queues', 'sort_order' => 140],
+            ['module' => 'recipient_payments', 'action' => 'process', 'name' => 'recipient_payments.process', 'description' => 'Process assigned recipient payments', 'sort_order' => 141],
+            ['module' => 'recipient_payments', 'action' => 'assign', 'name' => 'recipient_payments.assign', 'description' => 'Assign recipient payment tasks', 'sort_order' => 142],
+            ['module' => 'recipient_payments', 'action' => 'reconcile', 'name' => 'recipient_payments.reconcile', 'description' => 'Review recipient payment sessions and reconciliation', 'sort_order' => 143],
+            ['module' => 'recipient_payments', 'action' => 'override', 'name' => 'recipient_payments.override', 'description' => 'Override recipient payment dispatch blocks', 'sort_order' => 144],
+            ['module' => 'recipient_payments', 'action' => 'manage_wallets', 'name' => 'recipient_payments.manage_wallets', 'description' => 'Manage approved recipient payment wallets', 'sort_order' => 145],
 
             // Reports (2)
             ['module' => 'reports', 'action' => 'view', 'name' => 'reports.view', 'description' => 'View reports', 'sort_order' => 80],

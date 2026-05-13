@@ -18,6 +18,7 @@ use App\Services\Warehouse\PackageContactService;
 use App\Services\Warehouse\WarehouseTransportReceivingService;
 use App\Services\Warehouse\WarehouseTransportService;
 use App\Support\GenericPdfExporter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -175,6 +176,7 @@ class AdminTransportManifestController extends Controller
                 'arrived_at'            => $manifest->arrived_at?->format('Y-m-d H:i:s'),
                 'received_at'           => $manifest->received_at?->format('Y-m-d H:i:s'),
                 'created_at'            => $manifest->created_at->format('Y-m-d H:i:s'),
+                'can_delete'            => $this->transportService->deleteState($manifest)['deletable'],
             ];
         });
 
@@ -206,9 +208,10 @@ class AdminTransportManifestController extends Controller
             'createdBy',
             'receivedBy',
             'items.shipmentItem.shipment',
-            'containers.items.manifestItem.shipmentItem.shipment',
-            'containers.items.manifestItem.shipmentItem.warehouseReceiptItems.labels',
-            'containers.items.manifestItem.labelScans:id,transport_manifest_item_id,barcode_value,scanned_at',
+            'containers' => fn ($query) => $query
+                ->withCount('items')
+                ->withSum('items', 'expected_quantity')
+                ->orderBy('sequence_number'),
             'loadingExceptions.driver:id,name,phone',
             'loadingExceptions.container:id,container_code,container_type',
             'loadingExceptions.manifestItem.shipmentItem:id,description,tracking_code',
@@ -218,6 +221,7 @@ class AdminTransportManifestController extends Controller
         ]);
 
         $statusLabel = $this->formatStatusLabel($manifest->status);
+        $deleteState = $this->transportService->deleteState($manifest);
 
         $transportDrivers = Driver::where('is_active', true)
             ->whereJsonContains('task_capabilities', Driver::CAPABILITY_TRANSPORT)
@@ -228,10 +232,17 @@ class AdminTransportManifestController extends Controller
             'assign_driver_endpoint'   => route('admin.transport-manifests.assign-driver', $manifest),
             'unassign_driver_endpoint' => route('admin.transport-manifests.unassign-driver', $manifest),
             'dispatch_endpoint'        => route('admin.transport-manifests.dispatch', $manifest),
+            'undo_dispatch_endpoint'   => route('admin.transport-manifests.undo-dispatch', $manifest),
+            'print_waybill_endpoint'   => route('admin.transport-manifests.print-waybill', $manifest),
             'mark_all_loaded_endpoint' => route('admin.transport-manifests.mark-all-loaded', $manifest),
+            'mark_all_not_loaded_endpoint' => route('admin.transport-manifests.mark-all-not-loaded', $manifest),
+            'mark_arrived_endpoint' => route('admin.transport-manifests.mark-arrived', $manifest),
+            'undo_arrival_endpoint' => route('admin.transport-manifests.undo-arrival', $manifest),
             'mark_item_loaded_endpoint_template' => route('admin.transport-manifests.items.mark-loaded', ['manifest' => $manifest, 'item' => '__ITEM__']),
             'mark_item_not_loaded_endpoint_template' => route('admin.transport-manifests.items.mark-not-loaded', ['manifest' => $manifest, 'item' => '__ITEM__']),
             'create_container_endpoint' => route('admin.transport-manifests.containers.store', $manifest),
+            'container_items_endpoint_template' => route('admin.transport-manifests.containers.items-data', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
+            'update_container_notes_endpoint_template' => route('admin.transport-manifests.containers.notes', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
             'mark_container_loaded_endpoint_template' => route('admin.transport-manifests.containers.mark-loaded', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
             'mark_container_not_loaded_endpoint_template' => route('admin.transport-manifests.containers.mark-not-loaded', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
             'delete_container_endpoint_template' => route('admin.transport-manifests.containers.destroy', ['manifest' => $manifest, 'container' => '__CONTAINER__']),
@@ -239,9 +250,16 @@ class AdminTransportManifestController extends Controller
             'move_item_container_endpoint_template' => route('admin.transport-manifests.items.move-container', ['manifest' => $manifest, 'item' => '__ITEM__']),
             'approve_scan_issue_endpoint_template' => route('admin.transport-manifests.scan-issues.approve', ['manifest' => $manifest, 'exception' => '__ISSUE__']),
             'reject_scan_issue_endpoint_template' => route('admin.transport-manifests.scan-issues.reject', ['manifest' => $manifest, 'exception' => '__ISSUE__']),
+            'delete_endpoint' => route('admin.transport-manifests.destroy', $manifest),
+            'index_url' => route('admin.transport-manifests.index'),
         ];
 
-        return view('admin.transport-manifests.show', compact('manifest', 'statusLabel', 'transportDrivers', 'manifestConfig'));
+        $manifestIndexUrl = route('admin.transport-manifests.index');
+        $manifestBackLabel = 'Back to Transport Manifests';
+        $sortBatchUrl = $manifest->sortBatch ? route('admin.sort-batches.show', $manifest->sortBatch) : null;
+        $transferTimeline = $this->transportService->manifestTimeline($manifest);
+
+        return view('admin.transport-manifests.show', compact('manifest', 'statusLabel', 'transportDrivers', 'manifestConfig', 'deleteState', 'manifestIndexUrl', 'manifestBackLabel', 'sortBatchUrl', 'transferTimeline'));
     }
 
     public function incomingIndex(): View
@@ -299,6 +317,7 @@ class AdminTransportManifestController extends Controller
                 'id' => $manifest->id,
                 'manifest_number' => $manifest->manifest_number,
                 'status' => $manifest->status,
+                'status_label' => $this->formatStatusLabel($manifest->status),
                 'origin_warehouse' => $manifest->originWarehouse?->name,
                 'destination_warehouse' => $manifest->destinationWarehouse?->name,
                 'driver_name' => $manifest->assignedDriver?->name,
@@ -488,6 +507,27 @@ class AdminTransportManifestController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
+    public function undoDispatch(Request $request, TransportManifest $manifest): JsonResponse
+    {
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $result = $this->transportService->undoDispatch(
+            $manifest,
+            $warehouse,
+            Auth::guard('admin')->user(),
+            $validated['reason'] ?? null
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
     public function markItemLoaded(TransportManifest $manifest, TransportManifestItem $item): JsonResponse
     {
         $warehouse = $manifest->originWarehouse;
@@ -516,6 +556,59 @@ class AdminTransportManifestController extends Controller
             $manifest,
             $warehouse,
             Auth::guard('admin')->user()
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function markAllNotLoaded(TransportManifest $manifest): JsonResponse
+    {
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $result = $this->transportService->adminMarkAllItemsNotLoaded(
+            $manifest,
+            $warehouse,
+            Auth::guard('admin')->user()
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function markArrived(TransportManifest $manifest): JsonResponse
+    {
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $result = $this->transportService->adminMarkArrived(
+            $manifest,
+            $warehouse,
+            Auth::guard('admin')->user()
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function undoArrival(Request $request, TransportManifest $manifest): JsonResponse
+    {
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $result = $this->transportService->undoArrival(
+            $manifest,
+            $warehouse,
+            Auth::guard('admin')->user(),
+            $validated['reason'] ?? null
         );
 
         return response()->json($result, $result['success'] ? 200 : 422);
@@ -559,6 +652,36 @@ class AdminTransportManifestController extends Controller
         );
 
         return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function updateContainerNotes(Request $request, TransportManifest $manifest, TransportContainer $container): JsonResponse
+    {
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $result = $this->transportService->updateContainerNotes(
+            $manifest,
+            $container,
+            $warehouse,
+            $validated['notes'] ?? null
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function containerItemsData(Request $request, TransportManifest $manifest, TransportContainer $container): JsonResponse
+    {
+        if ((int) $container->transport_manifest_id !== (int) $manifest->id) {
+            abort(404);
+        }
+
+        return $this->containerItemsResponse($request, $container);
     }
 
     public function moveItemToContainer(Request $request, TransportManifest $manifest, TransportManifestItem $item): JsonResponse
@@ -630,6 +753,94 @@ class AdminTransportManifestController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
+    private function containerItemsResponse(Request $request, TransportContainer $container): JsonResponse
+    {
+        $query = $container->items()
+            ->with([
+                'manifestItem:id',
+                'manifestItem.labelScans:id,transport_manifest_item_id,barcode_value',
+                'shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone',
+                'shipmentItem.shipment:id,shipment_number',
+                'shipmentItem.warehouseReceiptItems.labels',
+            ]);
+
+        if ($search = trim((string) $request->input('search'))) {
+            $query->where(function (Builder $builder) use ($search) {
+                $builder->whereHas('shipmentItem', function (Builder $itemQuery) use ($search) {
+                    $itemQuery->where('description', 'like', "%{$search}%")
+                        ->orWhere('tracking_code', 'like', "%{$search}%")
+                        ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                        ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
+                        ->orWhereHas('shipment', fn (Builder $shipmentQuery) => $shipmentQuery->where('shipment_number', 'like', "%{$search}%"));
+                })->orWhereHas('manifestItem.labelScans', fn (Builder $labelQuery) => $labelQuery->where('barcode_value', 'like', "%{$search}%"));
+            });
+        }
+
+        $perPage = min(max((int) $request->input('per_page', 50), 10), 100);
+        $page = max((int) $request->input('page', 1), 1);
+        $total = $query->count();
+        $rows = $query->orderBy('id')->skip(($page - 1) * $perPage)->take($perPage)->get();
+
+        return response()->json([
+            'data' => $rows->map(function ($containerItem) {
+                $shipmentItem = $containerItem->shipmentItem;
+                $trackingCode = (string) ($shipmentItem?->tracking_code ?? '');
+                $labelCodes = $shipmentItem?->warehouseReceiptItems
+                    ? $shipmentItem->warehouseReceiptItems
+                        ->flatMap(fn ($receiptItem) => $receiptItem->labels)
+                        ->sortBy(fn ($label) => [(int) ($label->label_index ?? 0), (int) $label->id])
+                        ->pluck('barcode_value')
+                        ->filter()
+                        ->map(function ($labelCode) use ($trackingCode) {
+                            $labelCode = (string) $labelCode;
+                            return $trackingCode !== '' && str_starts_with($labelCode, $trackingCode . '-')
+                                ? str($labelCode)->after($trackingCode . '-')->toString()
+                                : $labelCode;
+                        })
+                        ->values()
+                    : collect();
+
+                return [
+                    'id' => $containerItem->id,
+                    'manifest_item_id' => $containerItem->transport_manifest_item_id,
+                    'description' => $shipmentItem?->description ?? 'Package',
+                    'tracking_code' => $trackingCode,
+                    'shipment_number' => $shipmentItem?->shipment?->shipment_number,
+                    'recipient_name' => $shipmentItem?->delivery_recipient_name,
+                    'recipient_phone' => $shipmentItem?->delivery_recipient_phone,
+                    'quantity' => (int) $containerItem->expected_quantity,
+                    'labels_count' => $labelCodes->count(),
+                    'labels_preview' => $labelCodes->take(3)->values(),
+                ];
+            })->values(),
+            'meta' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => max((int) ceil($total / $perPage), 1),
+                'from' => $total ? (($page - 1) * $perPage) + 1 : 0,
+                'to' => min($page * $perPage, $total),
+            ],
+        ]);
+    }
+
+    public function destroy(TransportManifest $manifest): JsonResponse
+    {
+        $warehouse = $manifest->originWarehouse;
+        if (!$warehouse) {
+            return response()->json(['success' => false, 'message' => 'Manifest has no origin warehouse.'], 422);
+        }
+
+        $user = Auth::guard('admin')->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Admin user not found.'], 422);
+        }
+
+        $result = $this->transportService->deleteManifest($manifest, $warehouse, $user);
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
     public function approveScanIssue(Request $request, TransportManifest $manifest, TransportLoadingException $exception): JsonResponse
     {
         $validated = $request->validate([
@@ -697,6 +908,37 @@ class AdminTransportManifestController extends Controller
             'data' => [
                 'container_code' => $container->container_code,
                 'label_html' => $labelHtml,
+            ],
+        ]);
+    }
+
+    public function printWaybill(TransportManifest $manifest): JsonResponse
+    {
+        $manifest->loadMissing([
+            'originWarehouse',
+            'destinationWarehouse',
+            'assignedDriver',
+            'createdBy',
+            'sortBatch',
+            'items.shipmentItem.shipment',
+            'containers' => fn ($query) => $query->orderBy('sequence_number'),
+            'containers.items.shipmentItem.shipment',
+            'containers.items.manifestItem',
+        ]);
+
+        if ($manifest->items->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'Add packages before printing a waybill.'], 422);
+        }
+
+        $waybillHtml = view('shared.transport-waybill', [
+            'manifest' => $manifest,
+        ])->render();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Waybill generated.',
+            'data' => [
+                'label_html' => $waybillHtml,
             ],
         ]);
     }

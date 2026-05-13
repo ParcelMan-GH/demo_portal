@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Warehouse;
 
 use App\Enums\PickupAssignmentStatus;
-use App\Http\Controllers\Controller;
+use App\Enums\ShipmentDestinationMode;
+use App\Helpers\PhoneHelper;
+use App\Http\Controllers\Admin\ShipmentController as AdminShipmentController;
 use App\Models\Driver;
 use App\Models\PickupAssignment;
-use App\Models\ShipmentItem;
 use App\Models\Shipment;
+use App\Models\ShipmentItem;
+use App\Models\ShipmentItemImage;
+use App\Models\Warehouse;
 use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceipt;
 use App\Services\StorageService;
@@ -18,9 +22,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
-class ReceiptController extends Controller
+class ReceiptController extends AdminShipmentController
 {
     public function __construct(
         private WarehousePortalService $portalService,
@@ -81,7 +86,29 @@ class ReceiptController extends Controller
             'save_item_url' => route('warehouse.receipts.pending.items.save', ['pickupAssignment' => $pickupAssignment, 'shipmentItem' => '__ITEM__']),
             'print_label_url' => route('warehouse.receipts.pending.items.print-label', ['pickupAssignment' => $pickupAssignment, 'shipmentItem' => '__ITEM__']),
             'finalize_url' => route('warehouse.receipts.pending.finalize', ['pickupAssignment' => $pickupAssignment]),
+            'add_package_url' => route('warehouse.receipts.pending.packages.add', ['pickupAssignment' => $pickupAssignment]),
+            'split_package_url' => route('warehouse.receipts.pending.items.split', ['pickupAssignment' => $pickupAssignment, 'shipmentItem' => '__ITEM__']),
+            'auto_group_by_phone_url' => route('warehouse.receipts.pending.auto-group-by-phone', ['pickupAssignment' => $pickupAssignment]),
+            'save_shared_destination_url' => route('warehouse.receipts.pending.shared-destination', ['pickupAssignment' => $pickupAssignment]),
             'can_receive' => !is_null($pickupAssignment->picked_up_at),
+            'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($pickupAssignment, $pickupAssignment->shipment),
+            'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($pickupAssignment, $pickupAssignment->shipment),
+            'shipment' => $this->serializeReceiptShipment($pickupAssignment->shipment),
+            'assignment' => [
+                'id' => $pickupAssignment->id,
+                'status' => $pickupAssignment->status?->value ?? (string) $pickupAssignment->status,
+                'status_label' => $this->statusLabel($pickupAssignment->status?->value ?? (string) $pickupAssignment->status),
+                'driver' => $pickupAssignment->driver ? [
+                    'id' => $pickupAssignment->driver->id,
+                    'name' => $pickupAssignment->driver->name,
+                    'phone' => $pickupAssignment->driver->phone,
+                ] : null,
+                'target_warehouse' => $pickupAssignment->targetWarehouse ? [
+                    'id' => $pickupAssignment->targetWarehouse->id,
+                    'name' => $pickupAssignment->targetWarehouse->name,
+                    'code' => $pickupAssignment->targetWarehouse->code,
+                ] : null,
+            ],
             'receipt' => $receipt ? [
                 'id' => $receipt->id,
                 'status' => $receipt->status,
@@ -102,10 +129,7 @@ class ReceiptController extends Controller
                         'created_at' => optional($photo->created_at)?->toIso8601String(),
                     ])->values();
 
-                $vendorPhotos = $item->images
-                    ->map(fn ($image) => $image->getSignedUrl()['url'] ?? null)
-                    ->filter()
-                    ->values();
+                $vendorPhotos = $this->serializeVendorPackagePhotos($item);
 
                 $vendorQuantity = (int) $item->quantity;
                 $driverQuantity = $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : null;
@@ -116,7 +140,11 @@ class ReceiptController extends Controller
                     'shipment_item_id' => $item->id,
                     'description' => $item->description,
                     'tracking_code' => $item->tracking_code,
+                    'delivery_recipient_name' => $item->delivery_recipient_name ?: $item->shipment?->delivery_recipient_name,
+                    'delivery_recipient_phone' => $item->delivery_recipient_phone ?: $item->shipment?->delivery_recipient_phone,
+                    'delivery_town' => $item->delivery_town ?: $item->shipment?->delivery_town,
                     'delivery_preference' => $item->delivery_preference ?? $item->shipment?->delivery_preference ?? 'deliver',
+                    'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
                     'fulfillment_type' => $item->fulfillment_type?->value ?? $item->shipment?->fulfillment_type?->value ?? 'warehouse',
                     'vendor_quantity' => $vendorQuantity,
                     'driver_confirmed_quantity' => $driverQuantity,
@@ -137,6 +165,8 @@ class ReceiptController extends Controller
                     'photos' => $receiptItem
                         ? $this->warehouseReceivingService->serializeReceiptItem($receiptItem)['photos']
                         : [],
+                    'can_split' => $this->canSplitPackageDuringReceiving($pickupAssignment, $receiptItem, $pickupAssignment->shipment),
+                    'split_lock_reason' => $this->receivingSplitLockReason($pickupAssignment, $receiptItem, $pickupAssignment->shipment),
                 ];
             })->values() ?? [],
         ];
@@ -328,6 +358,235 @@ class ReceiptController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
+    public function saveSharedDestination(Request $request, PickupAssignment $pickupAssignment): JsonResponse
+    {
+        $this->authorizePermission('warehouse.receiving.manage');
+
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        if ((int) $pickupAssignment->target_warehouse_id !== (int) $warehouse->id) {
+            abort(404);
+        }
+
+        $shipment = $pickupAssignment->shipment()->with([
+            'deliveryRegion:id,name',
+            'deliveryDistrict:id,name',
+            'items.images',
+            'items.deliveryRegion:id,name',
+            'items.deliveryDistrict:id,name',
+        ])->firstOrFail();
+
+        if (($shipment->destination_mode?->value ?? (string) $shipment->destination_mode) !== ShipmentDestinationMode::SINGLE->value) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Shared destination can only be edited in one drop-off mode.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'delivery_recipient_name' => ['nullable', 'string', 'max:255'],
+            'delivery_recipient_phone' => ['nullable', 'string', 'max:20'],
+            'delivery_region_id' => ['nullable', 'exists:regions,id'],
+            'delivery_district_id' => ['nullable', 'exists:districts,id'],
+            'delivery_town' => ['nullable', 'string', 'max:255'],
+            'delivery_landmark' => ['nullable', 'string', 'max:255'],
+            'delivery_instructions' => ['nullable', 'string', 'max:1000'],
+            'delivery_method' => ['nullable', 'in:direct,bus_handoff'],
+        ]);
+
+        $shipmentUpdates = [];
+        foreach ([
+            'delivery_recipient_name',
+            'delivery_region_id',
+            'delivery_district_id',
+            'delivery_town',
+            'delivery_landmark',
+            'delivery_instructions',
+        ] as $key) {
+            if (array_key_exists($key, $validated)) {
+                $shipmentUpdates[$key] = $validated[$key] ?? null;
+            }
+        }
+
+        if (array_key_exists('delivery_recipient_phone', $validated)) {
+            $shipmentUpdates['delivery_recipient_phone'] = ! empty($validated['delivery_recipient_phone'])
+                ? PhoneHelper::format($validated['delivery_recipient_phone'])
+                : null;
+        }
+
+        if (! empty($shipmentUpdates)) {
+            $shipment->update($shipmentUpdates);
+        }
+
+        if (array_key_exists('delivery_method', $validated) && $validated['delivery_method']) {
+            $shipment->items()->update(['delivery_method' => $validated['delivery_method']]);
+        }
+
+        $shipment = $shipment->fresh([
+            'deliveryRegion:id,name',
+            'deliveryDistrict:id,name',
+            'items.images',
+            'items.deliveryRegion:id,name',
+            'items.deliveryDistrict:id,name',
+        ]);
+
+        $receipt = $this->portalService->receiptForAssignment($pickupAssignment, $warehouse);
+        $pickupAssignment->loadMissing([
+            'photos:id,pickup_assignment_id,shipment_item_id,path,type,created_at',
+            'itemConfirmations:id,pickup_assignment_id,shipment_item_id,expected_quantity,confirmed_quantity,notes,confirmed_at',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shared destination saved.',
+            'data' => [
+                'shipment' => $this->serializeReceiptShipment($shipment),
+                'items' => $this->serializeReceiptItems($pickupAssignment, $shipment, $receipt),
+            ],
+        ]);
+    }
+
+    public function addReceiptPackage(Request $request, PickupAssignment $pickupAssignment): JsonResponse
+    {
+        $this->authorizePermission('warehouse.receiving.manage');
+
+        [$warehouse, $shipment] = $this->scopedReceivingShipment($pickupAssignment);
+        $assignment = $shipment->pickupAssignment;
+
+        if (! $this->canAddPackageDuringReceiving($assignment, $shipment)) {
+            return response()->json([
+                'success' => false,
+                'message' => $this->receivingAddPackageLockReason($assignment, $shipment) ?? 'Packages can no longer be added for this receipt.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'description' => ['required', 'string', 'max:500'],
+            'quantity' => ['required', 'integer', 'min:1'],
+            'delivery_method' => ['nullable', 'in:direct,bus_handoff'],
+            'photos' => ['nullable', 'array'],
+            'photos.*' => ['file', 'image', 'max:12288'],
+        ]);
+
+        $item = $shipment->items()->create([
+            'description' => $validated['description'],
+            'quantity' => (int) $validated['quantity'],
+            'status' => $this->initialStatusForAdminCreatedPackage($shipment, $assignment),
+            'delivery_preference' => 'deliver',
+            'fulfillment_type' => $shipment->fulfillment_type?->value ?? $shipment->getRawOriginal('fulfillment_type') ?? 'warehouse',
+            'delivery_method' => $validated['delivery_method'] ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
+        ]);
+
+        $this->ensurePickupConfirmationForAdminCreatedPackage($assignment, $item);
+
+        $result = $this->warehouseReceivingService->upsertReceiptItem(
+            assignment: $assignment,
+            shipmentItem: $item,
+            warehouse: $warehouse,
+            user: Auth::guard('admin')->user(),
+            receivedQuantity: (int) $validated['quantity'],
+            damagedQuantity: 0,
+            conditionStatus: 'ok',
+            notes: null,
+            photos: $request->file('photos', []),
+            removePhotoIds: []
+        );
+
+        if (($result['success'] ?? false) !== true) {
+            return response()->json($result, 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Package added.',
+            'data' => $this->warehouseReceivingPayload($assignment->fresh(), $warehouse),
+        ]);
+    }
+
+    public function splitReceiptPackage(Request $request, PickupAssignment $pickupAssignment, ShipmentItem $shipmentItem): JsonResponse
+    {
+        $this->authorizePermission('warehouse.receiving.manage');
+
+        [$warehouse, $shipment] = $this->scopedReceivingShipment($pickupAssignment);
+        $assignment = $shipment->pickupAssignment;
+
+        if ((int) $shipmentItem->shipment_id !== (int) $shipment->id) {
+            return response()->json(['success' => false, 'message' => 'Package not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'photo_ids' => ['required', 'array', 'min:1'],
+            'photo_ids.*' => ['required', 'integer'],
+        ]);
+
+        $receipt = $this->portalService->receiptForAssignment($assignment, $warehouse);
+        $receiptItem = $receipt?->items?->firstWhere('shipment_item_id', $shipmentItem->id);
+
+        if (! $this->canSplitPackageDuringReceiving($assignment, $receiptItem, $shipment)) {
+            return response()->json([
+                'success' => false,
+                'message' => $this->receivingSplitLockReason($assignment, $receiptItem, $shipment) ?? 'Package can no longer be split.',
+            ], 422);
+        }
+
+        $newItem = DB::transaction(function () use ($shipment, $shipmentItem, $validated, $assignment) {
+            $source = ShipmentItem::query()->lockForUpdate()->findOrFail($shipmentItem->id);
+            $newItem = $shipment->items()->create([
+                'description' => $source->description,
+                'quantity' => 1,
+                'status' => $this->initialStatusForAdminCreatedPackage($shipment, $assignment),
+                'delivery_preference' => $source->delivery_preference ?? 'deliver',
+                'fulfillment_type' => $source->fulfillment_type?->value ?? $source->getRawOriginal('fulfillment_type'),
+                'delivery_recipient_name' => $source->delivery_recipient_name,
+                'delivery_recipient_phone' => $source->delivery_recipient_phone,
+                'delivery_region_id' => $source->delivery_region_id,
+                'delivery_district_id' => $source->delivery_district_id,
+                'delivery_town' => $source->delivery_town,
+                'delivery_landmark' => $source->delivery_landmark,
+                'delivery_instructions' => $source->delivery_instructions,
+                'delivery_method' => $source->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
+            ]);
+
+            ShipmentItemImage::query()
+                ->whereIn('id', $validated['photo_ids'])
+                ->where('shipment_item_id', $source->id)
+                ->update(['shipment_item_id' => $newItem->id]);
+
+            $this->ensurePickupConfirmationForAdminCreatedPackage($assignment, $newItem);
+
+            return $newItem;
+        });
+
+        $shipment = $this->reloadReceivingShipment($shipment->fresh());
+        $this->syncDestinationModeFromVendorPhotoPhones($shipment);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Package split.',
+            'data' => $this->warehouseReceivingPayload($assignment->fresh(), $warehouse),
+        ]);
+    }
+
+    public function autoGroupReceiptPackagesByPhone(PickupAssignment $pickupAssignment): JsonResponse
+    {
+        $this->authorizePermission('warehouse.receiving.manage');
+
+        [$warehouse, $shipment] = $this->scopedReceivingShipment($pickupAssignment);
+
+        $result = $this->groupShipmentPackagesByPhoneForReceiving($shipment);
+        if (($result['success'] ?? false) !== true) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Auto-group by phone is no longer available for this receipt.',
+            ], $result['status'] ?? 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'] ?? 'Packages grouped by phone.',
+            'data' => $this->warehouseReceivingPayload($pickupAssignment->fresh(), $warehouse),
+        ]);
+    }
+
     public function printPendingItemLabel(PickupAssignment $pickupAssignment, ShipmentItem $shipmentItem): JsonResponse
     {
         $this->authorizePermission('warehouse.receiving.manage');
@@ -417,6 +676,14 @@ class ReceiptController extends Controller
             'save_item_url'   => route('warehouse.receipts.pending.items.save', ['pickupAssignment' => $pickupAssignment, 'shipmentItem' => '__ITEM__']),
             'print_label_url' => route('warehouse.receipts.pending.items.print-label', ['pickupAssignment' => $pickupAssignment, 'shipmentItem' => '__ITEM__']),
             'finalize_url'    => route('warehouse.receipts.pending.finalize', ['pickupAssignment' => $pickupAssignment]),
+            'add_package_url' => route('warehouse.receipts.pending.packages.add', ['pickupAssignment' => $pickupAssignment]),
+            'split_package_url' => route('warehouse.receipts.pending.items.split', ['pickupAssignment' => $pickupAssignment, 'shipmentItem' => '__ITEM__']),
+            'auto_group_by_phone_url' => route('warehouse.receipts.pending.auto-group-by-phone', ['pickupAssignment' => $pickupAssignment]),
+            'save_shared_destination_url' => route('warehouse.receipts.pending.shared-destination', ['pickupAssignment' => $pickupAssignment]),
+            'can_receive'     => true,
+            'can_auto_group'  => $this->canAutoGroupByPhoneDuringReceiving($pickupAssignment, $pickupAssignment->shipment),
+            'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($pickupAssignment, $pickupAssignment->shipment),
+            'shipment'        => $this->serializeReceiptShipment($pickupAssignment->shipment),
             'receipt'         => $receipt ? [
                 'id'               => $receipt->id,
                 'status'           => $receipt->status,
@@ -437,7 +704,7 @@ class ReceiptController extends Controller
                         'created_at' => optional($photo->created_at)?->toIso8601String(),
                     ])->values();
 
-                $vendorPhotos    = $item->images->map(fn ($image) => $image->getSignedUrl()['url'] ?? null)->filter()->values();
+                $vendorPhotos    = $this->serializeVendorPackagePhotos($item);
                 $vendorQuantity  = (int) $item->quantity;
                 $driverQuantity  = $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : null;
                 $expectedQuantity = $driverQuantity ?? $vendorQuantity;
@@ -447,7 +714,11 @@ class ReceiptController extends Controller
                     'shipment_item_id'            => $item->id,
                     'description'                 => $item->description,
                     'tracking_code'               => $item->tracking_code,
+                    'delivery_recipient_name'     => $item->delivery_recipient_name ?: $item->shipment?->delivery_recipient_name,
+                    'delivery_recipient_phone'    => $item->delivery_recipient_phone ?: $item->shipment?->delivery_recipient_phone,
+                    'delivery_town'               => $item->delivery_town ?: $item->shipment?->delivery_town,
                     'delivery_preference'         => $item->delivery_preference ?? $item->shipment?->delivery_preference ?? 'deliver',
+                    'delivery_method'             => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
                     'fulfillment_type'            => $item->fulfillment_type?->value ?? $item->shipment?->fulfillment_type?->value ?? 'warehouse',
                     'vendor_quantity'             => $vendorQuantity,
                     'driver_confirmed_quantity'   => $driverQuantity,
@@ -466,6 +737,8 @@ class ReceiptController extends Controller
                     'photos'                      => $receiptItem
                         ? $this->warehouseReceivingService->serializeReceiptItem($receiptItem)['photos']
                         : [],
+                    'can_split'                   => $this->canSplitPackageDuringReceiving($pickupAssignment, $receiptItem, $pickupAssignment->shipment),
+                    'split_lock_reason'           => $this->receivingSplitLockReason($pickupAssignment, $receiptItem, $pickupAssignment->shipment),
                 ];
             })->values() ?? [],
         ];
@@ -605,6 +878,154 @@ class ReceiptController extends Controller
         });
     }
 
+    private function scopedReceivingShipment(PickupAssignment $pickupAssignment): array
+    {
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+
+        if ((int) $pickupAssignment->target_warehouse_id !== (int) $warehouse->id) {
+            abort(404);
+        }
+
+        $shipment = $this->reloadReceivingShipment($pickupAssignment->shipment);
+        if (! $shipment || (int) ($shipment->pickupAssignment?->id ?? 0) !== (int) $pickupAssignment->id) {
+            abort(404);
+        }
+
+        return [$warehouse, $shipment];
+    }
+
+    private function warehouseReceivingPayload(PickupAssignment $pickupAssignment, Warehouse $warehouse): array
+    {
+        $pickupAssignment->load([
+            'shipment.deliveryRegion:id,name',
+            'shipment.deliveryDistrict:id,name',
+            'shipment.items.images',
+            'shipment.items.deliveryRegion:id,name',
+            'shipment.items.deliveryDistrict:id,name',
+            'photos:id,pickup_assignment_id,shipment_item_id,path,type,created_at',
+            'itemConfirmations:id,pickup_assignment_id,shipment_item_id,expected_quantity,confirmed_quantity,notes,confirmed_at',
+            'warehouseReceipt.items.photos',
+        ]);
+
+        $receipt = $this->portalService->receiptForAssignment($pickupAssignment, $warehouse);
+        $shipment = $pickupAssignment->shipment;
+
+        return [
+            'shipment' => $this->serializeReceiptShipment($shipment),
+            'items' => $this->serializeReceiptItems($pickupAssignment, $shipment, $receipt),
+            'receipt' => $receipt ? [
+                'id' => $receipt->id,
+                'status' => $receipt->status,
+                'status_label' => $this->receiptStatusLabel($receipt->status),
+                'has_discrepancies' => $receipt->items->contains(fn ($item) => $item->discrepancy_type !== 'none'),
+            ] : null,
+            'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($pickupAssignment, $shipment),
+            'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($pickupAssignment, $shipment),
+        ];
+    }
+
+    private function serializeReceiptShipment(?Shipment $shipment): ?array
+    {
+        if (! $shipment) {
+            return null;
+        }
+
+        return [
+            'id' => $shipment->id,
+            'destination_mode' => $shipment->destination_mode?->value ?? (string) $shipment->destination_mode,
+            'pickup_town' => $shipment->pickup_town,
+            'pickup_landmark' => $shipment->pickup_landmark,
+            'pickup_gh_post_address' => $shipment->pickup_gh_post_address,
+            'pickup_instructions' => $shipment->pickup_instructions,
+            'pickup_latitude' => $shipment->pickup_latitude,
+            'pickup_longitude' => $shipment->pickup_longitude,
+            'pickup_region' => $shipment->pickupRegion ? ['id' => $shipment->pickupRegion->id, 'name' => $shipment->pickupRegion->name] : null,
+            'pickup_district' => $shipment->pickupDistrict ? ['id' => $shipment->pickupDistrict->id, 'name' => $shipment->pickupDistrict->name] : null,
+            'delivery_recipient_name' => $shipment->delivery_recipient_name,
+            'delivery_recipient_phone' => $shipment->delivery_recipient_phone,
+            'delivery_region_id' => $shipment->delivery_region_id,
+            'delivery_district_id' => $shipment->delivery_district_id,
+            'delivery_town' => $shipment->delivery_town,
+            'delivery_landmark' => $shipment->delivery_landmark,
+            'delivery_instructions' => $shipment->delivery_instructions,
+            'delivery_region_name' => $shipment->deliveryRegion?->name,
+            'delivery_district_name' => $shipment->deliveryDistrict?->name,
+        ];
+    }
+
+    private function serializeReceiptItems(PickupAssignment $pickupAssignment, Shipment $shipment, ?WarehouseReceipt $receipt): array
+    {
+        $pickupAssignment->loadMissing([
+            'photos:id,pickup_assignment_id,shipment_item_id,path,type,created_at',
+            'itemConfirmations:id,pickup_assignment_id,shipment_item_id,expected_quantity,confirmed_quantity,notes,confirmed_at',
+        ]);
+
+        return $shipment->items->map(function (ShipmentItem $item) use ($pickupAssignment, $receipt, $shipment) {
+            $receiptItem = $receipt?->items?->firstWhere('shipment_item_id', $item->id);
+            $driverConfirmation = $pickupAssignment->itemConfirmations->firstWhere('shipment_item_id', $item->id);
+            $driverPhotos = $pickupAssignment->photos
+                ->where('shipment_item_id', $item->id)
+                ->values()
+                ->map(fn ($photo) => [
+                    'id' => $photo->id,
+                    'type' => $photo->type,
+                    'url' => $this->storageService->getUrl($photo->path),
+                    'created_at' => optional($photo->created_at)?->toIso8601String(),
+                ])->values();
+
+            $vendorPhotos = $this->serializeVendorPackagePhotos($item);
+
+            $vendorQuantity = (int) $item->quantity;
+            $driverQuantity = $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : null;
+            $expectedQuantity = $driverQuantity ?? $vendorQuantity;
+
+            return [
+                'shipment_item_id' => $item->id,
+                'description' => $item->description,
+                'tracking_code' => $item->tracking_code,
+                'delivery_recipient_name' => $item->delivery_recipient_name ?: $shipment->delivery_recipient_name,
+                'delivery_recipient_phone' => $item->delivery_recipient_phone ?: $shipment->delivery_recipient_phone,
+                'delivery_town' => $item->delivery_town ?: $shipment->delivery_town,
+                'delivery_preference' => $item->delivery_preference ?? $shipment->delivery_preference ?? 'deliver',
+                'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
+                'fulfillment_type' => $item->fulfillment_type?->value ?? $shipment->fulfillment_type?->value ?? 'warehouse',
+                'vendor_quantity' => $vendorQuantity,
+                'driver_confirmed_quantity' => $driverQuantity,
+                'driver_qty_matches_vendor' => $driverQuantity !== null ? $driverQuantity === $vendorQuantity : null,
+                'vendor_photos' => $vendorPhotos,
+                'driver_photos' => $driverPhotos,
+                'expected_quantity' => $expectedQuantity,
+                'expected_source' => $driverQuantity !== null ? 'driver' : 'vendor_fallback',
+                'received_quantity' => (int) ($receiptItem?->received_quantity ?? 0),
+                'damaged_quantity' => (int) ($receiptItem?->damaged_quantity ?? 0),
+                'discrepancy_type' => $receiptItem?->discrepancy_type ?? 'none',
+                'condition_status' => $receiptItem?->condition_status ?? 'ok',
+                'notes' => $receiptItem?->notes,
+                'barcode_value' => $receiptItem?->barcode_value,
+                'barcode_print_count' => (int) ($receiptItem?->barcode_print_count ?? 0),
+                'photos' => $receiptItem
+                    ? $this->warehouseReceivingService->serializeReceiptItem($receiptItem)['photos']
+                    : [],
+                'can_split' => $this->canSplitPackageDuringReceiving($pickupAssignment, $receiptItem, $shipment),
+                'split_lock_reason' => $this->receivingSplitLockReason($pickupAssignment, $receiptItem, $shipment),
+            ];
+        })->values()->all();
+    }
+
+    private function serializeVendorPackagePhotos(ShipmentItem $item): array
+    {
+        return $item->images
+            ->map(fn ($image) => [
+                'id' => $image->id,
+                'url' => $image->getSignedUrl()['url'] ?? null,
+                'original_name' => $image->original_name,
+                'recipient_phone' => $image->recipient_phone,
+            ])
+            ->filter(fn ($photo) => ! empty($photo['url']))
+            ->values()
+            ->all();
+    }
+
     public function receivedItemsIndex(): View
     {
         $this->authorizePermission('warehouse.items.scan');
@@ -735,7 +1156,7 @@ class ReceiptController extends Controller
         ]);
     }
 
-    private function authorizePermission(string $permission): void
+    protected function authorizePermission(string $permission): void
     {
         $user = Auth::guard('admin')->user();
         if (!$user || !$user->hasPermission($permission)) {

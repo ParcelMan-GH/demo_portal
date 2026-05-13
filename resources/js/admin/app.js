@@ -4,6 +4,8 @@
  */
 
 import Alpine from 'alpinejs';
+import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/browser';
+import { DecodeHintType } from '@zxing/library';
 import { initAdminUtils } from './core/admin-utils.js';
 import { initAdminLayout } from './modules/layout/index.js';
 
@@ -23,6 +25,11 @@ import '../warehouse/modules/manifests/incoming.js';
 import '../warehouse/modules/manifests/incoming-show.js';
 
 window.Alpine = Alpine;
+window.ZXingBrowser = {
+    BrowserMultiFormatReader,
+    BarcodeFormat,
+    DecodeHintType,
+};
 initAdminUtils();
 initAdminLayout();
 Alpine.start();

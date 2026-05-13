@@ -35,6 +35,7 @@ class WarehouseDeliveryService
         private SmsService $smsService,
         private \App\Services\VendorCommissionService $commissionService,
         private ChargesService $chargesService,
+        private ?RecipientPaymentService $recipientPaymentService = null,
     ) {
     }
 
@@ -44,7 +45,7 @@ class WarehouseDeliveryService
             ->with([
                 'warehouse:id,name,code',
                 'assignedDriver:id,name,phone,vehicle_type,vehicle_number',
-                'stops:id,delivery_run_id,status,total_packages,recipient_name,recipient_phone,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts',
+                'stops:id,delivery_run_id,status,total_packages,recipient_name,recipient_phone,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped',
                 'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status',
             ])
             ->where('warehouse_id', $warehouse->id);
@@ -229,6 +230,15 @@ class WarehouseDeliveryService
             ];
         }
 
+        $paymentBlock = $this->recipientPaymentService()->blockingSummaryForLocalDeliveryItems($warehouse, $shipmentItems);
+        if ($paymentBlock['blocked']) {
+            return [
+                'success' => false,
+                'message' => 'Recipient delivery fees must be paid, waived, or overridden before creating this delivery run.',
+                'data' => ['recipient_payment_blockers' => $paymentBlock['items']],
+            ];
+        }
+
         return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems, $claimedLabelIds, $allocatedQuantitiesByItemId) {
             $run = DeliveryRun::query()->create([
                 'run_number' => $this->generateRunNumber($warehouse),
@@ -358,6 +368,15 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Delivery run already exists for this batch.'];
         }
 
+        $paymentBlock = $this->recipientPaymentService()->blockingSummaryForBatch($batch);
+        if ($paymentBlock['blocked']) {
+            return [
+                'success' => false,
+                'message' => 'Recipient delivery fees must be paid, waived, or overridden before creating this delivery run.',
+                'data' => ['recipient_payment_blockers' => $paymentBlock['items']],
+            ];
+        }
+
         return DB::transaction(function () use ($batch, $warehouse, $user) {
             $batch = SortBatch::query()
                 ->with(['activeItems.shipmentItem.shipment'])
@@ -452,6 +471,11 @@ class WarehouseDeliveryService
                 ],
             ];
         });
+    }
+
+    private function recipientPaymentService(): RecipientPaymentService
+    {
+        return $this->recipientPaymentService ??= app(RecipientPaymentService::class);
     }
 
     public function assignDriver(DeliveryRun $run, Driver $driver, Warehouse $warehouse): array

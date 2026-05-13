@@ -359,7 +359,13 @@
 
                             <template x-for="manifest in manifests" :key="manifest.id">
                                 <tr class="hover:bg-slate-50/70">
-                                    <td x-show="visibleColumns.manifest_number" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="manifest.manifest_number"></td>
+                                    <td x-show="visibleColumns.manifest_number" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold">
+                                        <a
+                                            :href="'{{ route('admin.transport-manifests.show', ['manifest' => '__ID__']) }}'.replace('__ID__', manifest.id)"
+                                            class="text-slate-900 hover:underline"
+                                            x-text="manifest.manifest_number"
+                                        ></a>
+                                    </td>
                                     <td x-show="visibleColumns.route" class="px-4 py-2.5 whitespace-nowrap">
                                         <div class="flex items-center gap-1.5 text-xs">
                                             <span class="font-semibold text-slate-900" x-text="manifest.origin_warehouse || '—'"></span>
@@ -408,6 +414,16 @@
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                                 </svg>
                                             </a>
+                                            <button
+                                                type="button"
+                                                x-show="manifest.can_delete"
+                                                @@click="confirmDeleteManifest(manifest)"
+                                                class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                                title="Delete manifest">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6"/>
+                                                </svg>
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -517,11 +533,13 @@
         </div>
     </div>
 
-    <div
-        x-show="createManifestModalOpen"
-        x-cloak
-        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
-    >
+    <template x-teleport="body">
+        <div
+            x-show="createManifestModalOpen"
+            x-cloak
+            class="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+            style="display: none;"
+        >
         <div
             @@click.outside="createManifestModalOpen = false"
             x-transition
@@ -576,7 +594,40 @@
                 </button>
             </div>
         </div>
-    </div>
+        </div>
+    </template>
+
+    <template x-teleport="body">
+        <div
+            x-show="confirmModalOpen"
+            x-cloak
+            class="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+            style="display: none;"
+            @@keydown.escape.window="confirmModalOpen = false"
+        >
+            <div class="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl" @@click.outside="confirmModalOpen = false">
+                <div class="px-6 py-5">
+                    <div class="flex items-start gap-4">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m0 3.75h.008M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            </svg>
+                        </div>
+                        <div class="min-w-0">
+                            <h3 class="text-base font-bold text-slate-900">Delete Transport Manifest</h3>
+                            <p class="mt-1 text-sm leading-6 text-slate-600">
+                                This removes <span class="font-semibold text-slate-900" x-text="deleteTarget?.manifest_number || 'this manifest'"></span>. Only draft manifests with no loading or receiving activity can be deleted.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                    <button type="button" @@click="confirmModalOpen = false" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                    <button type="button" @@click="deleteManifest()" class="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-700">Delete Manifest</button>
+                </div>
+            </div>
+        </div>
+    </template>
 </div>
 
 @endsection
@@ -589,6 +640,8 @@ document.addEventListener('alpine:init', () => {
         loading: false,
         actionLoading: false,
         createManifestModalOpen: false,
+        confirmModalOpen: false,
+        deleteTarget: null,
         createManifestForm: {
             sort_batch_id: '',
         },
@@ -648,6 +701,11 @@ document.addEventListener('alpine:init', () => {
             this.createManifestModalOpen = true;
         },
 
+        confirmDeleteManifest(manifest) {
+            this.deleteTarget = manifest;
+            this.confirmModalOpen = true;
+        },
+
         async submitCreateManifest() {
             if (!this.createManifestForm.sort_batch_id || this.actionLoading) return;
 
@@ -682,6 +740,37 @@ document.addEventListener('alpine:init', () => {
             } catch (err) {
                 console.error(err);
                 window.showToast?.(err.message || 'Unable to create manifest.', 'error');
+            } finally {
+                this.actionLoading = false;
+            }
+        },
+
+        async deleteManifest() {
+            if (!this.deleteTarget?.id || this.actionLoading) return;
+
+            this.actionLoading = true;
+            try {
+                const endpoint = '{{ route('admin.transport-manifests.destroy', ['manifest' => '__ID__']) }}'.replace('__ID__', this.deleteTarget.id);
+                const response = await fetch(endpoint, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': this.csrfToken(),
+                    },
+                });
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || 'Failed to delete transport manifest.');
+                }
+
+                window.showToast?.(result.message || 'Transport manifest deleted.', 'success');
+                this.confirmModalOpen = false;
+                this.deleteTarget = null;
+                await this.loadData();
+            } catch (err) {
+                console.error(err);
+                window.showToast?.(err.message || 'Unable to delete manifest.', 'error');
             } finally {
                 this.actionLoading = false;
             }

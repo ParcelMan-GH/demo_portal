@@ -25,6 +25,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
         'is_active',
         'last_login_at',
@@ -104,6 +105,11 @@ class User extends Authenticatable
     public function auditLogs(): HasMany
     {
         return $this->hasMany(AdminAuditLog::class);
+    }
+
+    public function paymentWallets(): BelongsToMany
+    {
+        return $this->belongsToMany(PaymentWallet::class, 'payment_wallet_user')->withTimestamps();
     }
 
     // =====================

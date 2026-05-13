@@ -124,6 +124,12 @@
                                 </div>
                                 <div class="flex items-center gap-1.5 text-slate-300">
                                     <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h2.28a1 1 0 01.95.68l1.08 3.24a1 1 0 01-.27 1.05l-1.46 1.46a12.04 12.04 0 005.99 5.99l1.46-1.46a1 1 0 011.05-.27l3.24 1.08a1 1 0 01.68.95V19a2 2 0 01-2 2h-1C10.37 21 3 13.63 3 5z"/>
+                                    </svg>
+                                    <span class="truncate">{{ $admin->phone ?: 'No phone set' }}</span>
+                                </div>
+                                <div class="flex items-center gap-1.5 text-slate-300">
+                                    <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                     </svg>
                                     <span>Created by {{ $admin->creator?->name ?? 'System' }}</span>

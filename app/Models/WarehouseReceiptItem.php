@@ -72,4 +72,3 @@ class WarehouseReceiptItem extends Model
         return $this->hasMany(SortBatchItem::class)->whereNull('removed_at');
     }
 }
-

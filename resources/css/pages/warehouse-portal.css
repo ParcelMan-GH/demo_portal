@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 
 @source '../../views/warehouse/**/*.blade.php';
+@source '../../views/admin/sort-batches/*.blade.php';
+@source '../../views/admin/sort-batches/**/*.blade.php';
 @source '../../js/warehouse/**/*.js';
 @source '../../js/admin/core/toast.js';
 
@@ -17,35 +19,89 @@ body {
     font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
+:where(a[href], button:not(:disabled), [role="button"]:not([aria-disabled="true"]), [onclick], [x-on\:click], [\@click], [wire\:click], [data-action], [data-clickable], [data-bs-toggle], [data-toggle], [data-modal-target], [data-dropdown-toggle], summary, label[for], select:not(:disabled), input[type="button"]:not(:disabled), input[type="submit"]:not(:disabled), input[type="reset"]:not(:disabled), input[type="checkbox"]:not(:disabled), input[type="radio"]:not(:disabled), input[type="file"]:not(:disabled), .cursor-pointer) {
+    cursor: pointer;
+}
+
+:where(button:disabled, select:disabled, input:disabled, textarea:disabled, [aria-disabled="true"], .cursor-not-allowed) {
+    cursor: not-allowed;
+}
+
 @media (min-width: 1024px) {
     body.warehouse-portal {
-        zoom: 0.9;
+        zoom: 1;
     }
 }
 
 @supports not (zoom: 1) {
     body.warehouse-portal {
-        font-size: 14px;
+        font-size: 16px;
+    }
+}
+
+.rp-report-filters,
+.rp-report-filters * {
+    box-sizing: border-box;
+}
+
+.rp-report-filters > .grid > div,
+.rp-report-filters .relative {
+    min-width: 0;
+}
+
+.rp-report-filters input,
+.rp-report-filters select {
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (max-width: 480px) {
+    .rp-report-filters .rp-report-date-control {
+        font-size: 0.82rem;
+        letter-spacing: -0.01em;
+        padding-left: 2.35rem;
+        padding-right: 0.5rem;
     }
 }
 
 /* ===================== Sidebar ===================== */
 
 .wh-sidebar {
-    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    background: linear-gradient(180deg, #0f172a 0%, #1f2937 48%, #111827 100%);
     border-right: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 4px 0 32px -4px rgba(0, 0, 0, 0.3);
+    box-shadow:
+        4px 0 32px -4px rgba(0, 0, 0, 0.32),
+        1px 0 0 rgba(255, 255, 255, 0.04) inset;
+    overflow: hidden;
 }
 
-/* Subtle dot texture */
 .wh-sidebar::before {
+    display: none;
+}
+
+.wh-sidebar::after {
     content: '';
     position: absolute;
     inset: 0;
-    opacity: 0.03;
-    background-image: radial-gradient(circle, #fff 1px, transparent 1px);
-    background-size: 22px 22px;
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.12) 0%, transparent 32%, rgba(2, 6, 23, 0.18) 100%);
     pointer-events: none;
+}
+
+.wh-sidebar > * {
+    position: relative;
+    z-index: 1;
+}
+
+.wh-logo-mark {
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(255, 237, 213, 0.78);
+    box-shadow:
+        0 12px 24px rgba(2, 6, 23, 0.34),
+        0 1px 0 rgba(255, 255, 255, 0.9) inset;
+}
+
+.wh-brand-kicker {
+    color: rgba(251, 146, 60, 0.82);
 }
 
 /* Hidden scrollbar */
@@ -64,8 +120,10 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
+    width: 27px;
+    height: 27px;
+    border-radius: 7px;
+    transition: all 0.2s ease;
     flex-shrink: 0;
 }
 .wh-nav-icon svg {
@@ -90,7 +148,7 @@ body {
     font-size: 0.75rem;
     font-weight: 600;
     color: #fff;
-    background: #0f172a;
+    background: #111827;
     border-radius: 8px;
     white-space: nowrap;
     pointer-events: none;
@@ -106,7 +164,7 @@ body {
     top: 50%;
     transform: translateY(-50%);
     border: 5px solid transparent;
-    border-right-color: #0f172a;
+    border-right-color: #111827;
 }
 .wh-nav-link:hover .wh-tooltip {
     opacity: 1;
@@ -116,37 +174,59 @@ body {
 .wh-nav-section-label {
     display: block;
     padding: 0 0.75rem;
-    margin-bottom: 0.375rem;
+    margin-bottom: 0.25rem;
     font-size: 0.625rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: rgba(148, 163, 184, 0.5);
+    color: rgba(148, 163, 184, 0.72);
 }
 
 /* Nav links */
 .wh-nav-link {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.625rem;
-    padding: 0.55rem 0.75rem;
-    border-radius: 10px;
-    color: rgba(148, 163, 184, 0.8);
+    padding: 0.375rem 0.75rem;
+    border-radius: 8px;
+    color: rgba(203, 213, 225, 0.86);
     font-size: 0.8125rem;
-    font-weight: 500;
+    font-weight: 600;
+    margin-bottom: 1px;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     text-decoration: none;
 }
 .wh-nav-link:hover {
-    color: rgba(255, 255, 255, 0.95);
-    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    background: rgba(255, 255, 255, 0.07);
+}
+.wh-nav-link:hover .wh-nav-icon {
+    background: rgba(255, 255, 255, 0.1);
 }
 .wh-nav-link.active {
-    color: #fb923c;
-    background: rgba(251, 146, 60, 0.1);
+    color: #fff;
+    background: linear-gradient(90deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.05) 100%);
+}
+.wh-nav-link.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 22px;
+    background: linear-gradient(180deg, #fdba74 0%, #f97316 100%);
+    border-radius: 0 4px 4px 0;
+    box-shadow: 0 0 14px rgba(249, 115, 22, 0.52), 0 0 4px rgba(249, 115, 22, 0.28);
+}
+.wh-nav-link.active .wh-nav-icon {
+    background: rgba(251, 146, 60, 0.22);
+    color: #fdba74;
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.14);
 }
 .wh-nav-link.active .wh-nav-icon svg {
-    color: #fb923c;
+    color: #fdba74;
 }
 
 /* ===================== Header ===================== */

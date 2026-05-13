@@ -27,6 +27,7 @@
         $canTransportAssign = $authUser?->hasPermission('warehouse.transport.assign');
         $canDeliveryAssign = $authUser?->hasPermission('warehouse.delivery.assign');
         $canContacts = $authUser?->hasPermission('warehouse.contacts.manage');
+        $canRecipientPayments = $authUser?->hasPermission('warehouse.recipient_payments.view');
     @endphp
 
     <div class="min-h-screen flex">
@@ -39,13 +40,13 @@
             ]"
         >
             {{-- Logo Area --}}
-            <div class="flex items-center h-[72px] transition-all duration-300" :class="sidebarCollapsed ? 'px-3.5 justify-center' : 'px-5'">
-                <div class="flex-shrink-0 rounded-xl bg-white shadow-sm overflow-hidden flex items-center justify-center" style="width:44px;height:44px;">
+            <div class="flex items-center h-[60px] transition-all duration-300" :class="sidebarCollapsed ? 'px-4 justify-center' : 'px-5'">
+                <div class="wh-logo-mark flex-shrink-0 rounded-lg overflow-hidden flex items-center justify-center" style="width:38px;height:38px;">
                     <img src="{{ asset('logo.png') }}" alt="Parcelman" style="transform:scale(1.8);transform-origin:center 40%;">
                 </div>
                 <div class="ml-3 min-w-0 overflow-hidden transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'w-auto opacity-100'">
-                    <span class="text-white text-[15px] font-extrabold tracking-tight block whitespace-nowrap">Parcelman Express</span>
-                    <span class="block text-[10px] font-semibold uppercase tracking-[0.15em] whitespace-nowrap text-orange-400/60">Warehouse Portal</span>
+                    <span class="text-white text-[16px] font-extrabold tracking-tight block whitespace-nowrap">Parcelman</span>
+                    <span class="wh-brand-kicker block max-w-[190px] truncate text-[10px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap" title="{{ $warehouse?->name ?? 'Warehouse' }}">{{ $warehouse?->name ?? 'Warehouse' }}</span>
                 </div>
             </div>
 
@@ -53,7 +54,7 @@
             <div class="h-px transition-all duration-300" :class="sidebarCollapsed ? 'mx-3' : 'mx-5'" style="background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);"></div>
 
             {{-- Navigation --}}
-            <nav class="flex-1 overflow-y-auto warehouse-sidebar-scroll pt-4 pb-6 transition-all duration-300" :class="sidebarCollapsed ? 'px-2' : 'px-4'">
+            <nav class="flex-1 overflow-y-auto warehouse-sidebar-scroll py-4 transition-all duration-300" :class="sidebarCollapsed ? 'px-3' : 'px-3'">
 
                 @php
                     // Helper: build dynamic classes for nav links
@@ -70,8 +71,8 @@
                 @endif
 
                 {{-- ═══════════ OPERATIONS ═══════════ --}}
-                @if($canReceiving || $canItems || $canSorting || $canContacts)
-                <div class="wh-nav-section-label mt-6" x-show="!sidebarCollapsed">Operations</div>
+                @if($canReceiving || $canItems || $canSorting || $canContacts || $canRecipientPayments)
+                <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">Operations</div>
                 <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
 
                 @if($canReceiving)
@@ -82,8 +83,8 @@
                 </a>
                 <a href="{{ route('warehouse.receipts.pending.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.receipts.pending.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                     <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Pending Receipts</span>
-                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Pending Receipts</span></template>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Incoming Packages</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Incoming Packages</span></template>
                 </a>
                 <a href="{{ route('warehouse.pickups.received.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.pickups.received.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                     <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
@@ -92,10 +93,10 @@
                 </a>
                 @endif
                 @if($canItems)
-                <a href="{{ route('warehouse.items.received.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.items.received.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                <a href="{{ route('warehouse.packages.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.packages.*') || request()->routeIs('warehouse.items.received.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                     <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></div>
-                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Received Items</span>
-                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Received Items</span></template>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Warehouse Packages</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Warehouse Packages</span></template>
                 </a>
                 @endif
                 @if($canSorting)
@@ -112,11 +113,18 @@
                     <template x-if="sidebarCollapsed"><span class="wh-tooltip">Contact Queue</span></template>
                 </a>
                 @endif
+                @if($canRecipientPayments)
+                <a href="{{ route('warehouse.recipient-payments.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.recipient-payments.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a5 5 0 00-10 0v2M5 9h14l-1 11H6L5 9zm5 4h4"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Recipient Payments</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Recipient Payments</span></template>
+                </a>
+                @endif
                 @endif
 
                 {{-- ═══════════ TRANSPORT ═══════════ --}}
                 @if($canManifest || $canTransportAssign)
-                <div class="wh-nav-section-label mt-6" x-show="!sidebarCollapsed">Transport</div>
+                <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">Transport</div>
                 <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
 
                 <a href="{{ route('warehouse.manifests.transport.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.manifests.transport.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
@@ -133,7 +141,7 @@
 
                 {{-- ═══════════ DELIVERY ═══════════ --}}
                 @if($canDeliveryAssign || $canReceiving)
-                <div class="wh-nav-section-label mt-6" x-show="!sidebarCollapsed">Delivery</div>
+                <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">Delivery</div>
                 <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
 
                 @if($canDeliveryAssign)
@@ -159,7 +167,7 @@
 
                 {{-- ═══════════ SYSTEM ═══════════ --}}
                 @if($canUsers)
-                <div class="wh-nav-section-label mt-6" x-show="!sidebarCollapsed">System</div>
+                <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">System</div>
                 <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
 
                 <a href="{{ route('warehouse.users.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.users.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
@@ -358,7 +366,7 @@
     </div>
 
     <div id="admin-toast-container"
-         class="fixed top-5 right-5 z-[120] flex w-full max-w-sm flex-col gap-3 pointer-events-none"
+         class="fixed top-5 right-5 z-[9999] flex w-full max-w-sm flex-col gap-3 pointer-events-none"
          data-flash-success="{{ session('success') }}"
          data-flash-error="{{ session('error') }}"></div>
     @stack('scripts')

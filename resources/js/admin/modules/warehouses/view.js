@@ -22,6 +22,7 @@ function warehouseUsersTable(config) {
         userForm: {
             name: '',
             email: '',
+            phone: '',
             password: '',
             password_confirmation: '',
             role_id: null,
@@ -48,6 +49,7 @@ function warehouseUsersTable(config) {
             name: true,
             role: true,
             email: true,
+            phone: true,
             status: true,
             created_at: true,
             last_login_at: true,
@@ -57,6 +59,7 @@ function warehouseUsersTable(config) {
             { key: 'name', label: 'Name' },
             { key: 'role', label: 'Role' },
             { key: 'email', label: 'Email' },
+            { key: 'phone', label: 'Phone' },
             { key: 'status', label: 'Status' },
             { key: 'created_at', label: 'Created At' },
             { key: 'last_login_at', label: 'Last Login' },
@@ -96,6 +99,7 @@ function warehouseUsersTable(config) {
             this.userForm = {
                 name: '',
                 email: '',
+                phone: '',
                 password: '',
                 password_confirmation: '',
                 role_id: null,
@@ -114,6 +118,7 @@ function warehouseUsersTable(config) {
             this.userForm = {
                 name: user.name || '',
                 email: user.email || '',
+                phone: user.phone || '',
                 password: '',
                 password_confirmation: '',
                 role_id: Array.isArray(user.roles) && user.roles.length ? Number(user.roles[0].id) : null,
@@ -148,6 +153,7 @@ function warehouseUsersTable(config) {
             const payload = {
                 name: this.userForm.name,
                 email: this.userForm.email,
+                phone: this.userForm.phone,
                 role_id: this.userForm.role_id,
                 warehouse_id: this.warehouseId,
             };
@@ -375,7 +381,7 @@ function warehouseUsersTable(config) {
             }
 
             const doc = printWindow.document;
-            const headers = ['Name', 'Role', 'Email', 'Status', 'Created At', 'Last Login'];
+            const headers = ['Name', 'Role', 'Email', 'Phone', 'Status', 'Created At', 'Last Login'];
 
             if (!doc.documentElement) doc.appendChild(doc.createElement('html'));
             if (!doc.head) doc.documentElement.appendChild(doc.createElement('head'));
@@ -418,6 +424,7 @@ function warehouseUsersTable(config) {
                     row.name ?? '-',
                     roleName,
                     row.email ?? '-',
+                    row.phone ?? '-',
                     row.is_active ? 'Active' : 'Inactive',
                     row.created_at ?? '-',
                     row.last_login_at ?? '-',

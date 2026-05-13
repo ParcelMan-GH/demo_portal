@@ -73,6 +73,19 @@
                     <p x-show="formErrors.email" x-text="formErrors.email" class="mt-1 text-xs text-red-500"></p>
                 </div>
 
+                <!-- Phone -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                        Phone Number <span class="text-red-500">*</span>
+                    </label>
+                    <input type="tel"
+                           x-model="formData.phone"
+                           class="w-full px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                           :class="formErrors.phone ? 'border-red-300 focus:ring-red-400/50' : ''"
+                           placeholder="0241234567">
+                    <p x-show="formErrors.phone" x-text="formErrors.phone" class="mt-1 text-xs text-red-500"></p>
+                </div>
+
                 <!-- Role -->
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-2">Assign Role</label>

@@ -7,13 +7,16 @@ use App\Http\Controllers\Controller;
 use App\Models\ShipmentItem;
 use App\Models\SortBatch;
 use App\Models\Warehouse;
+use App\Services\Warehouse\RecipientPaymentService;
 use App\Services\Warehouse\WarehouseDeliveryService;
 use App\Services\Warehouse\WarehouseSortingService;
+use App\Services\Warehouse\WarehouseTransportService;
 use App\Support\GenericPdfExporter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -22,6 +25,8 @@ class AdminSortBatchController extends Controller
     public function __construct(
         private WarehouseSortingService $sortingService,
         private WarehouseDeliveryService $deliveryService,
+        private WarehouseTransportService $transportService,
+        private RecipientPaymentService $recipientPaymentService,
     ) {
     }
 
@@ -114,6 +119,7 @@ class AdminSortBatchController extends Controller
                     'run_number'             => $batch->deliveryRun?->run_number,
                     'run_status'             => $batch->deliveryRun?->status,
                     'run_id'                 => $batch->deliveryRun?->id,
+                    'can_delete'             => $this->sortingService->deleteState($batch)['deletable'],
                 ];
             }),
             'meta' => [
@@ -174,7 +180,7 @@ class AdminSortBatchController extends Controller
         return response()->json(['data' => $rows]);
     }
 
-    public function show(SortBatch $batch): View
+    public function show(Request $request, SortBatch $batch): View
     {
         $batch->load([
             'originWarehouse',
@@ -187,13 +193,56 @@ class AdminSortBatchController extends Controller
 
         $batch->loadCount('activeItems');
 
-        return view('admin.sort-batches.show', compact('batch'));
+        $deleteState = $this->sortingService->deleteState($batch);
+        $recipientPaymentSummary = $this->recipientPaymentService->summaryForBatch($batch);
+        $initialEligibleItems = collect();
+        $initialEligibleMeta = [
+            'total' => 0,
+            'per_page' => 25,
+            'current_page' => 1,
+            'last_page' => 1,
+            'from' => 0,
+            'to' => 0,
+        ];
+
+        if ($batch->status === SortBatch::STATUS_OPEN) {
+            $warehouse = Warehouse::findOrFail((int) $batch->origin_warehouse_id);
+            $eligibleQuery = $this->sortingService->eligibleItemsQuery($warehouse)->latest('id');
+            $total = $eligibleQuery->count();
+            $rows = $eligibleQuery->take(25)->get();
+            $initialEligibleItems = $this->sortingService->mapEligibleItems($rows);
+            $initialEligibleMeta = [
+                'total' => $total,
+                'per_page' => 25,
+                'current_page' => 1,
+                'last_page' => (int) ceil($total / 25) ?: 1,
+                'from' => $total > 0 ? 1 : 0,
+                'to' => min(25, $total),
+            ];
+        }
+
+        return view('admin.sort-batches.show', compact('batch', 'deleteState', 'recipientPaymentSummary', 'initialEligibleItems', 'initialEligibleMeta'));
     }
 
     public function itemsData(Request $request, SortBatch $batch): JsonResponse
     {
+        $relations = [
+            'shipmentItem.shipment.vendor',
+            'recipientPaymentTask.assignedTo',
+            'recipientPaymentTask.shipmentCharge',
+            'addedBy',
+        ];
+
+        if (Schema::hasTable('delivery_run_items') && Schema::hasTable('delivery_runs')) {
+            $relations[] = 'shipmentItem.deliveryRunItems.run';
+        }
+
+        if (Schema::hasTable('transport_manifest_items') && Schema::hasTable('transport_manifests')) {
+            $relations[] = 'shipmentItem.transportManifestItems.manifest';
+        }
+
         $query = $batch->activeItems()
-            ->with(['shipmentItem.shipment.vendor', 'addedBy']);
+            ->with($relations);
 
         if ($search = $request->get('search')) {
             $query->whereHas('shipmentItem', function ($q) use ($search) {
@@ -212,12 +261,21 @@ class AdminSortBatchController extends Controller
         $items   = $query->latest('id')->skip(($page - 1) * $perPage)->take($perPage)->get();
 
         return response()->json([
-            'data' => $items->map(function ($item, $index) use ($page, $perPage) {
+            'data' => $items->map(function ($item, $index) use ($batch, $page, $perPage) {
                 $si = $item->shipmentItem;
+                if (!$si) {
+                    $sortability = ['eligible' => false, 'reason' => 'Package record is missing.'];
+                } elseif ($batch->isOpen()) {
+                    $sortability = $this->sortingService->sortableWarehouseItemState($si, true);
+                } else {
+                    $sortability = ['eligible' => true, 'reason' => null];
+                }
+
                 return [
                     'row_number'               => (($page - 1) * $perPage) + $index + 1,
                     'id'                       => $item->id,
                     'shipment_item_id'         => $item->shipment_item_id,
+                    'warehouse_receipt_item_id' => $item->warehouse_receipt_item_id,
                     'shipment_id'              => $si?->shipment?->id,
                     'shipment_number'          => $si?->shipment?->shipment_number,
                     'vendor_name'              => $si?->shipment?->vendor?->name,
@@ -229,6 +287,9 @@ class AdminSortBatchController extends Controller
                     'delivery_town'            => $si?->delivery_town,
                     'added_by'                 => $item->addedBy?->name,
                     'added_at'                 => $item->added_at?->format('d M Y, H:i'),
+                    'is_sortable'              => $sortability['eligible'],
+                    'sort_block_reason'        => $sortability['reason'],
+                    'recipient_payment'        => $this->mapRecipientPaymentForBatchItem($item),
                 ];
             }),
             'meta' => [
@@ -288,6 +349,21 @@ class AdminSortBatchController extends Controller
                         ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                         ->orWhere('delivery_town', 'like', "%{$search}%")
                     );
+            });
+        }
+
+        $deliveryMethod = trim((string) $request->input('delivery_method'));
+        if (in_array($deliveryMethod, ShipmentItem::DELIVERY_METHODS, true)) {
+            $query->whereHas('shipmentItem', function (Builder $q) use ($deliveryMethod) {
+                if ($deliveryMethod === ShipmentItem::DELIVERY_METHOD_DIRECT) {
+                    $q->where(function (Builder $methodQuery) {
+                        $methodQuery->where('delivery_method', ShipmentItem::DELIVERY_METHOD_DIRECT)
+                            ->orWhereNull('delivery_method');
+                    });
+                    return;
+                }
+
+                $q->where('delivery_method', $deliveryMethod);
             });
         }
 
@@ -374,6 +450,20 @@ class AdminSortBatchController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
+    public function destroy(SortBatch $batch): JsonResponse
+    {
+        $warehouse = Warehouse::findOrFail((int) $batch->origin_warehouse_id);
+        $user      = Auth::guard('admin')->user();
+
+        $result = $this->sortingService->deleteBatch(
+            batch:     $batch,
+            warehouse: $warehouse,
+            user:      $user,
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
     public function createDeliveryRun(SortBatch $batch): JsonResponse
     {
         $warehouse = Warehouse::findOrFail((int) $batch->origin_warehouse_id);
@@ -386,5 +476,51 @@ class AdminSortBatchController extends Controller
         );
 
         return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function createTransportManifest(SortBatch $batch): JsonResponse
+    {
+        $warehouse = Warehouse::findOrFail((int) $batch->origin_warehouse_id);
+        $user      = Auth::guard('admin')->user();
+
+        $result = $this->transportService->createManifest(
+            batch:     $batch,
+            warehouse: $warehouse,
+            user:      $user,
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    private function mapRecipientPaymentForBatchItem($batchItem): array
+    {
+        $task = $batchItem->recipientPaymentTask;
+        $charge = $task?->shipmentCharge;
+
+        if (!$task) {
+            return [
+                'status' => 'not_queued',
+                'label' => 'Not queued',
+                'amount' => null,
+                'assigned_to' => null,
+            ];
+        }
+
+        $status = (string) $task->status;
+        $label = match ($status) {
+            'paid' => 'Paid',
+            'waived' => 'Waived',
+            'overridden' => 'Override',
+            'assigned' => 'Assigned',
+            'in_progress' => 'In progress',
+            default => $charge ? 'Pending payment' : 'No fee set',
+        };
+
+        return [
+            'status' => $status,
+            'label' => $label,
+            'amount' => $charge ? (float) $charge->amount : ($task->negotiated_amount !== null ? (float) $task->negotiated_amount : null),
+            'assigned_to' => $task->assignedTo?->name,
+        ];
     }
 }

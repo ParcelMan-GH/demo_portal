@@ -1,552 +1,417 @@
 @extends('warehouse.layouts.app')
 
-@section('title', 'Walk-in Receiving')
+@section('title', 'Walk-in Shipment')
 
 @section('content')
-
 @php
-$walkinConfig = [
-    'vendorLookupUrl' => route('warehouse.walkin.vendor-lookup'),
-    'vendorCreateUrl' => route('warehouse.walkin.vendor-create'),
-    'storeUrl' => route('warehouse.walkin.store'),
-    'locationSearchUrl' => route('warehouse.locations.search'),
-    'warehouse' => ['id' => $warehouse->id, 'name' => $warehouse->name, 'code' => $warehouse->code],
-];
+    $walkinConfig = [
+        'vendorLookupUrl' => route('warehouse.walkin.vendor-lookup'),
+        'vendorCreateUrl' => route('warehouse.walkin.vendor-create'),
+        'storeUrl' => route('warehouse.walkin.store'),
+        'printLabelsUrl' => route('warehouse.walkin.print-labels'),
+        'locationSearchUrl' => route('warehouse.locations.search'),
+        'transferWarehouses' => $transferWarehouses,
+    ];
 @endphp
 
-<div x-data="walkinShipment()" x-init="init()" data-walkin-config='@json($walkinConfig)'>
-
-    <div class="max-w-3xl mx-auto">
-
-    <!-- Hero Banner -->
-    <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl shadow-2xl shadow-slate-900/30 mb-6">
-        <div class="relative">
-            <div class="absolute inset-0 opacity-10">
-                <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <defs><pattern id="wgrid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" stroke-width="0.5"/></pattern></defs>
-                    <rect width="100" height="100" fill="url(#wgrid)"/>
-                </svg>
-            </div>
-            <div class="relative px-6 py-5">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-4">
-                        <a href="{{ route('warehouse.dashboard') }}" class="group w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white flex items-center justify-center transition-all">
-                            <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                        </a>
-                        <div>
-                            <h1 class="text-lg font-bold text-white tracking-tight">Walk-in Receiving</h1>
-                            <p class="text-xs text-slate-400 mt-0.5">Create a shipment for a walk-in vendor</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 backdrop-blur-sm">
-                        <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                        <span class="text-[11px] font-medium text-white/80">{{ $warehouse->name }}</span>
-                    </div>
+<div x-data="walkinShipment()" x-init="init()" data-walkin-config='@json($walkinConfig)' class="mx-auto max-w-5xl space-y-5">
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="flex flex-col gap-4 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div class="flex items-center gap-3">
+                <a href="{{ route('warehouse.dashboard') }}" class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </a>
+                <div>
+                    <h1 class="text-lg font-extrabold tracking-tight text-slate-950">Walk-in Shipment</h1>
+                    <p class="mt-0.5 text-xs font-medium text-slate-500">Counter entry for packages received at {{ $warehouse->name }}.</p>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Stepper -->
-    <div class="mb-6">
-        <div class="flex items-center">
-            <template x-for="(s, idx) in stepLabels()" :key="idx">
-                <div class="flex items-center" :class="idx < stepLabels().length - 1 ? 'flex-1' : ''">
-                    <button @@click="stepMap()[idx] < step && (step = stepMap()[idx])" class="flex items-center gap-2 group" :class="stepMap()[idx] < step ? 'cursor-pointer' : 'cursor-default'">
-                        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all duration-300 border-2"
-                             :class="step > stepMap()[idx] ? 'bg-slate-800 border-slate-800 text-white shadow-md shadow-slate-800/30' : (step === stepMap()[idx] ? 'bg-orange-600 border-orange-600 text-white shadow-md shadow-orange-600/30' : 'bg-white border-slate-200 text-slate-400')">
-                            <template x-if="step > stepMap()[idx]">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                            </template>
-                            <template x-if="step <= stepMap()[idx]">
-                                <span x-text="idx + 1"></span>
-                            </template>
-                        </div>
-                        <span class="text-xs font-semibold hidden sm:inline transition-colors"
-                              :class="step === stepMap()[idx] ? 'text-orange-700' : (step > stepMap()[idx] ? 'text-slate-600' : 'text-slate-400')"
-                              x-text="s"></span>
+            <div class="flex items-center gap-1 overflow-x-auto rounded-xl bg-slate-50 p-1 text-xs font-black text-slate-500 sm:gap-2">
+                <template x-for="item in stepItems" :key="item.id">
+                    <button type="button" @@click="item.id < step && (step = item.id)"
+                            class="flex shrink-0 items-center gap-2 rounded-lg px-2 py-2 transition sm:px-3"
+                            :class="step === item.id ? 'bg-orange-600 text-white shadow-sm shadow-orange-600/20' : (item.id < step ? 'text-orange-700 hover:bg-white' : 'cursor-default text-slate-400')">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-black"
+                              :class="step === item.id ? 'bg-white text-orange-700' : (item.id < step ? 'bg-orange-100 text-orange-700' : 'bg-white text-slate-500 ring-1 ring-slate-200')"
+                              x-text="item.id"></span>
+                        <span class="whitespace-nowrap" x-text="item.label"></span>
                     </button>
-                    <template x-if="idx < stepLabels().length - 1">
-                        <div class="flex-1 h-[2px] mx-4 rounded-full transition-all duration-500" :class="step > stepMap()[idx] ? 'bg-slate-400' : 'bg-slate-200'"></div>
-                    </template>
-                </div>
-            </template>
-        </div>
-    </div>
-
-    <!-- ═══════════ STEP 1: VENDOR ═══════════ -->
-    <div x-show="step === 1" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
-        <div>
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50">
-                <div class="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
-                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5">
-                        <span class="w-8 h-8 rounded-lg bg-orange-700 text-white flex items-center justify-center text-xs font-bold">1</span>
-                        Vendor Identification
-                    </h2>
-                    <p class="text-xs text-slate-500 mt-1 ml-[42px]">Enter the vendor's phone number to look up or create their account</p>
-                </div>
-                <div class="p-6 space-y-5">
-                    <!-- Phone Lookup -->
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-2">Phone Number</label>
-                        <div class="flex gap-2.5">
-                            <div class="relative flex-1">
-                                <div class="absolute left-0 top-0 bottom-0 w-11 flex items-center justify-center bg-slate-100 border-r border-slate-200 rounded-l-xl text-slate-500">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                                </div>
-                                <input type="text" x-model="vendorPhone" placeholder="e.g. 0241234567"
-                                       @@keydown.enter.prevent="lookupVendor()"
-                                       class="w-full pl-14 pr-4 py-3 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none placeholder:text-slate-400 font-mono">
-                            </div>
-                            <button @@click="lookupVendor()" :disabled="vendorLoading || vendorPhone.length < 9"
-                                    class="px-6 py-3 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-lg hover:shadow-orange-700/25 active:scale-[0.98]">
-                                <span x-show="!vendorLoading">Search</span>
-                                <span x-show="vendorLoading" class="flex items-center gap-2">
-                                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                    Searching
-                                </span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Vendor Found -->
-                    <div x-show="vendorFound === true && vendorData" x-transition.scale.origin.top class="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-5">
-                        <div class="flex items-center gap-1.5 mb-3">
-                            <svg class="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                            <span class="text-xs font-bold text-emerald-700 uppercase tracking-wider">Vendor Found</span>
-                        </div>
-                        <div class="flex items-center gap-4 mb-4">
-                            <div class="w-12 h-12 rounded-full bg-emerald-200 flex items-center justify-center text-emerald-700 text-lg font-bold" x-text="vendorData?.name?.charAt(0)?.toUpperCase()"></div>
-                            <div>
-                                <p class="text-sm font-bold text-slate-900" x-text="vendorData?.name"></p>
-                                <p class="text-xs text-slate-500" x-text="vendorData?.business_name || 'No business name'"></p>
-                                <p class="text-xs text-slate-500 font-mono mt-0.5" x-text="vendorData?.phone"></p>
-                            </div>
-                        </div>
-                        <div class="flex gap-2.5">
-                            <button @@click="selectVendor(vendorData)" class="flex-1 py-2.5 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl transition-all shadow-sm active:scale-[0.98]">
-                                Use This Vendor
-                            </button>
-                            <button @@click="resetVendor()" class="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors">
-                                Clear
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Vendor Not Found — Create Form -->
-                    <div x-show="vendorFound === false" x-transition.scale.origin.top class="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5">
-                        <div class="flex items-center gap-2 mb-4">
-                            <div class="w-8 h-8 rounded-lg bg-amber-200 flex items-center justify-center">
-                                <svg class="w-4 h-4 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-                            </div>
-                            <div>
-                                <p class="text-sm font-bold text-amber-900">No vendor found</p>
-                                <p class="text-[11px] text-amber-700">Fill in the details below to create a new vendor account</p>
-                            </div>
-                        </div>
-                        <div class="space-y-3">
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Full Name <span class="text-red-400">*</span></label>
-                                    <input type="text" x-model="newVendor.name" placeholder="John Doe" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white">
-                                </div>
-                                <div>
-                                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Business Name</label>
-                                    <input type="text" x-model="newVendor.business_name" placeholder="Optional" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white">
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Phone <span class="text-red-400">*</span></label>
-                                    <input type="text" x-model="newVendor.phone" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-100 text-slate-500 outline-none font-mono" readonly>
-                                </div>
-                                <div>
-                                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Email</label>
-                                    <input type="email" x-model="newVendor.email" placeholder="Optional" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mt-4 flex gap-2.5">
-                            <button @@click="createVendor()" :disabled="creatingVendor || !newVendor.name"
-                                    class="flex-1 py-2.5 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm active:scale-[0.98]">
-                                <span x-show="!creatingVendor">Create Vendor & Continue</span>
-                                <span x-show="creatingVendor" class="flex items-center justify-center gap-2">
-                                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                    Creating...
-                                </span>
-                            </button>
-                            <button @@click="resetVendor()" class="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors">Cancel</button>
-                        </div>
-                        <div x-show="vendorError" x-transition class="mt-3 px-3.5 py-2.5 bg-red-100 border border-red-200 rounded-xl">
-                            <p class="text-xs text-red-700 font-medium" x-text="vendorError"></p>
-                        </div>
-                    </div>
-
-                    <!-- Vendor Selected — Proceed -->
-                    <div x-show="vendorId && step === 1" x-transition class="rounded-2xl border-2 border-orange-200 bg-gradient-to-r from-orange-50 to-indigo-50 p-5">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3.5">
-                                <div class="w-11 h-11 rounded-full bg-orange-200 flex items-center justify-center text-orange-800 text-lg font-bold" x-text="vendorData?.name?.charAt(0)?.toUpperCase()"></div>
-                                <div>
-                                    <p class="text-sm font-bold text-slate-900" x-text="vendorData?.name"></p>
-                                    <p class="text-xs text-slate-500 font-mono" x-text="vendorData?.phone"></p>
-                                </div>
-                            </div>
-                            <button @@click="step = 2" class="px-6 py-2.5 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-orange-700/25 hover:shadow-lg hover:shadow-orange-700/30 active:scale-[0.98] flex items-center gap-2">
-                                Continue
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ═══════════ STEP 2: DESTINATION MODE ═══════════ -->
-    <div x-show="step === 2" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50 p-6">
-            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5 mb-4">
-                <span class="w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-bold">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-                </span>
-                Delivery Mode
-            </h2>
-            <div class="grid grid-cols-2 gap-4">
-                <label class="cursor-pointer">
-                    <input type="radio" x-model="destinationMode" value="single" class="sr-only peer">
-                    <div class="relative p-4 rounded-2xl border-2 transition-all duration-200 peer-checked:border-orange-600 peer-checked:bg-orange-50 peer-checked:shadow-md peer-checked:shadow-orange-600/15 border-slate-200 hover:border-slate-300 hover:bg-slate-50">
-                        <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3">
-                            <svg class="w-5 h-5 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        </div>
-                        <p class="text-sm font-bold text-slate-900">Single Destination</p>
-                        <p class="text-[11px] text-slate-500 mt-1">All items go to one address</p>
-                        <div class="absolute top-3.5 right-3.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all" :class="destinationMode === 'single' ? 'border-orange-600 bg-orange-600' : 'border-slate-300'">
-                            <svg x-show="destinationMode === 'single'" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                        </div>
-                    </div>
-                </label>
-                <label class="cursor-pointer">
-                    <input type="radio" x-model="destinationMode" value="per_item" class="sr-only peer">
-                    <div class="relative p-4 rounded-2xl border-2 transition-all duration-200 peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:shadow-md peer-checked:shadow-amber-500/15 border-slate-200 hover:border-slate-300 hover:bg-slate-50">
-                        <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center mb-3">
-                            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-                        </div>
-                        <p class="text-sm font-bold text-slate-900">Per-item Destinations</p>
-                        <p class="text-[11px] text-slate-500 mt-1">Each item has its own recipient</p>
-                        <div class="absolute top-3.5 right-3.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all" :class="destinationMode === 'per_item' ? 'border-amber-500 bg-amber-500' : 'border-slate-300'">
-                            <svg x-show="destinationMode === 'per_item'" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                        </div>
-                    </div>
-                </label>
-            </div>
-        </div>
-        <div class="flex items-center justify-between mt-6">
-            <button @@click="step = 1" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
-                Back
-            </button>
-            <button @@click="step = nextStepFrom(2)" class="px-6 py-2.5 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-orange-700/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
-                Continue
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-            </button>
-        </div>
-    </div>
-
-    <!-- ═══════════ STEP 3: FULFILLMENT METHOD (single only) ═══════════ -->
-    <div x-show="step === 3 && destinationMode === 'single'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
-        <div class="space-y-6">
-        <!-- Delivery Preference -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50">
-            <div class="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
-                <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5">
-                    <span class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">3</span>
-                    Delivery Preference
-                </h2>
-                <p class="text-xs text-slate-500 mt-1 ml-[42px]">How does the recipient want to receive their parcel?</p>
-            </div>
-            <div class="p-6">
-                <div class="grid grid-cols-1 gap-3">
-                    <template x-for="dp in [
-                        {v:'deliver', label:'Deliver to Recipient', desc:'We deliver the parcel to the recipient\'s address.', icon:'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z', color:'orange'},
-                        {v:'self_pickup', label:'Collect from Warehouse', desc:'The recipient will come to the warehouse to collect their parcel.', icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', color:'emerald'}
-                    ]" :key="dp.v">
-                        <label class="cursor-pointer">
-                            <input type="radio" x-model="deliveryPreference" :value="dp.v" class="sr-only peer">
-                            <div class="relative flex items-start gap-4 p-4 rounded-2xl border-2 transition-all duration-200 border-slate-200 hover:border-slate-300 hover:bg-slate-50 peer-checked:border-orange-600 peer-checked:bg-orange-50 peer-checked:shadow-md peer-checked:shadow-orange-600/10">
-                                <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-                                     :class="dp.color === 'orange' ? 'bg-orange-100' : 'bg-emerald-100'">
-                                    <svg class="w-5 h-5" :class="dp.color === 'orange' ? 'text-orange-700' : 'text-emerald-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" :d="dp.icon"/></svg>
-                                </div>
-                                <div class="flex-1">
-                                    <p class="text-sm font-bold text-slate-900" x-text="dp.label"></p>
-                                    <p class="text-xs text-slate-500 mt-1 leading-relaxed" x-text="dp.desc"></p>
-                                </div>
-                                <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 transition-all" :class="deliveryPreference === dp.v ? 'border-orange-600 bg-orange-600' : 'border-slate-300'">
-                                    <svg x-show="deliveryPreference === dp.v" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                </div>
-                            </div>
-                        </label>
-                    </template>
-                </div>
-            </div>
-        </div>
-        </div>
-        <div class="flex items-center justify-between mt-6">
-            <button @@click="step = 2" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
-                Back
-            </button>
-            <button @@click="step = 4" class="px-6 py-2.5 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-orange-700/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
-                Continue
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-            </button>
-        </div>
-    </div>
-
-    <!-- ═══════════ STEP 4 (or 3 for per_item): ITEMS & DELIVERY ═══════════ -->
-    <div x-show="step === itemsStep()" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
-        <div class="space-y-6">
-
-            <!-- Items List -->
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50">
-                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
-                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5">
-                        <span class="w-8 h-8 rounded-lg bg-cyan-600 text-white flex items-center justify-center text-xs font-bold">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                        </span>
-                        Items
-                        <span class="ml-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold" x-text="items.length"></span>
-                    </h2>
-                    <button @@click="addItem()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all active:scale-[0.97] flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                        Add Item
-                    </button>
-                </div>
-                <div class="divide-y divide-slate-100">
-                    <template x-for="(item, idx) in items" :key="idx">
-                        <div class="p-5">
-                            <div class="flex items-start gap-3.5">
-                                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#7c2d12] to-[#9a3412] flex items-center justify-center text-white text-[11px] font-bold shrink-0 mt-0.5 shadow-sm" x-text="idx + 1"></div>
-                                <div class="flex-1 space-y-3.5">
-                                    <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
-                                        <div class="sm:col-span-4">
-                                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Item Description <span class="text-red-400">*</span></label>
-                                            <input type="text" x-model="item.description" placeholder="What is being shipped?"
-                                                   class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
-                                        </div>
-                                        <div>
-                                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Qty <span class="text-red-400">*</span></label>
-                                            <input type="number" x-model.number="item.quantity" min="1"
-                                                   class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 text-center font-mono font-bold">
-                                        </div>
-                                    </div>
-
-                                    <!-- Per-item delivery -->
-                                    <template x-if="destinationMode === 'per_item'">
-                                        <div class="bg-amber-50/60 rounded-xl p-4 space-y-3 border border-amber-200/50">
-                                            <p class="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-                                                Delivery for this item
-                                            </p>
-                                            <div>
-                                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Delivery Preference</label>
-                                                <select x-model="item.delivery_preference" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white">
-                                                    <option value="deliver">Deliver to Recipient</option>
-                                                    <option value="self_pickup">Collect from Warehouse</option>
-                                                </select>
-                                            </div>
-                                            <div class="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Recipient <span class="text-red-400">*</span></label>
-                                                    <input type="text" x-model="item.delivery.recipient_name" placeholder="Name" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white">
-                                                </div>
-                                                <div>
-                                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Phone <span class="text-red-400">*</span></label>
-                                                    <input type="text" x-model="item.delivery.recipient_phone" placeholder="Phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white">
-                                                </div>
-                                            </div>
-                                            <div class="relative">
-                                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Location <span class="text-red-400">*</span></label>
-                                                <div class="relative">
-                                                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                                    <input type="text" x-model="item.delivery.locationQuery" @@input="searchLocation(item.delivery)" @@focus="item.delivery.locationResults.length && (item.delivery._showDropdown = true)" @@click.outside="item.delivery._showDropdown = false" placeholder="Search location..." class="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white placeholder:text-slate-400">
-                                                </div>
-                                                <div x-show="item.delivery._showDropdown && item.delivery.locationResults.length" class="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-2xl max-h-52 overflow-y-auto">
-                                                    <template x-for="loc in item.delivery.locationResults" :key="loc.id">
-                                                        <button @@click="selectLocation(item.delivery, loc)" class="w-full text-left px-4 py-2.5 hover:bg-orange-50 text-xs text-slate-700 border-b border-slate-50 last:border-0 flex items-center gap-2 transition-colors">
-                                                            <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-                                                            <span x-text="loc.display"></span>
-                                                        </button>
-                                                    </template>
-                                                </div>
-                                                <p x-show="item.delivery.selectedLocation" class="mt-1 text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                                                    <span x-text="item.delivery.selectedLocation?.display"></span>
-                                                </p>
-                                            </div>
-                                            <div class="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Landmark</label>
-                                                    <input type="text" x-model="item.delivery.landmark" placeholder="Near..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white placeholder:text-slate-400">
-                                                </div>
-                                                <div>
-                                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">Instructions</label>
-                                                    <input type="text" x-model="item.delivery.instructions" placeholder="Notes..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-white placeholder:text-slate-400">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </template>
-                                </div>
-                                <button x-show="items.length > 1" @@click="items.splice(idx, 1)" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors shrink-0 mt-0.5" title="Remove item">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                </button>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-            </div>
-
-            <!-- Single Mode Delivery -->
-            <div x-show="destinationMode === 'single'" class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50 p-6">
-                <h2 class="text-base font-bold text-slate-900 flex items-center gap-2.5 mb-4">
-                    <span class="w-8 h-8 rounded-lg bg-orange-700 text-white flex items-center justify-center text-xs font-bold">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-                    </span>
-                    Delivery Address
-                </h2>
-                <div class="space-y-3.5">
-                    <div class="grid grid-cols-2 gap-3.5">
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Recipient Name <span class="text-red-400">*</span></label>
-                            <input type="text" x-model="delivery.recipient_name" placeholder="Who receives the items?" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Phone <span class="text-red-400">*</span></label>
-                            <input type="text" x-model="delivery.recipient_phone" placeholder="0241234567" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 placeholder:text-slate-400 font-mono">
-                        </div>
-                    </div>
-                    <div class="relative">
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Location <span class="text-red-400">*</span></label>
-                        <div class="relative">
-                            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                            <input type="text" x-model="delivery.locationQuery" @@input="searchLocation(delivery)" @@focus="delivery.locationResults.length && (delivery._showDropdown = true)" @@click.outside="delivery._showDropdown = false" placeholder="Search for a town or area..." class="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
-                        </div>
-                        <div x-show="delivery._showDropdown && delivery.locationResults.length" class="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-2xl max-h-52 overflow-y-auto">
-                            <template x-for="loc in delivery.locationResults" :key="loc.id">
-                                <button @@click="selectLocation(delivery, loc)" class="w-full text-left px-4 py-3 hover:bg-orange-50 text-sm text-slate-700 border-b border-slate-100 last:border-0 flex items-center gap-2.5 transition-colors">
-                                    <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-                                    <span x-text="loc.display"></span>
-                                </button>
-                            </template>
-                        </div>
-                        <p x-show="delivery.selectedLocation" class="mt-1.5 text-xs text-emerald-600 font-semibold flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                            <span x-text="delivery.selectedLocation?.display"></span>
-                        </p>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3.5">
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Landmark</label>
-                            <input type="text" x-model="delivery.landmark" placeholder="Near a known place" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Delivery Instructions</label>
-                            <input type="text" x-model="delivery.instructions" placeholder="Special notes" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 outline-none bg-slate-50/50 placeholder:text-slate-400">
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Nav -->
-            <div class="flex items-center justify-between pt-2">
-                <button @@click="step = prevStepFrom(itemsStep())" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
-                    Back
-                </button>
-                <button @@click="goToReview()" :disabled="!canProceedToReview()"
-                        class="px-6 py-2.5 bg-orange-700 hover:bg-orange-800 text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-orange-700/25 hover:shadow-lg active:scale-[0.98] flex items-center gap-2">
-                    Review
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ═══════════ STEP 4: REVIEW ═══════════ -->
-    <div x-show="step === reviewStep()" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
-        <div class="space-y-5">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <!-- Vendor -->
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50 p-5">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Vendor</p>
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-800 text-sm font-bold" x-text="vendorData?.name?.charAt(0)?.toUpperCase()"></div>
-                        <div>
-                            <p class="text-sm font-bold text-slate-900" x-text="vendorData?.name"></p>
-                            <p class="text-xs text-slate-500 font-mono" x-text="vendorData?.phone"></p>
-                        </div>
-                    </div>
-                </div>
-                <!-- Delivery (single) -->
-                <div x-show="destinationMode === 'single'" class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50 p-5">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Deliver To</p>
-                    <p class="text-sm font-bold text-slate-900" x-text="delivery.recipient_name"></p>
-                    <p class="text-xs text-slate-500 font-mono" x-text="delivery.recipient_phone"></p>
-                    <p class="text-xs text-slate-500 mt-1" x-text="delivery.selectedLocation?.display"></p>
-                    <p x-show="delivery.landmark" class="text-[10px] text-slate-400 mt-1">Landmark: <span x-text="delivery.landmark"></span></p>
-                </div>
-            </div>
-
-            <!-- Items -->
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/50">
-                <div class="px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shipment Items</p>
-                    <p class="text-sm font-bold text-slate-900 mt-0.5"><span x-text="items.length"></span> item(s) &middot; <span x-text="destinationMode === 'single' ? 'Single destination' : 'Per-item destinations'"></span></p>
-                </div>
-                <template x-for="(item, idx) in items" :key="idx">
-                    <div class="px-5 py-3.5 border-b border-slate-50 last:border-0 flex items-center gap-3.5">
-                        <div class="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[10px] font-bold shrink-0" x-text="idx + 1"></div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm font-semibold text-slate-900 truncate" x-text="item.description"></p>
-                            <p class="text-[11px] text-slate-500 mt-0.5">
-                                Qty: <span class="font-mono font-bold" x-text="item.quantity"></span>
-                                <template x-if="destinationMode === 'per_item' && item.delivery.recipient_name">
-                                    <span> &middot; To: <span x-text="item.delivery.recipient_name"></span></span>
-                                </template>
-                            </p>
-                        </div>
-                    </div>
                 </template>
             </div>
+        </div>
+    </section>
 
-            <!-- Submit -->
-            <div class="flex items-center justify-between pt-3">
-                <button @@click="step = itemsStep()" class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-xl border border-slate-200 transition-colors flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
-                    Edit
-                </button>
-                <button @@click="submitShipment()" :disabled="submitting"
-                        class="px-8 py-3.5 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-white text-base font-bold rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xl shadow-slate-900/30 hover:shadow-2xl hover:shadow-slate-900/40 active:scale-[0.98] flex items-center gap-2.5">
-                    <span x-show="!submitting" class="flex items-center gap-2.5">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                        Submit Shipment
-                    </span>
-                    <span x-show="submitting" class="flex items-center gap-2.5">
-                        <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                        Creating...
-                    </span>
+    <section x-show="step === 1" x-transition.opacity class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-4 py-4 sm:px-5">
+            <h2 class="text-sm font-extrabold text-slate-950">Vendor</h2>
+            <p class="mt-1 text-xs text-slate-500">Search by phone. Existing vendors continue in one click.</p>
+        </div>
+        <div class="space-y-4 p-4 sm:p-5">
+            <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
+                <div>
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Vendor phone</label>
+                    <input type="text" x-model="vendorPhone" @@keydown.enter.prevent="lookupVendor()" placeholder="0241234567"
+                           class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                </div>
+                <button type="button" @@click="lookupVendor()" :disabled="vendorLoading || vendorPhone.length < 9"
+                        class="mt-auto rounded-xl border-2 border-slate-900 bg-slate-900 px-5 py-3 text-base font-black text-white transition hover:border-slate-800 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm">
+                    <span x-show="!vendorLoading">Search</span>
+                    <span x-show="vendorLoading">Searching...</span>
                 </button>
             </div>
-            <div x-show="submitError" x-transition class="px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
-                <p class="text-xs text-red-700 font-medium" x-text="submitError"></p>
+
+            <div x-show="vendorFound === true && vendorData" x-transition class="rounded-2xl border border-orange-100 bg-orange-50/60 p-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-600 text-sm font-black text-white shadow-lg shadow-orange-600/15" x-text="vendorData?.name?.charAt(0)?.toUpperCase()"></div>
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-extrabold text-slate-950" x-text="vendorData?.name"></p>
+                            <p class="truncate text-xs text-slate-600"><span x-text="vendorData?.business_name || 'No business name'"></span> · <span class="font-mono" x-text="vendorData?.phone"></span></p>
+                        </div>
+                    </div>
+                    <button type="button" @@click="selectVendor(vendorData)" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700">Continue</button>
+                </div>
+            </div>
+
+            <div x-show="vendorFound === false" x-transition class="rounded-2xl border border-orange-100 bg-orange-50/60 p-4">
+                <div class="mb-4">
+                    <p class="text-sm font-extrabold text-slate-950">Vendor not found</p>
+                    <p class="mt-1 text-xs text-slate-600">Enter the sender name to continue.</p>
+                </div>
+                <div>
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Full Name <span class="text-rose-500">*</span></label>
+                    <input type="text" x-model="newVendor.name" placeholder="Sender name" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                </div>
+                <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    <button type="button" @@click="resetVendor()" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-base font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:text-sm">Cancel</button>
+                    <button type="button" @@click="createVendor()" :disabled="creatingVendor || !newVendor.name"
+                            class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-base font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:border-orange-300 disabled:bg-orange-300 disabled:shadow-none sm:text-sm">
+                        <span x-show="!creatingVendor">Create & continue</span>
+                        <span x-show="creatingVendor">Creating...</span>
+                    </button>
+                </div>
+            </div>
+
+            <p x-show="vendorError" class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700" x-text="vendorError"></p>
+        </div>
+    </section>
+
+    <section x-show="step === 2" x-transition.opacity class="space-y-5">
+        <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="flex flex-row items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:items-center sm:px-5">
+                <div class="min-w-0">
+                    <h2 class="text-sm font-extrabold text-slate-950">Packages</h2>
+                    <p class="mt-1 text-xs text-slate-500">Each package carries its recipient details. Same recipient phone stays as one drop-off.</p>
+                </div>
+                <button type="button" @@click="openPackageModal()" class="shrink-0 rounded-xl border-2 border-orange-600 bg-orange-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700">Add Package</button>
+            </div>
+            <div>
+                <div x-show="items.length === 0" class="px-5 py-12 text-center">
+                    <p class="text-sm font-bold text-slate-500">No packages added yet.</p>
+                </div>
+
+                <div x-show="items.length > 0" class="overflow-x-auto">
+                    <table class="min-w-[760px] w-full text-left">
+                        <thead class="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-400">
+                            <tr>
+                                <th class="px-4 py-3">#</th>
+                                <th class="px-4 py-3">Package</th>
+                                <th class="px-4 py-3 text-center">Qty</th>
+                                <th class="px-4 py-3">Recipient</th>
+                                <th class="px-4 py-3">Phone</th>
+                                <th class="px-4 py-3">Location</th>
+                                <th class="whitespace-nowrap px-4 py-3">Forward To</th>
+                                <th class="px-4 py-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            <template x-for="(item, idx) in items" :key="item.key">
+                                <tr class="align-top transition hover:bg-orange-50/20">
+                                    <td class="px-4 py-3">
+                                        <span class="inline-flex h-7 min-w-7 items-center justify-center rounded-lg bg-slate-100 px-2 text-xs font-black text-slate-600" x-text="idx + 1"></span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <p class="max-w-[220px] truncate text-sm font-black text-slate-950" x-text="item.description"></p>
+                                        <span x-show="item.delivery_method === 'bus_handoff'" class="mt-1 inline-flex whitespace-nowrap rounded-lg bg-orange-50 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-orange-700 ring-1 ring-orange-100">Bus handoff</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <span class="text-sm font-black text-slate-800" x-text="item.quantity"></span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm font-semibold text-slate-700" x-text="item.delivery.recipient_name || 'Recipient'"></td>
+                                    <td class="px-4 py-3 font-mono text-xs font-bold text-slate-600" x-text="item.delivery.recipient_phone || '-'"></td>
+                                    <td class="px-4 py-3 text-sm font-semibold leading-5 text-slate-700" x-text="item.delivery.locationQuery || '-'"></td>
+                                    <td class="min-w-28 px-4 py-3 text-sm font-semibold leading-5 text-slate-700" x-text="warehouseLabel(item.forward_to_warehouse_id)"></td>
+                                    <td class="px-4 py-3">
+                                        <div class="flex justify-end gap-2">
+                                            <button type="button" @@click="openPackagePhotos(item)" class="rounded-xl border border-orange-100 bg-orange-50 px-3 py-2 text-xs font-black text-orange-700 transition hover:bg-orange-100">Photos</button>
+                                            <button type="button" @@click="openPackageModal(idx)" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50">Edit</button>
+                                            <button type="button" @@click="removeItem(idx)" class="rounded-xl border border-rose-100 bg-white px-3 py-2 text-xs font-black text-rose-600 transition hover:bg-rose-50">Remove</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <div class="flex items-center justify-between gap-3">
+            <button type="button" @@click="step = 1" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:border-slate-300 hover:bg-slate-50">Back</button>
+            <button type="button" @@click="goToReview()" :disabled="!canProceedToReview()" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">Review shipment</button>
+        </div>
+    </section>
+
+    <section x-show="step === 3" x-transition.opacity class="space-y-5">
+        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-100 px-4 py-4 sm:px-5">
+                <h2 class="text-sm font-extrabold text-slate-950">Review</h2>
+                <p class="mt-1 text-xs text-slate-500">Confirm the package setup before creating labels.</p>
+            </div>
+            <div class="grid gap-4 p-4 sm:grid-cols-3 sm:p-5">
+                <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Vendor</p>
+                    <p class="mt-2 text-sm font-extrabold text-slate-950" x-text="vendorData?.name"></p>
+                    <p class="mt-1 text-xs font-mono text-slate-500" x-text="vendorData?.phone"></p>
+                </div>
+                <div class="rounded-2xl border border-orange-100 bg-orange-50/60 p-4">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-orange-500">Detected Drop-Off</p>
+                    <p class="mt-2 text-sm font-extrabold text-slate-950" x-text="detectedDropoffMode()"></p>
+                    <p class="mt-1 text-xs text-slate-500">Based on recipient phone numbers</p>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Packages</p>
+                    <p class="mt-2 text-sm font-extrabold text-slate-950"><span x-text="items.length"></span> package(s)</p>
+                    <p class="mt-1 text-xs text-slate-500"><span x-text="items.filter(i => i.delivery_method === 'bus_handoff').length"></span> bus-station handoff</p>
+                </div>
+            </div>
+            <div class="border-t border-slate-100">
+                <div class="overflow-x-auto">
+                    <table class="min-w-[820px] w-full text-left">
+                        <thead class="bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-400">
+                            <tr>
+                                <th class="px-4 py-3">#</th>
+                                <th class="px-4 py-3">Package</th>
+                                <th class="px-4 py-3 text-center">Qty</th>
+                                <th class="px-4 py-3">Recipient</th>
+                                <th class="px-4 py-3">Phone</th>
+                                <th class="px-4 py-3">Location</th>
+                                <th class="px-4 py-3">Handoff</th>
+                                <th class="whitespace-nowrap px-4 py-3">Forward To</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            <template x-for="(item, idx) in items" :key="'review-' + item.key">
+                                <tr class="align-top">
+                                    <td class="px-4 py-3 text-xs font-black text-slate-500" x-text="idx + 1"></td>
+                                    <td class="px-4 py-3 text-sm font-black text-slate-950" x-text="item.description"></td>
+                                    <td class="px-4 py-3 text-center text-sm font-black text-slate-800" x-text="item.quantity"></td>
+                                    <td class="px-4 py-3 text-sm font-semibold text-slate-700" x-text="item.delivery.recipient_name || 'Recipient'"></td>
+                                    <td class="px-4 py-3 font-mono text-xs font-bold text-slate-600" x-text="item.delivery.recipient_phone || '-'"></td>
+                                    <td class="px-4 py-3 text-sm font-semibold leading-5 text-slate-700" x-text="item.delivery.locationQuery || '-'"></td>
+                                    <td class="px-4 py-3">
+                                        <span x-show="item.delivery_method === 'bus_handoff'" class="inline-flex whitespace-nowrap rounded-lg bg-orange-50 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-orange-700 ring-1 ring-orange-100">Bus handoff</span>
+                                        <span x-show="item.delivery_method !== 'bus_handoff'" class="text-xs font-bold text-slate-400">Direct</span>
+                                    </td>
+                                    <td class="min-w-28 px-4 py-3 text-sm font-semibold leading-5 text-slate-700" x-text="warehouseLabel(item.forward_to_warehouse_id)"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
 
-    </div><!-- /max-w-3xl -->
+        <div class="flex items-center justify-between gap-3">
+            <button type="button" @@click="step = 2" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:border-slate-300 hover:bg-slate-50">Edit details</button>
+            <button type="button" @@click="submitShipment()" :disabled="submitting" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">
+                <span x-show="!submitting">Submit</span>
+                <span x-show="submitting">Creating...</span>
+            </button>
+        </div>
+        <p x-show="submitError" class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700" x-text="submitError"></p>
+    </section>
+
+    <section x-show="step === 4" x-transition.opacity class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="flex flex-row items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:items-center sm:px-5">
+            <div class="min-w-0">
+                <h2 class="text-sm font-extrabold text-slate-950">Print Labels</h2>
+                <p class="mt-1 text-xs text-slate-500">Print and attach package labels.</p>
+            </div>
+            <button type="button" @@click="printAllLabels()" :disabled="printingLabels || !canPrintAnyLabels()"
+                    class="shrink-0 rounded-xl border-2 border-slate-900 bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-900/10 transition hover:border-slate-800 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40">
+                <span x-show="!printingLabels">Print All</span>
+                <span x-show="printingLabels">Printing...</span>
+            </button>
+        </div>
+        <div class="border-b border-slate-100 bg-orange-50/40 px-4 py-3 text-xs font-bold text-slate-600 sm:px-5">
+            <span x-text="totalLabelCount()"></span> label(s) selected across <span x-text="createdPackages.length"></span> package(s).
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-[760px] w-full text-left">
+                <thead class="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-400">
+                    <tr>
+                        <th class="px-4 py-3">Package</th>
+                        <th class="px-4 py-3 text-center">Qty</th>
+                        <th class="px-4 py-3">Tracking</th>
+                        <th class="px-4 py-3 text-center">Labels to print</th>
+                        <th class="px-4 py-3 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                    <template x-for="pkg in createdPackages" :key="pkg.id">
+                        <tr class="align-middle">
+                            <td class="px-4 py-4">
+                                <p class="text-sm font-black text-slate-950" x-text="pkg.description"></p>
+                                <p class="mt-1 text-xs text-slate-500"><span x-text="pkg.photo_count"></span> receipt photo(s)</p>
+                            </td>
+                            <td class="px-4 py-4 text-center text-sm font-black text-slate-800" x-text="pkg.quantity"></td>
+                            <td class="px-4 py-4 font-mono text-xs font-bold text-orange-600" x-text="pkg.tracking_code || 'Will generate on print'"></td>
+                            <td class="px-4 py-4">
+                                <div class="mx-auto flex w-36 items-center justify-center gap-2">
+                                    <button type="button" @@click="setPackageLabelCount(pkg, Number(pkg.label_count || 1) - 1)" :disabled="printingLabels || Number(pkg.label_count || 1) <= 1"
+                                            class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">-</button>
+                                    <input type="number" min="1" max="500" x-model.number="pkg.label_count" @@input="setPackageLabelCount(pkg, pkg.label_count)"
+                                           :disabled="printingLabels"
+                                           class="h-9 w-16 rounded-xl border-2 border-slate-200 bg-white text-center text-sm font-black text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-slate-50">
+                                    <button type="button" @@click="setPackageLabelCount(pkg, Number(pkg.label_count || 1) + 1)" :disabled="printingLabels || Number(pkg.label_count || 1) >= 500"
+                                            class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">+</button>
+                                </div>
+                            </td>
+                            <td class="px-4 py-4 text-right">
+                                <button type="button" @@click="printLabel(pkg)" :disabled="printingLabels || !Number(pkg.label_count || 0)"
+                                        class="rounded-xl border-2 border-orange-600 bg-orange-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">
+                                    <span x-show="printingPackageId !== pkg.id" x-text="pkg.barcode_print_count ? 'Reprint' : 'Print'"></span>
+                                    <span x-show="printingPackageId === pkg.id">Printing...</span>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <template x-teleport="body">
+        <div x-show="packageModalOpen" x-cloak x-transition.opacity class="fixed inset-0 z-[110] flex min-h-screen items-center justify-center bg-black/55 px-4 py-6 backdrop-blur-sm sm:p-4" style="display:none">
+            <div @@click.stop class="flex max-h-[calc(100dvh-3rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl sm:max-h-[calc(100vh-2rem)]">
+                <div class="shrink-0 flex items-start justify-between border-b border-slate-100 p-5">
+                    <div class="flex items-start gap-3">
+                        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-700 text-white shadow-lg shadow-orange-500/25">
+                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 8.5l5-3 5 3-5 3-5-3zM4 13l5 3 5-3M10 16l5 3 5-3M4 13l5-3 5 3-5 3-5-3z"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-extrabold text-slate-900" x-text="packageModalIndex === null ? 'Add Package' : 'Edit Package'"></h3>
+                            <p class="mt-1 text-sm text-slate-500">Record package details, recipient info, and receipt photos.</p>
+                        </div>
+                    </div>
+                    <button type="button" @@click="closePackageModal()" class="shrink-0 rounded-xl border border-slate-200 p-2 text-slate-400 hover:text-slate-700">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+                    <div>
+                        <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Receipt photos <span class="text-rose-500">*</span></label>
+                        <label class="flex min-w-0 cursor-pointer flex-col gap-3 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/70 px-3 py-3 transition hover:border-orange-300 hover:bg-orange-50/40 sm:flex-row sm:items-center sm:justify-between">
+                            <span class="min-w-0 max-w-full">
+                                <span class="block truncate text-sm font-bold text-slate-700" x-text="packageForm.photos.length ? packageForm.photos.length + ' photo(s) selected' : 'Upload or take package photos'"></span>
+                                <span class="block text-xs font-medium text-slate-400">PNG, JPG or WEBP up to 12MB each</span>
+                            </span>
+                            <span class="inline-flex w-fit shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-black text-orange-700 shadow-sm ring-1 ring-orange-100">Choose</span>
+                            <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" capture="environment" multiple class="hidden" @@change="handlePackagePhotos($event)">
+                        </label>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-12">
+                        <div class="sm:col-span-9">
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Description <span class="text-rose-500">*</span></label>
+                            <input x-model="packageForm.description" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                        </div>
+                        <div class="sm:col-span-3">
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Quantity <span class="text-rose-500">*</span></label>
+                            <input type="number" min="1" x-model.number="packageForm.quantity" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-black text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Recipient name</label>
+                                <input x-model="packageForm.delivery.recipient_name" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Recipient phone <span class="text-rose-500">*</span></label>
+                                <input x-model="packageForm.delivery.recipient_phone" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                            </div>
+                            <div class="relative sm:col-span-2" @@click.outside="packageForm.delivery._showDropdown = false" @@focusout="closeLocationDropdownSoon(packageForm.delivery)">
+                                <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Location <span class="text-rose-500">*</span></label>
+                                <input x-model="packageForm.delivery.locationQuery" @@input="searchLocation(packageForm.delivery)" @@focus="packageForm.delivery.locationResults.length && (packageForm.delivery._showDropdown = true)"
+                                       class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                                <div x-show="packageForm.delivery._showDropdown && packageForm.delivery.locationResults.length" class="absolute z-40 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                                    <template x-for="loc in packageForm.delivery.locationResults" :key="loc.id">
+                                        <button type="button" @@click="selectLocation(packageForm.delivery, loc)" class="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-orange-50">
+                                            <span x-text="loc.display"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Instructions</label>
+                                <textarea x-model="packageForm.delivery.instructions" rows="2" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border-2 border-slate-200 bg-white px-3 py-3">
+                            <span>
+                                <span class="block text-xs font-bold uppercase tracking-wide text-slate-500">Bus station</span>
+                                <span class="block text-sm font-black text-slate-900">Send to bus station</span>
+                            </span>
+                            <input type="checkbox" x-model="packageForm.send_to_bus_station" class="h-5 w-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
+                        </label>
+
+                        <div class="rounded-xl border-2 border-orange-100 bg-orange-50/40 px-3 py-3">
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-orange-600">Forward to warehouse</label>
+                            <select x-model="packageForm.forward_to_warehouse_id"
+                                    class="w-full rounded-xl border-2 border-orange-100 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                                <option value="">Keep at this warehouse</option>
+                                <template x-for="warehouse in transferWarehouses" :key="warehouse.id">
+                                    <option :value="warehouse.id" x-text="warehouse.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="shrink-0 flex justify-end gap-3 border-t border-slate-100 bg-slate-50 p-4">
+                    <button type="button" @@click="closePackageModal()" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-base font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:text-sm">Cancel</button>
+                    <button type="button" @@click="savePackageFromModal()" :disabled="!canSavePackageForm()" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-base font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:border-orange-300 disabled:bg-orange-300 disabled:shadow-none sm:text-sm" x-text="packageModalIndex === null ? 'Add Package' : 'Save Package'"></button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template x-teleport="body">
+        <div x-show="photoPreviewOpen" x-cloak x-transition.opacity @@click="closePackagePhotos()" @@keydown.window.escape="closePackagePhotos()" @@keydown.window.arrow-left="previousPackagePhoto()" @@keydown.window.arrow-right="nextPackagePhoto()"
+             class="fixed inset-0 z-[130] flex cursor-zoom-out items-center justify-center bg-black/85 p-8 backdrop-blur-sm" style="display:none">
+            <button type="button" @@click.stop="closePackagePhotos()" class="absolute right-4 top-4 z-20 rounded-full bg-black/45 p-3 text-white/80 transition hover:bg-black/70 hover:text-white">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            <button type="button" x-show="photoPreviewUrls.length > 1" @@click.stop="previousPackagePhoto()" class="absolute left-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white/80 transition hover:bg-black/70 hover:text-white">
+                <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <img @@click.stop :src="activePackagePhoto()?.url" :alt="activePackagePhoto()?.name || 'Package photo'" class="max-h-full max-w-full rounded-2xl object-contain shadow-2xl ring-1 ring-white/10">
+            <button type="button" x-show="photoPreviewUrls.length > 1" @@click.stop="nextPackagePhoto()" class="absolute right-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white/80 transition hover:bg-black/70 hover:text-white">
+                <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <div class="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white/90">
+                <span x-text="photoPreviewPackage?.description || 'Package'"></span>
+                <span x-show="photoPreviewUrls.length > 1"> · <span x-text="`${activePhotoIndex + 1} / ${photoPreviewUrls.length}`"></span></span>
+            </div>
+        </div>
+    </template>
 </div>
-
 @endsection
 
 @push('scripts')
@@ -554,170 +419,455 @@ $walkinConfig = [
 function walkinShipment() {
     return {
         config: {},
-        steps: [], // dynamic — use stepLabels() and stepMap() instead
+        transferWarehouses: [],
+        stepItems: [{ id: 1, label: 'Vendor' }, { id: 2, label: 'Packages' }, { id: 3, label: 'Review' }, { id: 4, label: 'Labels' }],
         step: 1,
-        vendorPhone: '', vendorLoading: false, vendorFound: null, vendorData: null, vendorId: null, vendorError: '',
+        vendorPhone: '',
+        vendorLoading: false,
+        vendorFound: null,
+        vendorData: null,
+        vendorId: null,
+        vendorError: '',
         newVendor: { name: '', business_name: '', phone: '', email: '' },
         creatingVendor: false,
-        deliveryPreference: 'deliver',
-        fulfillmentType: 'warehouse',
-        destinationMode: 'single',
-        items: [],
         delivery: null,
-        warehouseId: '',
-        submitting: false, submitError: '',
+        items: [],
+        itemSeed: 0,
+        packageModalOpen: false,
+        packageModalIndex: null,
+        packageForm: null,
+        submitting: false,
+        submitError: '',
+        createdPackages: [],
+        printingLabels: false,
+        printingPackageId: null,
+        photoPreviewOpen: false,
+        photoPreviewPackage: null,
+        photoPreviewUrls: [],
+        activePhotoIndex: 0,
 
         init() {
-            const el = this.$el.closest('[data-walkin-config]');
-            this.config = JSON.parse(el.dataset.walkinConfig);
-            this.warehouseId = this.config.warehouse.id;
-            this.items = [this.makeItem()];
+            this.config = JSON.parse(this.$el.dataset.walkinConfig);
+            this.transferWarehouses = Array.isArray(this.config.transferWarehouses) ? this.config.transferWarehouses : [];
             this.delivery = this.makeDelivery();
+            this.packageForm = this.emptyPackageForm();
         },
 
         makeDelivery() {
             return {
-                recipient_name: '', recipient_phone: '',
-                locationQuery: '', locationResults: [], locationSearching: false,
-                selectedLocation: null, _showDropdown: false,
-                region_id: '', district_id: '', town: '',
-                landmark: '', instructions: ''
+                recipient_name: '',
+                recipient_phone: '',
+                locationQuery: '',
+                locationResults: [],
+                selectedLocation: null,
+                _showDropdown: false,
+                region_id: '',
+                district_id: '',
+                town: '',
+                instructions: '',
             };
         },
 
         makeItem() {
+            this.itemSeed += 1;
             return {
-                description: '', quantity: 1,
-                delivery_preference: 'deliver',
-                delivery: this.makeDelivery ? this.makeDelivery() : {
-                    recipient_name: '', recipient_phone: '',
-                    locationQuery: '', locationResults: [], locationSearching: false,
-                    selectedLocation: null, _showDropdown: false,
-                    region_id: '', district_id: '', town: '',
-                    landmark: '', instructions: ''
-                }
+                key: `package-${Date.now()}-${this.itemSeed}`,
+                description: `Package ${this.itemSeed}`,
+                quantity: 1,
+                delivery_method: 'direct',
+                forward_to_warehouse_id: '',
+                delivery: this.makeDelivery(),
+                photos: [],
             };
         },
 
-        addItem() { this.items.push(this.makeItem()); },
+        emptyPackageForm() {
+            return {
+                key: 'package-form-empty',
+                description: '',
+                quantity: 1,
+                delivery_method: 'direct',
+                forward_to_warehouse_id: '',
+                delivery: this.makeDelivery(),
+                photos: [],
+                send_to_bus_station: false,
+            };
+        },
+
+        cloneItem(item) {
+            return {
+                ...item,
+                delivery: { ...item.delivery, locationResults: [], _showDropdown: false },
+                photos: [...(item.photos || [])],
+            };
+        },
+
+        openPackageModal(index = null) {
+            this.packageModalIndex = index;
+            this.packageForm = index === null ? this.makeItem() : this.cloneItem(this.items[index]);
+            this.packageForm.send_to_bus_station = this.packageForm.delivery_method === 'bus_handoff';
+            this.packageModalOpen = true;
+        },
+
+        closePackageModal() {
+            this.packageModalOpen = false;
+            this.packageModalIndex = null;
+            this.packageForm = this.emptyPackageForm();
+        },
+
+        savePackageFromModal() {
+            if (!this.canSavePackageForm()) return;
+            const item = this.cloneItem(this.packageForm);
+            item.delivery.recipient_name = item.delivery.recipient_name?.trim() || 'Recipient';
+            item.delivery_method = item.send_to_bus_station ? 'bus_handoff' : 'direct';
+            item.forward_to_warehouse_id = item.forward_to_warehouse_id ? Number(item.forward_to_warehouse_id) : null;
+            delete item.send_to_bus_station;
+            if (this.packageModalIndex === null) {
+                this.items.push(item);
+            } else {
+                this.items.splice(this.packageModalIndex, 1, item);
+            }
+            this.closePackageModal();
+        },
+
+        canSavePackageForm() {
+            if (!this.packageForm) return false;
+            const delivery = this.packageForm.delivery || {};
+            return Boolean(
+                this.packageForm.description?.trim()
+                && Number(this.packageForm.quantity || 0) > 0
+                && delivery.recipient_phone?.trim()
+                && delivery.locationQuery?.trim()
+                && (this.packageForm.photos || []).length > 0
+            );
+        },
+
+        removeItem(index) {
+            this.items.splice(index, 1);
+        },
+
+        warehouseLabel(id) {
+            if (!id) return '-';
+            const warehouse = this.transferWarehouses.find(row => Number(row.id) === Number(id));
+            return warehouse ? warehouse.name : 'Selected warehouse';
+        },
+
+        handlePackagePhotos(event) {
+            this.packageForm.photos = Array.from(event.target.files || []);
+        },
+
+        openPackagePhotos(item) {
+            this.closePackagePhotos();
+            this.photoPreviewPackage = item;
+            this.photoPreviewUrls = (item.photos || []).map(file => ({
+                name: file.name || 'Package photo',
+                url: URL.createObjectURL(file),
+            }));
+            this.activePhotoIndex = 0;
+            this.photoPreviewOpen = true;
+        },
+
+        closePackagePhotos() {
+            this.photoPreviewUrls.forEach(photo => URL.revokeObjectURL(photo.url));
+            this.photoPreviewUrls = [];
+            this.photoPreviewPackage = null;
+            this.activePhotoIndex = 0;
+            this.photoPreviewOpen = false;
+        },
+
+        activePackagePhoto() {
+            return this.photoPreviewUrls[this.activePhotoIndex] || this.photoPreviewUrls[0] || null;
+        },
+
+        nextPackagePhoto() {
+            if (this.photoPreviewUrls.length <= 1) return;
+            this.activePhotoIndex = (this.activePhotoIndex + 1) % this.photoPreviewUrls.length;
+        },
+
+        previousPackagePhoto() {
+            if (this.photoPreviewUrls.length <= 1) return;
+            this.activePhotoIndex = (this.activePhotoIndex - 1 + this.photoPreviewUrls.length) % this.photoPreviewUrls.length;
+        },
 
         async lookupVendor() {
             if (this.vendorPhone.length < 9) return;
-            this.vendorLoading = true; this.vendorFound = null; this.vendorData = null; this.vendorError = '';
+            this.vendorLoading = true;
+            this.vendorFound = null;
+            this.vendorData = null;
+            this.vendorError = '';
             try {
                 const res = await fetch(this.config.vendorLookupUrl + '?phone=' + encodeURIComponent(this.vendorPhone), {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                 });
                 const json = await res.json();
-                if (json.found) { this.vendorFound = true; this.vendorData = json.vendor; }
-                else { this.vendorFound = false; this.newVendor.phone = this.vendorPhone; }
-            } catch { this.vendorError = 'Failed to lookup vendor.'; }
-            this.vendorLoading = false;
+                if (json.found) {
+                    this.vendorFound = true;
+                    this.vendorData = json.vendor;
+                } else {
+                    this.vendorFound = false;
+                    this.newVendor.phone = this.vendorPhone;
+                }
+            } catch {
+                this.vendorError = 'Failed to lookup vendor.';
+            } finally {
+                this.vendorLoading = false;
+            }
         },
 
-        selectVendor(v) { this.vendorId = v.id; this.vendorData = v; },
-        resetVendor() { this.vendorFound = null; this.vendorData = null; this.vendorId = null; this.vendorError = ''; this.newVendor = { name: '', business_name: '', phone: '', email: '' }; },
+        selectVendor(vendor) {
+            this.vendorId = vendor.id;
+            this.vendorData = vendor;
+            this.step = 2;
+        },
+
+        resetVendor() {
+            this.vendorFound = null;
+            this.vendorData = null;
+            this.vendorId = null;
+            this.vendorError = '';
+            this.newVendor = { name: '', business_name: '', phone: '', email: '' };
+        },
 
         async createVendor() {
             if (!this.newVendor.name) return;
-            this.creatingVendor = true; this.vendorError = '';
+            this.creatingVendor = true;
+            this.vendorError = '';
             try {
+                this.newVendor.phone = this.vendorPhone;
                 const res = await fetch(this.config.vendorCreateUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
                     body: JSON.stringify(this.newVendor),
                 });
                 const json = await res.json();
-                if (json.success) { this.selectVendor(json.vendor); this.vendorFound = true; this.vendorData = json.vendor; }
-                else if (json.errors) { this.vendorError = Object.values(json.errors).flat().join(', '); }
-                else { this.vendorError = json.message || 'Failed to create vendor.'; }
-            } catch { this.vendorError = 'Failed to create vendor.'; }
-            this.creatingVendor = false;
+                if (!res.ok) {
+                    this.vendorError = json.errors ? Object.values(json.errors).flat().join(', ') : (json.message || 'Failed to create vendor.');
+                    return;
+                }
+                this.vendorFound = true;
+                this.vendorData = json.vendor;
+                this.selectVendor(json.vendor);
+            } catch {
+                this.vendorError = 'Failed to create vendor.';
+            } finally {
+                this.creatingVendor = false;
+            }
         },
 
-        searchLocation(d) {
-            const q = d.locationQuery;
-            if (q.length < 2) { d.locationResults = []; d._showDropdown = false; return; }
-            d.selectedLocation = null; d.region_id = ''; d.district_id = ''; d.town = '';
-            clearTimeout(d._timeout);
-            d._timeout = setTimeout(async () => {
+        searchLocation(target) {
+            const query = target.locationQuery.trim();
+            target.selectedLocation = null;
+            target.region_id = '';
+            target.district_id = '';
+            target.town = query;
+            if (query.length < 2) {
+                target.locationResults = [];
+                target._showDropdown = false;
+                return;
+            }
+            clearTimeout(target._timeout);
+            target._searchSeq = (target._searchSeq || 0) + 1;
+            const searchSeq = target._searchSeq;
+            target._timeout = setTimeout(async () => {
                 try {
-                    const res = await fetch(this.config.locationSearchUrl + '?q=' + encodeURIComponent(q), { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } });
+                    const res = await fetch(this.config.locationSearchUrl + '?q=' + encodeURIComponent(query), {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    });
                     const json = await res.json();
-                    d.locationResults = json.locations || [];
-                    d._showDropdown = d.locationResults.length > 0;
-                } catch { d.locationResults = []; }
-            }, 300);
+                    if (searchSeq !== target._searchSeq) return;
+                    target.locationResults = json.locations || [];
+                    target._showDropdown = target.locationResults.length > 0;
+                } catch {
+                    target.locationResults = [];
+                }
+            }, 250);
         },
 
-        selectLocation(d, loc) {
-            d.selectedLocation = loc; d.locationQuery = loc.display; d.locationResults = []; d._showDropdown = false;
-            d.region_id = loc.region.id; d.district_id = loc.district.id; d.town = loc.name;
+        selectLocation(target, location) {
+            clearTimeout(target._timeout);
+            target._searchSeq = (target._searchSeq || 0) + 1;
+            target.selectedLocation = location;
+            target.locationQuery = location.display;
+            target.locationResults = [];
+            target._showDropdown = false;
+            target.region_id = location.region?.id || '';
+            target.district_id = location.district?.id || '';
+            target.town = location.name || location.display;
+        },
+
+        closeLocationDropdownSoon(target) {
+            setTimeout(() => {
+                target._showDropdown = false;
+            }, 120);
         },
 
         canProceedToReview() {
-            if (!this.items.length) return false;
-            for (const item of this.items) {
-                if (!item.description || !item.quantity) return false;
-                if (this.destinationMode === 'per_item' && (!item.delivery.recipient_name || !item.delivery.recipient_phone || !item.delivery.region_id)) return false;
-            }
-            if (this.destinationMode === 'single' && (!this.delivery.recipient_name || !this.delivery.recipient_phone || !this.delivery.region_id)) return false;
-            return true;
+            if (!this.vendorId || this.items.length === 0) return false;
+            return this.items.every(item => item.description && item.quantity > 0 && item.delivery.recipient_phone && item.delivery.locationQuery.trim());
         },
 
-        // Step navigation helpers
-        stepLabels() {
-            return this.destinationMode === 'single'
-                ? ['Vendor', 'Delivery Mode', 'Fulfillment', 'Items & Delivery', 'Review']
-                : ['Vendor', 'Delivery Mode', 'Items & Delivery', 'Review'];
+        detectedDropoffMode() {
+            if (this.items.length <= 1) return 'Single drop-off';
+            const signatures = new Set(this.items.map(item => this.recipientSignature(item.delivery)));
+            return signatures.size === 1 ? 'Single drop-off' : 'Multiple drop-offs';
         },
-        stepMap() {
-            return this.destinationMode === 'single'
-                ? [1, 2, 3, 4, 5]
-                : [1, 2, 3, 4];
-        },
-        itemsStep()  { return this.destinationMode === 'single' ? 4 : 3; },
-        reviewStep() { return this.destinationMode === 'single' ? 5 : 4; },
-        nextStepFrom(current) { return current === 2 && this.destinationMode === 'per_item' ? 3 : current + 1; },
-        prevStepFrom(current) { return current === 3 && this.destinationMode === 'per_item' ? 2 : current - 1; },
 
-        goToReview() { if (this.canProceedToReview()) this.step = this.reviewStep(); },
+        recipientSignature(delivery) {
+            const phone = (delivery.recipient_phone || '').replace(/\D/g, '');
+            return phone;
+        },
+
+        goToReview() {
+            if (this.canProceedToReview()) this.step = 3;
+        },
+
+        deliveryPayload(delivery) {
+            return {
+                recipient_name: delivery.recipient_name,
+                recipient_phone: delivery.recipient_phone,
+                region_id: delivery.region_id || null,
+                district_id: delivery.district_id || null,
+                town: delivery.town || delivery.locationQuery,
+                instructions: delivery.instructions,
+            };
+        },
 
         async submitShipment() {
-            this.submitting = true; this.submitError = '';
-            const payload = {
-                vendor_id: this.vendorId,
-                delivery_preference: this.destinationMode === 'single' ? this.deliveryPreference : null,
-                destination_mode: this.destinationMode,
-                items: this.items.map(i => ({
-                    description: i.description, quantity: i.quantity,
-                    delivery_preference: this.destinationMode === 'per_item' ? i.delivery_preference : undefined,
-                    delivery: this.destinationMode === 'per_item' ? {
-                        recipient_name: i.delivery.recipient_name, recipient_phone: i.delivery.recipient_phone,
-                        region_id: i.delivery.region_id, district_id: i.delivery.district_id, town: i.delivery.town,
-                        landmark: i.delivery.landmark, instructions: i.delivery.instructions,
-                    } : undefined,
-                })),
-            };
-            if (this.destinationMode === 'single') {
-                payload.delivery = {
-                    recipient_name: this.delivery.recipient_name, recipient_phone: this.delivery.recipient_phone,
-                    region_id: this.delivery.region_id, district_id: this.delivery.district_id, town: this.delivery.town,
-                    landmark: this.delivery.landmark, instructions: this.delivery.instructions,
-                };
-            }
+            this.submitting = true;
+            this.submitError = '';
+            const items = this.items.map(item => ({
+                description: item.description,
+                quantity: item.quantity,
+                delivery_method: item.delivery_method,
+                forward_to_warehouse_id: item.forward_to_warehouse_id || null,
+                delivery: this.deliveryPayload(item.delivery),
+            }));
+
+            const formData = new FormData();
+            formData.append('vendor_id', this.vendorId);
+            formData.append('fulfillment_type', 'warehouse');
+            formData.append('delivery_preference', 'deliver');
+            formData.append('destination_mode', 'per_item');
+            formData.append('items_json', JSON.stringify(items));
+            this.items.forEach((item, index) => {
+                (item.photos || []).forEach(file => formData.append(`item_photos[${index}][]`, file));
+            });
+
             try {
                 const res = await fetch(this.config.storeUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-                    body: JSON.stringify(payload),
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
                 });
                 const json = await res.json();
-                if (json.success) { window.location.href = json.redirect; }
-                else if (json.errors) { this.submitError = Object.values(json.errors).flat().join(', '); }
-                else { this.submitError = json.message || 'Failed to create shipment.'; }
-            } catch { this.submitError = 'An unexpected error occurred.'; }
-            this.submitting = false;
+                if (!res.ok) {
+                    this.submitError = json.errors ? Object.values(json.errors).flat().join(', ') : (json.message || 'Failed to create shipment.');
+                    return;
+                }
+                this.createdPackages = (json.packages || []).map(pkg => this.prepareCreatedPackage(pkg));
+                this.step = 4;
+            } catch {
+                this.submitError = 'An unexpected error occurred.';
+            } finally {
+                this.submitting = false;
+            }
+        },
+
+        prepareCreatedPackage(pkg) {
+            const quantity = Math.max(1, Number(pkg.quantity || 1));
+            return {
+                ...pkg,
+                label_count: Math.max(1, Number(pkg.label_count || quantity)),
+            };
+        },
+
+        setPackageLabelCount(pkg, value) {
+            const count = Math.floor(Number(value || 1));
+            pkg.label_count = Number.isFinite(count) ? Math.max(1, Math.min(500, count)) : 1;
+        },
+
+        totalLabelCount() {
+            return this.createdPackages.reduce((total, pkg) => total + Math.max(1, Number(pkg.label_count || 1)), 0);
+        },
+
+        canPrintAnyLabels() {
+            return this.createdPackages.length > 0 && this.totalLabelCount() > 0 && this.totalLabelCount() <= 500;
+        },
+
+        printAllLabels() {
+            const packages = this.createdPackages
+                .map(pkg => ({ pkg, label_count: Math.max(1, Number(pkg.label_count || 1)) }))
+                .filter(row => row.label_count > 0);
+
+            return this.printRequestedLabels(packages);
+        },
+
+        async printLabel(pkg) {
+            return this.printRequestedLabels([{ pkg, label_count: Math.max(1, Number(pkg.label_count || 1)) }], pkg.id);
+        },
+
+        async printRequestedLabels(packages, packageId = null) {
+            if (!packages.length || this.printingLabels) return false;
+
+            this.printingLabels = true;
+            this.printingPackageId = packageId;
+            this.submitError = '';
+
+            try {
+                const singlePackage = packages.length === 1 ? packages[0] : null;
+                const res = await fetch(singlePackage ? singlePackage.pkg.print_url : this.config.printLabelsUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    body: singlePackage
+                        ? JSON.stringify({ label_count: singlePackage.label_count })
+                        : JSON.stringify({
+                            packages: packages.map(row => ({
+                                shipment_item_id: row.pkg.id,
+                                label_count: row.label_count,
+                            })),
+                        }),
+                });
+                const json = await res.json();
+                if (!res.ok || !json.success) throw new Error(json.message || 'Failed to generate label.');
+                const popup = window.open('', '_blank', 'width=900,height=650');
+                if (!popup) throw new Error('Pop-up blocked. Please allow pop-ups to print labels.');
+                popup.document.open();
+                popup.document.write(json.data?.label_html || '');
+                popup.document.close();
+                this.applyPrintedPackages(json.data?.packages || []);
+                return true;
+            } catch (error) {
+                this.submitError = error.message || 'Unable to print label.';
+                return false;
+            } finally {
+                this.printingLabels = false;
+                this.printingPackageId = null;
+            }
+        },
+
+        applyPrintedPackages(packages) {
+            packages.forEach(row => {
+                const pkg = this.createdPackages.find(candidate => Number(candidate.id) === Number(row.shipment_item_id));
+                if (!pkg) return;
+
+                pkg.tracking_code = row.barcode_value || pkg.tracking_code;
+                pkg.barcode_print_count = Number(row.print_count || pkg.barcode_print_count || 0);
+                pkg.label_count = Math.max(1, Number(row.label_count || pkg.label_count || 1));
+            });
         },
     };
 }

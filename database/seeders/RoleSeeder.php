@@ -146,6 +146,12 @@ class RoleSeeder extends Seeder
             'warehouse.invoices.delete',
             'warehouse.charges.view',
             'warehouse.charges.manage',
+            'warehouse.recipient_payments.view',
+            'warehouse.recipient_payments.process',
+            'warehouse.recipient_payments.assign',
+            'warehouse.recipient_payments.reconcile',
+            'warehouse.recipient_payments.override',
+            'warehouse.recipient_payments.manage_wallets',
         ])->pluck('id');
         $warehouseManager->permissions()->sync($warehouseManagerPermissions);
 
@@ -236,7 +242,51 @@ class RoleSeeder extends Seeder
         ])->pluck('id');
         $warehouseContactAgent->permissions()->sync($contactAgentPermissions);
 
-        $this->command->info('Successfully seeded 8 system roles:');
+        // 9. Recipient Payment Agent
+        $recipientPaymentAgent = Role::updateOrCreate(
+            ['slug' => 'recipient-payment-agent'],
+            [
+                'name' => 'Recipient Payment Agent',
+                'description' => 'Calls recipients, records delivery fee payments, and manages own payment sessions',
+                'is_system_role' => true,
+                'is_warehouse_role' => true,
+                'is_assignable_by_warehouse_manager' => true,
+                'is_active' => true,
+            ]
+        );
+
+        $recipientPaymentAgentPermissions = Permission::whereIn('name', [
+            'warehouse.dashboard.view',
+            'warehouse.recipient_payments.view',
+            'warehouse.recipient_payments.process',
+        ])->pluck('id');
+        $recipientPaymentAgent->permissions()->sync($recipientPaymentAgentPermissions);
+
+        // 10. Recipient Payment Supervisor
+        $recipientPaymentSupervisor = Role::updateOrCreate(
+            ['slug' => 'recipient_payment_supervisor'],
+            [
+                'name' => 'Recipient Payment Supervisor',
+                'description' => 'Assigns recipient payment work and reviews wallet reconciliation',
+                'is_system_role' => true,
+                'is_warehouse_role' => true,
+                'is_assignable_by_warehouse_manager' => true,
+                'is_active' => true,
+            ]
+        );
+
+        $recipientPaymentSupervisorPermissions = Permission::whereIn('name', [
+            'warehouse.dashboard.view',
+            'warehouse.recipient_payments.view',
+            'warehouse.recipient_payments.process',
+            'warehouse.recipient_payments.assign',
+            'warehouse.recipient_payments.reconcile',
+            'warehouse.recipient_payments.override',
+            'warehouse.recipient_payments.manage_wallets',
+        ])->pluck('id');
+        $recipientPaymentSupervisor->permissions()->sync($recipientPaymentSupervisorPermissions);
+
+        $this->command->info('Successfully seeded 10 system roles:');
         $this->command->info('  - Super Administrator (' . $superAdmin->permissions->count() . ' permissions)');
         $this->command->info('  - Operations Manager (' . $operationsManager->permissions->count() . ' permissions)');
         $this->command->info('  - Accountant (' . $accountant->permissions->count() . ' permissions)');
@@ -245,5 +295,7 @@ class RoleSeeder extends Seeder
         $this->command->info('  - Warehouse Sorter (' . $warehouseSorter->permissions->count() . ' permissions)');
         $this->command->info('  - Warehouse Dispatcher (' . $warehouseDispatcher->permissions->count() . ' permissions)');
         $this->command->info('  - Contact Agent (' . $warehouseContactAgent->permissions->count() . ' permissions)');
+        $this->command->info('  - Recipient Payment Agent (' . $recipientPaymentAgent->permissions->count() . ' permissions)');
+        $this->command->info('  - Recipient Payment Supervisor (' . $recipientPaymentSupervisor->permissions->count() . ' permissions)');
     }
 }

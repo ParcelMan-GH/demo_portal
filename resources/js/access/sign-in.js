@@ -1,10 +1,10 @@
 import Alpine from 'alpinejs';
-import '../../../../css/pages/admin-login.css';
+import '../../css/pages/access-sign-in.css';
 
 window.Alpine = Alpine;
 
 const register = () => {
-    Alpine.data('adminLoginPage', () => ({
+    Alpine.data('accessSignInPage', () => ({
         showPassword: false,
         isSubmitting: false,
         handleSubmit(event) {
@@ -23,4 +23,3 @@ if (window.Alpine) {
 }
 
 Alpine.start();
-

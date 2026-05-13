@@ -11,13 +11,17 @@ use Illuminate\Support\Facades\Storage;
 class StorageService
 {
     private ?S3Client $s3Client = null;
+    private ?string $driver = null;
+    private ?Filesystem $disk = null;
+    private ?Filesystem $s3Disk = null;
+    private ?array $s3Config = null;
 
     /**
      * Get the current storage driver from platform settings.
      */
     public function getDriver(): string
     {
-        return PlatformSetting::getValue('storage.driver', 'local');
+        return $this->driver ??= PlatformSetting::getValue('storage.driver', 'local');
     }
 
     /**
@@ -25,13 +29,17 @@ class StorageService
      */
     public function getDisk(): Filesystem
     {
+        if ($this->disk !== null) {
+            return $this->disk;
+        }
+
         $driver = $this->getDriver();
 
         if ($driver === 's3') {
-            return $this->getS3Disk();
+            return $this->disk = $this->getS3Disk();
         }
 
-        return Storage::disk('local');
+        return $this->disk = Storage::disk('local');
     }
 
     /**
@@ -39,7 +47,24 @@ class StorageService
      */
     private function getS3Disk(): Filesystem
     {
-        $config = [
+        if ($this->s3Disk !== null) {
+            return $this->s3Disk;
+        }
+
+        // Create a dynamic filesystem config
+        config(['filesystems.disks.storj' => $this->getS3Config()]);
+
+        return $this->s3Disk = Storage::disk('storj');
+    }
+
+    /**
+     * Get S3 settings once per service instance.
+     *
+     * @return array<string, mixed>
+     */
+    private function getS3Config(): array
+    {
+        return $this->s3Config ??= [
             'driver' => 's3',
             'key' => PlatformSetting::getValue('storage.s3.access_key', ''),
             'secret' => PlatformSetting::getValue('storage.s3.secret_key', ''),
@@ -48,11 +73,6 @@ class StorageService
             'endpoint' => PlatformSetting::getValue('storage.s3.endpoint', ''),
             'use_path_style_endpoint' => true,
         ];
-
-        // Create a dynamic filesystem config
-        config(['filesystems.disks.storj' => $config]);
-
-        return Storage::disk('storj');
     }
 
     /**
@@ -61,14 +81,16 @@ class StorageService
     private function getS3Client(): S3Client
     {
         if ($this->s3Client === null) {
+            $config = $this->getS3Config();
+
             $this->s3Client = new S3Client([
                 'version' => 'latest',
                 'region' => 'us-east-1',
-                'endpoint' => PlatformSetting::getValue('storage.s3.endpoint', ''),
+                'endpoint' => $config['endpoint'],
                 'use_path_style_endpoint' => true,
                 'credentials' => [
-                    'key' => PlatformSetting::getValue('storage.s3.access_key', ''),
-                    'secret' => PlatformSetting::getValue('storage.s3.secret_key', ''),
+                    'key' => $config['key'],
+                    'secret' => $config['secret'],
                 ],
             ]);
         }
@@ -163,7 +185,7 @@ class StorageService
             $expiryMinutes = (int) PlatformSetting::getValue('storage.s3.signed_url_expiry', 60);
         }
 
-        $bucket = PlatformSetting::getValue('storage.s3.bucket', '');
+        $bucket = $this->getS3Config()['bucket'];
         $client = $this->getS3Client();
 
         $cmd = $client->getCommand('GetObject', [

@@ -1,481 +1,310 @@
-@extends('admin.layouts.app')
+@extends($layoutName ?? 'admin.layouts.app')
 
 @section('title', $batch->batch_number)
 @section('breadcrumb-parent', 'Sort Batches')
 @section('breadcrumb-current', $batch->batch_number)
 
 @section('content')
+@php
+    $sortBatchShowConfig = $sortBatchShowConfig ?? [
+        'indexUrl' => route('admin.sort-batches.index'),
+        'itemsDataUrl' => route('admin.sort-batches.items-data', $batch->id),
+        'eligibleItemsUrl' => route('admin.sort-batches.eligible-items', $batch->id),
+        'addItemsUrl' => route('admin.sort-batches.add-items', $batch->id),
+        'removeItemUrlTemplate' => route('admin.sort-batches.remove-item', ['batch' => $batch->id, 'shipmentItem' => '__ITEM__']),
+        'sealUrl' => route('admin.sort-batches.seal', $batch->id),
+        'reopenUrl' => route('admin.sort-batches.reopen', $batch->id),
+        'deleteBatchUrl' => route('admin.sort-batches.destroy', $batch->id),
+        'createManifestUrl' => route('admin.sort-batches.create-transport-manifest', $batch->id),
+        'createRunUrl' => route('admin.sort-batches.create-delivery-run', $batch->id),
+        'shipmentShowUrlTemplate' => route('admin.shipments.show', '__ID__'),
+        'packageShowUrlTemplate' => route('warehouse.packages.show', '__ID__'),
+        'manifestShowUrlTemplate' => route('admin.transport-manifests.show', '__ID__'),
+        'deliveryRunShowUrlTemplate' => route('admin.delivery-runs.show', '__ID__'),
+    ];
+
+    $reopenLockReason = null;
+
+    if ($batch->transportManifest?->status === \App\Models\TransportManifest::STATUS_RECEIVED) {
+        $reopenLockReason = 'Transport manifest completed';
+    } elseif ($batch->deliveryRun?->status === \App\Models\DeliveryRun::STATUS_COMPLETED) {
+        $reopenLockReason = 'Delivery run completed';
+    }
+
+    $batchListModeUrl = url()->current() . '#batch-items';
+    $batchAddModeUrl = url()->current() . '?mode=add#warehouse-packages';
+    $initialItemsMode = request('mode') === 'add' && $batch->status === \App\Models\SortBatch::STATUS_OPEN ? 'add' : 'list';
+    $initialEligibleItems = collect($initialEligibleItems ?? []);
+    $initialEligibleMeta = $initialEligibleMeta ?? [
+        'total' => $initialEligibleItems->count(),
+        'per_page' => 25,
+        'current_page' => 1,
+        'last_page' => 1,
+        'from' => $initialEligibleItems->isNotEmpty() ? 1 : 0,
+        'to' => $initialEligibleItems->count(),
+    ];
+    $isWarehousePortal = ($layoutName ?? null) === 'warehouse.layouts.app' || request()->routeIs('warehouse.*');
+@endphp
 
 <div class="space-y-6" x-data="sortBatchShow()" x-init="init()">
 
     <!-- Hero Section -->
-    <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30">
-        <div class="relative">
-            <!-- Background Pattern -->
-            <div class="absolute inset-0 opacity-10">
-                <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <defs>
-                        <pattern id="sbgrid" width="10" height="10" patternUnits="userSpaceOnUse">
-                            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" stroke-width="0.5"/>
-                        </pattern>
-                    </defs>
-                    <rect width="100" height="100" fill="url(#sbgrid)"/>
-                </svg>
+    <section class="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 shadow-xl shadow-slate-300/20">
+        <div class="relative p-5 sm:p-6">
+            <div class="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.22),transparent_58%)]"></div>
+
+            <div class="relative flex items-center justify-between gap-3">
+                <a href="{{ $sortBatchShowConfig['indexUrl'] }}" class="inline-flex min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-slate-200 transition hover:bg-white/15">
+                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    <span class="truncate">Back to Sort Batches</span>
+                </a>
+
+                <div class="flex shrink-0 items-center gap-2">
+                    @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                        <span class="inline-flex items-center rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-black text-emerald-300 ring-1 ring-emerald-400/25">Open</span>
+                    @else
+                        <span class="inline-flex items-center rounded-full bg-slate-500/20 px-3 py-1 text-xs font-black text-slate-300 ring-1 ring-slate-400/25">Sealed</span>
+                    @endif
+
+                    @if($batch->dispatch_mode === \App\Models\SortBatch::DISPATCH_TRANSFER)
+                        <span class="inline-flex items-center rounded-full bg-orange-500/15 px-3 py-1 text-xs font-black text-orange-200 ring-1 ring-orange-400/30">Transfer</span>
+                    @else
+                        <span class="inline-flex items-center whitespace-nowrap rounded-full bg-amber-500/15 px-3 py-1 text-xs font-black text-amber-200 ring-1 ring-amber-400/30">Local Delivery</span>
+                    @endif
+                </div>
             </div>
 
-            <div class="relative px-6 lg:px-8 py-6">
-                <!-- Top Row: Back Button + Actions -->
-                <div class="flex items-center justify-between mb-6">
-                    <a href="{{ route('admin.sort-batches.index') }}" class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium transition-all backdrop-blur-sm hover:shadow-md">
-                        <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                        </svg>
-                        <span class="text-xs">Back to Sort Batches</span>
-                    </a>
-
-                    <!-- Action Buttons -->
-                    <div class="flex items-center gap-2 flex-wrap justify-end">
-                        @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
-                        <!-- Add Items -->
-                        <button type="button" @@click="goSortingWorkspace()"
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/30 text-blue-200 text-xs font-semibold transition-all backdrop-blur-sm">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            Sort Items
-                        </button>
-                        <!-- Seal Batch -->
-                        <button type="button" @@click="sealBatch()" :disabled="actionLoading"
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold transition-all backdrop-blur-sm disabled:opacity-50">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                            Seal Batch
-                        </button>
-                        @endif
-
-                        @if($batch->status === \App\Models\SortBatch::STATUS_SEALED)
-                        <!-- Reopen Batch -->
-                        <button type="button" @@click="reopenBatch()" :disabled="actionLoading"
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/30 text-amber-200 text-xs font-semibold transition-all backdrop-blur-sm disabled:opacity-50">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                            Reopen
-                        </button>
-
-                        @if($batch->dispatch_mode === \App\Models\SortBatch::DISPATCH_LOCAL_DELIVERY && !$batch->deliveryRun)
-                        <!-- Create Delivery Run -->
-                        <button type="button" @@click="createDeliveryRun()" :disabled="actionLoading"
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-200 text-xs font-semibold transition-all backdrop-blur-sm disabled:opacity-50">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                            Create Delivery Run
-                        </button>
-                        @endif
-                        @endif
-                    </div>
-                </div>
-
-                <!-- Main Row: Profile LEFT, Summary RIGHT -->
-                <div class="flex flex-col lg:flex-row lg:items-start gap-6">
-                    <!-- LEFT: Batch Info -->
-                    <div class="flex items-start gap-5 lg:flex-shrink-0">
-                        <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-xl shadow-blue-500/30 ring-4 ring-white/10">
-                            <svg class="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+            <div class="relative mt-5 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+                <div class="min-w-0 xl:max-w-[640px]">
+                    <div class="flex items-start gap-4">
+                        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-lg shadow-orange-950/25">
+                            <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
                             </svg>
                         </div>
-
-                        <div class="space-y-1.5 min-w-0">
-                            <h1 class="text-2xl font-bold text-white">{{ $batch->batch_number }}</h1>
-
-                            <!-- Status + Mode Badges -->
-                            <div class="flex flex-wrap items-center gap-2">
-                                @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/30">Open</span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-black uppercase tracking-[0.16em] text-orange-200">Sort Batch Workspace</p>
+                            <h1 class="mt-1 break-words text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl xl:text-2xl 2xl:text-3xl">{{ $batch->batch_number }}</h1>
+                            <div class="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-300">
+                                @if($isWarehousePortal)
+                                    @if($batch->dispatch_mode === \App\Models\SortBatch::DISPATCH_TRANSFER)
+                                        <span>Transfer to {{ $batch->destinationWarehouse?->name ?? 'destination warehouse' }}</span>
+                                    @else
+                                        <span>Local delivery batch</span>
+                                    @endif
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-500/30 text-slate-300 ring-1 ring-slate-400/30">Sealed</span>
+                                    <span>{{ $batch->originWarehouse?->name ?? '—' }}</span>
+                                    @if($batch->destinationWarehouse)
+                                        <span class="text-slate-600">/</span>
+                                        <span>{{ $batch->destinationWarehouse->name }}</span>
+                                    @endif
                                 @endif
-
-                                @if($batch->dispatch_mode === \App\Models\SortBatch::DISPATCH_TRANSFER)
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 ring-1 ring-blue-400/30">Transfer</span>
-                                @else
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/30">Local Delivery</span>
-                                @endif
+                                <span class="text-slate-600">/</span>
+                                <span>Created by {{ $batch->createdBy?->name ?? '—' }}</span>
+                                <span class="text-slate-600">/</span>
+                                <span>{{ $batch->created_at->format('d M Y, H:i') }}</span>
                             </div>
+                        </div>
+                    </div>
 
-                            <!-- Warehouse Route -->
-                            <div class="flex items-center gap-2 text-sm text-slate-300">
-                                <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    @if($batch->status === \App\Models\SortBatch::STATUS_SEALED && $reopenLockReason === null)
+                    <button type="button" @@click="reopenBatch()" :disabled="actionLoading"
+                            class="mt-4 inline-flex items-center gap-2 rounded-xl border border-amber-300/30 bg-amber-500/15 px-4 py-3 text-sm font-black text-amber-100 transition hover:bg-amber-500/25 disabled:opacity-50">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Reopen
+                    </button>
+                    @endif
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 xl:w-[430px] xl:shrink-0 2xl:w-[480px]">
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-3 xl:p-3">
+                        <div class="flex items-center gap-3">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500/20 text-orange-300">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                 </svg>
-                                <span>{{ $batch->originWarehouse?->name ?? '—' }}</span>
-                                @if($batch->destinationWarehouse)
-                                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                    </svg>
-                                    <span>{{ $batch->destinationWarehouse->name }}</span>
-                                @endif
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-lg font-black leading-tight text-white"><span x-text="batchItemsCount">{{ $batch->active_items_count }}</span> items</p>
+                                <p class="mt-1 text-xs font-bold text-slate-400">{{ (int) ($recipientPaymentSummary['pending'] ?? 0) }} pending</p>
                             </div>
                         </div>
                     </div>
 
-                    <!-- RIGHT: Summary Cards -->
-                    <div class="lg:ml-auto grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div class="bg-white/5 rounded-xl px-4 py-3 border border-white/10 min-w-[120px]">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                                    <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-white leading-none" x-text="batchItemsCount">{{ $batch->active_items_count }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Items</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="bg-white/5 rounded-xl px-4 py-3 border border-white/10 min-w-[120px]">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center">
-                                    <svg class="w-3.5 h-3.5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-sm font-bold text-white leading-none truncate max-w-[100px]">{{ $batch->createdBy?->name ?? '—' }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Created By</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        @if($batch->transportManifest)
-                        <div class="bg-white/5 rounded-xl px-4 py-3 border border-white/10 min-w-[120px]">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-sm font-bold text-white leading-none">Manifest</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Linked</p>
-                                </div>
-                            </div>
-                        </div>
-                        @endif
-
-                        <div class="bg-white/5 rounded-xl px-4 py-3 border border-white/10 min-w-[120px]">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg bg-slate-500/20 flex items-center justify-center">
-                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-white leading-none">{{ $batch->created_at->format('M d') }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Created</p>
-                                </div>
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-3 xl:p-3">
+                        <div class="flex items-center gap-3">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m-7 4h8m4-14v16l-2-1-2 1-2-1-2 1-2-1-2 1V4l2 1 2-1 2 1 2-1 2 1 2-1z"/>
+                                </svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-base font-black leading-tight text-white">GHS {{ number_format((float) ($recipientPaymentSummary['paid_total'] ?? 0), 2) }}</p>
+                                <p class="mt-1 text-xs font-bold text-slate-400">{{ (int) ($recipientPaymentSummary['paid'] ?? 0) }} paid</p>
                             </div>
                         </div>
                     </div>
+
+                @if($batch->transportManifest)
+                <a href="{{ str_replace('__ID__', $batch->transportManifest->id, $sortBatchShowConfig['manifestShowUrlTemplate']) }}"
+                       class="rounded-2xl border border-white/10 bg-white/10 p-3 transition hover:border-orange-300/40 hover:bg-white/15 sm:p-4">
+                    <div class="flex items-center gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-black text-white">{{ $batch->transportManifest->manifest_number }}</p>
+                            <p class="text-xs font-bold text-slate-400">Transport manifest</p>
+                        </div>
+                    </div>
+                </a>
+                @endif
+
+                @if($batch->deliveryRun)
+                <a href="{{ str_replace('__ID__', $batch->deliveryRun->id, $sortBatchShowConfig['deliveryRunShowUrlTemplate']) }}"
+                       class="rounded-2xl border border-white/10 bg-white/10 p-3 transition hover:border-orange-300/40 hover:bg-white/15 sm:p-4">
+                    <div class="flex items-center gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-black text-white">{{ $batch->deliveryRun->run_number }}</p>
+                            <p class="text-xs font-bold text-slate-400">Delivery run</p>
+                        </div>
+                    </div>
+                </a>
+                @endif
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
-    <!-- Action Feedback -->
+    <!-- Action Toast -->
     <div x-show="actionMessage" x-cloak x-transition
-         class="flex items-center gap-3 px-5 py-3 rounded-2xl border text-sm font-medium"
-         :class="actionSuccess ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'">
-        <svg x-show="actionSuccess" class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <svg x-show="!actionSuccess" class="w-4 h-4 text-rose-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+         class="fixed right-4 top-4 z-[200] flex w-[min(440px,calc(100vw-2rem))] items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-bold shadow-2xl sm:right-6 sm:top-6"
+         :class="actionSuccess ? 'border-emerald-200 bg-emerald-50 text-emerald-800 shadow-emerald-900/10' : 'border-rose-200 bg-rose-50 text-rose-800 shadow-rose-900/10'"
+         role="alert">
+        <svg x-show="actionSuccess" class="h-4 w-4 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <svg x-show="!actionSuccess" class="h-4 w-4 flex-shrink-0 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <span x-text="actionMessage"></span>
         <button type="button" @@click="actionMessage = ''" class="ml-auto text-current opacity-50 hover:opacity-100">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
     </div>
 
-    <!-- Tabs Section -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex min-h-[520px]">
-
-        <!-- Sidebar Nav -->
-        <aside class="w-52 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col py-4 px-2.5">
-
-            <!-- Section: Batch -->
-            <p class="px-1.5 mb-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Batch</p>
-
-            <!-- Overview -->
-            <button @@click="activeTab = 'overview'"
-                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'overview' ? 'bg-sky-50 ring-1 ring-sky-100 shadow-sm' : 'hover:bg-slate-50'">
-                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'overview' ? 'bg-sky-500 shadow-sm shadow-sky-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'overview' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 7h18M3 12h18M3 17h18"/>
-                    </svg>
-                </div>
-                <span class="text-xs transition-colors" :class="activeTab === 'overview' ? 'font-bold text-sky-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Overview</span>
-            </button>
-
-            <!-- Batch Items -->
-            <button @@click="activeTab = 'items'"
-                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'items' ? 'bg-blue-50 ring-1 ring-blue-100 shadow-sm' : 'hover:bg-slate-50'">
-                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'items' ? 'bg-blue-500 shadow-sm shadow-blue-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'items' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                    </svg>
-                </div>
-                <span class="flex-1 text-xs transition-colors" :class="activeTab === 'items' ? 'font-bold text-blue-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Batch Items</span>
-                <span class="inline-flex items-center justify-center min-w-[1.125rem] h-4 px-1 text-[9px] font-bold rounded-full transition-all"
-                    :class="activeTab === 'items' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'" x-text="batchItemsCount">{{ $batch->active_items_count }}</span>
-            </button>
-
-            <!-- Divider: Logistics -->
-            <div class="flex items-center gap-2 mt-3 mb-1.5 px-1">
-                <div class="flex-1 h-px bg-slate-100"></div>
-                <p class="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Logistics</p>
-                <div class="flex-1 h-px bg-slate-100"></div>
-            </div>
-
-            <!-- Transport -->
-            <button @@click="activeTab = 'transport'"
-                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'transport' ? 'bg-emerald-50 ring-1 ring-emerald-100 shadow-sm' : 'hover:bg-slate-50'">
-                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'transport' ? 'bg-emerald-500 shadow-sm shadow-emerald-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'transport' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                </div>
-                <span class="flex-1 text-xs transition-colors" :class="activeTab === 'transport' ? 'font-bold text-emerald-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Transport</span>
-                @if($batch->transportManifest)
-                <span class="inline-flex items-center justify-center min-w-[1.125rem] h-4 px-1 text-[9px] font-bold rounded-full transition-all"
-                    :class="activeTab === 'transport' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'">1</span>
-                @endif
-            </button>
-
-            <!-- Delivery -->
-            <button @@click="activeTab = 'delivery'"
-                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg transition-all duration-150 text-left"
-                :class="activeTab === 'delivery' ? 'bg-amber-50 ring-1 ring-amber-100 shadow-sm' : 'hover:bg-slate-50'">
-                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'delivery' ? 'bg-amber-500 shadow-sm shadow-amber-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'delivery' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                    </svg>
-                </div>
-                <span class="flex-1 text-xs transition-colors" :class="activeTab === 'delivery' ? 'font-bold text-amber-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Delivery Run</span>
-                @if($batch->deliveryRun)
-                <span class="inline-flex items-center justify-center min-w-[1.125rem] h-4 px-1 text-[9px] font-bold rounded-full transition-all"
-                    :class="activeTab === 'delivery' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500'">1</span>
-                @endif
-            </button>
-
-        </aside>
-
-        <!-- Tab Content Area -->
-        <div class="flex-1 min-w-0 px-8 py-6 overflow-auto bg-slate-50/60">
-
-            <!-- ═══════════════════════════════════════ -->
-            <!-- OVERVIEW TAB                            -->
-            <!-- ═══════════════════════════════════════ -->
-            <div x-show="activeTab === 'overview'" x-cloak>
-                <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
-
-                    <!-- Batch Details Card -->
-                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                        <div class="mb-4">
-                            <h3 class="text-sm font-bold text-slate-900">Batch Details</h3>
-                            <p class="text-xs text-slate-500 mt-0.5">Core information about this sort batch</p>
-                        </div>
-                        <div class="space-y-3">
-                            <div class="flex items-center justify-between py-2 border-b border-slate-100">
-                                <span class="text-xs font-medium text-slate-500">Batch Number</span>
-                                <span class="text-xs font-semibold text-slate-900 font-mono">{{ $batch->batch_number }}</span>
-                            </div>
-                            <div class="flex items-center justify-between py-2 border-b border-slate-100">
-                                <span class="text-xs font-medium text-slate-500">Status</span>
-                                @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Open
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> Sealed
-                                    </span>
-                                @endif
-                            </div>
-                            <div class="flex items-center justify-between py-2 border-b border-slate-100">
-                                <span class="text-xs font-medium text-slate-500">Dispatch Mode</span>
-                                @if($batch->dispatch_mode === \App\Models\SortBatch::DISPATCH_TRANSFER)
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">Transfer</span>
-                                @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">Local Delivery</span>
-                                @endif
-                            </div>
-                            <div class="flex items-center justify-between py-2 border-b border-slate-100">
-                                <span class="text-xs font-medium text-slate-500">Items Count</span>
-                                <span class="text-xs font-semibold text-slate-900" x-text="batchItemsCount">{{ $batch->active_items_count }}</span>
-                            </div>
-                            <div class="flex items-center justify-between py-2 border-b border-slate-100">
-                                <span class="text-xs font-medium text-slate-500">Created At</span>
-                                <span class="text-xs font-semibold text-slate-900">{{ $batch->created_at->format('d M Y, H:i') }}</span>
-                            </div>
-                            <div class="flex items-center justify-between py-2 border-b border-slate-100">
-                                <span class="text-xs font-medium text-slate-500">Created By</span>
-                                <span class="text-xs font-semibold text-slate-900">{{ $batch->createdBy?->name ?? '—' }}</span>
-                            </div>
-                            @if($batch->status === \App\Models\SortBatch::STATUS_SEALED)
-                            <div class="flex items-center justify-between py-2 border-b border-slate-100">
-                                <span class="text-xs font-medium text-slate-500">Sealed By</span>
-                                <span class="text-xs font-semibold text-slate-900">{{ $batch->sealedBy?->name ?? '—' }}</span>
-                            </div>
-                            <div class="flex items-center justify-between py-2 border-b border-slate-100">
-                                <span class="text-xs font-medium text-slate-500">Sealed At</span>
-                                <span class="text-xs font-semibold text-slate-900">{{ $batch->sealed_at?->format('d M Y, H:i') ?? '—' }}</span>
-                            </div>
-                            @endif
-                        </div>
-                    </div>
-
-                    <!-- Warehouse Route Card -->
-                    <div class="space-y-5">
-                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                            <div class="mb-4">
-                                <h3 class="text-sm font-bold text-slate-900">Warehouse Route</h3>
-                                <p class="text-xs text-slate-500 mt-0.5">Origin and destination warehouses</p>
-                            </div>
-                            <div class="flex items-center gap-4">
-                                <!-- Origin -->
-                                <div class="flex-1 bg-slate-50 rounded-xl p-4 border border-slate-100">
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <div class="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center">
-                                            <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-                                            </svg>
-                                        </div>
-                                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Origin</span>
-                                    </div>
-                                    <p class="text-sm font-bold text-slate-900">{{ $batch->originWarehouse?->name ?? '—' }}</p>
-                                    @if($batch->originWarehouse?->code)
-                                        <p class="text-[10px] text-slate-500 mt-0.5 font-mono">{{ $batch->originWarehouse->code }}</p>
-                                    @endif
-                                </div>
-
-                                <!-- Arrow -->
-                                <div class="flex-shrink-0">
-                                    <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                        </svg>
-                                    </div>
-                                </div>
-
-                                <!-- Destination -->
-                                <div class="flex-1 bg-slate-50 rounded-xl p-4 border border-slate-100">
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <div class="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
-                                            <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                            </svg>
-                                        </div>
-                                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Destination</span>
-                                    </div>
-                                    <p class="text-sm font-bold text-slate-900">{{ $batch->destinationWarehouse?->name ?? '—' }}</p>
-                                    @if($batch->destinationWarehouse?->code)
-                                        <p class="text-[10px] text-slate-500 mt-0.5 font-mono">{{ $batch->destinationWarehouse->code }}</p>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Notes Card -->
-                        @if($batch->notes)
-                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                            <h3 class="text-sm font-bold text-slate-900 mb-2">Notes</h3>
-                            <p class="text-sm text-slate-600 leading-relaxed">{{ $batch->notes }}</p>
-                        </div>
-                        @endif
-
-                        <!-- Quick Links Card -->
-                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                            <h3 class="text-sm font-bold text-slate-900 mb-3">Quick Links</h3>
-                            <div class="space-y-2">
-                                <button @@click="activeTab = 'items'" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-100 transition-colors group">
-                                    <div class="flex items-center gap-2.5">
-                                        <div class="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center">
-                                            <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                            </svg>
-                                        </div>
-                                        <span class="text-xs font-semibold text-slate-700 group-hover:text-blue-700">View Batch Items</span>
-                                    </div>
-                                    <span class="text-[10px] font-bold text-slate-400 group-hover:text-blue-500" x-text="batchItemsCount + ' items'">{{ $batch->active_items_count }} items</span>
-                                </button>
-
-                                @if($batch->transportManifest)
-                                <button @@click="activeTab = 'transport'" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-slate-100 hover:border-emerald-100 transition-colors group">
-                                    <div class="flex items-center gap-2.5">
-                                        <div class="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
-                                            <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                            </svg>
-                                        </div>
-                                        <span class="text-xs font-semibold text-slate-700 group-hover:text-emerald-700">Transport Manifest</span>
-                                    </div>
-                                    <span class="text-[10px] font-bold text-slate-400 group-hover:text-emerald-500">{{ $batch->transportManifest->manifest_number }}</span>
-                                </button>
-                                @endif
-
-                                @if($batch->deliveryRun)
-                                <button @@click="activeTab = 'delivery'" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-amber-50 border border-slate-100 hover:border-amber-100 transition-colors group">
-                                    <div class="flex items-center gap-2.5">
-                                        <div class="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center">
-                                            <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                                            </svg>
-                                        </div>
-                                        <span class="text-xs font-semibold text-slate-700 group-hover:text-amber-700">Delivery Run</span>
-                                    </div>
-                                    <span class="text-[10px] font-bold text-slate-400 group-hover:text-amber-500">{{ $batch->deliveryRun->run_number }}</span>
-                                </button>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ═══════════════════════════════════════ -->
-            <!-- SORTING WORKSPACE                       -->
-            <!-- ═══════════════════════════════════════ -->
-            <div x-show="activeTab === 'items'" x-cloak>
-                <div class="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.8fr)] gap-5">
-                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
+    <!-- Batch Items Workspace -->
+    <div id="batch-items" class="space-y-5">
+                    <div id="batch-items-card" x-ref="itemsListPanel" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div class="border-b border-slate-100 px-4 pb-6 pt-4 sm:px-5">
+                            <div class="flex flex-col gap-4">
+                            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                             <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600">
+                                    <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-sm font-bold text-slate-900">Batch Items</h3>
-                                    <p class="text-[11px] text-slate-500 mt-0.5">
+                                    <h3 class="text-lg font-black text-slate-950">Batch Items</h3>
+                                    <p class="mt-0.5 text-sm text-slate-500">
                                         <span x-text="itemsMeta.total"></span> <span x-text="itemsMeta.total === 1 ? 'item' : 'items'"></span> currently selected
+                                    </p>
+                                    <p x-show="blockedItemsCount() > 0" x-cloak class="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-rose-600">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                        <span x-text="blockedItemsCount()"></span>
+                                        <span x-text="blockedItemsCount() === 1 ? 'item needs attention' : 'items need attention'"></span>
                                     </p>
                                 </div>
                             </div>
-                            <div class="relative">
-                                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="flex flex-wrap gap-2 lg:justify-end">
+                                @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                                <button type="button" onclick="document.getElementById('batch-items-card').style.display = 'none'; document.getElementById('warehouse-packages').style.display = 'block'; document.getElementById('warehouse-packages').scrollIntoView({ behavior: 'smooth', block: 'start' }); return false;"
+                                        class="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-orange-600 bg-orange-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                    Add Packages
+                                </button>
+                                <button type="button" @@click="sealBatch()" :disabled="actionLoading"
+                                        class="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50">
+                                    <svg class="w-3.5 h-3.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                    </svg>
+                                    Seal Batch
+                                </button>
+                                @endif
+
+                                @if($batch->status === \App\Models\SortBatch::STATUS_SEALED && $batch->dispatch_mode === \App\Models\SortBatch::DISPATCH_LOCAL_DELIVERY && !$batch->deliveryRun)
+                                <button type="button" @@click="createDeliveryRun()" :disabled="actionLoading"
+                                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-xs font-bold text-white transition-colors shadow-sm disabled:opacity-50">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                    </svg>
+                                    Create Delivery Run
+                                </button>
+                                @endif
+
+                                @if($batch->status === \App\Models\SortBatch::STATUS_SEALED && $batch->dispatch_mode === \App\Models\SortBatch::DISPATCH_TRANSFER && !$batch->transportManifest)
+                                <button type="button" @@click="createTransportManifest()" :disabled="actionLoading"
+                                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-xs font-bold text-white transition-colors shadow-sm disabled:opacity-50">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    Create Manifest
+                                </button>
+                                @endif
+
+                                @if($batch->transportManifest)
+                                <a href="{{ str_replace('__ID__', $batch->transportManifest->id, $sortBatchShowConfig['manifestShowUrlTemplate']) }}"
+                                   class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 transition-colors">
+                                    View Manifest
+                                    <svg class="w-3.5 h-3.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </a>
+                                @endif
+
+                                @if($batch->deliveryRun)
+                                <a href="{{ str_replace('__ID__', $batch->deliveryRun->id, $sortBatchShowConfig['deliveryRunShowUrlTemplate']) }}"
+                                   class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 transition-colors">
+                                    View Delivery Run
+                                    <svg class="w-3.5 h-3.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </a>
+                                @endif
+
+                                @if($deleteState['deletable'])
+                                <button type="button" @@click="deleteBatch()" :disabled="actionLoading"
+                                        class="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-rose-100 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700 transition hover:border-rose-200 hover:bg-rose-100 disabled:opacity-50">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12m-9 0V5a1 1 0 011-1h4a1 1 0 011 1v2m2 0v12a2 2 0 01-2 2H8a2 2 0 01-2-2V7h12z"/>
+                                    </svg>
+                                    Delete Batch
+                                </button>
+                                @endif
+                            </div>
+                            </div>
+                            <div class="relative mt-1 w-full sm:max-w-md">
+                                <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                                 </svg>
                                 <input type="text" x-model="itemsSearch" @@input="onItemsSearch()" placeholder="Search selected packages"
-                                       class="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none w-56 bg-slate-50/50">
+                                       class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                             </div>
+                        </div>
                         </div>
 
                         <div x-show="itemsLoading" class="flex items-center justify-center py-16">
-                            <svg class="w-6 h-6 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <svg class="w-6 h-6 text-orange-500 animate-spin" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
@@ -486,315 +315,554 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                             </svg>
                             <p class="text-sm font-medium" x-text="itemsSearch ? 'No selected packages match your search' : 'No packages in this batch'"></p>
-                            <p class="text-xs text-slate-400 mt-1" x-show="!itemsSearch">Use the warehouse package list to add packages directly.</p>
+                            <p class="text-xs text-slate-400 mt-1" x-show="!itemsSearch">Add packages from the warehouse package selector.</p>
+                            @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                            <button type="button" x-show="!itemsSearch" onclick="document.getElementById('batch-items-card').style.display = 'none'; document.getElementById('warehouse-packages').style.display = 'block'; document.getElementById('warehouse-packages').scrollIntoView({ behavior: 'smooth', block: 'start' }); return false;"
+                                    class="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-sm transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                </svg>
+                                Add Packages
+                            </button>
+                            @endif
                         </div>
 
-                        <div x-show="!itemsLoading && items.length > 0" class="divide-y divide-slate-100">
+                        <div x-show="!itemsLoading && items.length > 0" class="divide-y divide-slate-100 md:hidden">
                             <template x-for="item in items" :key="item.id">
-                                <div class="px-4 py-3 hover:bg-slate-50/70 group">
+                                <article class="p-4" :class="item.is_sortable ? 'bg-white' : 'bg-rose-50/70'">
                                     <div class="flex items-start justify-between gap-3">
                                         <div class="min-w-0">
-                                            <div class="flex items-center gap-2 flex-wrap">
-                                                <template x-if="item.shipment_id">
-                                                    <a :href="shipmentUrl(item.shipment_id)" class="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline" x-text="item.shipment_number"></a>
-                                                </template>
-                                                <span x-show="item.tracking_code" class="font-mono text-[11px] text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded" x-text="item.tracking_code"></span>
-                                                <span class="inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full bg-slate-100 text-[10px] font-semibold text-slate-700" x-text="'Qty ' + (item.quantity || '—')"></span>
-                                            </div>
-                                            <p class="text-xs text-slate-700 mt-1 truncate" x-text="item.description || '—'"></p>
-                                            <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-                                                <span x-text="item.vendor_name || 'No vendor'"></span>
-                                                <span x-text="item.delivery_recipient_name || 'No recipient'"></span>
-                                                <span x-show="item.delivery_recipient_phone" x-text="item.delivery_recipient_phone"></span>
-                                                <span x-text="item.delivery_town || 'No town'"></span>
-                                            </div>
+                                            <template x-if="item.shipment_id">
+                                                <a :href="shipmentUrl(item.shipment_id)" class="block truncate font-mono text-sm font-black text-orange-700 underline decoration-orange-200 underline-offset-4" x-text="item.shipment_number"></a>
+                                            </template>
+                                            <template x-if="item.warehouse_receipt_item_id">
+                                                <a :href="packageUrl(item.warehouse_receipt_item_id)" class="mt-1 block truncate text-base font-black text-slate-950 hover:text-orange-700 hover:underline" x-text="item.description || 'No description'"></a>
+                                            </template>
+                                            <p x-show="!item.warehouse_receipt_item_id" class="mt-1 truncate text-base font-black text-slate-950" x-text="item.description || 'No description'"></p>
+                                            <p class="mt-1 truncate font-mono text-xs font-bold text-slate-500" x-text="item.tracking_code || 'No tracking code'"></p>
                                         </div>
-                                        @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                                        <span class="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
+                                            Qty <span class="ml-1" x-text="item.quantity || '—'"></span>
+                                        </span>
+                                    </div>
+
+                                    <div x-show="!item.is_sortable" x-cloak class="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700" x-text="item.sort_block_reason || 'No longer eligible'"></div>
+
+                                    <div class="mt-4 grid grid-cols-2 gap-3">
+                                        <div class="rounded-xl bg-slate-50 px-3 py-2">
+                                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Recipient</p>
+                                            <p class="mt-1 truncate text-sm font-bold text-slate-800" x-text="item.delivery_recipient_name || 'No recipient'"></p>
+                                        </div>
+                                        <div class="rounded-xl bg-slate-50 px-3 py-2">
+                                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Phone</p>
+                                            <p class="mt-1 truncate text-sm font-bold text-slate-800" x-text="item.delivery_recipient_phone || 'No phone'"></p>
+                                        </div>
+                                        <div class="rounded-xl bg-slate-50 px-3 py-2">
+                                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Town</p>
+                                            <p class="mt-1 truncate text-sm font-bold text-slate-800" x-text="item.delivery_town || 'No town'"></p>
+                                        </div>
+                                        <div class="rounded-xl bg-slate-50 px-3 py-2">
+                                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Payment</p>
+                                            <span class="mt-1 inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black"
+                                                  :class="paymentBadgeClass(item.recipient_payment?.status)"
+                                                  x-text="item.recipient_payment?.label || 'Not queued'"></span>
+                                        </div>
+                                    </div>
+
+                                    @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                                    <div class="mt-4 flex justify-end">
                                         <button type="button" @@click="removeItem(item)"
                                                 :disabled="actionLoading"
-                                                class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-30 flex-shrink-0">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                class="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-rose-100 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700 transition hover:border-rose-200 hover:bg-rose-100 disabled:opacity-40">
+                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            Remove
                                         </button>
-                                        @endif
                                     </div>
-                                </div>
+                                    @endif
+                                </article>
                             </template>
                         </div>
 
-                        <div x-show="!itemsLoading && itemsMeta.last_page > 1" class="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
-                            <p class="text-[11px] text-slate-500">
+                        <div x-show="!itemsLoading && items.length > 0" class="hidden overflow-x-auto md:block">
+                            <table class="min-w-[1180px] w-full text-left text-xs">
+                                <thead class="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-400">
+                                    <tr>
+                                        <th class="min-w-[160px] px-4 py-3">Shipment</th>
+                                        <th class="min-w-[140px] px-3 py-3">Tracking</th>
+                                        <th class="px-3 py-3">Description</th>
+                                        <th class="px-3 py-3">Vendor</th>
+                                        <th class="px-3 py-3">Recipient</th>
+                                        <th class="px-3 py-3">Phone</th>
+                                        <th class="px-3 py-3">Town</th>
+                                        <th class="px-3 py-3">Payment</th>
+                                        <th class="px-3 py-3 text-center">Qty</th>
+                                        <th class="px-3 py-3">Added</th>
+                                        <th class="px-4 py-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    <template x-for="item in items" :key="item.id">
+                                        <tr class="transition-colors"
+                                            :class="item.is_sortable ? 'hover:bg-orange-50/20' : 'bg-rose-50/80 ring-1 ring-inset ring-rose-200 hover:bg-rose-50'">
+                                            <td class="px-4 py-4 align-middle">
+                                                <template x-if="item.shipment_id">
+                                                    <a :href="shipmentUrl(item.shipment_id)" class="whitespace-nowrap font-mono text-sm font-black text-orange-700 underline decoration-orange-200 underline-offset-4 hover:text-orange-800" x-text="item.shipment_number"></a>
+                                                </template>
+                                                <span x-show="!item.shipment_id" class="text-sm font-bold text-slate-400">No shipment #</span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span x-show="item.tracking_code" class="block max-w-[170px] truncate font-mono text-xs font-black text-slate-700" x-text="item.tracking_code"></span>
+                                                <span x-show="!item.tracking_code" class="text-xs font-semibold text-slate-400">—</span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <template x-if="item.warehouse_receipt_item_id">
+                                                    <a :href="packageUrl(item.warehouse_receipt_item_id)" class="block max-w-[210px] truncate text-sm font-bold text-slate-800 hover:text-orange-700 hover:underline" x-text="item.description || '—'"></a>
+                                                </template>
+                                                <span x-show="!item.warehouse_receipt_item_id" class="block max-w-[210px] truncate text-sm font-bold text-slate-800" x-text="item.description || '—'"></span>
+                                                <span x-show="!item.is_sortable" x-cloak
+                                                      class="mt-1 inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-black text-rose-700 ring-1 ring-rose-200">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 9v3.75m0 3.75h.008v.008H12V16.5zm9-4.5a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                    </svg>
+                                                    <span x-text="item.sort_block_reason || 'No longer eligible'"></span>
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="block max-w-[150px] truncate text-sm font-semibold text-slate-600" x-text="item.vendor_name || 'No vendor'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="block max-w-[150px] truncate text-sm font-bold text-slate-800" x-text="item.delivery_recipient_name || 'No recipient'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="whitespace-nowrap text-sm font-semibold text-slate-600" x-text="item.delivery_recipient_phone || 'No phone'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="block max-w-[130px] truncate text-sm font-semibold text-slate-600" x-text="item.delivery_town || 'No town'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <div class="space-y-1">
+                                                    <span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black"
+                                                          :class="paymentBadgeClass(item.recipient_payment?.status)"
+                                                          x-text="item.recipient_payment?.label || 'Not queued'"></span>
+                                                    <p class="text-[10px] font-bold text-slate-400" x-show="item.recipient_payment?.amount !== null && item.recipient_payment?.amount !== undefined">
+                                                        GHS <span x-text="formatMoney(item.recipient_payment?.amount)"></span>
+                                                    </p>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-4 text-center align-middle">
+                                                <span class="inline-flex items-center justify-center rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-700" x-text="item.quantity || '—'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="block max-w-[140px] truncate text-xs font-semibold text-slate-600" x-text="item.added_at || '—'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 text-right align-middle">
+                                                @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                                                <button type="button" @@click="removeItem(item)"
+                                                        :disabled="actionLoading"
+                                                        class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 transition hover:border-rose-200 hover:bg-rose-100 disabled:opacity-40">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                    Remove
+                                                </button>
+                                                @else
+                                                <span class="text-slate-400">—</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div x-show="!itemsLoading && itemsMeta.last_page > 1" class="flex flex-col gap-3 border-t border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                            <p class="text-sm text-slate-500">
                                 Showing <span class="font-semibold text-slate-700" x-text="itemsMeta.from"></span>
                                 to <span class="font-semibold text-slate-700" x-text="itemsMeta.to"></span>
                                 of <span class="font-semibold text-slate-700" x-text="itemsMeta.total"></span>
                             </p>
                             <div class="flex items-center gap-1">
-                                <button @@click="goItemsPage(itemsMeta.current_page - 1)" :disabled="itemsMeta.current_page <= 1" class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">Prev</button>
-                                <button @@click="goItemsPage(itemsMeta.current_page + 1)" :disabled="itemsMeta.current_page >= itemsMeta.last_page" class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">Next</button>
+                                <button @@click="goItemsPage(itemsMeta.current_page - 1)" :disabled="itemsMeta.current_page <= 1" class="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Prev</button>
+                                <button @@click="goItemsPage(itemsMeta.current_page + 1)" :disabled="itemsMeta.current_page >= itemsMeta.last_page" class="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
                             </div>
                         </div>
                     </div>
-
-                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div class="px-5 py-4 border-b border-slate-100">
-                            <div class="flex items-center justify-between gap-3 mb-3">
+                    <div id="warehouse-packages" x-ref="addPackagesPanel" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" style="display: none;">
+                        <div class="border-b border-slate-100 px-4 py-4 sm:px-5">
+                            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600">
+                                        <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7h18M3 12h18M3 17h18"/>
                                         </svg>
                                     </div>
                                     <div>
-                                        <h3 class="text-sm font-bold text-slate-900">Warehouse Packages</h3>
-                                        <p class="text-[11px] text-slate-500 mt-0.5">
+                                        <h3 class="text-lg font-black text-slate-950">Warehouse Packages</h3>
+                                        <p class="mt-0.5 text-sm text-slate-500">
                                             <span x-text="eligibleMeta.total"></span> eligible at {{ $batch->originWarehouse?->name ?? 'warehouse' }}
                                         </p>
                                     </div>
                                 </div>
-                                @if($batch->status !== \App\Models\SortBatch::STATUS_OPEN)
-                                <span class="px-2.5 py-1 rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">Read-only</span>
-                                @endif
+                                <button type="button" onclick="document.getElementById('warehouse-packages').style.display = 'none'; document.getElementById('batch-items-card').style.display = 'block'; document.getElementById('batch-items-card').scrollIntoView({ behavior: 'smooth', block: 'start' }); return false;"
+                                        class="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                    </svg>
+                                    Back
+                                </button>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <div class="relative flex-1">
-                                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+                                <div class="relative w-full lg:max-w-md">
+                                    <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                                     </svg>
                                     <input type="text" x-model="eligibleSearch" @@input="onEligibleSearch()" placeholder="Search tracking, shipment, recipient, phone, town"
-                                           class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300">
+                                           class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                 </div>
-                                @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                                <div class="inline-flex w-full rounded-xl border border-slate-200 bg-slate-50 p-1 sm:w-auto">
+                                    <button type="button" @@click="setEligibleDeliveryFilter('')"
+                                            class="flex-1 rounded-lg px-3 py-2 text-xs font-black transition-colors sm:flex-none"
+                                            :class="eligibleDeliveryMethod === '' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+                                        All
+                                    </button>
+                                    <button type="button" @@click="setEligibleDeliveryFilter('bus_handoff')"
+                                            class="flex-1 rounded-lg px-3 py-2 text-xs font-black transition-colors sm:flex-none"
+                                            :class="eligibleDeliveryMethod === 'bus_handoff' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-500 hover:text-orange-700'">
+                                        Bus Courier
+                                    </button>
+                                    <button type="button" @@click="setEligibleDeliveryFilter('direct')"
+                                            class="flex-1 rounded-lg px-3 py-2 text-xs font-black transition-colors sm:flex-none"
+                                            :class="eligibleDeliveryMethod === 'direct' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+                                        Direct
+                                    </button>
+                                </div>
                                 <button type="button" @@click="addSelectedItems()"
                                         :disabled="selectedEligibleIds.length === 0 || eligibleLoading"
-                                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                                    Add <span x-text="selectedEligibleIds.length || ''"></span>
+                                        class="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-orange-600 bg-orange-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:border-orange-300 disabled:bg-orange-300 disabled:opacity-60 disabled:shadow-none lg:ml-auto">
+                                    Add Selected <span x-text="selectedEligibleIds.length ? '(' + selectedEligibleIds.length + ')' : ''"></span>
                                 </button>
-                                @endif
-                            </div>
-                            <div x-show="selectedEligibleIds.length > 0" class="mt-2 flex items-center gap-2">
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200">
-                                    <span x-text="selectedEligibleIds.length + ' selected'"></span>
-                                    <button type="button" @@click="selectedEligibleIds = []" class="hover:text-emerald-900">
-                                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-                                    </button>
-                                </span>
                             </div>
                         </div>
 
-                        <div x-show="eligibleLoading" class="flex items-center justify-center py-16">
-                            <svg class="w-6 h-6 text-emerald-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <div class="max-h-[640px] overflow-auto">
+                            <table class="w-full min-w-[1140px] text-left text-xs">
+                                <thead class="sticky top-0 z-10 border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-400">
+                                    <tr>
+                                        <th class="w-12 px-4 py-3"></th>
+                                        <th class="min-w-[160px] px-4 py-3">Shipment</th>
+                                        <th class="min-w-[140px] px-4 py-3">Tracking</th>
+                                        <th class="px-4 py-3">Description</th>
+                                        <th class="px-4 py-3">Method</th>
+                                        <th class="px-4 py-3">Vendor</th>
+                                        <th class="px-4 py-3">Recipient</th>
+                                        <th class="px-4 py-3">Phone</th>
+                                        <th class="px-4 py-3">Town</th>
+                                        <th class="px-4 py-3 text-center">Qty</th>
+                                        <th class="px-4 py-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    @forelse($initialEligibleItems as $item)
+                                    <tr @@click="toggleEligible({{ (int) $item['warehouse_receipt_item_id'] }})"
+                                        class="cursor-pointer transition-colors hover:bg-orange-50/20"
+                                        :class="selectedEligibleIds.includes({{ (int) $item['warehouse_receipt_item_id'] }}) ? 'bg-orange-50/70' : ''">
+                                        <td class="px-4 py-4 align-middle">
+                                            <button type="button" @@click.stop="toggleEligible({{ (int) $item['warehouse_receipt_item_id'] }})"
+                                                    class="flex h-6 w-6 items-center justify-center rounded-md border-2 transition-all"
+                                                    :class="selectedEligibleIds.includes({{ (int) $item['warehouse_receipt_item_id'] }}) ? 'bg-orange-600 border-orange-600' : 'border-slate-300 hover:border-orange-400'">
+                                                <svg x-show="selectedEligibleIds.includes({{ (int) $item['warehouse_receipt_item_id'] }})" class="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                                </svg>
+                                            </button>
+                                        </td>
+                                        <td class="px-4 py-4 align-middle">
+                                            <span class="whitespace-nowrap font-mono text-sm font-black text-orange-700">{{ $item['shipment_number'] ?? 'No shipment #' }}</span>
+                                        </td>
+                                        <td class="px-4 py-4 align-middle">
+                                            <span class="block max-w-[170px] truncate font-mono text-xs font-black text-slate-700">{{ $item['tracking_code'] ?? '—' }}</span>
+                                        </td>
+                                        <td class="px-4 py-4 align-middle">
+                                            <a href="{{ route('warehouse.packages.show', $item['warehouse_receipt_item_id']) }}"
+                                               @@click.stop
+                                               class="block max-w-[210px] truncate text-sm font-bold text-slate-800 hover:text-orange-700 hover:underline">
+                                                {{ $item['item_description'] ?? '—' }}
+                                            </a>
+                                        </td>
+                                        <td class="px-4 py-4 align-middle">
+                                            <span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black {{ ($item['delivery_method'] ?? null) === \App\Models\ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF ? 'bg-orange-100 text-orange-700 ring-1 ring-orange-200' : 'bg-slate-100 text-slate-600' }}">
+                                                {{ $item['delivery_method_label'] ?? 'Direct Delivery' }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-4 align-middle">
+                                            <span class="block max-w-[150px] truncate text-sm font-semibold text-slate-600">{{ $item['vendor_name'] ?? 'No vendor' }}</span>
+                                        </td>
+                                        <td class="px-4 py-4 align-middle">
+                                            <span class="block max-w-[150px] truncate text-sm font-bold text-slate-800">{{ data_get($item, 'destination.recipient_name') ?? 'No recipient' }}</span>
+                                        </td>
+                                        <td class="px-4 py-4 align-middle">
+                                            <span class="whitespace-nowrap text-sm font-semibold text-slate-600">{{ data_get($item, 'destination.recipient_phone') ?? 'No phone' }}</span>
+                                        </td>
+                                        <td class="px-4 py-4 align-middle">
+                                            <span class="block max-w-[130px] truncate text-sm font-semibold text-slate-600">{{ data_get($item, 'destination.town') ?? 'No town' }}</span>
+                                        </td>
+                                        <td class="px-4 py-4 text-center align-middle">
+                                            <span class="inline-flex items-center justify-center rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-700">{{ $item['received_quantity'] ?? 0 }}</span>
+                                        </td>
+                                        <td class="px-4 py-4 text-right align-middle">
+                                            <button type="button" @@click.stop="toggleEligible({{ (int) $item['warehouse_receipt_item_id'] }})"
+                                                    class="inline-flex items-center justify-center rounded-xl px-3 py-2 text-xs font-black transition-colors"
+                                                    :class="selectedEligibleIds.includes({{ (int) $item['warehouse_receipt_item_id'] }}) ? 'border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100' : 'bg-orange-600 text-white shadow-sm shadow-orange-600/15 hover:bg-orange-700'">
+                                                <span x-text="selectedEligibleIds.includes({{ (int) $item['warehouse_receipt_item_id'] }}) ? 'Selected' : 'Add'">Add</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr>
+                                        <td colspan="11" class="px-4 py-12 text-center text-sm font-semibold text-slate-500">
+                                            No eligible warehouse packages.
+                                        </td>
+                                    </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div x-show="eligibleLoading" class="flex items-center justify-center py-16" @if($initialItemsMode === 'add' && $initialEligibleItems->isNotEmpty()) style="display:none" @endif>
+                            <svg class="w-6 h-6 text-orange-500 animate-spin" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                             </svg>
                         </div>
 
-                        <div x-show="!eligibleLoading && eligibleItems.length === 0" class="px-4 py-16 text-center">
+                        <div x-show="!eligibleLoading && eligibleError" class="px-4 py-8">
+                            <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-bold text-rose-700" x-text="eligibleError"></div>
+                        </div>
+
+                        <div x-show="!eligibleLoading && !eligibleError && eligibleItems.length === 0" class="px-4 py-16 text-center">
                             <p class="text-sm font-medium text-slate-500" x-text="eligibleSearch ? 'No warehouse packages match your search' : 'No eligible warehouse packages'"></p>
                             <p class="text-xs text-slate-400 mt-1">Packages already in an active sort batch are hidden here.</p>
                         </div>
 
-                        <div x-show="!eligibleLoading && eligibleItems.length > 0" class="divide-y divide-slate-100 max-h-[640px] overflow-y-auto">
+                        <div x-show="false" class="divide-y divide-slate-100 md:hidden">
                             <template x-for="item in eligibleItems" :key="item.warehouse_receipt_item_id">
-                                <div class="px-4 py-3 hover:bg-emerald-50/40 transition-colors"
-                                     :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'bg-emerald-50/70' : ''">
+                                <article class="p-4" :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'bg-orange-50/50' : 'bg-white'">
                                     <div class="flex items-start gap-3">
                                         @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
                                         <button type="button" @@click="toggleEligible(item.warehouse_receipt_item_id)"
-                                                class="mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0"
-                                                :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'bg-emerald-600 border-emerald-600' : 'border-slate-300 hover:border-emerald-400'">
-                                            <svg x-show="selectedEligibleIds.includes(item.warehouse_receipt_item_id)" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                class="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-all"
+                                                :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'bg-orange-600 border-orange-600' : 'border-slate-300 hover:border-orange-400'">
+                                            <svg x-show="selectedEligibleIds.includes(item.warehouse_receipt_item_id)" class="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
                                             </svg>
                                         </button>
                                         @endif
                                         <div class="min-w-0 flex-1">
-                                            <div class="flex items-center gap-2 flex-wrap">
-                                                <span class="text-xs font-bold text-slate-900" x-text="item.shipment_number || 'No shipment #'"></span>
-                                                <span x-show="item.tracking_code" class="font-mono text-[11px] text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded" x-text="item.tracking_code"></span>
-                                                <span class="inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full bg-slate-100 text-[10px] font-semibold text-slate-700" x-text="'Qty ' + item.received_quantity"></span>
+                                            <div class="flex items-start justify-between gap-3">
+                                                <div class="min-w-0">
+                                                    <p class="truncate font-mono text-sm font-black text-slate-950" x-text="item.shipment_number || 'No shipment #'"></p>
+                                                    <p class="mt-1 truncate text-base font-black text-slate-950" x-text="item.item_description || 'No description'"></p>
+                                                    <p class="mt-1 truncate font-mono text-xs font-bold text-slate-500" x-text="item.tracking_code || 'No tracking code'"></p>
+                                                </div>
+                                                <span class="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
+                                                    Qty <span class="ml-1" x-text="item.received_quantity"></span>
+                                                </span>
                                             </div>
-                                            <p class="text-xs text-slate-700 mt-1 truncate" x-text="item.item_description || '—'"></p>
-                                            <div class="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-slate-500">
-                                                <span class="truncate" x-text="item.vendor_name || 'No vendor'"></span>
-                                                <span class="truncate" x-text="item.destination?.recipient_name || 'No recipient'"></span>
-                                                <span class="truncate" x-text="item.destination?.recipient_phone || 'No phone'"></span>
-                                                <span class="truncate" x-text="item.destination?.town || 'No town'"></span>
+                                            <div class="mt-3 grid grid-cols-2 gap-3">
+                                                <div class="rounded-xl bg-slate-50 px-3 py-2">
+                                                    <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Recipient</p>
+                                                    <p class="mt-1 truncate text-sm font-bold text-slate-800" x-text="item.destination?.recipient_name || 'No recipient'"></p>
+                                                </div>
+                                                <div class="rounded-xl bg-slate-50 px-3 py-2">
+                                                    <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Phone</p>
+                                                    <p class="mt-1 truncate text-sm font-bold text-slate-800" x-text="item.destination?.recipient_phone || 'No phone'"></p>
+                                                </div>
+                                                <div class="rounded-xl bg-slate-50 px-3 py-2">
+                                                    <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Town</p>
+                                                    <p class="mt-1 truncate text-sm font-bold text-slate-800" x-text="item.destination?.town || 'No town'"></p>
+                                                </div>
+                                                <div class="rounded-xl bg-slate-50 px-3 py-2">
+                                                    <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Method</p>
+                                                    <span class="mt-1 inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black"
+                                                          :class="item.delivery_method === 'bus_handoff' ? 'bg-orange-100 text-orange-700 ring-1 ring-orange-200' : 'bg-slate-100 text-slate-600'"
+                                                          x-text="item.delivery_method_label || 'Direct Delivery'"></span>
+                                                </div>
                                             </div>
                                         </div>
-                                        @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
-                                        <button type="button" @@click="addOneItem(item)"
-                                                :disabled="eligibleLoading"
-                                                class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-[11px] font-bold text-white disabled:opacity-40 flex-shrink-0">
-                                            Add
-                                        </button>
-                                        @endif
                                     </div>
-                                </div>
+                                </article>
                             </template>
                         </div>
 
-                        <div x-show="!eligibleLoading && eligibleMeta.last_page > 1" class="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
-                            <p class="text-[11px] text-slate-500">
-                                Showing <span class="font-semibold text-slate-700" x-text="eligibleMeta.from"></span>
-                                to <span class="font-semibold text-slate-700" x-text="eligibleMeta.to"></span>
-                                of <span class="font-semibold text-slate-700" x-text="eligibleMeta.total"></span>
-                            </p>
-                            <div class="flex items-center gap-1">
-                                <button @@click="goEligiblePage(eligibleMeta.current_page - 1)" :disabled="eligibleMeta.current_page <= 1" class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">Prev</button>
-                                <button @@click="goEligiblePage(eligibleMeta.current_page + 1)" :disabled="eligibleMeta.current_page >= eligibleMeta.last_page" class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">Next</button>
+                        <div x-show="false" class="hidden max-h-[640px] overflow-auto md:block">
+                            <table class="w-full min-w-[1140px] text-left text-xs">
+                                <thead class="sticky top-0 z-10 border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-400">
+                                    <tr>
+                                        <th class="w-12 px-4 py-3"></th>
+                                        <th class="min-w-[160px] px-4 py-3">Shipment</th>
+                                        <th class="min-w-[140px] px-4 py-3">Tracking</th>
+                                        <th class="px-4 py-3">Description</th>
+                                        <th class="px-4 py-3">Method</th>
+                                        <th class="px-4 py-3">Vendor</th>
+                                        <th class="px-4 py-3">Recipient</th>
+                                        <th class="px-4 py-3">Phone</th>
+                                        <th class="px-4 py-3">Town</th>
+                                        <th class="px-4 py-3 text-center">Qty</th>
+                                        <th class="px-4 py-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    <template x-for="item in eligibleItems" :key="item.warehouse_receipt_item_id">
+                                        <tr class="transition-colors hover:bg-orange-50/20"
+                                            :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'bg-orange-50/70' : ''">
+                                            <td class="px-4 py-4 align-middle">
+                                                @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                                                <button type="button" @@click="toggleEligible(item.warehouse_receipt_item_id)"
+                                                        class="flex h-6 w-6 items-center justify-center rounded-md border-2 transition-all"
+                                                        :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'bg-orange-600 border-orange-600' : 'border-slate-300 hover:border-orange-400'">
+                                                    <svg x-show="selectedEligibleIds.includes(item.warehouse_receipt_item_id)" class="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                                    </svg>
+                                                </button>
+                                                @endif
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="whitespace-nowrap font-mono text-sm font-black text-orange-700" x-text="item.shipment_number || 'No shipment #'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span x-show="item.tracking_code" class="block max-w-[170px] truncate font-mono text-xs font-black text-slate-700" x-text="item.tracking_code"></span>
+                                                <span x-show="!item.tracking_code" class="text-xs font-semibold text-slate-400">—</span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="block max-w-[210px] truncate text-sm font-bold text-slate-800" x-text="item.item_description || '—'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black"
+                                                      :class="item.delivery_method === 'bus_handoff' ? 'bg-orange-100 text-orange-700 ring-1 ring-orange-200' : 'bg-slate-100 text-slate-600'"
+                                                      x-text="item.delivery_method_label || 'Direct Delivery'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="block max-w-[150px] truncate text-sm font-semibold text-slate-600" x-text="item.vendor_name || 'No vendor'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="block max-w-[150px] truncate text-sm font-bold text-slate-800" x-text="item.destination?.recipient_name || 'No recipient'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="whitespace-nowrap text-sm font-semibold text-slate-600" x-text="item.destination?.recipient_phone || 'No phone'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="block max-w-[130px] truncate text-sm font-semibold text-slate-600" x-text="item.destination?.town || 'No town'"></span>
+                                            </td>
+                                            <td class="px-4 py-4 text-center align-middle">
+                                                <span class="inline-flex items-center justify-center rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-700" x-text="item.received_quantity"></span>
+                                            </td>
+                                            <td class="px-4 py-4 text-right align-middle">
+                                                @if($batch->status === \App\Models\SortBatch::STATUS_OPEN)
+                                                <button type="button" @@click="addOneItem(item)"
+                                                        :disabled="eligibleLoading"
+                                                        class="inline-flex items-center justify-center rounded-xl px-3 py-2 text-xs font-black transition-colors disabled:opacity-40"
+                                                        :class="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100' : 'bg-orange-600 text-white shadow-sm shadow-orange-600/15 hover:bg-orange-700'">
+                                                    <span x-text="selectedEligibleIds.includes(item.warehouse_receipt_item_id) ? 'Selected' : 'Add'"></span>
+                                                </button>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div x-show="!eligibleLoading && !eligibleError && eligibleItems.length > 0" class="border-t border-slate-100 px-4 py-4">
+                            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                <div class="text-sm text-slate-600">
+                                    Showing <span x-text="eligibleMeta.from || 0"></span> to <span x-text="eligibleMeta.to || 0"></span> of <span x-text="eligibleMeta.total || 0"></span> results
+                                </div>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm font-semibold text-slate-600">Rows</span>
+                                        <div x-data="{ open: false }" class="relative">
+                                            <button type="button" @@click="open = !open"
+                                                    class="inline-flex h-10 min-w-[72px] items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 transition hover:bg-slate-50">
+                                                <span x-text="eligibleMeta.per_page"></span>
+                                                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                            </button>
+                                            <div x-show="open" @@click.away="open = false" x-transition
+                                                 class="absolute bottom-full mb-1 right-0 w-16 rounded-lg border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-lg p-1 z-[9999]" style="display:none">
+                                                <button type="button" @@click="setEligiblePerPage(10); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="eligibleMeta.per_page == 10 ? 'bg-slate-100/70' : ''">10</button>
+                                                <button type="button" @@click="setEligiblePerPage(25); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="eligibleMeta.per_page == 25 ? 'bg-slate-100/70' : ''">25</button>
+                                                <button type="button" @@click="setEligiblePerPage(50); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="eligibleMeta.per_page == 50 ? 'bg-slate-100/70' : ''">50</button>
+                                                <button type="button" @@click="setEligiblePerPage(100); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="eligibleMeta.per_page == 100 ? 'bg-slate-100/70' : ''">100</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="text-sm font-black text-slate-700">Page <span x-text="eligibleMeta.current_page || 1"></span> / <span x-text="eligibleMeta.last_page || 1"></span></div>
+                                    <div class="flex space-x-1">
+                                        <button @@click="firstEligiblePage()" :disabled="eligibleMeta.current_page <= 1" :class="eligibleMeta.current_page <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/></svg>
+                                        </button>
+                                        <button @@click="previousEligiblePage()" :disabled="eligibleMeta.current_page <= 1" :class="eligibleMeta.current_page <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                        </button>
+                                        <button @@click="nextEligiblePage()" :disabled="eligibleMeta.current_page >= eligibleMeta.last_page" :class="eligibleMeta.current_page >= eligibleMeta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                        </button>
+                                        <button @@click="lastEligiblePage()" :disabled="eligibleMeta.current_page >= eligibleMeta.last_page" :class="eligibleMeta.current_page >= eligibleMeta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
+                    </div>
+    </div>
+
+    <div x-show="confirmModal.open" x-cloak x-transition.opacity
+         class="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+         @@keydown.escape.window="closeConfirmModal()" style="display:none">
+        <div @@click.stop
+             class="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+             x-transition.scale.origin.center>
+            <div class="px-5 py-5">
+                <div class="flex items-start gap-4">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-sm"
+                          :class="confirmModal.iconClass">
+                        <svg x-show="confirmModal.icon === 'remove'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:none">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        <svg x-show="confirmModal.icon === 'delete'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:none">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 7h12m-9 0V5a1 1 0 011-1h4a1 1 0 011 1v2m2 0v12a2 2 0 01-2 2H8a2 2 0 01-2-2V7h12z"/>
+                        </svg>
+                        <svg x-show="confirmModal.icon === 'seal'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:none">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                        <svg x-show="confirmModal.icon === 'run'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:none">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        <svg x-show="confirmModal.icon === 'manifest'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:none">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <svg x-show="confirmModal.icon === 'reopen'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:none">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                    </span>
+                    <div class="min-w-0">
+                        <h3 class="text-base font-bold text-slate-900" x-text="confirmModal.title"></h3>
+                        <p class="mt-1.5 text-sm leading-relaxed text-slate-500" x-text="confirmModal.message"></p>
                     </div>
                 </div>
             </div>
-
-            <!-- ═══════════════════════════════════════ -->
-            <!-- TRANSPORT TAB                           -->
-            <!-- ═══════════════════════════════════════ -->
-            <div x-show="activeTab === 'transport'" x-cloak>
-                @if($batch->transportManifest)
-                @php $manifest = $batch->transportManifest; @endphp
-                <div class="space-y-5">
-                    <!-- Manifest Info Card -->
-                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                        <div class="flex items-start justify-between mb-5">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-                                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 class="text-sm font-bold text-slate-900">Transport Manifest</h3>
-                                    <p class="text-xs text-slate-500 mt-0.5">{{ $manifest->manifest_number }}</p>
-                                </div>
-                            </div>
-                            <a href="{{ route('admin.transport-manifests.show', $manifest->id) }}"
-                                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors shadow-sm">
-                                View Manifest
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </a>
-                        </div>
-                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            @php
-                                $manifestStatusColors = [
-                                    'draft' => 'bg-slate-100 text-slate-700', 'assigned' => 'bg-blue-100 text-blue-700',
-                                    'loading' => 'bg-amber-100 text-amber-700', 'in_transit' => 'bg-violet-100 text-violet-700',
-                                    'arrived' => 'bg-indigo-100 text-indigo-700', 'received' => 'bg-emerald-100 text-emerald-700',
-                                    'cancelled' => 'bg-rose-100 text-rose-700',
-                                ];
-                            @endphp
-                            <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Status</div>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $manifestStatusColors[$manifest->status] ?? 'bg-slate-100 text-slate-700' }}">
-                                    {{ ucfirst(str_replace('_', ' ', $manifest->status)) }}
-                                </span>
-                            </div>
-                            <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Driver</div>
-                                <p class="text-sm font-semibold text-slate-900">{{ $manifest->assignedDriver?->name ?? 'Not assigned' }}</p>
-                            </div>
-                            <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Created At</div>
-                                <p class="text-sm font-semibold text-slate-900">{{ $manifest->created_at->format('d M Y, H:i') }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                @else
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="flex flex-col items-center justify-center py-16 text-slate-400">
-                        <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
-                            <svg class="w-7 h-7 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
-                        </div>
-                        <p class="text-sm font-medium text-slate-500">No Transport Manifest</p>
-                        <p class="text-xs text-slate-400 mt-1">This batch has not been assigned to a transport manifest yet.</p>
-                    </div>
-                </div>
-                @endif
+            <div class="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3">
+                <button type="button" @@click="closeConfirmModal()" :disabled="actionLoading"
+                        class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+                    Cancel
+                </button>
+                <button type="button" @@click="confirmAction()" :disabled="actionLoading"
+                        class="inline-flex min-w-32 items-center justify-center gap-2 rounded-xl px-5 py-2 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                        :class="confirmModal.confirmClass">
+                    <svg x-show="actionLoading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" style="display:none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <span x-text="actionLoading ? 'Please wait...' : confirmModal.confirmText"></span>
+                </button>
             </div>
-
-            <!-- ═══════════════════════════════════════ -->
-            <!-- DELIVERY RUN TAB                        -->
-            <!-- ═══════════════════════════════════════ -->
-            <div x-show="activeTab === 'delivery'" x-cloak>
-                @if($batch->deliveryRun)
-                @php $run = $batch->deliveryRun; @endphp
-                <div class="space-y-5">
-                    <!-- Delivery Run Info Card -->
-                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                        <div class="flex items-start justify-between mb-5">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 class="text-sm font-bold text-slate-900">Delivery Run</h3>
-                                    <p class="text-xs text-slate-500 mt-0.5">{{ $run->run_number }}</p>
-                                </div>
-                            </div>
-                            <a href="{{ route('admin.delivery-runs.show', $run->id) }}"
-                                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold transition-colors shadow-sm">
-                                View Delivery Run
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </a>
-                        </div>
-                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            @php
-                                $runStatusColors = [
-                                    'draft' => 'bg-slate-100 text-slate-700', 'assigned' => 'bg-blue-100 text-blue-700',
-                                    'out_for_delivery' => 'bg-amber-100 text-amber-700', 'partially_delivered' => 'bg-violet-100 text-violet-700',
-                                    'completed' => 'bg-emerald-100 text-emerald-700', 'cancelled' => 'bg-rose-100 text-rose-700',
-                                ];
-                            @endphp
-                            <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Status</div>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $runStatusColors[$run->status] ?? 'bg-slate-100 text-slate-700' }}">
-                                    {{ ucfirst(str_replace('_', ' ', $run->status)) }}
-                                </span>
-                            </div>
-                            <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Driver</div>
-                                <p class="text-sm font-semibold text-slate-900">{{ $run->assignedDriver?->name ?? 'Not assigned' }}</p>
-                            </div>
-                            <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Created At</div>
-                                <p class="text-sm font-semibold text-slate-900">{{ $run->created_at->format('d M Y, H:i') }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                @else
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="flex flex-col items-center justify-center py-16 text-slate-400">
-                        <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
-                            <svg class="w-7 h-7 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                            </svg>
-                        </div>
-                        <p class="text-sm font-medium text-slate-500">No Delivery Run</p>
-                        @if($batch->status === \App\Models\SortBatch::STATUS_SEALED && $batch->dispatch_mode === \App\Models\SortBatch::DISPATCH_LOCAL_DELIVERY)
-                        <p class="text-xs text-slate-400 mt-1 mb-4">This sealed local-delivery batch is ready for a delivery run.</p>
-                        <button type="button" @@click="createDeliveryRun()" :disabled="actionLoading"
-                                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold transition-colors shadow-sm disabled:opacity-50">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                            Create Delivery Run
-                        </button>
-                        @else
-                        <p class="text-xs text-slate-400 mt-1">This batch has not been assigned to a delivery run yet.</p>
-                        @endif
-                    </div>
-                </div>
-                @endif
-            </div>
-
         </div>
     </div>
 
@@ -806,15 +874,27 @@
 <script>
 function sortBatchShow() {
     return {
-        activeTab: 'items',
-
         // Action state
         actionLoading: false,
         actionMessage: '',
         actionSuccess: true,
         batchItemsCount: {{ (int) $batch->active_items_count }},
+        reopenLocked: @json($reopenLockReason !== null),
+        reopenLockReason: @json($reopenLockReason),
+        confirmModal: {
+            open: false,
+            action: null,
+            payload: null,
+            title: '',
+            message: '',
+            confirmText: 'Continue',
+            icon: 'seal',
+            iconClass: 'bg-orange-100 text-orange-600',
+            confirmClass: 'bg-orange-600 text-white hover:bg-orange-700',
+        },
 
         // Items tab state
+        itemsMode: @json($initialItemsMode),
         items: [],
         itemsMeta: { total: 0, per_page: 20, current_page: 1, last_page: 1, from: 0, to: 0 },
         itemsSearch: '',
@@ -822,32 +902,83 @@ function sortBatchShow() {
         itemsLoaded: false,
         _searchTimeout: null,
         _eligibleSearchTimeout: null,
-        _itemsDataUrl: @json(route('admin.sort-batches.items-data', $batch->id)),
-        _eligibleItemsUrl: @json(route('admin.sort-batches.eligible-items', $batch->id)),
-        _addItemsUrl: @json(route('admin.sort-batches.add-items', $batch->id)),
-        _removeItemUrl: @json(route('admin.sort-batches.remove-item', ['batch' => $batch->id, 'shipmentItem' => '__ITEM__'])),
-        _sealUrl: @json(route('admin.sort-batches.seal', $batch->id)),
-        _reopenUrl: @json(route('admin.sort-batches.reopen', $batch->id)),
-        _createRunUrl: @json(route('admin.sort-batches.create-delivery-run', $batch->id)),
-        _shipmentShowUrl: @json(route('admin.shipments.show', '__ID__')),
-        _deliveryRunShowUrl: @json(route('admin.delivery-runs.show', '__ID__')),
+        _indexUrl: @json($sortBatchShowConfig['indexUrl']),
+        _itemsDataUrl: @json($sortBatchShowConfig['itemsDataUrl']),
+        _eligibleItemsUrl: @json($sortBatchShowConfig['eligibleItemsUrl']),
+        _addItemsUrl: @json($sortBatchShowConfig['addItemsUrl']),
+        _removeItemUrl: @json($sortBatchShowConfig['removeItemUrlTemplate']),
+        _sealUrl: @json($sortBatchShowConfig['sealUrl']),
+        _reopenUrl: @json($sortBatchShowConfig['reopenUrl']),
+        _deleteBatchUrl: @json($sortBatchShowConfig['deleteBatchUrl']),
+        _createManifestUrl: @json($sortBatchShowConfig['createManifestUrl']),
+        _createRunUrl: @json($sortBatchShowConfig['createRunUrl']),
+        _shipmentShowUrl: @json($sortBatchShowConfig['shipmentShowUrlTemplate']),
+        _packageShowUrl: @json($sortBatchShowConfig['packageShowUrlTemplate']),
+        _manifestShowUrl: @json($sortBatchShowConfig['manifestShowUrlTemplate']),
+        _deliveryRunShowUrl: @json($sortBatchShowConfig['deliveryRunShowUrlTemplate']),
+        _listModeUrl: @json($batchListModeUrl),
+        _addModeUrl: @json($batchAddModeUrl),
 
         // Warehouse package state
-        eligibleItems: [],
-        eligibleMeta: { total: 0, per_page: 20, current_page: 1, last_page: 1, from: 0, to: 0 },
+        eligibleItems: @json($initialEligibleItems->values()),
+        eligibleMeta: @json($initialEligibleMeta),
         eligibleSearch: '',
+        eligibleDeliveryMethod: '',
         eligibleLoading: false,
+        eligibleError: '',
+        eligibleHydrated: @json($initialEligibleItems->isEmpty()),
         selectedEligibleIds: [],
 
         init() {
             this.fetchItems(1);
-            this.loadEligibleItems(1);
-            this.$watch('activeTab', (val) => {
-                if (val === 'items') {
-                    if (!this.itemsLoaded) this.fetchItems(1);
-                    if (!this.eligibleItems.length && !this.eligibleLoading) this.loadEligibleItems(1);
-                }
-            });
+            if (this.itemsMode === 'add') {
+                this.loadEligibleItems(1);
+                this.$nextTick(() => {
+                    setTimeout(() => {
+                        this.$refs.addPackagesPanel?.scrollIntoView({ behavior: 'auto', block: 'start' });
+                    }, 40);
+                });
+            }
+        },
+
+        requestConfirm(action, {
+            title,
+            message,
+            confirmText = 'Continue',
+            payload = null,
+            icon = 'seal',
+            iconClass = 'bg-orange-100 text-orange-600',
+            confirmClass = 'bg-orange-600 text-white hover:bg-orange-700',
+        }) {
+            this.confirmModal = {
+                open: true,
+                action,
+                payload,
+                title,
+                message,
+                confirmText,
+                icon,
+                iconClass,
+                confirmClass,
+            };
+        },
+
+        closeConfirmModal() {
+            if (this.actionLoading) return;
+            this.confirmModal.open = false;
+        },
+
+        confirmAction() {
+            const action = this.confirmModal.action;
+            const payload = this.confirmModal.payload;
+            this.confirmModal.open = false;
+
+            if (action === 'remove-item') return this.performRemoveItem(payload);
+            if (action === 'seal-batch') return this.performSealBatch();
+            if (action === 'reopen-batch') return this.performReopenBatch();
+            if (action === 'delete-batch') return this.performDeleteBatch();
+            if (action === 'create-transport-manifest') return this.performCreateTransportManifest();
+            if (action === 'create-delivery-run') return this.performCreateDeliveryRun();
         },
 
         // ─── Items Tab ────────────────────────────────────────────────────────
@@ -886,34 +1017,82 @@ function sortBatchShow() {
             return this._shipmentShowUrl.replace('__ID__', id);
         },
 
+        packageUrl(id) {
+            return this._packageShowUrl.replace('__ID__', id);
+        },
+
+        blockedItemsCount() {
+            return this.items.filter((item) => item.is_sortable === false).length;
+        },
+
         // ─── Warehouse Packages ───────────────────────────────────────────────
 
-        goSortingWorkspace() {
-            this.activeTab = 'items';
+        async openAddPackages() {
+            this.itemsMode = 'add';
+            this.showPackageSelector();
             this.$nextTick(() => {
-                const input = document.querySelector('input[x-model="eligibleSearch"]');
-                input?.focus();
+                setTimeout(() => {
+                    this.$refs.addPackagesPanel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 40);
+                const input = this.$refs.addPackagesPanel?.querySelector('input[x-model="eligibleSearch"]');
+                input?.focus({ preventScroll: true });
             });
+            await this.loadEligibleItems(1);
+        },
+
+        closeAddPackages() {
+            this.itemsMode = 'list';
+            this.selectedEligibleIds = [];
+            this.showBatchItems();
+            this.$nextTick(() => {
+                this.$refs.itemsListPanel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        },
+
+        showPackageSelector() {
+            document.getElementById('batch-items-card')?.classList.add('hidden');
+            document.getElementById('warehouse-packages')?.classList.remove('hidden');
+        },
+
+        showBatchItems() {
+            document.getElementById('warehouse-packages')?.classList.add('hidden');
+            document.getElementById('batch-items-card')?.classList.remove('hidden');
         },
 
         loadEligibleItems(page) {
             this.eligibleLoading = true;
+            this.eligibleError = '';
             const params = new URLSearchParams({
                 page: page || this.eligibleMeta.current_page,
                 per_page: this.eligibleMeta.per_page,
             });
             if (this.eligibleSearch) params.set('search', this.eligibleSearch);
-            return fetch(this._eligibleItemsUrl + '?' + params.toString())
-                .then(r => r.json())
+            if (this.eligibleDeliveryMethod) params.set('delivery_method', this.eligibleDeliveryMethod);
+            return fetch(this._eligibleItemsUrl + '?' + params.toString(), {
+                headers: { 'Accept': 'application/json' },
+            })
+                .then(async r => {
+                    const json = await r.json().catch(() => ({}));
+                    if (!r.ok) {
+                        throw new Error(json.message || 'Could not load warehouse packages.');
+                    }
+                    return json;
+                })
                 .then(json => {
                     this.eligibleItems = json.data || [];
                     this.eligibleMeta = json.meta || this.eligibleMeta;
+                    this.eligibleHydrated = true;
                     this.selectedEligibleIds = this.selectedEligibleIds.filter((id) =>
                         this.eligibleItems.some((item) => item.warehouse_receipt_item_id === id)
                     );
                     this.eligibleLoading = false;
                 })
-                .catch(() => { this.eligibleLoading = false; });
+                .catch((error) => {
+                    this.eligibleItems = [];
+                    this.eligibleLoading = false;
+                    this.eligibleHydrated = true;
+                    this.eligibleError = error.message || 'Could not load warehouse packages.';
+                });
         },
 
         onEligibleSearch() {
@@ -921,9 +1100,37 @@ function sortBatchShow() {
             this._eligibleSearchTimeout = setTimeout(() => this.loadEligibleItems(1), 300);
         },
 
+        setEligibleDeliveryFilter(method) {
+            this.eligibleDeliveryMethod = method;
+            this.selectedEligibleIds = [];
+            this.loadEligibleItems(1);
+        },
+
         goEligiblePage(p) {
             if (p < 1 || p > this.eligibleMeta.last_page) return;
             this.loadEligibleItems(p);
+        },
+
+        setEligiblePerPage(limit) {
+            this.eligibleMeta.per_page = Number(limit) || 25;
+            this.selectedEligibleIds = [];
+            this.loadEligibleItems(1);
+        },
+
+        firstEligiblePage() {
+            if (this.eligibleMeta.current_page > 1) this.loadEligibleItems(1);
+        },
+
+        previousEligiblePage() {
+            if (this.eligibleMeta.current_page > 1) this.loadEligibleItems(this.eligibleMeta.current_page - 1);
+        },
+
+        nextEligiblePage() {
+            if (this.eligibleMeta.current_page < this.eligibleMeta.last_page) this.loadEligibleItems(this.eligibleMeta.current_page + 1);
+        },
+
+        lastEligiblePage() {
+            if (this.eligibleMeta.current_page < this.eligibleMeta.last_page) this.loadEligibleItems(this.eligibleMeta.last_page);
         },
 
         toggleEligible(id) {
@@ -936,8 +1143,7 @@ function sortBatchShow() {
         },
 
         addOneItem(item) {
-            this.selectedEligibleIds = [item.warehouse_receipt_item_id];
-            return this.addSelectedItems();
+            this.toggleEligible(item.warehouse_receipt_item_id);
         },
 
         async addSelectedItems() {
@@ -957,7 +1163,7 @@ function sortBatchShow() {
                 if (json.success) {
                     this.selectedEligibleIds = [];
                     this.showAction(true, json.message || 'Items added successfully.');
-                    await this.refreshSortingLists();
+                    window.location.href = this._listModeUrl;
                 } else {
                     this.showAction(false, json.message || 'Failed to add items.');
                     this.eligibleLoading = false;
@@ -978,7 +1184,18 @@ function sortBatchShow() {
         // ─── Remove Item ──────────────────────────────────────────────────────
 
         async removeItem(item) {
-            if (!confirm(`Remove "${item.description || item.tracking_code || 'this item'}" from the batch?`)) return;
+            this.requestConfirm('remove-item', {
+                title: 'Remove Package',
+                message: `Remove "${item.description || item.tracking_code || 'this item'}" from this batch?`,
+                confirmText: 'Remove',
+                payload: item,
+                icon: 'remove',
+                iconClass: 'bg-rose-100 text-rose-600',
+                confirmClass: 'border border-rose-200 bg-white text-rose-700 hover:bg-rose-50',
+            });
+        },
+
+        async performRemoveItem(item) {
             this.actionLoading = true;
             const removeUrl = this._removeItemUrl.replace('__ITEM__', item.shipment_item_id);
             try {
@@ -1004,7 +1221,17 @@ function sortBatchShow() {
         // ─── Seal / Reopen ────────────────────────────────────────────────────
 
         async sealBatch() {
-            if (!confirm('Seal this sort batch? No more items can be added after sealing.')) return;
+            this.requestConfirm('seal-batch', {
+                title: 'Seal Batch',
+                message: 'Seal this sort batch? No more items can be added after sealing.',
+                confirmText: 'Seal Batch',
+                icon: 'seal',
+                iconClass: 'bg-orange-100 text-orange-600',
+                confirmClass: 'bg-orange-600 text-white hover:bg-orange-700',
+            });
+        },
+
+        async performSealBatch() {
             this.actionLoading = true;
             try {
                 const resp = await fetch(this._sealUrl, {
@@ -1017,6 +1244,7 @@ function sortBatchShow() {
                 const json = await resp.json();
                 this.showAction(json.success, json.message || (json.success ? 'Batch sealed.' : 'Failed to seal batch.'));
                 if (json.success) setTimeout(() => window.location.reload(), 800);
+                if (!json.success) await this.fetchItems(this.itemsMeta.current_page);
             } catch (e) {
                 this.showAction(false, 'An unexpected error occurred.');
             } finally {
@@ -1025,7 +1253,22 @@ function sortBatchShow() {
         },
 
         async reopenBatch() {
-            if (!confirm('Reopen this sort batch? Items can be added or removed again.')) return;
+            if (this.reopenLocked) {
+                this.showAction(false, this.reopenLockReason || 'This batch cannot be reopened.');
+                return;
+            }
+
+            this.requestConfirm('reopen-batch', {
+                title: 'Reopen Batch',
+                message: 'Reopen this sort batch? Items can be added or removed again.',
+                confirmText: 'Reopen',
+                icon: 'reopen',
+                iconClass: 'bg-amber-100 text-amber-700',
+                confirmClass: 'bg-amber-600 text-white hover:bg-amber-700',
+            });
+        },
+
+        async performReopenBatch() {
             this.actionLoading = true;
             try {
                 const resp = await fetch(this._reopenUrl, {
@@ -1045,10 +1288,95 @@ function sortBatchShow() {
             }
         },
 
-        // ─── Create Delivery Run ──────────────────────────────────────────────
+        async deleteBatch() {
+            this.requestConfirm('delete-batch', {
+                title: 'Delete Batch',
+                message: 'Delete this sort batch? Packages in this batch will be returned to warehouse inventory.',
+                confirmText: 'Delete Batch',
+                icon: 'delete',
+                iconClass: 'bg-rose-100 text-rose-600',
+                confirmClass: 'bg-rose-600 text-white hover:bg-rose-700',
+            });
+        },
+
+        async performDeleteBatch() {
+            this.actionLoading = true;
+            try {
+                const resp = await fetch(this._deleteBatchUrl, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                });
+                const json = await resp.json();
+                this.showAction(json.success, json.message || (json.success ? 'Batch deleted.' : 'Failed to delete batch.'));
+                if (json.success) {
+                    setTimeout(() => {
+                        window.location.href = this._indexUrl;
+                    }, 800);
+                }
+            } catch (e) {
+                this.showAction(false, 'An unexpected error occurred.');
+            } finally {
+                this.actionLoading = false;
+            }
+        },
+
+        // ─── Create Manifest / Delivery Run ─────────────────────────────────
+
+        async createTransportManifest() {
+            this.requestConfirm('create-transport-manifest', {
+                title: 'Create Manifest',
+                message: 'Create a transport manifest from this sealed transfer batch?',
+                confirmText: 'Create Manifest',
+                icon: 'manifest',
+                iconClass: 'bg-orange-100 text-orange-600',
+                confirmClass: 'bg-orange-600 text-white hover:bg-orange-700',
+            });
+        },
+
+        async performCreateTransportManifest() {
+            this.actionLoading = true;
+            try {
+                const resp = await fetch(this._createManifestUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                });
+                const json = await resp.json();
+                this.showAction(json.success, this.responseMessage(json, json.success ? 'Manifest created.' : 'Failed to create manifest.'));
+                if (json.success) {
+                    const manifestId = json.data?.manifest?.id;
+                    if (manifestId) {
+                        setTimeout(() => {
+                            window.location.href = this._manifestShowUrl.replace('__ID__', manifestId);
+                        }, 800);
+                    } else {
+                        setTimeout(() => window.location.reload(), 800);
+                    }
+                }
+            } catch (e) {
+                this.showAction(false, 'An unexpected error occurred.');
+            } finally {
+                this.actionLoading = false;
+            }
+        },
 
         async createDeliveryRun() {
-            if (!confirm('Create a delivery run from this sealed batch? This cannot be undone.')) return;
+            this.requestConfirm('create-delivery-run', {
+                title: 'Create Delivery Run',
+                message: 'Create a delivery run from this sealed batch? This cannot be undone.',
+                confirmText: 'Create Run',
+                icon: 'run',
+                iconClass: 'bg-orange-100 text-orange-600',
+                confirmClass: 'bg-orange-600 text-white hover:bg-orange-700',
+            });
+        },
+
+        async performCreateDeliveryRun() {
             this.actionLoading = true;
             try {
                 const resp = await fetch(this._createRunUrl, {
@@ -1059,7 +1387,7 @@ function sortBatchShow() {
                     },
                 });
                 const json = await resp.json();
-                this.showAction(json.success, json.message || (json.success ? 'Delivery run created.' : 'Failed to create delivery run.'));
+                this.showAction(json.success, this.responseMessage(json, json.success ? 'Delivery run created.' : 'Failed to create delivery run.'));
                 if (json.success) {
                     // Navigate to the delivery run if we have an id
                     const runId = json.data?.run?.id;
@@ -1083,11 +1411,35 @@ function sortBatchShow() {
         showAction(success, message) {
             this.actionSuccess = success;
             this.actionMessage = message;
-            if (success) {
-                setTimeout(() => { this.actionMessage = ''; }, 5000);
-            }
+            setTimeout(() => { this.actionMessage = ''; }, success ? 4000 : 7000);
+        },
+
+        responseMessage(json, fallback) {
+            const rawBlockers = json?.data?.recipient_payment_blockers || json?.recipient_payment_blockers || [];
+            const blockers = Array.isArray(rawBlockers) ? rawBlockers : (rawBlockers.items || []);
+            if (!blockers.length) return json.message || fallback;
+
+            const lines = blockers.slice(0, 5).map((item) => {
+                const code = item.tracking_code || item.shipment_number || `Package #${item.shipment_item_id}`;
+                const amount = item.amount ? `, GHS ${this.formatMoney(item.amount)}` : '';
+                return `${code} (${item.recipient_name || 'No recipient'}${amount})`;
+            });
+            const extra = blockers.length > 5 ? ` and ${blockers.length - 5} more` : '';
+            return `${json.message || fallback} Blocking packages: ${lines.join('; ')}${extra}.`;
+        },
+
+        paymentBadgeClass(status) {
+            if (status === 'paid') return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
+            if (status === 'waived' || status === 'overridden') return 'bg-slate-100 text-slate-700 ring-1 ring-slate-200';
+            if (status === 'not_queued') return 'bg-slate-50 text-slate-400 ring-1 ring-slate-100';
+            return 'bg-orange-50 text-orange-700 ring-1 ring-orange-200';
+        },
+
+        formatMoney(value) {
+            return Number(value || 0).toFixed(2);
         },
     };
 }
+
 </script>
 @endpush

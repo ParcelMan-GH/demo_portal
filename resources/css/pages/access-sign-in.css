@@ -1,0 +1,89 @@
+.access-shell {
+    background:
+        radial-gradient(900px 520px at 6% 4%, rgba(249, 115, 22, 0.15), transparent 58%),
+        radial-gradient(760px 500px at 92% 90%, rgba(194, 65, 12, 0.13), transparent 62%),
+        linear-gradient(135deg, #f8fafc 0%, #fff7ed 48%, #fef3c7 100%);
+    color: #0f172a;
+}
+
+.access-shell::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+        linear-gradient(rgba(15, 23, 42, 0.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.055) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent 80%);
+}
+
+.access-unit {
+    min-height: 620px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    box-shadow:
+        0 30px 80px rgba(15, 23, 42, 0.16),
+        0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+.access-card {
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+}
+
+.access-visual {
+    background:
+        linear-gradient(150deg, rgba(124, 45, 18, 0.98) 0%, rgba(154, 52, 18, 0.96) 55%, rgba(194, 65, 12, 0.94) 100%);
+    box-shadow: none;
+}
+
+.access-visual::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        radial-gradient(circle at 84% 4%, rgba(255, 255, 255, 0.09) 0 160px, transparent 161px),
+        radial-gradient(circle at 48% 46%, rgba(255, 255, 255, 0.06) 0 140px, transparent 141px),
+        radial-gradient(circle at 6% 100%, rgba(255, 255, 255, 0.07) 0 220px, transparent 221px);
+    pointer-events: none;
+}
+
+.access-visual-inner {
+    min-height: 556px;
+}
+
+@media (min-width: 1024px) {
+    .access-card {
+        border-left: 1px solid rgba(148, 163, 184, 0.18);
+    }
+}
+
+.access-panel {
+    background: rgba(255, 247, 237, 0.14);
+    border: 1px solid rgba(253, 186, 116, 0.28);
+    box-shadow: 0 24px 50px rgba(67, 20, 7, 0.2);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+.access-card input[type='email']:focus,
+.access-card input[type='password']:focus,
+.access-card input[type='text']:focus {
+    border-color: rgba(249, 115, 22, 0.72);
+    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.14);
+}
+
+.access-card input[type='checkbox'] {
+    accent-color: #f97316;
+}
+
+.access-submit {
+    background: linear-gradient(135deg, #ea580c, #f97316);
+    box-shadow: 0 18px 36px rgba(234, 88, 12, 0.24);
+}
+
+.access-submit:hover {
+    background: linear-gradient(135deg, #c2410c, #ea580c);
+}

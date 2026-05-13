@@ -7,7 +7,7 @@ function getConfig() {
 
     const config = parseJsonAttribute(container, 'data-warehouse-pending-receipts-config', null);
     if (!config) {
-        console.error('Invalid pending receipts config JSON');
+        console.error('Invalid incoming packages config JSON');
     }
 
     return config;
@@ -22,9 +22,9 @@ function registerPendingReceiptsPage() {
     const pageConfig = {
         endpoint: config.endpoint,
         defaultSort: 'assigned_at',
-        exportFileName: 'warehouse-pending-receipts',
-        printTitle: 'Warehouse Pending Receipts',
-        statuses: config.statuses || [],
+        exportFileName: 'warehouse-incoming-packages',
+        printTitle: 'Warehouse Incoming Packages',
+        statuses: (config.statuses || []).filter((status) => status.value !== 'assigned'),
         columns: [
             { key: 'shipment_number', label: 'Shipment #', exportLabel: 'Shipment Number' },
             { key: 'driver_name', label: 'Driver', exportLabel: 'Driver Name' },
@@ -154,6 +154,23 @@ function registerPendingReceiptsPage() {
                     default:
                         return 'border-slate-200/50 bg-white/60 text-slate-700';
                 }
+            },
+
+            formatDisplayDate(value) {
+                if (!value) return '-';
+
+                const normalized = String(value).replace(' ', 'T');
+                const date = new Date(normalized);
+                if (Number.isNaN(date.getTime())) return value;
+
+                return new Intl.DateTimeFormat('en-GH', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                }).format(date);
             },
         };
     });

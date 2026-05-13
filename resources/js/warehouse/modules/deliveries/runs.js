@@ -39,6 +39,13 @@ function registerWarehouseDeliveryRunsPage() {
         { value: 'completed', label: 'Completed' },
         { value: 'cancelled', label: 'Cancelled' },
     ];
+    const stopStatuses = [
+        { value: 'pending', label: 'Pending' },
+        { value: 'arrived', label: 'Arrived' },
+        { value: 'delivered', label: 'Delivered' },
+        { value: 'failed', label: 'Failed' },
+        { value: 'handed_off', label: 'Handed Off' },
+    ];
 
     const pageConfig = {
         endpoint: config.data_endpoint,
@@ -64,8 +71,29 @@ function registerWarehouseDeliveryRunsPage() {
 
         return {
             ...page,
+            showFilters: false,
             deliveryDrivers: Array.isArray(config.delivery_drivers) ? config.delivery_drivers : [],
             localDeliveryBatches: Array.isArray(config.local_delivery_batches) ? config.local_delivery_batches : [],
+            runStats: config.run_stats || {},
+            stopStatuses,
+            filters: {
+                created_date_from: '',
+                created_date_to: '',
+                assigned_date_from: '',
+                assigned_date_to: '',
+                dispatched_date_from: '',
+                dispatched_date_to: '',
+                completed_date_from: '',
+                completed_date_to: '',
+                status: '',
+                driver_id: '',
+                stop_status: '',
+                verification: '',
+                stops_min: '',
+                stops_max: '',
+                items_min: '',
+                items_max: '',
+            },
             selectedDriverByRun: {},
             newRunBatchId: '',
             canResetCodes: Boolean(config.can_reset_codes),
@@ -79,6 +107,107 @@ function registerWarehouseDeliveryRunsPage() {
 
             init() {
                 this.loadData();
+                this.initDateRange();
+            },
+
+            buildParams(overrides = {}) {
+                const params = page.buildParams.call(this, overrides);
+                Object.entries(this.filters).forEach(([key, value]) => {
+                    if (value !== '' && value !== null && value !== undefined) {
+                        params.set(key, value);
+                    }
+                });
+                return params;
+            },
+
+            applyFilters() {
+                this.meta.current_page = 1;
+                this.loadData();
+            },
+
+            clearFilters() {
+                Object.keys(this.filters).forEach((key) => { this.filters[key] = ''; });
+                ['createdDateRange', 'assignedDateRange', 'dispatchedDateRange', 'completedDateRange'].forEach((ref) => {
+                    if (this.$refs[ref]) this.$refs[ref].value = '';
+                });
+                this.meta.current_page = 1;
+                this.loadData();
+            },
+
+            clearFilter(key) {
+                if (!Object.prototype.hasOwnProperty.call(this.filters, key)) return;
+                this.filters[key] = '';
+
+                const dateRefs = {
+                    created_date_from: 'createdDateRange',
+                    created_date_to: 'createdDateRange',
+                    assigned_date_from: 'assignedDateRange',
+                    assigned_date_to: 'assignedDateRange',
+                    dispatched_date_from: 'dispatchedDateRange',
+                    dispatched_date_to: 'dispatchedDateRange',
+                    completed_date_from: 'completedDateRange',
+                    completed_date_to: 'completedDateRange',
+                };
+                if (dateRefs[key] && this.$refs[dateRefs[key]]) {
+                    const fromKey = key.replace('_to', '_from');
+                    const toKey = key.replace('_from', '_to');
+                    this.filters[fromKey] = '';
+                    this.filters[toKey] = '';
+                    this.$refs[dateRefs[key]].value = '';
+                }
+
+                this.applyFilters();
+            },
+
+            activeFilterChips() {
+                const labels = {
+                    created_date_from: 'Created date',
+                    assigned_date_from: 'Assigned date',
+                    dispatched_date_from: 'Dispatched date',
+                    completed_date_from: 'Completed date',
+                    status: 'Run status',
+                    driver_id: 'Driver',
+                    stop_status: 'Stop status',
+                    verification: 'Verification',
+                    stops_min: 'Min stops',
+                    stops_max: 'Max stops',
+                    items_min: 'Min items',
+                    items_max: 'Max items',
+                };
+
+                return Object.entries(this.filters)
+                    .filter(([key, value]) => value !== '' && value !== null && value !== undefined && !key.endsWith('_to'))
+                    .map(([key, value]) => ({ key, label: `${labels[key] || key}: ${this.filterValueLabel(key, value)}` }));
+            },
+
+            filterValueLabel(key, value) {
+                if (key.endsWith('_from')) {
+                    const toKey = key.replace('_from', '_to');
+                    return [value, this.filters[toKey]].filter(Boolean).join(' - ');
+                }
+
+                if (key === 'status') {
+                    return this.statusLabel(value);
+                }
+
+                if (key === 'driver_id') {
+                    return this.deliveryDrivers.find((driver) => String(driver.id) === String(value))?.name || value;
+                }
+
+                if (key === 'stop_status') {
+                    return this.stopStatuses.find((status) => status.value === value)?.label || value;
+                }
+
+                if (key === 'verification') {
+                    return {
+                        verified: 'Verified by code',
+                        skipped: 'Verification skipped',
+                        code_sent: 'Code sent',
+                        no_code: 'No code sent',
+                    }[value] || value;
+                }
+
+                return value;
             },
 
             statusBadgeClass(status) {
@@ -98,6 +227,78 @@ function registerWarehouseDeliveryRunsPage() {
                     default:
                         return 'border-slate-200/50 bg-white/60 text-slate-700';
                 }
+            },
+
+            statusLabel(status) {
+                const normalized = String(status || '').toLowerCase();
+                return statuses.find(item => item.value === normalized)?.label || (status || '-');
+            },
+
+            initDateRange() {
+                const setupPicker = (refName, fromKey, toKey) => {
+                    if (!this.$refs[refName]) return;
+                    if (!window.$ || !window.moment || !window.$.fn.daterangepicker) return;
+                    const $input = window.$(this.$refs[refName]);
+                    $input.daterangepicker({
+                        autoUpdateInput: false,
+                        alwaysShowCalendars: true,
+                        opens: 'left',
+                        locale: { format: 'YYYY-MM-DD', cancelLabel: 'Clear' },
+                        ranges: {
+                            Today: [window.moment(), window.moment()],
+                            Yesterday: [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
+                            'Last 7 Days': [window.moment().subtract(6, 'days'), window.moment()],
+                            'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
+                            'This Month': [window.moment().startOf('month'), window.moment().endOf('month')],
+                            'Last Month': [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
+                        },
+                    });
+                    $input.on('apply.daterangepicker', (ev, picker) => {
+                        this.filters[fromKey] = picker.startDate.format('YYYY-MM-DD');
+                        this.filters[toKey] = picker.endDate.format('YYYY-MM-DD');
+                        $input.val(`${this.filters[fromKey]} - ${this.filters[toKey]}`);
+                    });
+                    $input.on('cancel.daterangepicker', () => {
+                        this.filters[fromKey] = '';
+                        this.filters[toKey] = '';
+                        $input.val('');
+                    });
+                };
+
+                const setupPickers = () => {
+                    setupPicker('createdDateRange', 'created_date_from', 'created_date_to');
+                    setupPicker('assignedDateRange', 'assigned_date_from', 'assigned_date_to');
+                    setupPicker('dispatchedDateRange', 'dispatched_date_from', 'dispatched_date_to');
+                    setupPicker('completedDateRange', 'completed_date_from', 'completed_date_to');
+                };
+
+                if (window.$ && window.moment && window.$.fn.daterangepicker) {
+                    setupPickers();
+                    return;
+                }
+
+                const cssId = 'daterangepicker-css';
+                if (!document.getElementById(cssId)) {
+                    const link = document.createElement('link');
+                    link.id = cssId;
+                    link.rel = 'stylesheet';
+                    link.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
+                    document.head.appendChild(link);
+                }
+
+                const loadScript = (id, src) => new Promise((resolve) => {
+                    if (document.getElementById(id)) return resolve();
+                    const script = document.createElement('script');
+                    script.id = id;
+                    script.src = src;
+                    script.onload = () => resolve();
+                    document.body.appendChild(script);
+                });
+
+                loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
+                    .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
+                    .then(() => loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js'))
+                    .then(setupPickers);
             },
 
             stopStatusClass(status) {

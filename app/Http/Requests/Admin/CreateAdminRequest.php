@@ -2,12 +2,22 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Helpers\PhoneHelper;
 use App\Models\Role;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
 class CreateAdminRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('phone')) {
+            $this->merge([
+                'phone' => PhoneHelper::format((string) $this->input('phone')) ?? $this->input('phone'),
+            ]);
+        }
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -25,6 +35,11 @@ class CreateAdminRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
+            'phone' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
+                if (!PhoneHelper::isValid((string) $value)) {
+                    $fail('Please enter a valid Ghana phone number.');
+                }
+            }, 'unique:users,phone'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role_id' => ['nullable', 'exists:roles,id'],
             'roles' => ['nullable', 'array', 'max:1'],
@@ -96,6 +111,8 @@ class CreateAdminRequest extends FormRequest
             'email.required' => 'Email address is required.',
             'email.email' => 'Please enter a valid email address.',
             'email.unique' => 'This email address is already in use.',
+            'phone.required' => 'Phone number is required.',
+            'phone.unique' => 'This phone number is already in use.',
             'password.required' => 'Password is required.',
             'password.min' => 'Password must be at least 8 characters.',
             'password.confirmed' => 'Password confirmation does not match.',

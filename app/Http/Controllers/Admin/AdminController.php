@@ -55,6 +55,7 @@ class AdminController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%")
                   ->orWhereHas('roles', function ($roleQuery) use ($search) {
                       $roleQuery->where('roles.name', 'like', "%{$search}%");
                   });
@@ -87,7 +88,7 @@ class AdminController extends Controller
         // Sorting
         $sortField = $request->input('sort', 'created_at');
         $sortDirection = $request->input('direction', 'desc');
-        $allowedSorts = ['name', 'email', 'created_at', 'last_login_at'];
+        $allowedSorts = ['name', 'email', 'phone', 'created_at', 'last_login_at'];
 
         if (in_array($sortField, $allowedSorts)) {
             $query->orderBy($sortField, $sortDirection === 'asc' ? 'asc' : 'desc');
@@ -106,6 +107,7 @@ class AdminController extends Controller
                 'id' => $admin->id,
                 'name' => $admin->name,
                 'email' => $admin->email,
+                'phone' => $admin->phone,
                 'avatar' => strtoupper(substr($admin->name, 0, 1)),
                 'roles' => $admin->roles->map(fn($r) => [
                     'id' => $r->id,
@@ -159,6 +161,7 @@ class AdminController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%")
                   ->orWhereHas('roles', function ($roleQuery) use ($search) {
                       $roleQuery->where('roles.name', 'like', "%{$search}%");
                   });
@@ -181,6 +184,7 @@ class AdminController extends Controller
             return [
                 'Name' => $admin->name,
                 'Email' => $admin->email,
+                'Phone' => $admin->phone,
                 'Roles' => $admin->roles->pluck('name')->implode(', '),
                 'Status' => $admin->is_active ? 'Active' : 'Inactive',
                 'Created By' => $admin->creator?->name ?? 'System',
@@ -258,6 +262,7 @@ class AdminController extends Controller
         $admin = User::create([
             'name' => $request->name,
             'email' => $request->email,
+            'phone' => $request->phone,
             'password' => Hash::make($request->password),
             'is_active' => $request->boolean('is_active', true),
             'created_by_user_id' => $currentUser->id,
@@ -415,7 +420,7 @@ class AdminController extends Controller
      */
     public function update(UpdateAdminRequest $request, User $admin): RedirectResponse|JsonResponse
     {
-        $data = $request->only(['name', 'email', 'is_active', 'warehouse_id']);
+        $data = $request->only(['name', 'email', 'phone', 'is_active', 'warehouse_id']);
 
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);

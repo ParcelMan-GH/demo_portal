@@ -2682,6 +2682,21 @@ $shipmentConfig = [
             <!-- ═══════════════════════════════════════ -->
             <div x-show="activeTab === 'receiving'" x-cloak>
 
+                @include('shared.receiving.workspace', [
+                    'packagesExpr' => 'receiving.packages',
+                    'showPackageToolbar' => true,
+                    'showAdminPackageControls' => true,
+                    'detailsClick' => 'openPackageDetailsModal(pkg)',
+                    'receiveClick' => 'openReceivingPackageModal(pkg, 1)',
+                    'photosClick' => 'openReceivingPhotosModal(pkg)',
+                    'printClick' => 'openReceivingLabelPrintModal(pkg)',
+                    'finalizeClick' => 'openFinalizeConfirm()',
+                    'finalizeDisabled' => '!canFinalizeReceiving()',
+                    'finalizeLabelExpr' => 'finalizeReceivingButtonLabel()',
+                    'finalizeSubtitle' => 'Mark all packages as received and move shipment to warehouse status.',
+                ])
+
+                <div class="hidden">
                 <!-- Loading -->
                 <div x-show="receiving.loading" class="flex items-center justify-center py-20">
                     <div class="flex gap-1.5">
@@ -2895,209 +2910,19 @@ $shipmentConfig = [
                                 </div>
 
 	                        <!-- Packages Table -->
-	                        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-	                            <div class="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-	                                <div class="flex items-start gap-3">
-	                                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm">
-	                                        <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-	                                    </span>
-	                                    <div>
-	                                        <h3 class="text-sm font-bold text-slate-900">Packages</h3>
-	                                        <p class="text-xs text-slate-500">Open a package to receive it or save delivery changes.</p>
-	                                        <p x-show="receiving.autoGroupLockReason" class="mt-1 text-[10px] text-amber-600" x-text="receiving.autoGroupLockReason" style="display:none"></p>
-	                                    </div>
-	                                </div>
-	                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
-	                                    <button type="button"
-	                                            @@click="openReceivingAddPackageModal()"
-	                                            class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition-all hover:bg-slate-50">
-	                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v16m8-8H4"/></svg>
-	                                        Add Package
-	                                    </button>
-	                                    <button type="button"
-	                                            @@click="autoGroupReceivingPackagesByPhone()"
-	                                            :disabled="receiving.autoGrouping || !receiving.canAutoGroup"
-	                                            class="inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
-	                                            :class="receiving.canAutoGroup ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-200 text-slate-500'">
-	                                        <svg x-show="!receiving.autoGrouping" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-	                                        <svg x-show="receiving.autoGrouping" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-	                                        <span x-text="receiving.autoGrouping ? 'Grouping...' : 'Auto-group by Phone'"></span>
-	                                    </button>
-	                                    <button type="button"
-	                                            @@click="loadReceiving()"
-	                                            class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition-all hover:bg-slate-50">
-	                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-	                                        Refresh
-	                                    </button>
-	                                </div>
-	                            </div>
-	                            <div class="overflow-x-auto">
-	                                <table class="min-w-[1180px] w-full divide-y divide-slate-100 text-left">
-	                                    <thead class="bg-slate-50">
-	                                        <tr>
-	                                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Package</th>
-	                                            <th class="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">Expected</th>
-		                                            <th class="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">Received</th>
-		                                            <th class="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">Remaining</th>
-		                                            <th class="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">Status</th>
-		                                            <th class="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">Condition</th>
-		                                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Recipient</th>
-		                                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Delivery Method</th>
-		                                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Custody</th>
-	                                            <th class="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-wide text-slate-500">Actions</th>
-	                                        </tr>
-	                                    </thead>
-		                                    <tbody class="divide-y divide-slate-100">
-		                                        <template x-if="receiving.packages.length === 0">
-		                                            <tr>
-		                                                <td colspan="10" class="px-4 py-12 text-center">
-		                                                    <p class="text-sm font-semibold text-slate-600">No packages found for receiving.</p>
-		                                                    <p class="mt-1 text-xs text-slate-400">Add a package here if more packages arrived during receiving.</p>
-		                                                </td>
-	                                            </tr>
-	                                        </template>
-	                                        <template x-for="pkg in receiving.packages" :key="pkg.shipment_item_id">
-	                                            <tr class="align-top hover:bg-slate-50/60">
-	                                                <td class="px-4 py-4">
-	                                                    <div class="min-w-0 space-y-1">
-	                                                        <button type="button"
-	                                                                @@click="openPackageDetailsModal(pkg)"
-	                                                                class="block max-w-xs truncate text-left text-[11px] font-black text-slate-900 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-orange-700 hover:decoration-orange-300"
-	                                                                x-text="pkg.description || 'No description'"></button>
-	                                                        <p x-show="pkg.tracking_code" class="mt-0.5 text-[10px] font-mono text-slate-400" x-text="pkg.tracking_code"></p>
-	                                                    </div>
-	                                                </td>
-	                                                <td class="px-4 py-4 text-center">
-	                                                    <span class="text-[11px] font-bold text-slate-700" x-text="receivingExpectedQuantity(pkg)"></span>
-	                                                </td>
-	                                                <td class="px-4 py-4 text-center">
-	                                                    <span class="text-[11px] font-bold text-emerald-700" x-text="pkg.received_quantity"></span>
-	                                                </td>
-	                                                <td class="px-4 py-4 text-center">
-	                                                    <span class="text-[11px] font-bold text-amber-700" x-text="receivingPendingQuantity(pkg)"></span>
-		                                                </td>
-		                                                <td class="px-4 py-4 text-center">
-		                                                    <span class="text-[10px] font-black uppercase tracking-wide"
-		                                                          :class="receivingPackageStatusTextClass(pkg)"
-		                                                          x-text="receivingPackageStatusLabel(pkg)"></span>
-		                                                </td>
-		                                                <td class="px-4 py-4 text-center">
-		                                                    <span x-show="receivingPackageIsReceived(pkg)"
-		                                                          class="text-[10px] font-bold uppercase tracking-wide"
-		                                                          :class="receivingConditionTextClass(pkg.condition_status)"
-		                                                          x-text="receivingConditionLabel(pkg.condition_status)" style="display:none"></span>
-		                                                    <span x-show="!receivingPackageIsReceived(pkg)"
-		                                                          class="text-[10px] font-bold uppercase tracking-wide text-slate-400" style="display:none">-</span>
-		                                                </td>
-	                                                <td class="px-4 py-4">
-	                                                    <div class="space-y-1 text-[11px]">
-	                                                        <p class="flex max-w-xs items-center gap-1.5 truncate font-semibold text-slate-800">
-	                                                            <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 0115 0"/></svg>
-	                                                            <span class="truncate" x-text="pkg.delivery_recipient_name || 'No recipient set'"></span>
-	                                                        </p>
-	                                                        <p x-show="pkg.delivery_recipient_phone" class="flex items-center gap-1.5 text-slate-500">
-	                                                            <svg class="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372a1.125 1.125 0 00-.852-1.091l-4.423-1.106a1.125 1.125 0 00-1.173.417l-.97 1.293a1.125 1.125 0 01-1.21.38 12.035 12.035 0 01-7.143-7.143 1.125 1.125 0 01.38-1.21l1.293-.97a1.125 1.125 0 00.417-1.173L6.963 3.102A1.125 1.125 0 005.872 2.25H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
-	                                                            <span x-text="pkg.delivery_recipient_phone"></span>
-	                                                        </p>
-	                                                        <p x-show="pkg.delivery_town" class="flex max-w-xs items-center gap-1.5 truncate text-slate-500">
-	                                                            <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
-	                                                            <span class="truncate" x-text="pkg.delivery_town"></span>
-	                                                        </p>
-	                                                    </div>
-	                                                </td>
-	                                                <td class="px-4 py-4">
-	                                                    <div class="space-y-1 text-[11px]">
-	                                                        <p class="flex items-center gap-1.5 font-bold"
-	                                                           :class="pkg.delivery_method === 'bus_handoff' ? 'text-violet-700' : 'text-orange-700'">
-	                                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h7.5m-7.5 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m13.5 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.875c.621 0 1.125-.504 1.125-1.125V14.25m-17.25 0h17.25m-17.25 0V6.375c0-.621.504-1.125 1.125-1.125h10.5c.621 0 1.125.504 1.125 1.125v7.875"/></svg>
-	                                                            <span x-text="pkg.delivery_method === 'bus_handoff' ? 'Bus courier' : 'Direct delivery'"></span>
-	                                                        </p>
-	                                                        <p class="flex items-center gap-1.5 font-semibold"
-	                                                           :class="receivingDeliveryFeeClass(pkg)">
-	                                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6v12m-3-2.818c.696.424 1.626.682 3 .682 2.25 0 3-1.007 3-2.25 0-1.244-.75-2.25-3-2.25s-3-1.006-3-2.25S9.75 6.864 12 6.864c1.374 0 2.304.258 3 .682"/></svg>
-	                                                            <span x-text="receivingDeliveryFeeLabel(pkg)"></span>
-	                                                        </p>
-	                                                        <p x-show="packageDeliveryStatusLabel(pkg)"
-	                                                           class="flex items-center gap-1.5 font-semibold"
-	                                                           :class="packageDeliveryStatusClass(pkg)">
-	                                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-	                                                            <span x-text="'Status: ' + packageDeliveryStatusLabel(pkg)"></span>
-	                                                        </p>
-	                                                    </div>
-	                                                </td>
-	                                                <td class="px-4 py-4">
-	                                                    <button type="button"
-	                                                            @@click="openPackageCustodyModal(pkg)"
-	                                                            :disabled="!packageCustodyCanOpen(pkg)"
-		                                                            class="block text-left disabled:cursor-default">
-		                                                        <span class="block truncate text-[11px] font-bold"
-		                                                              :class="packageCustodyClass(pkg)"
-		                                                              x-text="packageCustodySummary(pkg)"></span>
-		                                                        <span class="mt-1 block space-y-0.5 text-[10px] text-slate-400">
-		                                                            <template x-for="line in packageCustodyDetailLines(pkg)" :key="line">
-		                                                                <span class="block whitespace-nowrap" x-text="line"></span>
-		                                                            </template>
-		                                                        </span>
-		                                                    </button>
-	                                                </td>
-	                                                <td class="px-4 py-4 text-right">
-	                                                    <div class="flex flex-col items-end gap-1.5">
-	                                                        <button type="button"
-	                                                                @@click="openReceivingPackageModal(pkg, 1)"
-	                                                                class="inline-flex items-center gap-1 text-[11px] font-black text-slate-700 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-slate-950 hover:decoration-slate-700">
-	                                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.5 7.125L16.875 4.5"/></svg>
-	                                                            <span x-text="receivingPackageActionLabel(pkg)"></span>
-	                                                        </button>
-	                                                        <button type="button"
-	                                                                @@click="openReceivingPhotosModal(pkg)"
-	                                                                class="inline-flex items-center gap-1 text-[11px] font-black text-slate-700 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-slate-950 hover:decoration-slate-700">
-	                                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6.827 6.175A2.31 2.31 0 019.186 4.5h5.628a2.31 2.31 0 012.36 1.675l.365 1.286A1.875 1.875 0 0019.342 8.8H20.25A2.25 2.25 0 0122.5 11.05v6.2a2.25 2.25 0 01-2.25 2.25H3.75a2.25 2.25 0 01-2.25-2.25v-6.2A2.25 2.25 0 013.75 8.8h.908a1.875 1.875 0 001.803-1.339l.366-1.286z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 13.5a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-	                                                            View Photos
-	                                                        </button>
-	                                                        <button type="button"
-	                                                                @@click="openReceivingSplitModal(pkg)"
-	                                                                :disabled="!pkg.can_split || pkg.vendor_photos.length < 2"
-	                                                                class="inline-flex items-center gap-1 text-[11px] font-black underline underline-offset-4 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-	                                                                :class="pkg.can_split && pkg.vendor_photos.length >= 2 ? 'text-slate-700 decoration-slate-300 hover:text-slate-950 hover:decoration-slate-700' : 'text-slate-400 decoration-slate-200'">
-	                                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.047 1.124-.047s.751.016 1.124.047c1.131.094 1.976 1.057 1.976 2.192V7.5M8.25 7.5h7.5M8.25 7.5l-.621 8.696A2.25 2.25 0 009.873 18.6h4.254a2.25 2.25 0 002.244-2.404L15.75 7.5"/></svg>
-	                                                            Split Photos
-	                                                        </button>
-	                                                        <button type="button"
-	                                                                @@click="removeReceivingPackage(pkg)"
-	                                                                :disabled="!pkg.can_delete"
-	                                                                class="inline-flex items-center gap-1 text-[11px] font-black underline underline-offset-4 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-	                                                                :class="pkg.can_delete ? 'text-rose-700 decoration-rose-300 hover:text-rose-900 hover:decoration-rose-700' : 'text-slate-400 decoration-slate-200'">
-	                                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12"/></svg>
-	                                                            Remove
-	                                                        </button>
-	                                                        <div x-show="receivingPackageIsReceived(pkg)" class="inline-flex" style="display:none">
-	                                                            <button type="button"
-	                                                                    @@click="openReceivingLabelPrintModal(pkg)"
-	                                                                    class="inline-flex items-center gap-1 text-[11px] font-black text-slate-700 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-slate-950 hover:decoration-slate-700">
-	                                                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6.75 7.5V6A2.25 2.25 0 019 3.75h6A2.25 2.25 0 0117.25 6v1.5m-10.5 0h10.5m-10.5 0A2.25 2.25 0 004.5 9.75v3A2.25 2.25 0 006.75 15h.75m9.75-7.5A2.25 2.25 0 0119.5 9.75v3A2.25 2.25 0 0117.25 15h-.75m-9 0v5.25h9V15m-9 0h9"/></svg>
-	                                                                Print Labels
-	                                                            </button>
-	                                                        </div>
-	                                                    </div>
-	                                                </td>
-	                                            </tr>
-	                                        </template>
-	                                    </tbody>
-	                                </table>
-	                            </div>
-
-	                            <!-- Table Footer: Finalize -->
-	                            <div class="flex flex-col gap-3 border-t border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-	                                <div>
-	                                    <p class="text-[11px] font-bold text-slate-800">Finalize Receiving</p>
-	                                    <p class="text-[10px] text-slate-500">Mark all packages as received and move shipment to warehouse status.</p>
-	                                </div>
-	                                <button @@click="openFinalizeConfirm()" :disabled="!canFinalizeReceiving()"
-	                                        class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-50">
-	                                    <span x-text="finalizeReceivingButtonLabel()"></span>
-	                                </button>
-	                            </div>
-	                        </div>
+	                        @include('shared.receiving.packages-workspace', [
+	                            'packagesExpr' => 'receiving.packages',
+	                            'showToolbar' => true,
+	                            'showAdminPackageControls' => true,
+	                            'detailsClick' => 'openPackageDetailsModal(pkg)',
+	                            'receiveClick' => 'openReceivingPackageModal(pkg, 1)',
+	                            'photosClick' => 'openReceivingPhotosModal(pkg)',
+	                            'printClick' => 'openReceivingLabelPrintModal(pkg)',
+	                            'finalizeClick' => 'openFinalizeConfirm()',
+	                            'finalizeDisabled' => '!canFinalizeReceiving()',
+	                            'finalizeLabelExpr' => 'finalizeReceivingButtonLabel()',
+	                            'finalizeSubtitle' => 'Mark all packages as received and move shipment to warehouse status.',
+	                        ])
 
                             <!-- Charges Ledger -->
                             <div class="hidden">
@@ -3200,11 +3025,12 @@ $shipmentConfig = [
                                         </table>
                                     </div>
                                 </div>
-                            </div>
-	                    </div>
-	                </template>
+	                            </div>
+		                    </div>
+		                </template>
+                </div>
 
-	                {{-- Driver Assignment History Modal --}}
+		                {{-- Driver Assignment History Modal --}}
 		                <div x-show="assignmentHistoryModalOpen" @@click="assignmentHistoryModalOpen = false" x-transition.opacity class="fixed inset-0 z-[188] flex justify-end bg-black/55 backdrop-blur-sm" style="display:none">
 		                    <div @@click.stop x-transition:enter="transition ease-out duration-200"
 		                         x-transition:enter-start="translate-x-full"

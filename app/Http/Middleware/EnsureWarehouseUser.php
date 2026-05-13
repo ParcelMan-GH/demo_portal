@@ -24,16 +24,19 @@ class EnsureWarehouseUser
             return redirect()->route('admin.login');
         }
 
-        // Super admin bypasses warehouse checks — can access any warehouse
+        // Super admins can enter the warehouse portal only when a warehouse
+        // context has been explicitly assigned or selected.
         if ($user->isSuperAdmin()) {
-            // If super admin has no warehouse_id, assign the first active warehouse for context
             if ((int) ($user->warehouse_id ?? 0) <= 0) {
-                $firstWarehouse = \App\Models\Warehouse::where('is_active', true)->first();
-                if ($firstWarehouse) {
-                    $user->warehouse_id = $firstWarehouse->id;
-                    $user->saveQuietly();
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => 'Select a warehouse context before using warehouse routes.'], 403);
                 }
+
+                return redirect()
+                    ->route('admin.dashboard')
+                    ->with('error', 'Select a warehouse context before using warehouse routes.');
             }
+
             return $next($request);
         }
 
@@ -68,4 +71,3 @@ class EnsureWarehouseUser
         return $next($request);
     }
 }
-

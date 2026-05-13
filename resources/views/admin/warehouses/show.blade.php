@@ -542,7 +542,7 @@ $warehouseUsersTableConfig = [
                                 type="text"
                                 x-model="search"
                                 @@input.debounce.500ms="meta.current_page = 1; loadData()"
-                                placeholder="Search users..."
+                                placeholder="Search users, email, phone..."
                                 class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 focus:ring-2 focus:ring-slate-400/40 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400"
                             >
                             <svg class="absolute right-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -673,6 +673,15 @@ $warehouseUsersTableConfig = [
                                         </svg>
                                     </div>
                                 </th>
+                                <th x-show="visibleColumns.phone" @@click="sort('phone')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <div class="flex items-center">
+                                        PHONE
+                                        <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'phone' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
+                                        </svg>
+                                    </div>
+                                </th>
                                 <th x-show="visibleColumns.status" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">STATUS</th>
                                 <th x-show="visibleColumns.created_at" @@click="sort('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                                     <div class="flex items-center">
@@ -713,6 +722,7 @@ $warehouseUsersTableConfig = [
                                         </template>
                                     </td>
                                     <td x-show="visibleColumns.email" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-700" x-text="user.email"></td>
+                                    <td x-show="visibleColumns.phone" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-700" x-text="user.phone || '-'"></td>
                                     <td x-show="visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap">
                                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'" x-text="user.is_active ? 'Active' : 'Inactive'"></span>
                                     </td>
@@ -867,6 +877,18 @@ $warehouseUsersTableConfig = [
                                            :class="userFormErrors.email ? 'border-red-300 focus:ring-red-400/50' : ''"
                                            placeholder="warehouse.user@example.com">
                                     <p x-show="userFormErrors.email" x-text="userFormErrors.email" class="mt-1 text-xs text-red-500"></p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                                        Phone Number <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="tel"
+                                           x-model="userForm.phone"
+                                           class="w-full px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                                           :class="userFormErrors.phone ? 'border-red-300 focus:ring-red-400/50' : ''"
+                                           placeholder="0241234567">
+                                    <p x-show="userFormErrors.phone" x-text="userFormErrors.phone" class="mt-1 text-xs text-red-500"></p>
                                 </div>
 
                                 <div>
@@ -1872,6 +1894,5 @@ $warehouseUsersTableConfig = [
 </div>
 
 @endsection
-
 
 

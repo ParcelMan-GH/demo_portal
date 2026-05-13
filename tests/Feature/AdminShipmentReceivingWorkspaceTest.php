@@ -660,6 +660,7 @@ test('post-pickup split works from receiving before receipt starts and returns r
     $response->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.receiving_package.shipment_item_id', $newItem->id)
+        ->assertJsonPath('data.receiving_package.tracking_code', $newItem->fresh()->tracking_code)
         ->assertJsonPath('data.receiving_package.delivery_town', 'Kasoa')
         ->assertJsonPath('data.receiving_package.can_split', true)
         ->assertJsonPath('data.receiving_package.vendor_photos.0.id', $secondPhoto->id)
@@ -668,6 +669,8 @@ test('post-pickup split works from receiving before receipt starts and returns r
         ->assertJsonPath('data.source_receiving_package.can_split', true);
 
     expect($newItem->description)->toBe('Camera box')
+        ->and($newItem->tracking_code)->toStartWith('TRK')
+        ->and($newItem->status->value)->toBe('picked_up')
         ->and($newItem->delivery_recipient_name)->toBe('Kojo Driver')
         ->and($newItem->delivery_recipient_phone)->toBe('+233501112223')
         ->and($newItem->delivery_region_id)->toBe($location['region']->id)
@@ -964,6 +967,7 @@ test('post-pickup receiving can add a package and returns receiving package payl
         ->assertJsonPath('data.package.description', 'Extra carton')
         ->assertJsonPath('data.package.quantity', 3)
         ->assertJsonPath('data.receiving_package.description', 'Extra carton')
+        ->assertJsonPath('data.receiving_package.tracking_code', ShipmentItem::find($newItemId)?->tracking_code)
         ->assertJsonPath('data.receiving_package.vendor_quantity', 3)
         ->assertJsonPath('data.receiving_package.expected_quantity', 3)
         ->assertJsonPath('data.receiving_package.received_quantity', 3)
@@ -974,7 +978,11 @@ test('post-pickup receiving can add a package and returns receiving package payl
         'shipment_id' => $shipment->id,
         'description' => 'Extra carton',
         'quantity' => 3,
+        'status' => 'picked_up',
     ]);
+
+    $newItem = ShipmentItem::findOrFail($newItemId);
+    expect($newItem->tracking_code)->toStartWith('TRK');
 
     $this->assertDatabaseHas('warehouse_receipt_items', [
         'shipment_item_id' => $newItemId,
@@ -982,6 +990,7 @@ test('post-pickup receiving can add a package and returns receiving package payl
         'received_quantity' => 3,
         'damaged_quantity' => 0,
         'condition_status' => 'ok',
+        'barcode_value' => $newItem->tracking_code,
     ]);
 
     $this->assertDatabaseHas('pickup_item_confirmations', [
@@ -1280,7 +1289,8 @@ test('post-pickup auto-group by phone works from receiving before warehouse inta
     $response->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.destination_mode', 'per_item')
-        ->assertJsonPath('data.can_auto_group', true);
+        ->assertJsonPath('data.can_auto_group', false)
+        ->assertJsonPath('data.auto_group_lock_reason', 'No phone grouping is needed for the current package photos.');
 
     $receivingPackages = collect($response->json('data.receiving_packages'));
 
@@ -1351,7 +1361,8 @@ test('receiving is available for picked up shipment even when assignment picked 
         ->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.can_receive', true)
-        ->assertJsonPath('data.can_auto_group', true)
+        ->assertJsonPath('data.can_auto_group', false)
+        ->assertJsonPath('data.auto_group_lock_reason', 'No phone grouping is needed for the current package photos.')
         ->assertJsonPath('data.packages.0.shipment_item_id', $item->id);
 
     $this->postJson(route('admin.shipments.receiving.details', [
@@ -1694,6 +1705,157 @@ test('single-destination receiving details save syncs all receiving package card
         'delivery_landmark' => 'Near roundabout',
         'delivery_instructions' => 'Call vendor office first',
     ]);
+});
+
+test('warehouse receiving can edit a one drop-off shared destination', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'single',
+        'delivery_recipient_name' => 'Old Recipient',
+        'delivery_recipient_phone' => '+233240000000',
+        'delivery_town' => 'Old Town',
+    ]);
+
+    $firstItem = rwCreateShipmentItem($shipment, ['description' => 'Package 1']);
+    $secondItem = rwCreateShipmentItem($shipment, ['description' => 'Package 2']);
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+
+    $response = $this->postJson(route('warehouse.receipts.pending.shared-destination', $assignment), [
+        'delivery_recipient_name' => 'Ama Shared',
+        'delivery_recipient_phone' => '0541234567',
+        'delivery_region_id' => $location['region']->id,
+        'delivery_district_id' => $location['district']->id,
+        'delivery_town' => 'Adenta Barrier',
+        'delivery_instructions' => 'Call on arrival',
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF,
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.shipment.delivery_recipient_name', 'Ama Shared')
+        ->assertJsonPath('data.shipment.delivery_town', 'Adenta Barrier')
+        ->assertJsonPath('data.items.0.delivery_recipient_name', 'Ama Shared')
+        ->assertJsonPath('data.items.1.delivery_recipient_phone', '+233541234567')
+        ->assertJsonPath('data.items.0.delivery_method', ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF);
+
+    $this->assertDatabaseHas('shipments', [
+        'id' => $shipment->id,
+        'destination_mode' => 'single',
+        'delivery_recipient_name' => 'Ama Shared',
+        'delivery_recipient_phone' => '+233541234567',
+        'delivery_town' => 'Adenta Barrier',
+    ]);
+
+    $this->assertDatabaseHas('shipment_items', [
+        'id' => $firstItem->id,
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF,
+    ]);
+    $this->assertDatabaseHas('shipment_items', [
+        'id' => $secondItem->id,
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF,
+    ]);
+});
+
+test('warehouse receiving can add and split packages from the package workspace', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'per_item',
+    ]);
+    $item = rwCreateShipmentItem($shipment, ['description' => 'Grouped package']);
+    $keptPhoto = rwAddVendorPhoto($item, 'kept.jpg');
+    $movedPhoto = rwAddVendorPhoto($item, 'moved.jpg', 1);
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+
+    $this->postJson(route('warehouse.receipts.pending.packages.add', $assignment), [
+        'description' => 'Extra counter package',
+        'quantity' => 2,
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF,
+    ])->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.items.1.description', 'Extra counter package')
+        ->assertJsonPath('data.items.1.received_quantity', 2);
+
+    $this->postJson(route('warehouse.receipts.pending.items.split', [
+        'pickupAssignment' => $assignment,
+        'shipmentItem' => $item,
+    ]), [
+        'photo_ids' => [$movedPhoto->id],
+    ])->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.items', fn ($items) => count($items) === 3);
+
+    expect($keptPhoto->fresh()->shipment_item_id)->toBe($item->id)
+        ->and($movedPhoto->fresh()->shipment_item_id)->not->toBe($item->id);
+});
+
+test('warehouse receiving can auto-group packages by tagged photo phone', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'single',
+    ]);
+    $firstItem = rwCreateShipmentItem($shipment, ['description' => 'Mixed package A']);
+    $secondItem = rwCreateShipmentItem($shipment, ['description' => 'Mixed package B']);
+    rwAddVendorPhoto($firstItem, 'ama.jpg')->update(['recipient_phone' => '+233241111111']);
+    rwAddVendorPhoto($secondItem, 'kojo.jpg')->update(['recipient_phone' => '+233542222222']);
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+
+    $this->postJson(route('warehouse.receipts.pending.auto-group-by-phone', $assignment))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.shipment.destination_mode', 'per_item')
+        ->assertJsonPath('data.can_auto_group', false)
+        ->assertJsonPath('data.items', fn ($items) => count($items) === 2);
+
+    expect($shipment->fresh()->destination_mode->value)->toBe('per_item');
+});
+
+test('warehouse receiving auto-group splits mixed phone photos on the same package', function () {
+    $location = rwCreateLocation();
+    $warehouse = rwCreateWarehouse($location['region'], $location['district']);
+    $shipment = rwCreateShipment(rwCreateVendor(), [
+        'status' => 'picked_up',
+        'destination_mode' => 'single',
+    ]);
+    $item = rwCreateShipmentItem($shipment, ['description' => 'Mixed recipient package']);
+    $firstPhoto = rwAddVendorPhoto($item, 'ama.jpg');
+    $firstPhoto->update(['recipient_phone' => '+233241111111']);
+    $secondPhoto = rwAddVendorPhoto($item, 'kojo.jpg', 1);
+    $secondPhoto->update(['recipient_phone' => '+233542222222']);
+    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+        'picked_up_at' => now(),
+    ]);
+
+    $response = $this->postJson(route('warehouse.receipts.pending.auto-group-by-phone', $assignment))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.shipment.destination_mode', 'per_item')
+        ->assertJsonPath('data.can_auto_group', false)
+        ->assertJsonPath('data.items', fn ($items) => count($items) === 2);
+
+    $items = collect($response->json('data.items'));
+
+    expect($shipment->items()->count())->toBe(2)
+        ->and($items->pluck('delivery_recipient_phone')->all())->toEqualCanonicalizing([
+            '+233241111111',
+            '+233542222222',
+        ])
+        ->and($firstPhoto->fresh()->shipment_item_id)->not->toBe($secondPhoto->fresh()->shipment_item_id);
+
+    $this->postJson(route('warehouse.receipts.pending.auto-group-by-phone', $assignment))
+        ->assertStatus(422)
+        ->assertJsonPath('message', 'No phone grouping is needed for the current package photos.');
 });
 
 test('receiving finalization accepts approval reason for discrepancy receipts', function () {

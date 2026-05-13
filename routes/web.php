@@ -23,12 +23,14 @@ use App\Http\Controllers\Admin\AdminMarketingController;
 use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\AdminContactQueueController;
 use App\Http\Controllers\Admin\AdminShipmentChargesController;
+use App\Http\Controllers\Admin\RecipientPaymentController;
 use App\Http\Controllers\Warehouse\WarehouseShipmentChargesController;
 use App\Http\Controllers\Admin\VendorPayoutController;
 use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
 use App\Http\Controllers\Warehouse\DeliveryRunController as WarehouseDeliveryRunController;
 use App\Http\Controllers\Warehouse\InvoiceController as WarehouseInvoiceController;
+use App\Http\Controllers\Warehouse\PackageController as WarehousePackageController;
 use App\Http\Controllers\Warehouse\ReceiptController as WarehouseReceiptController;
 use App\Http\Controllers\Warehouse\ShipmentPaymentController as WarehouseShipmentPaymentController;
 use App\Http\Controllers\Warehouse\SortingController as WarehouseSortingController;
@@ -340,6 +342,36 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('contacts/worker-stats', [AdminContactQueueController::class, 'workerStats'])->name('contacts.worker-stats');
         Route::post('contacts/add-to-queue', [AdminContactQueueController::class, 'addToQueue'])->name('contacts.add-to-queue');
 
+        // Recipient Payments
+        Route::get('recipient-payments', [RecipientPaymentController::class, 'index'])->name('recipient-payments.index');
+        Route::get('recipient-payments/reports', [RecipientPaymentController::class, 'reports'])->name('recipient-payments.reports');
+        Route::get('recipient-payments/reports-data', [RecipientPaymentController::class, 'reportsData'])->name('recipient-payments.reports.data');
+        Route::get('recipient-payments/reports-export', [RecipientPaymentController::class, 'reportsExport'])->name('recipient-payments.reports.export');
+        Route::get('recipient-payments-data', [RecipientPaymentController::class, 'data'])->name('recipient-payments.data');
+        Route::get('recipient-payments-data-export', [RecipientPaymentController::class, 'dataExport'])->name('recipient-payments.data.export');
+        Route::get('recipient-payments/locations/search', [RecipientPaymentController::class, 'locationSearch'])->name('recipient-payments.locations.search');
+        Route::get('recipient-payments/wallets', [RecipientPaymentController::class, 'wallets'])->name('recipient-payments.wallets');
+        Route::get('recipient-payments/wallets-export', [RecipientPaymentController::class, 'walletsExport'])->name('recipient-payments.wallets.export');
+        Route::post('recipient-payments/wallets', [RecipientPaymentController::class, 'storeWallet'])->name('recipient-payments.wallets.store');
+        Route::post('recipient-payments/wallets/{wallet}/update', [RecipientPaymentController::class, 'updateWallet'])->name('recipient-payments.wallets.update');
+        Route::post('recipient-payments/wallets/{wallet}/delete', [RecipientPaymentController::class, 'deleteWallet'])->name('recipient-payments.wallets.delete');
+        Route::post('recipient-payments/wallets/{wallet}/status', [RecipientPaymentController::class, 'updateWalletStatus'])->name('recipient-payments.wallets.status');
+        Route::get('recipient-payments/sessions', [RecipientPaymentController::class, 'sessions'])->name('recipient-payments.sessions');
+        Route::get('recipient-payments/sessions-export', [RecipientPaymentController::class, 'sessionsExport'])->name('recipient-payments.sessions.export');
+        Route::post('recipient-payments/sessions', [RecipientPaymentController::class, 'startSession'])->name('recipient-payments.sessions.store');
+        Route::post('recipient-payments/sessions/{session}/close', [RecipientPaymentController::class, 'closeSession'])->name('recipient-payments.sessions.close');
+        Route::post('recipient-payments/scan', [RecipientPaymentController::class, 'scan'])->name('recipient-payments.scan');
+        Route::post('recipient-payments/bulk-assign', [RecipientPaymentController::class, 'bulkAssign'])->name('recipient-payments.bulk-assign');
+        Route::post('recipient-payments/groups/log-call', [RecipientPaymentController::class, 'logGroupCall'])->name('recipient-payments.groups.log-call');
+        Route::post('recipient-payments/groups/update-details', [RecipientPaymentController::class, 'updateGroupDetails'])->name('recipient-payments.groups.update-details');
+        Route::post('recipient-payments/groups/mark-paid', [RecipientPaymentController::class, 'markGroupPaid'])->name('recipient-payments.groups.mark-paid');
+        Route::post('recipient-payments/{task}/assign', [RecipientPaymentController::class, 'assign'])->name('recipient-payments.assign');
+        Route::post('recipient-payments/{task}/release', [RecipientPaymentController::class, 'release'])->name('recipient-payments.release');
+        Route::post('recipient-payments/{task}/log-call', [RecipientPaymentController::class, 'logCall'])->name('recipient-payments.log-call');
+        Route::post('recipient-payments/{task}/fee', [RecipientPaymentController::class, 'setFee'])->name('recipient-payments.fee');
+        Route::post('recipient-payments/{task}/mark-paid', [RecipientPaymentController::class, 'markPaid'])->name('recipient-payments.mark-paid');
+        Route::post('recipient-payments/{task}/override', [RecipientPaymentController::class, 'override'])->name('recipient-payments.override');
+
         // Delivery Runs (admin read visibility)
         Route::get('delivery-runs', [AdminDeliveryRunController::class, 'index'])->name('delivery-runs.index');
         Route::get('delivery-runs-data', [AdminDeliveryRunController::class, 'data'])->name('delivery-runs.data');
@@ -364,13 +396,18 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('transport-manifests/incoming/{manifest}/items/{shipmentItem}/scan-receive', [AdminTransportManifestController::class, 'scanIncomingItem'])->name('transport-manifests.incoming.items.scan');
         Route::post('transport-manifests/incoming/{manifest}/finalize-receipt', [AdminTransportManifestController::class, 'finalizeIncoming'])->name('transport-manifests.incoming.finalize');
         Route::get('transport-manifests/{manifest}', [AdminTransportManifestController::class, 'show'])->name('transport-manifests.show');
+        Route::delete('transport-manifests/{manifest}', [AdminTransportManifestController::class, 'destroy'])->name('transport-manifests.destroy');
         Route::post('transport-manifests/{manifest}/assign-driver', [AdminTransportManifestController::class, 'assignDriver'])->name('transport-manifests.assign-driver');
         Route::post('transport-manifests/{manifest}/unassign-driver', [AdminTransportManifestController::class, 'unassignDriver'])->name('transport-manifests.unassign-driver');
         Route::post('transport-manifests/{manifest}/dispatch', [AdminTransportManifestController::class, 'dispatch'])->name('transport-manifests.dispatch');
+        Route::post('transport-manifests/{manifest}/undo-dispatch', [AdminTransportManifestController::class, 'undoDispatch'])->name('transport-manifests.undo-dispatch');
+        Route::post('transport-manifests/{manifest}/print-waybill', [AdminTransportManifestController::class, 'printWaybill'])->name('transport-manifests.print-waybill');
         Route::post('transport-manifests/{manifest}/items/{item}/mark-loaded', [AdminTransportManifestController::class, 'markItemLoaded'])->name('transport-manifests.items.mark-loaded');
         Route::post('transport-manifests/{manifest}/items/{item}/mark-not-loaded', [AdminTransportManifestController::class, 'markItemNotLoaded'])->name('transport-manifests.items.mark-not-loaded');
         Route::post('transport-manifests/{manifest}/items/{item}/move-container', [AdminTransportManifestController::class, 'moveItemToContainer'])->name('transport-manifests.items.move-container');
         Route::post('transport-manifests/{manifest}/containers', [AdminTransportManifestController::class, 'createContainer'])->name('transport-manifests.containers.store');
+        Route::get('transport-manifests/{manifest}/containers/{container}/items-data', [AdminTransportManifestController::class, 'containerItemsData'])->name('transport-manifests.containers.items-data');
+        Route::post('transport-manifests/{manifest}/containers/{container}/notes', [AdminTransportManifestController::class, 'updateContainerNotes'])->name('transport-manifests.containers.notes');
         Route::post('transport-manifests/{manifest}/containers/{container}/mark-loaded', [AdminTransportManifestController::class, 'markContainerLoaded'])->name('transport-manifests.containers.mark-loaded');
         Route::post('transport-manifests/{manifest}/containers/{container}/mark-not-loaded', [AdminTransportManifestController::class, 'markContainerNotLoaded'])->name('transport-manifests.containers.mark-not-loaded');
         Route::post('transport-manifests/{manifest}/containers/{container}/print-label', [AdminTransportManifestController::class, 'printContainerLabel'])->name('transport-manifests.containers.print-label');
@@ -378,6 +415,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('transport-manifests/{manifest}/scan-issues/{exception}/approve', [AdminTransportManifestController::class, 'approveScanIssue'])->name('transport-manifests.scan-issues.approve');
         Route::post('transport-manifests/{manifest}/scan-issues/{exception}/reject', [AdminTransportManifestController::class, 'rejectScanIssue'])->name('transport-manifests.scan-issues.reject');
         Route::post('transport-manifests/{manifest}/mark-all-loaded', [AdminTransportManifestController::class, 'markAllLoaded'])->name('transport-manifests.mark-all-loaded');
+        Route::post('transport-manifests/{manifest}/mark-all-not-loaded', [AdminTransportManifestController::class, 'markAllNotLoaded'])->name('transport-manifests.mark-all-not-loaded');
+        Route::post('transport-manifests/{manifest}/mark-arrived', [AdminTransportManifestController::class, 'markArrived'])->name('transport-manifests.mark-arrived');
+        Route::post('transport-manifests/{manifest}/undo-arrival', [AdminTransportManifestController::class, 'undoArrival'])->name('transport-manifests.undo-arrival');
 
         // Sort Batches (admin read visibility)
         Route::get('package-tracking', [\App\Http\Controllers\Admin\PackageTrackingController::class, 'index'])->name('package-tracking.index');
@@ -395,6 +435,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::delete('sort-batches/{batch}/items/{shipmentItem}', [AdminSortBatchController::class, 'removeItem'])->name('sort-batches.remove-item');
         Route::post('sort-batches/{batch}/seal', [AdminSortBatchController::class, 'seal'])->name('sort-batches.seal');
         Route::post('sort-batches/{batch}/reopen', [AdminSortBatchController::class, 'reopen'])->name('sort-batches.reopen');
+        Route::delete('sort-batches/{batch}', [AdminSortBatchController::class, 'destroy'])->name('sort-batches.destroy');
+        Route::post('sort-batches/{batch}/create-transport-manifest', [AdminSortBatchController::class, 'createTransportManifest'])->name('sort-batches.create-transport-manifest');
         Route::post('sort-batches/{batch}/create-delivery-run', [AdminSortBatchController::class, 'createDeliveryRun'])->name('sort-batches.create-delivery-run');
 
         // Collection Center (self-pickup)
@@ -460,6 +502,8 @@ Route::prefix('warehouse')
         // Walk-in Vendor Shipments
         Route::get('walkin', [WarehouseWalkinController::class, 'create'])->name('walkin.create');
         Route::post('walkin', [WarehouseWalkinController::class, 'store'])->name('walkin.store');
+        Route::post('walkin/print-labels', [WarehouseWalkinController::class, 'printLabels'])->name('walkin.print-labels');
+        Route::post('walkin/items/{shipmentItem}/print-label', [WarehouseWalkinController::class, 'printLabel'])->name('walkin.items.print-label');
         Route::get('walkin/vendor-lookup', [WarehouseWalkinController::class, 'vendorLookup'])->name('walkin.vendor-lookup');
         Route::post('walkin/vendor-create', [WarehouseWalkinController::class, 'vendorCreate'])->name('walkin.vendor-create');
         Route::get('locations/search', [WarehouseWalkinController::class, 'locationSearch'])->name('locations.search');
@@ -483,15 +527,27 @@ Route::prefix('warehouse')
         Route::get('receipts/pending', [WarehouseReceiptController::class, 'pendingIndex'])->name('receipts.pending.index');
         Route::get('receipts/pending-data', [WarehouseReceiptController::class, 'pendingData'])->name('receipts.pending.data');
         Route::get('receipts/pending/{pickupAssignment}', [WarehouseReceiptController::class, 'pendingShow'])->name('receipts.pending.show');
+        Route::post('receipts/pending/{pickupAssignment}/packages', [WarehouseReceiptController::class, 'addReceiptPackage'])->name('receipts.pending.packages.add');
+        Route::post('receipts/pending/{pickupAssignment}/auto-group-by-phone', [WarehouseReceiptController::class, 'autoGroupReceiptPackagesByPhone'])->name('receipts.pending.auto-group-by-phone');
+        Route::post('receipts/pending/{pickupAssignment}/shared-destination', [WarehouseReceiptController::class, 'saveSharedDestination'])->name('receipts.pending.shared-destination');
+        Route::post('receipts/pending/{pickupAssignment}/items/{shipmentItem}/split', [WarehouseReceiptController::class, 'splitReceiptPackage'])->name('receipts.pending.items.split');
         Route::post('receipts/pending/{pickupAssignment}/items/{shipmentItem}', [WarehouseReceiptController::class, 'savePendingItem'])->name('receipts.pending.items.save');
         Route::post('receipts/pending/{pickupAssignment}/items/{shipmentItem}/print-label', [WarehouseReceiptController::class, 'printPendingItemLabel'])->name('receipts.pending.items.print-label');
         Route::post('receipts/pending/{pickupAssignment}/finalize', [WarehouseReceiptController::class, 'finalizePendingReceipt'])->name('receipts.pending.finalize');
         Route::get('pickups/received', [WarehouseReceiptController::class, 'receivedPickupsIndex'])->name('pickups.received.index');
         Route::get('pickups/received-data', [WarehouseReceiptController::class, 'receivedPickupsData'])->name('pickups.received.data');
         Route::get('pickups/received/{pickupAssignment}', [WarehouseReceiptController::class, 'receivedPickupShow'])->name('pickups.received.show');
-        Route::get('items/received', [WarehouseReceiptController::class, 'receivedItemsIndex'])->name('items.received.index');
-        Route::get('items/received-data', [WarehouseReceiptController::class, 'receivedItemsData'])->name('items.received.data');
-        Route::get('items/received/{warehouseReceiptItem}', [WarehouseReceiptController::class, 'receivedItemShow'])->name('items.received.show');
+        Route::get('packages', [WarehousePackageController::class, 'index'])->name('packages.index');
+        Route::get('packages-data', [WarehousePackageController::class, 'data'])->name('packages.data');
+        Route::get('packages/{warehouseReceiptItem}', [WarehousePackageController::class, 'show'])->name('packages.show');
+        Route::put('packages/{warehouseReceiptItem}', [WarehousePackageController::class, 'update'])->name('packages.update');
+        Route::post('packages/{warehouseReceiptItem}/sort-batch', [WarehousePackageController::class, 'moveSortBatch'])->name('packages.sort-batch');
+        Route::post('packages/{warehouseReceiptItem}/print-label', [WarehousePackageController::class, 'printLabel'])->name('packages.print-label');
+        Route::post('packages/{warehouseReceiptItem}/delivery-fee', [WarehousePackageController::class, 'setDeliveryFee'])->name('packages.delivery-fee');
+        Route::post('packages/{warehouseReceiptItem}/mark-paid', [WarehousePackageController::class, 'markDeliveryPaid'])->name('packages.mark-paid');
+        Route::get('items/received', [WarehousePackageController::class, 'legacyIndex'])->name('items.received.index');
+        Route::get('items/received-data', [WarehousePackageController::class, 'data'])->name('items.received.data');
+        Route::get('items/received/{warehouseReceiptItem}', [WarehousePackageController::class, 'show'])->name('items.received.show');
 
         // Shipment charges ledger (warehouse)
         Route::get('shipments/{shipment}/charges', [WarehouseShipmentChargesController::class, 'index'])->name('shipments.charges.index');
@@ -505,11 +561,18 @@ Route::prefix('warehouse')
         Route::get('sorting', [WarehouseSortingController::class, 'index'])->name('sorting.index');
         Route::get('sorting/items-data', [WarehouseSortingController::class, 'itemsData'])->name('sorting.items.data');
         Route::get('sorting/batches-data', [WarehouseSortingController::class, 'batchesData'])->name('sorting.batches.data');
+        Route::get('sorting/batches-export', [WarehouseSortingController::class, 'export'])->name('sorting.batches.export');
         Route::post('sorting/batches', [WarehouseSortingController::class, 'storeBatch'])->name('sorting.batches.store');
+        Route::get('sorting/batches/{sortBatch}', [WarehouseSortingController::class, 'show'])->name('sorting.show');
+        Route::get('sorting/batches/{sortBatch}/items-data', [WarehouseSortingController::class, 'batchItemsData'])->name('sorting.items-data');
+        Route::get('sorting/batches/{sortBatch}/eligible-items', [WarehouseSortingController::class, 'eligibleItemsData'])->name('sorting.eligible-items');
         Route::post('sorting/batches/{sortBatch}/items', [WarehouseSortingController::class, 'addItems'])->name('sorting.batches.items.store');
         Route::delete('sorting/batches/{sortBatch}/items/{shipmentItem}', [WarehouseSortingController::class, 'removeItem'])->name('sorting.batches.items.destroy');
         Route::post('sorting/batches/{sortBatch}/seal', [WarehouseSortingController::class, 'seal'])->name('sorting.batches.seal');
         Route::post('sorting/batches/{sortBatch}/reopen', [WarehouseSortingController::class, 'reopen'])->name('sorting.batches.reopen');
+        Route::delete('sorting/batches/{sortBatch}', [WarehouseSortingController::class, 'destroy'])->name('sorting.destroy');
+        Route::post('sorting/batches/{sortBatch}/create-transport-manifest', [WarehouseSortingController::class, 'createTransportManifest'])->name('sorting.create-transport-manifest');
+        Route::post('sorting/batches/{sortBatch}/create-delivery-run', [WarehouseSortingController::class, 'createDeliveryRun'])->name('sorting.create-delivery-run');
 
         // Transport Manifests (Outbound + Incoming)
         Route::get('manifests/transport', [WarehouseTransportManifestController::class, 'outboundIndex'])->name('manifests.transport.index');
@@ -517,16 +580,32 @@ Route::prefix('warehouse')
         Route::post('manifests/transport', [WarehouseTransportManifestController::class, 'create'])->name('manifests.transport.store');
         Route::post('manifests/transport/{manifest}/assign-driver', [WarehouseTransportManifestController::class, 'assignDriver'])->name('manifests.transport.assign-driver');
         Route::post('manifests/transport/{manifest}/dispatch', [WarehouseTransportManifestController::class, 'dispatch'])->name('manifests.transport.dispatch');
+        Route::post('manifests/transport/{manifest}/undo-dispatch', [WarehouseTransportManifestController::class, 'undoDispatch'])->name('manifests.transport.undo-dispatch');
+        Route::post('manifests/transport/{manifest}/print-waybill', [WarehouseTransportManifestController::class, 'printWaybill'])->name('manifests.transport.print-waybill');
         Route::post('manifests/transport/{manifest}/unassign-driver', [WarehouseTransportManifestController::class, 'unassignDriver'])->name('manifests.transport.unassign-driver');
+        Route::post('manifests/transport/{manifest}/mark-all-loaded', [WarehouseTransportManifestController::class, 'markAllLoaded'])->name('manifests.transport.mark-all-loaded');
+        Route::post('manifests/transport/{manifest}/mark-all-not-loaded', [WarehouseTransportManifestController::class, 'markAllNotLoaded'])->name('manifests.transport.mark-all-not-loaded');
+        Route::post('manifests/transport/{manifest}/mark-arrived', [WarehouseTransportManifestController::class, 'markArrived'])->name('manifests.transport.mark-arrived');
+        Route::post('manifests/transport/{manifest}/undo-arrival', [WarehouseTransportManifestController::class, 'undoArrival'])->name('manifests.transport.undo-arrival');
+        Route::post('manifests/transport/{manifest}/items/{item}/mark-loaded', [WarehouseTransportManifestController::class, 'markItemLoaded'])->name('manifests.transport.items.mark-loaded');
+        Route::post('manifests/transport/{manifest}/items/{item}/mark-not-loaded', [WarehouseTransportManifestController::class, 'markItemNotLoaded'])->name('manifests.transport.items.mark-not-loaded');
         Route::post('manifests/transport/{manifest}/items/{item}/move-container', [WarehouseTransportManifestController::class, 'moveItemToContainer'])->name('manifests.transport.items.move-container');
         Route::post('manifests/transport/{manifest}/containers', [WarehouseTransportManifestController::class, 'createContainer'])->name('manifests.transport.containers.store');
+        Route::get('manifests/transport/{manifest}/containers/{container}/items-data', [WarehouseTransportManifestController::class, 'containerItemsData'])->name('manifests.transport.containers.items-data');
+        Route::post('manifests/transport/{manifest}/containers/{container}/attach-sort-batch', [WarehouseTransportManifestController::class, 'attachSortBatchToContainer'])->name('manifests.transport.containers.attach-sort-batch');
+        Route::post('manifests/transport/{manifest}/containers/{container}/notes', [WarehouseTransportManifestController::class, 'updateContainerNotes'])->name('manifests.transport.containers.notes');
         Route::post('manifests/transport/{manifest}/containers/{container}/mark-loaded', [WarehouseTransportManifestController::class, 'markContainerLoaded'])->name('manifests.transport.containers.mark-loaded');
+        Route::post('manifests/transport/{manifest}/containers/{container}/mark-not-loaded', [WarehouseTransportManifestController::class, 'markContainerNotLoaded'])->name('manifests.transport.containers.mark-not-loaded');
         Route::post('manifests/transport/{manifest}/containers/{container}/print-label', [WarehouseTransportManifestController::class, 'printContainerLabel'])->name('manifests.transport.containers.print-label');
         Route::delete('manifests/transport/{manifest}/containers/{container}', [WarehouseTransportManifestController::class, 'deleteContainer'])->name('manifests.transport.containers.destroy');
+        Route::post('manifests/transport/{manifest}/scan-issues/{exception}/approve', [WarehouseTransportManifestController::class, 'approveScanIssue'])->name('manifests.transport.scan-issues.approve');
+        Route::post('manifests/transport/{manifest}/scan-issues/{exception}/reject', [WarehouseTransportManifestController::class, 'rejectScanIssue'])->name('manifests.transport.scan-issues.reject');
+        Route::delete('manifests/transport/{manifest}', [WarehouseTransportManifestController::class, 'destroy'])->name('manifests.transport.destroy');
         Route::get('manifests/transport/{manifest}', [WarehouseTransportManifestController::class, 'outboundShow'])->name('manifests.transport.show');
 
         Route::get('manifests/incoming', [WarehouseTransportManifestController::class, 'incomingIndex'])->name('manifests.incoming.index');
         Route::get('manifests/incoming-data', [WarehouseTransportManifestController::class, 'incomingData'])->name('manifests.incoming.data');
+        Route::post('manifests/incoming/scan', [WarehouseTransportManifestController::class, 'scanIncomingPackage'])->name('manifests.incoming.scan');
         Route::get('manifests/incoming/{manifest}', [WarehouseTransportManifestController::class, 'incomingShow'])->name('manifests.incoming.show');
         Route::post('manifests/incoming/{manifest}/items/{shipmentItem}/scan-receive', [WarehouseTransportManifestController::class, 'scanIncomingItem'])->name('manifests.incoming.items.scan');
         Route::post('manifests/incoming/{manifest}/finalize-receipt', [WarehouseTransportManifestController::class, 'finalizeIncoming'])->name('manifests.incoming.finalize');
@@ -543,6 +622,7 @@ Route::prefix('warehouse')
         Route::patch('deliveries/runs/{run}/stops/{stop}/packages', [WarehouseDeliveryRunController::class, 'updateStopPackages'])->name('deliveries.runs.stops.update-packages');
         Route::patch('deliveries/runs/{run}/stops/{stop}/delivery-method', [WarehouseDeliveryRunController::class, 'updateStopDeliveryMethod'])->name('deliveries.runs.stops.update-delivery-method');
         Route::post('deliveries/runs/{run}/stops/{stop}/confirm-handoff', [WarehouseDeliveryRunController::class, 'adminConfirmHandoff'])->name('deliveries.runs.stops.confirm-handoff');
+        Route::post('deliveries/runs/{run}/stops/{stop}/items/{item}/confirm-handoff', [WarehouseDeliveryRunController::class, 'confirmHandoffItem'])->name('deliveries.runs.stops.items.confirm-handoff');
         Route::get('deliveries/pending-confirmations', [WarehouseDeliveryRunController::class, 'pendingConfirmations'])->name('deliveries.pending-confirmations');
         Route::get('deliveries/pending-confirmations-data', [WarehouseDeliveryRunController::class, 'pendingConfirmationsData'])->name('deliveries.pending-confirmations-data');
         Route::get('deliveries/runs/{run}', [WarehouseDeliveryRunController::class, 'show'])->name('deliveries.runs.show');
@@ -558,6 +638,36 @@ Route::prefix('warehouse')
         Route::post('contacts/{task}/resolve', [WarehouseContactQueueController::class, 'resolve'])->name('contacts.resolve');
         Route::get('contacts/{task}/attempts', [WarehouseContactQueueController::class, 'attempts'])->name('contacts.attempts');
         Route::get('contacts/worker-stats', [WarehouseContactQueueController::class, 'workerStats'])->name('contacts.worker-stats');
+
+        // Recipient Payments
+        Route::get('recipient-payments', [RecipientPaymentController::class, 'index'])->name('recipient-payments.index');
+        Route::get('recipient-payments/reports', [RecipientPaymentController::class, 'reports'])->name('recipient-payments.reports');
+        Route::get('recipient-payments/reports-data', [RecipientPaymentController::class, 'reportsData'])->name('recipient-payments.reports.data');
+        Route::get('recipient-payments/reports-export', [RecipientPaymentController::class, 'reportsExport'])->name('recipient-payments.reports.export');
+        Route::get('recipient-payments-data', [RecipientPaymentController::class, 'data'])->name('recipient-payments.data');
+        Route::get('recipient-payments-data-export', [RecipientPaymentController::class, 'dataExport'])->name('recipient-payments.data.export');
+        Route::get('recipient-payments/locations/search', [RecipientPaymentController::class, 'locationSearch'])->name('recipient-payments.locations.search');
+        Route::get('recipient-payments/wallets', [RecipientPaymentController::class, 'wallets'])->name('recipient-payments.wallets');
+        Route::get('recipient-payments/wallets-export', [RecipientPaymentController::class, 'walletsExport'])->name('recipient-payments.wallets.export');
+        Route::post('recipient-payments/wallets', [RecipientPaymentController::class, 'storeWallet'])->name('recipient-payments.wallets.store');
+        Route::post('recipient-payments/wallets/{wallet}/update', [RecipientPaymentController::class, 'updateWallet'])->name('recipient-payments.wallets.update');
+        Route::post('recipient-payments/wallets/{wallet}/delete', [RecipientPaymentController::class, 'deleteWallet'])->name('recipient-payments.wallets.delete');
+        Route::post('recipient-payments/wallets/{wallet}/status', [RecipientPaymentController::class, 'updateWalletStatus'])->name('recipient-payments.wallets.status');
+        Route::get('recipient-payments/sessions', [RecipientPaymentController::class, 'sessions'])->name('recipient-payments.sessions');
+        Route::get('recipient-payments/sessions-export', [RecipientPaymentController::class, 'sessionsExport'])->name('recipient-payments.sessions.export');
+        Route::post('recipient-payments/sessions', [RecipientPaymentController::class, 'startSession'])->name('recipient-payments.sessions.store');
+        Route::post('recipient-payments/sessions/{session}/close', [RecipientPaymentController::class, 'closeSession'])->name('recipient-payments.sessions.close');
+        Route::post('recipient-payments/scan', [RecipientPaymentController::class, 'scan'])->name('recipient-payments.scan');
+        Route::post('recipient-payments/bulk-assign', [RecipientPaymentController::class, 'bulkAssign'])->name('recipient-payments.bulk-assign');
+        Route::post('recipient-payments/groups/log-call', [RecipientPaymentController::class, 'logGroupCall'])->name('recipient-payments.groups.log-call');
+        Route::post('recipient-payments/groups/update-details', [RecipientPaymentController::class, 'updateGroupDetails'])->name('recipient-payments.groups.update-details');
+        Route::post('recipient-payments/groups/mark-paid', [RecipientPaymentController::class, 'markGroupPaid'])->name('recipient-payments.groups.mark-paid');
+        Route::post('recipient-payments/{task}/assign', [RecipientPaymentController::class, 'assign'])->name('recipient-payments.assign');
+        Route::post('recipient-payments/{task}/release', [RecipientPaymentController::class, 'release'])->name('recipient-payments.release');
+        Route::post('recipient-payments/{task}/log-call', [RecipientPaymentController::class, 'logCall'])->name('recipient-payments.log-call');
+        Route::post('recipient-payments/{task}/fee', [RecipientPaymentController::class, 'setFee'])->name('recipient-payments.fee');
+        Route::post('recipient-payments/{task}/mark-paid', [RecipientPaymentController::class, 'markPaid'])->name('recipient-payments.mark-paid');
+        Route::post('recipient-payments/{task}/override', [RecipientPaymentController::class, 'override'])->name('recipient-payments.override');
 
         // Invoice Management
         Route::post('receipts/pending/{pickupAssignment}/invoices', [WarehouseInvoiceController::class, 'store'])->name('invoices.store');

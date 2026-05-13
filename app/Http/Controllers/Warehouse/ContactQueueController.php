@@ -251,4 +251,12 @@ class ContactQueueController extends Controller
 
         return response()->json(['data' => $stats]);
     }
+
+    private function authorizePermission(string $permission): void
+    {
+        $user = Auth::guard('admin')->user();
+        if (!$user || !$user->hasPermission($permission)) {
+            abort(403, 'Unauthorized action.');
+        }
+    }
 }

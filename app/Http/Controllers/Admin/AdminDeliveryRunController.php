@@ -142,7 +142,12 @@ class AdminDeliveryRunController extends Controller
             'assignedDriver',
             'sortBatch',
             'createdBy',
+            'stops.region',
+            'stops.district',
+            'stops.confirmedBy',
             'stops.items.shipmentItem.shipment',
+            'stops.items.shipmentItem.images',
+            'stops.items.shipmentItem.warehouseReceiptItems.photos',
             'stops.verificationAttempts',
         ]);
 

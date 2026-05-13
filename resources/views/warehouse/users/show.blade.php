@@ -34,6 +34,7 @@
         formData: {
             name: @js($admin->name),
             email: @js($admin->email),
+            phone: @js($admin->phone),
             role_id: @js(optional($admin->roles->first())?->id ? (string) optional($admin->roles->first())->id : ''),
             password: '',
             password_confirmation: '',
@@ -65,6 +66,7 @@
             const payload = {
                 name: this.formData.name,
                 email: this.formData.email,
+                phone: this.formData.phone,
             };
 
             if (!this.isSelf) {
@@ -211,6 +213,12 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                                     </svg>
                                     <span class="truncate">{{ $admin->email }}</span>
+                                </div>
+                                <div class="flex items-center gap-1.5 text-slate-300">
+                                    <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h2.28a1 1 0 01.95.68l1.08 3.24a1 1 0 01-.27 1.05l-1.46 1.46a12.04 12.04 0 005.99 5.99l1.46-1.46a1 1 0 011.05-.27l3.24 1.08a1 1 0 01.68.95V19a2 2 0 01-2 2h-1C10.37 21 3 13.63 3 5z"/>
+                                    </svg>
+                                    <span class="truncate">{{ $admin->phone ?: 'No phone set' }}</span>
                                 </div>
                                 <div class="flex items-center gap-1.5 text-slate-300">
                                     <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -741,4 +749,3 @@
     @include('warehouse.users.partials.user-modal')
 </div>
 @endsection
-

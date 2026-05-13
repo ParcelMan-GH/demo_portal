@@ -57,6 +57,7 @@ class WarehousePortalService
                 'targetWarehouse:id,name,code',
             ])
             ->where('target_warehouse_id', $warehouse->id)
+            ->whereNotNull('picked_up_at')
             ->whereNull('received_at')
             ->where('status', '!=', 'cancelled');
     }

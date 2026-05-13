@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\LoginRequest;
+use App\Helpers\PhoneHelper;
 use App\Services\AdminAuditLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -28,9 +29,13 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request): RedirectResponse
     {
-        $credentials = $request->only('email', 'password');
+        $identifier = trim((string) $request->input('email'));
+        $loginField = filter_var($identifier, FILTER_VALIDATE_EMAIL) ? 'email' : 'phone';
+        $credentials = [
+            $loginField => $loginField === 'phone' ? (PhoneHelper::format($identifier) ?? $identifier) : $identifier,
+            'password' => (string) $request->input('password'),
+        ];
         $remember = $request->boolean('remember');
-        $attemptedEmail = (string) $request->input('email');
 
         if (!Auth::guard('admin')->attempt($credentials, $remember)) {
             $this->auditLogService->logAuthEvent(
@@ -38,7 +43,8 @@ class AuthController extends Controller
                 description: 'Admin login failed due to invalid credentials.',
                 request: $request,
                 metadata: [
-                    'email' => $attemptedEmail,
+                    'identifier' => $identifier,
+                    'login_field' => $loginField,
                     'reason' => 'invalid_credentials',
                 ],
                 statusCode: 422
@@ -59,7 +65,8 @@ class AuthController extends Controller
                 request: $request,
                 actor: $admin,
                 metadata: [
-                    'email' => $attemptedEmail,
+                    'identifier' => $identifier,
+                    'login_field' => $loginField,
                     'reason' => 'inactive_account',
                 ],
                 statusCode: 403
@@ -84,13 +91,16 @@ class AuthController extends Controller
             request: $request,
             actor: $admin,
             metadata: [
-                'email' => $attemptedEmail,
+                'identifier' => $identifier,
+                'login_field' => $loginField,
                 'remember' => $remember,
             ],
             statusCode: 200
         );
 
-        if (!empty($admin->warehouse_id)) {
+        if (!$admin->isSuperAdmin()
+            && !empty($admin->warehouse_id)
+            && $admin->roles()->where('is_warehouse_role', true)->exists()) {
             return redirect()->route('warehouse.dashboard');
         }
 

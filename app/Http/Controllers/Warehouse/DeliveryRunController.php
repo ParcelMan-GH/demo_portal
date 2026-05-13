@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Warehouse;
 
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryRun;
+use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
 use App\Models\Driver;
 use App\Models\SortBatch;
@@ -31,22 +32,30 @@ class DeliveryRunController extends Controller
         $this->authorizePermission('warehouse.delivery.assign');
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
         $user = Auth::guard('admin')->user();
+        $localDeliveryBatches = SortBatch::query()
+            ->where('origin_warehouse_id', $warehouse->id)
+            ->where('dispatch_mode', SortBatch::DISPATCH_LOCAL_DELIVERY)
+            ->where('status', SortBatch::STATUS_SEALED)
+            ->whereDoesntHave('deliveryRun')
+            ->orderByDesc('id')
+            ->get(['id', 'batch_number']);
+        $runStatsQuery = DeliveryRun::query()->where('warehouse_id', $warehouse->id);
 
         return view('warehouse.deliveries.runs.index', [
             'warehouse' => $warehouse,
             'canResetCodes' => (bool) $user?->hasPermission('warehouse.delivery.code.reset'),
+            'runStats' => [
+                'total' => (clone $runStatsQuery)->count(),
+                'active' => (clone $runStatsQuery)->whereNotIn('status', ['completed', 'cancelled'])->count(),
+                'completed' => (clone $runStatsQuery)->where('status', 'completed')->count(),
+                'ready_batches' => $localDeliveryBatches->count(),
+            ],
             'deliveryDrivers' => Driver::query()
                 ->where('is_active', true)
                 ->whereJsonContains('task_capabilities', Driver::CAPABILITY_DELIVERY)
                 ->orderBy('name')
                 ->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']),
-            'localDeliveryBatches' => SortBatch::query()
-                ->where('origin_warehouse_id', $warehouse->id)
-                ->where('dispatch_mode', SortBatch::DISPATCH_LOCAL_DELIVERY)
-                ->where('status', SortBatch::STATUS_SEALED)
-                ->whereDoesntHave('deliveryRun')
-                ->orderByDesc('id')
-                ->get(['id', 'batch_number']),
+            'localDeliveryBatches' => $localDeliveryBatches,
         ]);
     }
 
@@ -70,6 +79,55 @@ class DeliveryRunController extends Controller
 
         if ($status = $request->input('status')) {
             $query->where('status', $status);
+        }
+
+        foreach ([
+            'created' => 'created_at',
+            'assigned' => 'assigned_at',
+            'dispatched' => 'dispatched_at',
+            'completed' => 'completed_at',
+        ] as $prefix => $column) {
+            if ($from = $request->input("{$prefix}_date_from")) {
+                $query->whereDate($column, '>=', $from);
+            }
+
+            if ($to = $request->input("{$prefix}_date_to")) {
+                $query->whereDate($column, '<=', $to);
+            }
+        }
+
+        if ($driverId = $request->input('driver_id')) {
+            $query->where('assigned_driver_id', $driverId);
+        }
+
+        if ($stopStatus = $request->input('stop_status')) {
+            $query->whereHas('stops', fn (Builder $stopQuery) => $stopQuery->where('status', $stopStatus));
+        }
+
+        if ($verification = $request->input('verification')) {
+            match ($verification) {
+                'verified' => $query->whereHas('stops.verificationAttempts', fn (Builder $attemptQuery) => $attemptQuery->where('is_success', true)),
+                'skipped' => $query->whereHas('stops', fn (Builder $stopQuery) => $stopQuery->where('verification_skipped', true)),
+                'code_sent' => $query->whereHas('stops', fn (Builder $stopQuery) => $stopQuery->whereNotNull('verification_code_sent_at')),
+                'no_code' => $query->whereHas('stops', fn (Builder $stopQuery) => $stopQuery->whereNull('verification_code_sent_at')->where('verification_skipped', false)),
+                default => null,
+            };
+        }
+
+        if (($minStops = $request->input('stops_min')) !== null && $minStops !== '') {
+            $query->has('stops', '>=', max(0, (int) $minStops));
+        }
+
+        if (($maxStops = $request->input('stops_max')) !== null && $maxStops !== '') {
+            $query->has('stops', '<=', max(0, (int) $maxStops));
+        }
+
+        if (($minItems = $request->input('items_min')) !== null && $minItems !== '') {
+            $query->has('items', '>=', max(0, (int) $minItems));
+        }
+
+        if (($maxItems = $request->input('items_max')) !== null && $maxItems !== '') {
+            $query->has('items', '<=', max(0, (int) $maxItems));
         }
 
         $sort = $request->input('sort', 'created_at');
@@ -226,7 +284,9 @@ class DeliveryRunController extends Controller
             'createdBy',
             'stops.region',
             'stops.district',
+            'stops.confirmedBy',
             'stops.items.shipmentItem.shipment',
+            'stops.verificationAttempts',
             'items.shipmentItem.shipment',
             'items.stop',
         ]);
@@ -237,84 +297,26 @@ class DeliveryRunController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']);
 
-        $stopsData = $run->stops->map(function ($stop) {
-            return [
-                'id' => $stop->id,
-                'recipient_name' => $stop->recipient_name,
-                'recipient_phone' => $stop->recipient_phone,
-                'status' => $stop->status,
-                'region_name' => $stop->region?->name ?? '',
-                'district_name' => $stop->district?->name ?? '',
-                'town' => $stop->town ?? '',
-                'gh_post_address' => $stop->gh_post_address ?? '',
-                'landmark' => $stop->landmark ?? '',
-                'code_sent_at' => $stop->verification_code_sent_at?->format('M d, H:i'),
-                'verification_code' => $this->getStopOtpCode($stop),
-                'attempts' => (int) $stop->verification_attempts,
-                'max_attempts' => (int) $stop->max_attempts,
-                'arrived_at' => $stop->arrived_at?->format('M d, Y H:i'),
-                'delivered_at' => $stop->delivered_at?->format('M d, Y H:i'),
-                'failure_reason' => $stop->failure_reason,
-                'failure_notes' => $stop->failure_notes,
-                'delivery_notes' => $stop->delivery_notes,
-                'has_proof_photo' => !empty($stop->proof_photo_path),
-                'total_packages' => (int) $stop->total_packages,
-                'verification_skipped' => (bool) $stop->verification_skipped,
-                'verification_skip_reason' => $stop->verification_skip_reason,
-                'verification_skipped_at' => $stop->verification_skipped_at?->format('M d, Y H:i'),
-                'delivery_method' => $stop->delivery_method ?? 'direct',
-                'handoff' => $stop->delivery_method === 'bus_handoff' ? [
-                    'courier_name' => $stop->handoff_courier_name,
-                    'courier_phone' => $stop->handoff_courier_phone,
-                    'vehicle_number' => $stop->handoff_vehicle_number,
-                    'handed_off_at' => $stop->handoff_at?->format('M d, Y H:i'),
-                ] : null,
-                'confirmed_at' => $stop->confirmed_at?->format('M d, Y H:i'),
-                'confirmation_notes' => $stop->confirmation_notes,
-                'items_count' => $stop->items->count(),
-                'items' => $stop->items->map(fn($item) => [
-                    'id' => $item->id,
-                    'description' => $item->shipmentItem?->description ?? '-',
-                    'shipment_number' => $item->shipmentItem?->shipment?->shipment_number ?? '-',
-                    'fulfillment_type' => $item->shipmentItem?->fulfillment_type?->value ?? $item->shipmentItem?->shipment?->fulfillment_type?->value ?? 'warehouse',
-                    'expected_quantity' => (int) $item->expected_quantity,
-                    'delivered_quantity' => (int) $item->delivered_quantity,
-                    'status' => $item->status,
-                    'notes' => $item->notes ?? '',
-                ])->values()->toArray(),
-            ];
-        })->values()->toArray();
-
-        $itemsData = $run->items->map(function ($item) {
-            return [
-                'id' => $item->id,
-                'description' => $item->shipmentItem?->description ?? '-',
-                'tracking_code' => $item->shipmentItem?->tracking_code ?? '',
-                'shipment_number' => $item->shipmentItem?->shipment?->shipment_number ?? '-',
-                'fulfillment_type' => $item->shipmentItem?->fulfillment_type?->value ?? $item->shipmentItem?->shipment?->fulfillment_type?->value ?? 'warehouse',
-                'stop_recipient' => $item->stop?->recipient_name ?? '-',
-                'expected_quantity' => (int) $item->expected_quantity,
-                'delivered_quantity' => (int) $item->delivered_quantity,
-                'status' => $item->status,
-                'notes' => $item->notes ?? '',
-                'delivered_at' => $item->delivered_at?->format('M d, H:i'),
-            ];
-        })->values()->toArray();
-
         $user = Auth::guard('admin')->user();
-        $runConfig = [
-            'assign_driver_endpoint' => route('warehouse.deliveries.runs.assign-driver', ['run' => $run]),
-            'dispatch_endpoint' => route('warehouse.deliveries.runs.dispatch', ['run' => $run]),
-            'resend_code_endpoint' => route('warehouse.deliveries.runs.stops.resend-code', ['run' => $run, 'stop' => '__STOP__']),
-            'can_reset_codes' => (bool) $user?->hasPermission('warehouse.delivery.code.reset'),
+        $statusLabel = $this->formatStatusLabel($run->status);
+        $deliveryRunRoutes = [
+            'indexUrl' => route('warehouse.deliveries.runs.index'),
+            'sortBatchUrl' => $run->sortBatch ? route('warehouse.sorting.show', $run->sortBatch) : null,
+            'assignDriverUrl' => route('warehouse.deliveries.runs.assign-driver', $run),
+            'dispatchUrl' => route('warehouse.deliveries.runs.dispatch', $run),
+            'resendCodeUrlTemplate' => route('warehouse.deliveries.runs.stops.resend-code', ['run' => $run->id, 'stop' => '__STOP__']),
+            'updateStopDeliveryMethodUrlTemplate' => route('warehouse.deliveries.runs.stops.update-delivery-method', ['run' => $run->id, 'stop' => '__STOP__']),
+            'confirmHandoffItemUrlTemplate' => route('warehouse.deliveries.runs.stops.items.confirm-handoff', ['run' => $run->id, 'stop' => '__STOP__', 'item' => '__ITEM__']),
+            'canResetCodes' => (bool) $user?->hasPermission('warehouse.delivery.code.reset'),
         ];
 
-        return view('warehouse.deliveries.runs.show', [
+        return view('admin.delivery-runs.show', [
+            'layoutName' => 'warehouse.layouts.app',
             'run' => $run,
+            'statusLabel' => $statusLabel,
             'deliveryDrivers' => $deliveryDrivers,
-            'stopsData' => $stopsData,
-            'itemsData' => $itemsData,
-            'runConfig' => $runConfig,
+            'deliveryRunRoutes' => $deliveryRunRoutes,
+            'hideRunWarehouseMeta' => true,
         ]);
     }
 
@@ -389,10 +391,15 @@ class DeliveryRunController extends Controller
     public function updateStopDeliveryMethod(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
     {
         $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
 
         $validated = $request->validate([
             'delivery_method' => ['required', 'string', 'in:direct,bus_handoff'],
         ]);
+
+        if ((int) $run->warehouse_id !== (int) $warehouse->id) {
+            return response()->json(['success' => false, 'message' => 'Run not found.'], 404);
+        }
 
         if ($stop->delivery_run_id !== $run->id) {
             return response()->json(['success' => false, 'message' => 'Stop not found.'], 404);
@@ -405,6 +412,105 @@ class DeliveryRunController extends Controller
         $stop->update(['delivery_method' => $validated['delivery_method']]);
 
         return response()->json(['success' => true, 'message' => 'Delivery method updated.', 'delivery_method' => $stop->delivery_method]);
+    }
+
+    public function confirmHandoffItem(Request $request, DeliveryRun $run, DeliveryRunStop $stop, DeliveryRunItem $item): JsonResponse
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+
+        $validated = $request->validate([
+            'action' => ['required', 'in:delivered,failed'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if ((int) $run->warehouse_id !== (int) $warehouse->id) {
+            return response()->json(['success' => false, 'message' => 'Run not found.'], 404);
+        }
+
+        if ((int) $stop->delivery_run_id !== (int) $run->id || (int) $item->delivery_run_stop_id !== (int) $stop->id) {
+            return response()->json(['success' => false, 'message' => 'Item not found.'], 404);
+        }
+
+        if (in_array($item->status, [DeliveryRunItem::STATUS_DELIVERED, DeliveryRunItem::STATUS_FAILED], true)) {
+            return response()->json(['success' => false, 'message' => 'This item has already been resolved.'], 400);
+        }
+
+        $admin = Auth::guard('admin')->user();
+        $now = now();
+        $notes = $validated['notes'] ?? null;
+
+        if ($validated['action'] === 'delivered') {
+            $item->update([
+                'status' => DeliveryRunItem::STATUS_DELIVERED,
+                'notes' => $notes,
+                'delivered_quantity' => $item->expected_quantity,
+                'delivered_at' => $now,
+            ]);
+
+            if ($item->shipmentItem) {
+                $item->shipmentItem->update(['status' => \App\Enums\ItemStatus::DELIVERED]);
+                \App\Models\ShipmentItemTracking::create([
+                    'shipment_item_id' => $item->shipmentItem->id,
+                    'status' => \App\Enums\ItemStatus::DELIVERED->value,
+                    'location' => $stop->town ?: $stop->landmark,
+                    'notes' => 'Delivery confirmed by warehouse via phone call. ' . ($notes ?? ''),
+                    'meta' => ['confirmed_by' => $admin->name, 'confirmed_at' => $now->toIso8601String()],
+                    'created_by' => "user:{$admin->id}",
+                    'created_at' => $now,
+                ]);
+
+                if ($item->shipmentItem->shipment) {
+                    $allDelivered = $item->shipmentItem->shipment->items()
+                        ->where('status', '!=', \App\Enums\ItemStatus::DELIVERED->value)
+                        ->doesntExist();
+
+                    if ($allDelivered) {
+                        $item->shipmentItem->shipment->update(['status' => \App\Enums\ShipmentStatus::DELIVERED]);
+                    }
+                }
+            }
+        } else {
+            $item->update([
+                'status' => DeliveryRunItem::STATUS_FAILED,
+                'notes' => $notes,
+                'delivered_quantity' => 0,
+            ]);
+
+            if ($item->shipmentItem) {
+                $item->shipmentItem->update(['status' => \App\Enums\ItemStatus::AT_DESTINATION]);
+            }
+        }
+
+        $stopItems = DeliveryRunItem::query()->where('delivery_run_stop_id', $stop->id)->get();
+        $allResolved = $stopItems->every(fn (DeliveryRunItem $runItem) => in_array($runItem->status, [DeliveryRunItem::STATUS_DELIVERED, DeliveryRunItem::STATUS_FAILED], true));
+
+        if ($allResolved) {
+            $allDelivered = $stopItems->every(fn (DeliveryRunItem $runItem) => $runItem->status === DeliveryRunItem::STATUS_DELIVERED);
+            $stop->update([
+                'status' => $allDelivered ? DeliveryRunStop::STATUS_DELIVERED : DeliveryRunStop::STATUS_FAILED,
+                'confirmed_by_admin_id' => $admin->id,
+                'confirmed_at' => $now,
+                'confirmation_notes' => 'All items confirmed via warehouse phone calls.',
+            ]);
+
+            if ($allDelivered) {
+                app(\App\Services\VendorCommissionService::class)->createEarningsForStop($stop);
+            }
+
+            $this->refreshRunStatusAfterStopResolution($run);
+        }
+
+        $recipientName = $item->shipmentItem?->delivery_recipient_name ?? 'Package';
+
+        return response()->json([
+            'success' => true,
+            'message' => $validated['action'] === 'delivered'
+                ? "{$recipientName} confirmed as delivered."
+                : "{$recipientName} marked as failed.",
+            'all_resolved' => $allResolved,
+            'run_status' => $run->fresh()->status,
+        ]);
     }
 
     public function adminConfirmHandoff(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
@@ -564,5 +670,53 @@ class DeliveryRunController extends Controller
             ->where('expires_at', '>', now())
             ->latest('created_at')
             ->value('code');
+    }
+
+    private function formatStatusLabel(string $status): string
+    {
+        return match ($status) {
+            DeliveryRun::STATUS_DRAFT => 'Draft',
+            DeliveryRun::STATUS_ASSIGNED => 'Assigned',
+            DeliveryRun::STATUS_OUT_FOR_DELIVERY => 'Out for Delivery',
+            DeliveryRun::STATUS_PARTIALLY_DELIVERED => 'Partially Delivered',
+            DeliveryRun::STATUS_COMPLETED => 'Completed',
+            DeliveryRun::STATUS_CANCELLED => 'Cancelled',
+            default => ucwords(str_replace('_', ' ', $status)),
+        };
+    }
+
+    private function refreshRunStatusAfterStopResolution(DeliveryRun $run): void
+    {
+        if ($run->status === DeliveryRun::STATUS_CANCELLED) {
+            return;
+        }
+
+        $run->unsetRelation('stops');
+        $run->load('stops');
+
+        $totalStops = $run->stops->count();
+        if ($totalStops === 0) {
+            return;
+        }
+
+        $completedStops = $run->stops
+            ->whereIn('status', [
+                DeliveryRunStop::STATUS_DELIVERED,
+                DeliveryRunStop::STATUS_FAILED,
+            ])
+            ->count();
+
+        if ($completedStops === $totalStops) {
+            $run->update([
+                'status' => DeliveryRun::STATUS_COMPLETED,
+                'completed_at' => $run->completed_at ?? now(),
+            ]);
+
+            return;
+        }
+
+        if ($completedStops > 0) {
+            $run->update(['status' => DeliveryRun::STATUS_PARTIALLY_DELIVERED]);
+        }
     }
 }

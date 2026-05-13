@@ -269,6 +269,22 @@
                     </div>
                 </div>
 
+                @hasPermission('recipient_payments.view')
+                <a href="{{ route('admin.recipient-payments.index') }}"
+                   class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.recipient-payments.*') ? 'active text-white' : '' }}"
+                   :class="sidebarCollapsed ? 'px-2 justify-center' : 'px-3'">
+                    <div class="nav-icon-wrap">
+                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a5 5 0 00-10 0v2M5 9h14l-1 11H6L5 9zm5 4h4"/>
+                        </svg>
+                    </div>
+                    <span class="text-[12px] font-medium ml-2.5 whitespace-nowrap transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0 hidden' : 'w-auto opacity-100'">Recipient Payments</span>
+                    <template x-if="sidebarCollapsed">
+                        <span class="sidebar-tooltip">Recipient Payments</span>
+                    </template>
+                </a>
+                @endhasPermission
+
                 @hasPermission('invoices.view')
                 <a href="{{ route('admin.invoices.index') }}"
                    class="nav-item relative flex items-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-all {{ request()->routeIs('admin.invoices.*') ? 'active text-white' : '' }}"

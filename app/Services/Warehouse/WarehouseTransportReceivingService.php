@@ -11,10 +11,12 @@ use App\Models\TransportContainer;
 use App\Models\TransportContainerItem;
 use App\Models\TransportManifest;
 use App\Models\TransportManifestItem;
+use App\Models\TransportManifestReceiptLabelScan;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
+use App\Models\WarehouseReceiptItemLabel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -27,7 +29,8 @@ class WarehouseTransportReceivingService
         User $user,
         int $receivedQuantity,
         ?string $lineStatus = null,
-        ?string $notes = null
+        ?string $notes = null,
+        ?string $scannedLabelBarcode = null
     ): array {
         if ((int) $manifest->destination_warehouse_id !== (int) $warehouse->id) {
             return ['success' => false, 'message' => 'Cannot receive items for another warehouse manifest.'];
@@ -41,7 +44,7 @@ class WarehouseTransportReceivingService
             return ['success' => false, 'message' => 'Received quantity must be zero or greater.'];
         }
 
-        return DB::transaction(function () use ($manifest, $shipmentItem, $warehouse, $user, $receivedQuantity, $lineStatus, $notes) {
+        return DB::transaction(function () use ($manifest, $shipmentItem, $warehouse, $user, $receivedQuantity, $lineStatus, $notes, $scannedLabelBarcode) {
             $line = TransportManifestItem::query()
                 ->where('transport_manifest_id', $manifest->id)
                 ->where('shipment_item_id', $shipmentItem->id)
@@ -52,7 +55,53 @@ class WarehouseTransportReceivingService
                 return ['success' => false, 'message' => 'Item is not part of this manifest.'];
             }
 
-            $resolvedStatus = $lineStatus ?: $this->resolveLineStatus((int) $line->expected_quantity, $receivedQuantity);
+            if ($scannedLabelBarcode) {
+                $label = WarehouseReceiptItemLabel::query()
+                    ->where('barcode_value', $scannedLabelBarcode)
+                    ->whereHas('receiptItem', fn ($query) => $query->where('shipment_item_id', $shipmentItem->id))
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$label) {
+                    return ['success' => false, 'message' => 'Scanned label does not belong to this package line.'];
+                }
+
+                $alreadyScanned = TransportManifestReceiptLabelScan::query()
+                    ->where('transport_manifest_id', $manifest->id)
+                    ->where('warehouse_receipt_item_label_id', $label->id)
+                    ->exists();
+
+                if ($alreadyScanned) {
+                    return ['success' => false, 'message' => 'This label has already been received.'];
+                }
+
+                TransportManifestReceiptLabelScan::query()->create([
+                    'transport_manifest_id' => $manifest->id,
+                    'transport_manifest_item_id' => $line->id,
+                    'warehouse_receipt_item_label_id' => $label->id,
+                    'scanned_by_user_id' => $user->id,
+                    'barcode_value' => $label->barcode_value,
+                    'scanned_at' => now(),
+                ]);
+            }
+
+            $quantityStatus = $this->resolveLineStatus((int) $line->expected_quantity, $receivedQuantity);
+            $resolvedStatus = $lineStatus ?: $quantityStatus;
+
+            if ($lineStatus !== TransportManifestItem::LINE_DAMAGED && $quantityStatus !== TransportManifestItem::LINE_RECEIVED) {
+                $resolvedStatus = $quantityStatus;
+            }
+
+            if (
+                in_array($resolvedStatus, [
+                    TransportManifestItem::LINE_SHORT,
+                    TransportManifestItem::LINE_EXCESS,
+                    TransportManifestItem::LINE_DAMAGED,
+                ], true)
+                && blank($notes)
+            ) {
+                return ['success' => false, 'message' => 'Add discrepancy notes before saving this receiving line.'];
+            }
 
             $line->update([
                 'received_quantity' => $receivedQuantity,

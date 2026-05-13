@@ -4,6 +4,7 @@ use App\Models\SortBatch;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Warehouse\WarehousePortalService;
+use App\Services\Warehouse\WarehousePackageLedgerService;
 use App\Services\Warehouse\WarehouseSortingService;
 
 test('pending receipts query is scoped to picked up and not yet received assignments', function () {
@@ -31,6 +32,20 @@ test('received items query uses warehouse receipt items as source of truth', fun
 
     expect($sql)->toContain('warehouse_receipt_items')
         ->and($sql)->toContain('exists');
+});
+
+test('warehouse package ledger uses finalized warehouse receipt items as warehouse touch source', function () {
+    $warehouse = new Warehouse(['id' => 188]);
+    $warehouse->id = 188;
+
+    /** @var WarehousePackageLedgerService $service */
+    $service = app(WarehousePackageLedgerService::class);
+    $query = $service->query($warehouse);
+    $sql = $query->toSql();
+
+    expect($sql)->toContain('warehouse_receipt_items')
+        ->and($sql)->toContain('warehouse_receipts')
+        ->and($query->getBindings())->toContain('finalized');
 });
 
 test('sorting eligible items query excludes zero received quantity and active batched items', function () {

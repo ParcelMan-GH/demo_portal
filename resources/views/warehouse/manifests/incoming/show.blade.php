@@ -6,7 +6,44 @@
 @section('breadcrumb-current', $manifest->manifest_number)
 
 @php
-    $items = $manifest->items;
+    $storageService = app(\App\Services\StorageService::class);
+    $photoPayload = function ($photo, string $source) use ($storageService) {
+        $url = $storageService->getUrl($photo->path);
+
+        if (!$storageService->exists($photo->path) && \Illuminate\Support\Facades\Storage::disk('public')->exists($photo->path)) {
+            $url = url(\Illuminate\Support\Facades\Storage::disk('public')->url($photo->path));
+        }
+
+        return [
+            'id' => $photo->id,
+            'url' => $url,
+            'name' => $photo->original_name ?: $source . ' photo',
+            'source' => $source,
+        ];
+    };
+
+    $containerLineMeta = collect();
+
+    foreach ($manifest->containers->sortBy('sequence_number') as $container) {
+        foreach ($container->items as $containerItem) {
+            if (!$containerItem->transport_manifest_item_id) {
+                continue;
+            }
+
+            $containerLineMeta->put($containerItem->transport_manifest_item_id, [
+                'id' => $container->id,
+                'code' => $container->container_code,
+                'type' => str($container->container_type)->replace('_', ' ')->title()->toString(),
+                'sequence' => (int) $container->sequence_number,
+                'status' => $container->status,
+                'item_status' => $containerItem->status,
+            ]);
+        }
+    }
+
+    $items = $manifest->items
+        ->sortBy(fn ($line) => sprintf('%06d-%010d', $containerLineMeta->get($line->id)['sequence'] ?? 999999, $line->id))
+        ->values();
     $totalExpected = $items->sum('expected_quantity');
     $totalLoaded = $items->sum('loaded_quantity');
     $totalReceived = $items->sum('received_quantity');
@@ -42,21 +79,52 @@
     ];
 
     $physicalPackageTotal = 0;
-    $itemsData = $items->map(function ($line) use (&$physicalPackageTotal) {
+    $itemsData = $items->map(function ($line) use (&$physicalPackageTotal, $containerLineMeta, $photoPayload, $manifest) {
         $labels = $line->shipmentItem?->warehouseReceiptItems
             ?->flatMap(fn ($receiptItem) => $receiptItem->labels)
             ->filter()
             ->unique('id')
             ->values() ?? collect();
+        $containerMeta = $containerLineMeta->get($line->id, []);
         $physicalPackageCount = max($labels->count(), 1);
         $loadedPackageCount = $line->labelScans?->count() ?: ((int) $line->loaded_quantity > 0 ? $physicalPackageCount : 0);
         $physicalPackageTotal += $physicalPackageCount;
+        $shipmentItem = $line->shipmentItem;
+        $vendorPhotos = $shipmentItem?->images
+            ?->map(fn ($photo) => $photoPayload($photo, 'Vendor'))
+            ->values() ?? collect();
+        $driverPhotos = $shipmentItem?->shipment?->pickupAssignment?->photos
+            ?->filter(fn ($photo) => !$photo->shipment_item_id || (int) $photo->shipment_item_id === (int) $shipmentItem?->id)
+            ->map(fn ($photo) => $photoPayload($photo, 'Driver'))
+            ->values() ?? collect();
+        $receiptPhotos = $shipmentItem?->warehouseReceiptItems
+            ?->flatMap(fn ($receiptItem) => $receiptItem->photos)
+            ->map(fn ($photo) => $photoPayload($photo, 'Receipt'))
+            ->values() ?? collect();
+        $primaryPhotos = $vendorPhotos->isNotEmpty()
+            ? $vendorPhotos
+            : ($driverPhotos->isNotEmpty() ? $driverPhotos : $receiptPhotos);
 
         return [
+            'manifest_id' => $manifest->id,
+            'manifest_number' => $manifest->manifest_number,
+            'manifest_status' => $manifest->status,
+            'manifest_url' => route('warehouse.manifests.incoming.show', $manifest),
             'shipment_item_id' => $line->shipment_item_id,
             'shipment_number' => $line->shipmentItem?->shipment?->shipment_number,
             'description' => $line->shipmentItem?->description,
             'tracking_code' => $line->shipmentItem?->tracking_code,
+            'recipient_name' => $line->shipmentItem?->delivery_recipient_name ?: $line->shipmentItem?->shipment?->delivery_recipient_name,
+            'recipient_phone' => $line->shipmentItem?->delivery_recipient_phone ?: $line->shipmentItem?->shipment?->delivery_recipient_phone,
+            'container_id' => $containerMeta['id'] ?? null,
+            'container_code' => $containerMeta['code'] ?? 'Unassigned',
+            'container_url' => isset($containerMeta['id'])
+                ? route('warehouse.manifests.incoming.show', $manifest) . '?container=' . $containerMeta['id']
+                : null,
+            'container_type' => $containerMeta['type'] ?? 'No container',
+            'container_sequence' => $containerMeta['sequence'] ?? null,
+            'container_status' => $containerMeta['status'] ?? null,
+            'container_item_status' => $containerMeta['item_status'] ?? null,
             'physical_package_count' => $physicalPackageCount,
             'loaded_package_count' => min($loadedPackageCount, $physicalPackageCount),
             'labels' => $labels->map(fn ($label) => [
@@ -71,6 +139,14 @@
             'received_quantity' => (int) $line->received_quantity,
             'line_status' => $line->line_status,
             'vendor_name' => $line->shipmentItem?->shipment?->vendor?->name,
+            'photos' => [
+                'primary' => $primaryPhotos->values(),
+                'primary_source' => $vendorPhotos->isNotEmpty() ? 'Vendor' : ($driverPhotos->isNotEmpty() ? 'Driver' : 'Receipt'),
+                'vendor' => $vendorPhotos,
+                'driver' => $driverPhotos,
+                'receipt' => $receiptPhotos,
+                'total' => $vendorPhotos->count() + $driverPhotos->count() + $receiptPhotos->count(),
+            ],
             'notes' => $line->notes,
             'loaded_at' => optional($line->loaded_at)?->format('Y-m-d H:i:s'),
             'received_at' => optional($line->received_at)?->format('Y-m-d H:i:s'),
@@ -83,120 +159,412 @@
      x-data="warehouseIncomingManifestShowPage">
 
     {{-- ── Hero ────────────────────────────────────────────────────────── --}}
-    <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30">
-        <div class="relative">
-            <div class="absolute inset-0 opacity-10">
-                <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <defs>
-                        <pattern id="incomingGrid" width="10" height="10" patternUnits="userSpaceOnUse">
-                            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" stroke-width="0.5"/>
-                        </pattern>
-                    </defs>
-                    <rect width="100" height="100" fill="url(#incomingGrid)"/>
-                </svg>
-            </div>
+    <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 shadow-xl shadow-slate-300/20">
+        <div class="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
+            <div class="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.20),transparent_58%)]"></div>
+        </div>
+        <div class="relative p-5 sm:p-6">
+            <a href="{{ $indexRoute ?? route('warehouse.manifests.incoming.index') }}" class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/10 px-2.5 py-2 text-xs font-black text-slate-200 transition hover:bg-white/15 sm:gap-2 sm:px-3">
+                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                <span>Back</span>
+            </a>
 
-            <div class="relative px-6 lg:px-8 py-6">
-                <div class="mb-6">
-                    <a href="{{ $indexRoute ?? route('warehouse.manifests.incoming.index') }}" class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium transition-all backdrop-blur-sm hover:shadow-md">
-                        <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                        </svg>
-                        <span class="text-xs">{{ $backLabel ?? 'Back to Incoming Manifests' }}</span>
-                    </a>
+            <div class="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <div class="flex min-w-0 items-start gap-4">
+                    <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20 sm:h-20 sm:w-20">
+                        <svg class="h-9 w-9" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-xs font-black uppercase tracking-[0.22em] text-orange-200">From {{ $manifest->originWarehouse?->name ?? 'Origin Warehouse' }}</p>
+                        <h1 class="mt-2 text-3xl font-black leading-tight text-white sm:text-4xl">{{ $manifest->manifest_number }}</h1>
+                        <p class="mt-3 text-sm font-bold text-slate-300">
+                            {{ $manifest->assignedDriver?->name ?? 'No driver' }}
+                            @if($manifest->assignedDriver?->phone)
+                                <span class="px-2 text-slate-500">/</span>{{ $manifest->assignedDriver->phone }}
+                            @endif
+                            <span class="px-2 text-slate-500">/</span>
+                            {{ $manifest->arrived_at ? 'Arrived ' . $manifest->arrived_at->format('d M Y, h:i A') : 'Not arrived' }}
+                        </p>
+                    </div>
                 </div>
 
-                <div class="flex flex-col lg:flex-row lg:items-start gap-6">
-                    <div class="flex items-start gap-5 lg:flex-shrink-0">
-                        <div class="relative flex-shrink-0">
-                            <div class="w-20 h-20 lg:w-24 lg:h-24 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 flex items-center justify-center text-white text-2xl lg:text-3xl font-bold shadow-xl shadow-emerald-500/30 ring-4 ring-white/10">
-                                <svg class="w-10 h-10 lg:w-12 lg:h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                </svg>
-                            </div>
-                        </div>
-
-                        <div class="space-y-2 min-w-0">
-                            <div>
-                                <h1 class="text-xl lg:text-2xl font-bold text-white truncate">{{ $manifest->manifest_number }}</h1>
-                                <p class="text-slate-300 text-sm mt-0.5 truncate">
-                                    {{ $manifest->originWarehouse?->name ?? '-' }}
-                                    <svg class="inline w-3.5 h-3.5 text-slate-400 mx-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-                                    </svg>
-                                    {{ $manifest->destinationWarehouse?->name ?? '-' }}
-                                </p>
-                            </div>
-
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $statusClass }}">
-                                    <span class="w-1.5 h-1.5 rounded-full {{ $statusDotClass }}"></span>
-                                    {{ str($manifest->status)->replace('_', ' ')->title() }}
-                                </span>
-                                @if($manifest->assignedDriver)
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-500/20 text-slate-300">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                                        {{ $manifest->assignedDriver->name }}
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
+                <div class="grid grid-cols-2 gap-3 sm:flex sm:items-center">
+                    <div class="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur sm:min-w-40">
+                        <p class="text-2xl font-black text-white">{{ number_format($items->count()) }} lines</p>
+                        <p class="mt-1 text-sm font-bold text-slate-400">{{ number_format($totalExpected) }} qty expected</p>
                     </div>
-
-                    <div class="flex items-center gap-2 flex-wrap lg:flex-nowrap lg:ml-auto lg:self-start">
-                        <div class="w-20 h-20 lg:w-24 lg:h-24 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 p-2 flex flex-col items-center justify-center text-center gap-1.5 transition-colors shrink-0">
-                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-600/30 to-orange-700/20 flex items-center justify-center flex-shrink-0">
-                                <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="text-base lg:text-lg font-bold text-white leading-none">{{ number_format($items->count()) }}</p>
-                                <p class="text-[9px] leading-tight text-slate-400 mt-0.5 font-medium">Items</p>
-                            </div>
-                        </div>
-
-                        <div class="w-20 h-20 lg:w-24 lg:h-24 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 p-2 flex flex-col items-center justify-center text-center gap-1.5 transition-colors shrink-0">
-                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/30 to-violet-600/20 flex items-center justify-center flex-shrink-0">
-                                <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="text-base lg:text-lg font-bold text-white leading-none">{{ number_format($totalExpected) }}</p>
-                                <p class="text-[9px] leading-tight text-slate-400 mt-0.5 font-medium">Expected</p>
-                            </div>
-                        </div>
-
-                        <div class="w-20 h-20 lg:w-24 lg:h-24 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 p-2 flex flex-col items-center justify-center text-center gap-1.5 transition-colors shrink-0">
-                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500/30 to-indigo-600/20 flex items-center justify-center flex-shrink-0">
-                                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="text-base lg:text-lg font-bold text-white leading-none">{{ number_format($totalLoaded) }}</p>
-                                <p class="text-[9px] leading-tight text-slate-400 mt-0.5 font-medium">Loaded</p>
-                            </div>
-                        </div>
-
-                        <div class="w-20 h-20 lg:w-24 lg:h-24 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 p-2 flex flex-col items-center justify-center text-center gap-1.5 transition-colors shrink-0">
-                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center flex-shrink-0">
-                                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="text-base lg:text-lg font-bold text-white leading-none">{{ number_format($totalReceived) }}</p>
-                                <p class="text-[9px] leading-tight text-slate-400 mt-0.5 font-medium">Received</p>
-                            </div>
-                        </div>
+                    <div class="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur sm:min-w-40">
+                        <p class="text-2xl font-black text-white">{{ number_format($manifest->containers->count()) }} containers</p>
+                        <p class="mt-1 text-sm font-bold text-slate-400">{{ str($manifest->status)->replace('_', ' ')->title() }}</p>
+                    </div>
+                    <div class="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur sm:min-w-40">
+                        <p class="text-2xl font-black text-white">{{ number_format($totalReceived) }} received</p>
+                        <p class="mt-1 text-sm font-bold text-slate-400">of {{ number_format($items->count()) }} lines</p>
                     </div>
                 </div>
             </div>
         </div>
+    </section>
+
+    {{-- ── Container Receiving Workspace ──────────────────────────────── --}}
+    <div class="space-y-5">
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                <h2 class="text-2xl font-black text-slate-950">Containers</h2>
+                <p class="mt-1 text-sm font-semibold text-slate-500">Inspect each container, verify package photos, then receive the lines.</p>
+            </div>
+            <div class="flex shrink-0 items-center justify-end gap-2">
+                <span class="inline-flex h-10 items-center whitespace-nowrap rounded-xl px-3 text-xs font-black"
+                    :class="isFinalized() ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : (canReceive() ? 'bg-orange-50 text-orange-700 ring-1 ring-orange-200' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200')"
+                    x-text="isFinalized() ? 'Finalized' : (canReceive() ? 'Ready to Receive' : 'Waiting for Arrival')"></span>
+                <button type="button" x-show="!isFinalized()" @@click="showFinalizeModal = true" :disabled="!canFinalize() || loading"
+                    class="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl bg-slate-950 px-3 text-xs font-black text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45 sm:px-4">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span class="hidden sm:inline">Finalize Receipt</span>
+                    <span class="sm:hidden">Finalize</span>
+                </button>
+            </div>
+        </div>
+
+        <div x-show="isFinalized()" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+            This incoming receipt has been finalized. Container lines are read-only.
+        </div>
+        <div x-show="!isFinalized() && !canReceive()" class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">
+            This transfer has not arrived yet. You can inspect the containers, but receiving is locked.
+        </div>
+
+        <template x-if="containerGroups().length === 0">
+            <div class="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center shadow-sm">
+                <p class="text-base font-black text-slate-900">No containers found</p>
+                <p class="mt-1 text-sm font-semibold text-slate-500">This incoming transfer has no packed containers.</p>
+            </div>
+        </template>
+
+        <div class="space-y-5">
+            <template x-for="container in containerGroups()" :key="container.id || container.code">
+                <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition"
+                    :data-incoming-container-id="container.id">
+                    <button type="button" @@click="toggleContainer(container.id)" class="flex w-full flex-col gap-4 bg-orange-50/55 px-5 py-4 text-left sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="text-lg font-black text-slate-950" x-text="container.type || 'Container'"></h3>
+                                <span class="inline-flex rounded-full border border-orange-200 bg-white px-3 py-1 text-xs font-black text-orange-700" x-text="`${container.lines} ${container.lines === 1 ? 'LINE' : 'LINES'} - ${container.qty} QTY`"></span>
+                                <span x-show="container.issues > 0" class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black text-rose-700" x-text="`${container.issues} ${container.issues === 1 ? 'ISSUE' : 'ISSUES'}`"></span>
+                            </div>
+                            <p class="mt-1 truncate font-mono text-sm font-black text-slate-500" x-text="container.code || 'Unassigned'"></p>
+                        </div>
+                        <div class="flex min-w-[220px] items-center gap-3">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-between text-xs font-black text-slate-600">
+                                    <span x-text="`${container.receivedLines}/${container.lines} lines`"></span>
+                                    <span x-text="`${container.receivedQty}/${container.qty} qty`"></span>
+                                </div>
+                                <div class="mt-2 h-2 overflow-hidden rounded-full bg-white">
+                                    <div class="h-full rounded-full bg-orange-600 transition-all" :style="`width: ${container.progress}%`"></div>
+                                </div>
+                            </div>
+                            <svg class="h-5 w-5 shrink-0 text-slate-500 transition-transform" :class="isContainerOpen(container.id) ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </div>
+                    </button>
+
+                    <div x-show="isContainerOpen(container.id)">
+                        <div class="divide-y divide-slate-100">
+                            <template x-for="row in container.items" :key="row.shipment_item_id">
+                                <div class="grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                                    <div class="flex min-w-0 gap-3">
+                                        <button type="button" @@click.stop="openPhotoViewer(row)" class="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                                            <template x-if="primaryPhoto(row)">
+                                                <img :src="primaryPhoto(row).url" :alt="primaryPhoto(row).name" class="h-full w-full object-cover">
+                                            </template>
+                                            <template x-if="!primaryPhoto(row)">
+                                                <div class="flex h-full w-full items-center justify-center text-[10px] font-black text-slate-400">No Photo</div>
+                                            </template>
+                                            <span x-show="photoCount(row) > 1" class="absolute bottom-1 right-1 rounded-full bg-slate-950/75 px-1.5 py-0.5 text-[10px] font-black text-white" x-text="'+' + (photoCount(row) - 1)"></span>
+                                        </button>
+
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex min-w-0 items-start justify-between gap-3">
+                                                <div class="min-w-0">
+                                                    <p class="text-sm font-black text-slate-950" x-text="row.description || 'Package'"></p>
+                                                    <p class="mt-0.5 truncate font-mono text-xs font-black text-slate-500" x-text="row.tracking_code || 'No tracking'"></p>
+                                                </div>
+                                                <span class="shrink-0 text-right text-sm font-black text-slate-700 md:hidden" x-text="`Qty ${row.expected_quantity}`"></span>
+                                            </div>
+                                            <p class="mt-1 text-sm font-semibold text-slate-500">
+                                                <span x-text="row.recipient_name || 'No recipient'"></span>
+                                                <span x-show="row.recipient_phone" class="text-slate-300"> / </span>
+                                                <span x-show="row.recipient_phone" x-text="row.recipient_phone"></span>
+                                            </p>
+                                            <div x-show="hasDiscrepancy(row)" class="mt-2 inline-flex max-w-full items-center rounded-full border px-3 py-1 text-xs font-black" :class="discrepancyTone(row)">
+                                                <span class="truncate" x-text="discrepancyCopy(row)"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex flex-wrap items-center justify-end gap-4">
+                                        <span class="hidden min-w-16 text-right text-sm font-black text-slate-700 md:inline" x-text="`Qty ${row.expected_quantity}`"></span>
+                                        <button type="button" @@click="openReceiveModal(row.shipment_item_id)" :disabled="isFinalized() || !canReceive() || loading"
+                                            class="inline-flex h-10 items-center justify-center rounded-xl bg-orange-600 px-4 text-xs font-black text-white shadow-sm shadow-orange-600/20 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none">
+                                            <span x-text="row.received_at ? 'Edit' : 'Receive'"></span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </section>
+            </template>
+        </div>
     </div>
 
+    {{-- Photo Viewer Modal --}}
+    <template x-teleport="body">
+        <template x-if="photoViewer.open && photoViewer.row">
+            <div class="fixed inset-0 z-[230] flex min-h-dvh w-screen items-center justify-center bg-slate-950/95 p-3" @@keydown.escape.window="closePhotoViewer()" @@keydown.arrow-right.window="nextViewerPhoto()" @@keydown.arrow-left.window="previousViewerPhoto()">
+                <button type="button" class="absolute inset-0 cursor-zoom-out" @@click="closePhotoViewer()" aria-label="Close photo viewer"></button>
+
+                <div class="pointer-events-none absolute left-0 right-0 top-0 z-10 bg-gradient-to-b from-slate-950 via-slate-950/70 to-transparent px-4 py-4 sm:px-6">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="min-w-0 text-white">
+                            <h3 class="truncate text-base font-black sm:text-xl" x-text="photoViewer.row.description || 'Package photos'"></h3>
+                            <p class="mt-1 truncate font-mono text-xs font-black text-slate-300 sm:text-sm" x-text="photoViewer.row.tracking_code || 'No tracking code'"></p>
+                            <p class="mt-1 truncate text-xs font-semibold text-slate-300 sm:text-sm">
+                                <span x-text="photoViewer.row.recipient_name || 'No recipient'"></span>
+                                <span x-show="photoViewer.row.recipient_phone"> / </span>
+                                <span x-show="photoViewer.row.recipient_phone" x-text="photoViewer.row.recipient_phone"></span>
+                            </p>
+                        </div>
+                        <button type="button" @@click="closePhotoViewer()" class="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/15 transition hover:bg-white/20">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div @@click.stop class="relative z-[1] flex h-full w-full items-center justify-center px-1 py-24 sm:px-14">
+                    <template x-if="currentViewerPhoto()">
+                        <img :src="currentViewerPhoto().url" :alt="currentViewerPhoto().name" class="max-h-full max-w-full object-contain shadow-2xl">
+                    </template>
+
+                    <button type="button" x-show="viewerPhotos().length > 1" @@click="previousViewerPhoto()" class="absolute left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/15 backdrop-blur transition hover:bg-white/20 sm:left-5">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <button type="button" x-show="viewerPhotos().length > 1" @@click="nextViewerPhoto()" class="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/15 backdrop-blur transition hover:bg-white/20 sm:right-5">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
+                    </button>
+                </div>
+
+                <div class="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent px-4 pb-4 pt-10 sm:px-6">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <p class="text-xs font-black text-slate-300">
+                            <span x-text="currentViewerPhoto()?.source || 'Photo'"></span>
+                            <span> photo </span>
+                            <span x-text="photoViewer.index + 1"></span>
+                            <span> of </span>
+                            <span x-text="viewerPhotos().length"></span>
+                        </p>
+                        <div class="flex gap-2 overflow-x-auto pb-1">
+                            <template x-for="(photo, index) in viewerPhotos()" :key="`${photo.source}-${photo.id}`">
+                                <button type="button" @@click="selectViewerPhoto(index)" class="h-14 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-slate-900 transition" :class="index === photoViewer.index ? 'border-orange-500 opacity-100' : 'border-white/20 opacity-60 hover:opacity-100'">
+                                    <img :src="photo.url" :alt="photo.name" class="h-full w-full object-cover">
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </template>
+
+    @include('shared.incoming-receive-modal')
+
+    @if(false)
+    {{-- Receive Item Modal --}}
+    <template x-teleport="body">
+        <template x-if="receiveModal.open && receiveModal.itemIndex >= 0">
+        <div
+            class="fixed inset-0 z-[220] flex min-h-dvh w-screen items-center justify-center p-4"
+            @@keydown.escape.window="closeReceiveModal()"
+        >
+            <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" @@click="closeReceiveModal()"></div>
+
+            <div
+                @@click.stop
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 translate-y-3 scale-[0.98]"
+                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                x-transition:leave-end="opacity-0 translate-y-2 scale-[0.98]"
+                class="relative flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+            >
+                <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+                    <div class="flex min-w-0 items-start gap-4">
+                        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
+                            <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3.75 4.5h2.5v15h-2.5zM9 4.5h1.5v15H9zM13.25 4.5h3v15h-3zM19 4.5h1.25v15H19z"/>
+                            </svg>
+                        </div>
+                        <div class="min-w-0">
+                            <h3 class="text-xl font-black text-slate-900">Receive Package</h3>
+                            <p class="mt-1 text-sm font-semibold text-slate-500">Scan the package label or verify manually before saving.</p>
+                        </div>
+                    </div>
+                    <button type="button" @@click="closeReceiveModal()" class="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto px-6 py-5">
+                    <div class="rounded-3xl border-2 border-orange-200 bg-orange-50/60 p-4">
+                        <label class="mb-2 block text-xs font-black uppercase tracking-wide text-orange-800">Scan package label</label>
+                        <div class="flex flex-col gap-2 sm:flex-row">
+                            <div class="relative flex-1">
+                                <svg class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.75 4.5h2.5v15h-2.5zM9 4.5h1.5v15H9zM13.25 4.5h3v15h-3zM19 4.5h1.25v15H19z"/>
+                                </svg>
+                                <input
+                                    type="text"
+                                    x-model="receiveScanCode"
+                                    @@keydown.enter.prevent="scanReceiveCurrentItem()"
+                                    class="h-14 w-full rounded-2xl border-2 border-orange-200 bg-white pl-12 pr-4 text-base font-black text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                                    placeholder="Scan or enter label code..."
+                                >
+                            </div>
+                            <button type="button" @@click="scanReceiveCurrentItem()" :disabled="loading" class="h-14 rounded-2xl bg-orange-600 px-5 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700 disabled:opacity-50">
+                                Scan Receive
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 grid gap-5 lg:grid-cols-[1fr_1.15fr]">
+                        <div class="space-y-4">
+                            <div class="rounded-3xl border border-slate-200 bg-white p-4">
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Package</p>
+                                <h4 class="mt-2 text-xl font-black text-slate-950" x-text="items[receiveModal.itemIndex]?.description || 'Package'"></h4>
+                                <p class="mt-1 font-mono text-sm font-black text-slate-500" x-text="items[receiveModal.itemIndex]?.tracking_code || 'No tracking code'"></p>
+                                <div class="mt-3 grid gap-2 text-sm font-bold text-slate-600">
+                                    <p>
+                                        <span class="text-slate-400">Recipient:</span>
+                                        <span x-text="items[receiveModal.itemIndex]?.recipient_name || 'No recipient'"></span>
+                                        <span x-show="items[receiveModal.itemIndex]?.recipient_phone"> / </span>
+                                        <span x-show="items[receiveModal.itemIndex]?.recipient_phone" x-text="items[receiveModal.itemIndex]?.recipient_phone"></span>
+                                    </p>
+                                    <p>
+                                        <span class="text-slate-400">Container:</span>
+                                        <span class="font-mono" x-text="items[receiveModal.itemIndex]?.container_code || 'Unassigned'"></span>
+                                        <span class="text-slate-400"> / </span>
+                                        <span x-text="items[receiveModal.itemIndex]?.container_type || 'No container'"></span>
+                                    </p>
+                                </div>
+                                <div class="mt-4 grid grid-cols-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                                    <div class="px-3 py-3">
+                                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Expected</p>
+                                        <p class="mt-1 text-xl font-black text-slate-900" x-text="items[receiveModal.itemIndex]?.expected_quantity ?? 0"></p>
+                                    </div>
+                                    <div class="border-l border-slate-200 px-3 py-3">
+                                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Loaded</p>
+                                        <p class="mt-1 text-xl font-black text-slate-900" x-text="items[receiveModal.itemIndex]?.loaded_quantity ?? 0"></p>
+                                    </div>
+                                    <div class="border-l border-slate-200 px-3 py-3">
+                                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Received</p>
+                                        <p class="mt-1 text-xl font-black text-emerald-700" x-text="items[receiveModal.itemIndex]?.received_quantity || 0"></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <div class="flex items-center justify-between gap-3">
+                                    <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Labels</p>
+                                    <span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-slate-600" x-text="(items[receiveModal.itemIndex]?.labels?.length || 0) + ((items[receiveModal.itemIndex]?.labels?.length || 0) === 1 ? ' label' : ' labels')"></span>
+                                </div>
+                                <div class="mt-3 grid gap-2 sm:grid-cols-2" x-show="items[receiveModal.itemIndex]?.labels?.length">
+                                    <template x-for="label in items[receiveModal.itemIndex]?.labels || []" :key="label.id">
+                                        <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                            <p class="font-mono text-xs font-black text-slate-800" x-text="label.barcode_value"></p>
+                                            <p class="mt-0.5 text-[10px] font-semibold text-slate-400" x-text="label.labels_total ? ('Label ' + label.label_index + ' of ' + label.labels_total) : 'Label'"></p>
+                                        </div>
+                                    </template>
+                                </div>
+                                <p x-show="!items[receiveModal.itemIndex]?.labels?.length" class="mt-3 text-sm font-semibold text-slate-400">No labels recorded for this line.</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-5">
+                            <div>
+                                <label class="mb-2 block text-sm font-bold text-slate-800">Received Quantity</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    x-model.number="items[receiveModal.itemIndex].received_quantity"
+                                    class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-lg font-black text-slate-900 outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                                    placeholder="0"
+                                >
+                            </div>
+
+                            <div>
+                                <label class="mb-2 block text-sm font-bold text-slate-800">Receipt Status</label>
+                                <select
+                                    x-model="items[receiveModal.itemIndex].line_status"
+                                    class="h-14 w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                                >
+                                    <option value="received">Received</option>
+                                    <option value="short">Short</option>
+                                    <option value="excess">Excess</option>
+                                    <option value="damaged">Damaged</option>
+                                    <option value="pending">Pending</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="mb-2 block text-sm font-bold text-slate-800">Notes</label>
+                                <textarea
+                                    rows="4"
+                                    x-model="items[receiveModal.itemIndex].notes"
+                                    class="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                                    placeholder="Shortage, damage, or receiving notes..."
+                                ></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                    <button type="button" @@click="closeReceiveModal()" class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100">
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        @@click="markExpected(receiveModal.itemId)"
+                        :disabled="loading"
+                        class="rounded-2xl border border-orange-200 bg-orange-50 px-5 py-3 text-sm font-black text-orange-700 transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Receive As Expected
+                    </button>
+                    <button
+                        type="button"
+                        @@click="saveItem(receiveModal.itemId)"
+                        :disabled="loading"
+                        class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-black text-white shadow-lg shadow-slate-900/15 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <svg x-show="loading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <span x-text="loading ? 'Saving...' : 'Save Receipt'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        </template>
+    </template>
+
+    @endif
+
+    @if(false)
     {{-- ── Sidebar + Content ───────────────────────────────────────────── --}}
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex min-h-[680px]">
 
@@ -522,7 +890,7 @@
 
             {{-- ── Receiving Tab ──────────────────────────────────────────── --}}
             <div x-show="activeTab === 'receiving'" x-cloak>
-                @include('shared.transport-containers-section', ['manifest' => $manifest, 'allowContainerActions' => false])
+                @include('shared.transport-containers-section', ['manifest' => $manifest, 'allowContainerActions' => false, 'hideEmptyContainers' => true])
 
                 {{-- Header --}}
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mt-6 mb-5">
@@ -984,44 +1352,120 @@
         </div>
     </div>
 
+    @endif
+
     {{-- Finalize Receipt Modal --}}
-    <div x-show="showFinalizeModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" @@keydown.escape.window="showFinalizeModal = false">
-        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @@click="showFinalizeModal = false"></div>
-        <div class="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden" @@click.stop>
-            <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <template x-teleport="body">
+    <div x-show="showFinalizeModal" x-cloak class="fixed inset-0 z-[220] flex min-h-dvh w-screen items-center justify-center p-4" style="display: none;" @@keydown.escape.window="showFinalizeModal = false">
+        <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" @@click="showFinalizeModal = false"></div>
+        <div
+            class="relative flex max-h-[90dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+            @@click.stop
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-3 scale-[0.98]"
+            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+            x-transition:leave-end="opacity-0 translate-y-2 scale-[0.98]"
+        >
+            <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-6">
+                <div class="flex min-w-0 items-start gap-4">
+                    <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
+                        <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                     </div>
-                    <div>
-                        <h3 class="text-base font-bold text-slate-900">Finalize Incoming Receipt</h3>
-                        <p class="text-xs text-slate-500">Confirm all items have been scanned and verified</p>
+                    <div class="min-w-0">
+                        <h3 class="text-2xl font-black leading-tight text-slate-950">Finalize Receipt</h3>
+                        <p class="mt-1 text-base font-semibold text-slate-500">Lock this incoming transfer after verification.</p>
                     </div>
                 </div>
-                <button @@click="showFinalizeModal = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <button type="button" @@click="showFinalizeModal = false" class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
+                    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div class="px-6 py-5">
-                <label class="block text-sm font-semibold text-slate-700 mb-2">Notes (optional)</label>
-                <textarea x-model="finalizeNotes" rows="4" class="w-full rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" placeholder="Add final receiving notes"></textarea>
+
+            <div class="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+                <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <p class="text-[11px] font-black uppercase tracking-wide text-slate-400">Incoming Transfer</p>
+                    <p class="mt-2 font-mono text-lg font-black text-slate-950">{{ $manifest->manifest_number }}</p>
+                    <div class="mt-4 grid grid-cols-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                        <div class="px-3 py-3">
+                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Lines</p>
+                            <p class="mt-1 text-xl font-black text-slate-950">{{ number_format($items->count()) }}</p>
+                        </div>
+                        <div class="border-l border-slate-200 px-3 py-3">
+                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Expected</p>
+                            <p class="mt-1 text-xl font-black text-slate-950">{{ number_format($totalExpected) }}</p>
+                        </div>
+                        <div class="border-l border-slate-200 px-3 py-3">
+                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Received</p>
+                            <p class="mt-1 text-xl font-black text-emerald-700" x-text="receivedQuantityTotal()"></p>
+                        </div>
+                        <div class="border-l border-slate-200 px-3 py-3">
+                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Issues</p>
+                            <p class="mt-1 text-xl font-black" :class="discrepancyCount() ? 'text-rose-700' : 'text-slate-950'" x-text="discrepancyCount()"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="discrepancyCount() > 0" class="mt-5 rounded-3xl border border-rose-200 bg-rose-50 px-4 py-4">
+                    <div class="flex items-start gap-3">
+                        <svg class="mt-0.5 h-5 w-5 shrink-0 text-rose-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        </svg>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-black text-rose-800">Discrepancies recorded</p>
+                            <div class="mt-3 divide-y divide-rose-200/70 rounded-2xl border border-rose-200 bg-white/70">
+                                <template x-for="item in discrepancyItems()" :key="item.shipment_item_id">
+                                    <div class="px-3 py-2">
+                                        <p class="text-sm font-black text-slate-950" x-text="item.description || 'Package'"></p>
+                                        <p class="mt-0.5 font-mono text-xs font-black text-slate-500" x-text="item.tracking_code || 'No tracking'"></p>
+                                        <p class="mt-1 text-xs font-bold text-rose-700" x-text="discrepancyCopy(item)"></p>
+                                        <p x-show="item.notes" class="mt-1 text-xs font-semibold text-slate-500" x-text="item.notes"></p>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-5 rounded-3xl border border-amber-200 bg-amber-50 px-4 py-4">
+                    <div class="flex gap-3">
+                        <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        </svg>
+                        <p class="text-sm font-black leading-6 text-amber-800">Finalize only after all received quantities and exceptions are correct.</p>
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    <label class="mb-2 block text-sm font-black text-slate-900">Notes</label>
+                    <textarea
+                        x-model="finalizeNotes"
+                        rows="4"
+                        class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                        placeholder="Final receiving notes..."
+                    ></textarea>
+                </div>
             </div>
-            <div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+
+            <div class="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6">
                 <button type="button" @@click="showFinalizeModal = false"
-                    class="px-4 py-2 text-sm font-semibold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
+                    class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 transition hover:bg-slate-50 sm:h-14 sm:px-8 sm:text-base">
                     Cancel
                 </button>
                 <button type="button" @@click="finalizeReceipt()"
-                    :disabled="!canReceive() || loading"
-                    class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                    <svg x-show="loading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    :disabled="!canFinalize() || loading"
+                    class="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 text-sm font-black text-white shadow-lg shadow-slate-950/15 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45 sm:h-14 sm:px-8 sm:text-base">
+                    <svg x-show="loading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <svg x-show="!loading" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     <span x-text="loading ? 'Finalizing...' : 'Finalize Receipt'"></span>
                 </button>
             </div>
         </div>
     </div>
+    </template>
 </div>
 
 @push('scripts')

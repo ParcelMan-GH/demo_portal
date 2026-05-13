@@ -1115,6 +1115,7 @@ class ShipmentController extends Controller
         $item = $shipment->items()->create([
             'description' => $validated['description'] ?? null,
             'quantity' => $validated['quantity'] ?? 1,
+            'status' => $this->initialStatusForAdminCreatedPackage($shipment, $assignment),
         ]);
 
         $this->applyReceivingPackageDetails($shipment, $item, $validated, true);
@@ -1324,10 +1325,15 @@ class ShipmentController extends Controller
             ], 422);
         }
 
+        $newItemStatus = $item->status?->value ?? $item->getRawOriginal('status') ?? ItemStatus::PENDING->value;
+        if ($pickupComplete && $newItemStatus === ItemStatus::PENDING->value) {
+            $newItemStatus = $this->initialStatusForAdminCreatedPackage($shipment, $assignment);
+        }
+
         $newItem = $shipment->items()->create([
             'description' => $item->description,
             'quantity' => 1,
-            'status' => $item->status?->value ?? $item->getRawOriginal('status') ?? 'pending',
+            'status' => $newItemStatus,
             'delivery_preference' => $item->delivery_preference ?? 'deliver',
             'fulfillment_type' => $item->fulfillment_type?->value ?? $item->getRawOriginal('fulfillment_type'),
             'delivery_recipient_name' => $item->delivery_recipient_name,
@@ -2081,7 +2087,11 @@ class ShipmentController extends Controller
             $assignment->warehouseReceipt->load('items');
         }
 
-        return ! $assignment?->warehouseReceipt?->items?->isNotEmpty();
+        if ($assignment?->warehouseReceipt?->items?->isNotEmpty()) {
+            return false;
+        }
+
+        return $this->shipmentNeedsPhoneAutoGrouping($shipment ?? $assignment?->shipment);
     }
 
     protected function receivingAutoGroupLockReason(?\App\Models\PickupAssignment $assignment, ?Shipment $shipment = null): ?string
@@ -2100,7 +2110,86 @@ class ShipmentController extends Controller
             return 'Auto-group by phone is only available before warehouse receiving starts.';
         }
 
+        if (! $this->shipmentNeedsPhoneAutoGrouping($shipment ?? $assignment?->shipment)) {
+            return 'No phone grouping is needed for the current package photos.';
+        }
+
         return null;
+    }
+
+    protected function shipmentNeedsPhoneAutoGrouping(?Shipment $shipment): bool
+    {
+        if (! $shipment) {
+            return false;
+        }
+
+        $shipment->loadMissing(['items.images']);
+
+        $photos = $shipment->items->flatMap(fn (ShipmentItem $item) => $item->images);
+        if ($photos->isEmpty()) {
+            return false;
+        }
+
+        $taggedPhotos = $photos->filter(fn (ShipmentItemImage $image) => ! empty($image->recipient_phone));
+        if ($taggedPhotos->isEmpty()) {
+            return false;
+        }
+
+        $groups = $photos->groupBy(fn (ShipmentItemImage $image) => $image->recipient_phone ?: '__untagged__');
+        $sourceItemGroups = $photos->groupBy('shipment_item_id');
+
+        $onePhoneGroupTouchesMultipleItems = $groups->contains(function ($images) {
+            return collect($images)->pluck('shipment_item_id')->filter()->unique()->count() > 1;
+        });
+
+        if ($onePhoneGroupTouchesMultipleItems) {
+            return true;
+        }
+
+        $oneItemContainsMultiplePhoneGroups = $sourceItemGroups->contains(function ($images) {
+            return collect($images)
+                ->map(fn (ShipmentItemImage $image) => $image->recipient_phone ?: '__untagged__')
+                ->unique()
+                ->count() > 1;
+        });
+
+        if ($oneItemContainsMultiplePhoneGroups) {
+            return true;
+        }
+
+        $phones = $taggedPhotos
+            ->map(fn (ShipmentItemImage $image) => $this->normalizePhotoPhone($image->recipient_phone))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($phones->isEmpty()) {
+            return false;
+        }
+
+        $destinationMode = $shipment->destination_mode?->value ?? (string) $shipment->destination_mode;
+
+        if ($phones->count() > 1) {
+            if ($destinationMode !== ShipmentDestinationMode::PER_ITEM->value) {
+                return true;
+            }
+
+            return $shipment->items->contains(function (ShipmentItem $item) {
+                $phone = $item->images
+                    ->map(fn (ShipmentItemImage $image) => $this->normalizePhotoPhone($image->recipient_phone))
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                return $phone->count() === 1 && $this->normalizePhotoPhone($item->delivery_recipient_phone) !== $phone->first();
+            });
+        }
+
+        if ($destinationMode !== ShipmentDestinationMode::SINGLE->value) {
+            return true;
+        }
+
+        return $this->normalizePhotoPhone($shipment->delivery_recipient_phone) !== $phones->first();
     }
 
     protected function canAddPackageDuringReceiving(?\App\Models\PickupAssignment $assignment, ?Shipment $shipment = null): bool
@@ -2332,6 +2421,7 @@ class ShipmentController extends Controller
 
         $assignment ??= $shipment->pickupAssignment;
         $receiptItem ??= $this->findReceiptItemForShipmentItem($assignment, $item);
+        $this->ensureTrackingCodeForReceivingPackage($shipment, $item, $assignment, $receiptItem);
 
         $driverConfirmation = $assignment?->itemConfirmations?->firstWhere('shipment_item_id', $item->id);
         $driverPhotos = $assignment
@@ -2950,6 +3040,54 @@ class ShipmentController extends Controller
         }
     }
 
+    protected function initialStatusForAdminCreatedPackage(Shipment $shipment, mixed $assignment): string
+    {
+        $shipmentStatus = $shipment->status?->value ?? $shipment->getRawOriginal('status');
+
+        if ($assignment?->received_at || in_array($shipmentStatus, [
+            ShipmentStatus::AT_WAREHOUSE->value,
+            ShipmentStatus::SORTED->value,
+            ShipmentStatus::IN_TRANSIT->value,
+            ShipmentStatus::AT_DESTINATION->value,
+            ShipmentStatus::OUT_FOR_DELIVERY->value,
+            ShipmentStatus::HANDED_TO_COURIER->value,
+            ShipmentStatus::DELIVERED->value,
+        ], true)) {
+            return ItemStatus::AT_WAREHOUSE->value;
+        }
+
+        if ($this->isPickupCompleteForReceiving($shipment, $assignment)) {
+            return ItemStatus::PICKED_UP->value;
+        }
+
+        return ItemStatus::PENDING->value;
+    }
+
+    protected function ensureTrackingCodeForReceivingPackage(
+        Shipment $shipment,
+        ShipmentItem $item,
+        mixed $assignment,
+        ?WarehouseReceiptItem $receiptItem,
+    ): void {
+        $itemStatus = $item->status?->value ?? $item->getRawOriginal('status');
+        $shouldHaveTracking = $receiptItem
+            || $this->isPickupCompleteForReceiving($shipment, $assignment)
+            || ($itemStatus && $itemStatus !== ItemStatus::PENDING->value);
+
+        if ($shouldHaveTracking && empty($item->tracking_code)) {
+            $item->update(['tracking_code' => ShipmentItem::generateTrackingCode()]);
+            $item->refresh();
+        }
+
+        if ($receiptItem && empty($receiptItem->barcode_value) && filled($item->tracking_code)) {
+            $receiptItem->update([
+                'barcode_value' => $item->tracking_code,
+                'barcode_format' => 'code128',
+            ]);
+            $receiptItem->refresh();
+        }
+    }
+
     protected function syncReceivingPackageDeliveryFee(Shipment $shipment, ShipmentItem $item, array $validated): void
     {
         if (! array_key_exists('delivery_fee_mode', $validated)) {
@@ -3458,10 +3596,8 @@ class ShipmentController extends Controller
 
     // ─── AUTO-GROUP BY PHONE ──────────────────────────────────────────────────
 
-    public function autoGroupByPhone(Shipment $shipment): JsonResponse
+    protected function groupShipmentPackagesByPhoneForReceiving(Shipment $shipment): array
     {
-        $this->authorizePermission('shipments.edit');
-
         $shipment->load([
             'items.images',
             'items.deliveryRegion',
@@ -3474,24 +3610,24 @@ class ShipmentController extends Controller
         ]);
 
         $assignment = $shipment->pickupAssignment;
-        $pickupComplete = $this->isPickupCompleteForReceiving($shipment, $assignment);
         if (! $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment)) {
-            return response()->json([
+            return [
                 'success' => false,
+                'status' => 422,
                 'message' => $this->receivingAutoGroupLockReason($assignment, $shipment) ?? 'Auto-group by phone is no longer available for this shipment.',
-            ], 422);
+            ];
         }
 
         $allImages = $shipment->items->flatMap(fn ($item) => $item->images);
 
         if ($allImages->isEmpty()) {
-            return response()->json(['success' => false, 'message' => 'No photos to group.'], 400);
+            return ['success' => false, 'status' => 400, 'message' => 'No photos to group.'];
         }
 
         $taggedImages = $allImages->filter(fn ($img) => ! empty($img->recipient_phone));
 
         if ($taggedImages->isEmpty()) {
-            return response()->json(['success' => false, 'message' => 'No photos have recipient phone tags. Tag photos with phone numbers first.'], 400);
+            return ['success' => false, 'status' => 400, 'message' => 'No photos have recipient phone tags. Tag photos with phone numbers first.'];
         }
 
         $grouped = $allImages->groupBy(fn ($img) => $img->recipient_phone ?: '__untagged__');
@@ -3510,7 +3646,6 @@ class ShipmentController extends Controller
             ]);
 
             $assignment = $shipment->pickupAssignment;
-            $pickupComplete = $this->isPickupCompleteForReceiving($shipment, $assignment);
             $sourceItems = $shipment->items->keyBy('id');
             $usedItemIds = collect();
             $groupedItems = [];
@@ -3609,36 +3744,64 @@ class ShipmentController extends Controller
                 'pickupAssignment.warehouseReceipt.items',
             ]);
 
-            return response()->json([
+            return [
                 'success' => true,
+                'status' => 200,
                 'message' => count($groupedItems).' package(s) created. Destination mode set to '.$newMode->value.'.',
-                'data' => [
-                    'destination_mode' => $newMode->value,
-                    'delivery' => $this->serializeShipmentDelivery($shipment),
-                    'delivery_recipient_phone' => $shipment->delivery_recipient_phone,
-                    'packages' => $shipment->items->map(fn ($item) => [
-                        'id' => $item->id,
-                        'description' => $item->description,
-                        'quantity' => $item->quantity,
-                        'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
-                        'delivery_recipient_phone' => $item->delivery_recipient_phone,
-                        'delivery_recipient_name' => $item->delivery_recipient_name,
-                        'photos' => $item->images->map(fn ($img) => [
-                            'id' => $img->id,
-                            'url' => app(\App\Services\StorageService::class)->getUrl($img->path),
-                            'original_name' => $img->original_name,
-                            'recipient_phone' => $img->recipient_phone,
-                        ])->values(),
-                    ])->values(),
-                    'receiving_packages' => $shipment->items
-                        ->map(fn (ShipmentItem $item) => $this->serializeReceivingPackage($shipment, $item, $assignment))
-                        ->values(),
-                    'can_receive' => $this->canReceiveInAdminWorkspace($assignment),
-                    'assignment_id' => $assignment?->id,
-                    'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment),
-                    'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($assignment, $shipment),
-                ],
-            ]);
+                'shipment' => $shipment,
+                'assignment' => $shipment->pickupAssignment,
+                'grouped_items' => $groupedItems,
+                'destination_mode' => $newMode,
+            ];
         });
+    }
+
+    public function autoGroupByPhone(Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $result = $this->groupShipmentPackagesByPhoneForReceiving($shipment);
+        if (($result['success'] ?? false) !== true) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Auto-group by phone is no longer available for this shipment.',
+            ], $result['status'] ?? 422);
+        }
+
+        /** @var Shipment $shipment */
+        $shipment = $result['shipment'];
+        $assignment = $result['assignment'];
+        $newMode = $result['destination_mode'];
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'data' => [
+                'destination_mode' => $newMode->value,
+                'delivery' => $this->serializeShipmentDelivery($shipment),
+                'delivery_recipient_phone' => $shipment->delivery_recipient_phone,
+                'packages' => $shipment->items->map(fn ($item) => [
+                    'id' => $item->id,
+                    'description' => $item->description,
+                    'quantity' => $item->quantity,
+                    'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
+                    'delivery_recipient_phone' => $item->delivery_recipient_phone,
+                    'delivery_recipient_name' => $item->delivery_recipient_name,
+                    'photos' => $item->images->map(fn ($img) => [
+                        'id' => $img->id,
+                        'url' => app(\App\Services\StorageService::class)->getUrl($img->path),
+                        'original_name' => $img->original_name,
+                        'recipient_phone' => $img->recipient_phone,
+                    ])->values(),
+                ])->values(),
+                'receiving_packages' => $shipment->items
+                    ->map(fn (ShipmentItem $item) => $this->serializeReceivingPackage($shipment, $item, $assignment))
+                    ->values(),
+                'can_receive' => $this->canReceiveInAdminWorkspace($assignment),
+                'assignment_id' => $assignment?->id,
+                'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($assignment, $shipment),
+                'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($assignment, $shipment),
+            ],
+        ]);
     }
 }
