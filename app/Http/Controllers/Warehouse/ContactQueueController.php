@@ -63,6 +63,7 @@ class ContactQueueController extends Controller
                 $q->where('recipient_name', 'like', "%{$search}%")
                   ->orWhere('recipient_phone', 'like', "%{$search}%")
                   ->orWhere('delivery_town', 'like', "%{$search}%")
+                  ->orWhereHas('shipmentItem', fn ($sq) => $sq->where('tracking_code', 'like', "%{$search}%"))
                   ->orWhereHas('shipment', fn ($sq) => $sq->where('shipment_number', 'like', "%{$search}%"));
             });
         }
@@ -91,6 +92,8 @@ class ContactQueueController extends Controller
                 'assigned_to_id' => $task->assigned_to_user_id,
                 'assigned_at' => $task->assigned_at?->format('M d, H:i'),
                 'callback_at' => $task->callback_at?->format('M d, H:i'),
+                'is_callback_due' => $task->outcome === PackageContactTask::OUTCOME_CALLBACK
+                    && $task->callback_at?->lte(now()),
                 'attempts_count' => $task->attempts_count,
                 'resolved_at' => $task->resolved_at?->format('M d, H:i'),
                 'notes' => $task->notes,
@@ -148,10 +151,38 @@ class ContactQueueController extends Controller
         $admin = Auth::guard('admin')->user();
         $warehouse = $this->portalService->resolveWarehouse($admin);
 
+        $eligibleWorkers = User::where('warehouse_id', $warehouse->id)
+            ->where('is_active', true)
+            ->whereHas('roles', fn ($q) => $q->where('is_warehouse_role', true))
+            ->get()
+            ->filter(fn ($user) => $user->hasPermission('warehouse.contacts.manage'))
+            ->count();
+
+        if ($eligibleWorkers === 0) {
+            return response()->json([
+                'success' => false,
+                'reason' => 'no_workers',
+                'message' => 'No eligible warehouse contact workers found. Add an active warehouse user with contact queue permission.',
+            ]);
+        }
+
+        $pendingTasks = PackageContactTask::where('warehouse_id', $warehouse->id)
+            ->where('status', PackageContactTask::STATUS_PENDING)
+            ->whereNull('assigned_to_user_id')
+            ->count();
+
+        if ($pendingTasks === 0) {
+            return response()->json([
+                'success' => false,
+                'reason' => 'no_pending_tasks',
+                'message' => "There are no pending unassigned contact tasks for {$warehouse->name}.",
+            ]);
+        }
+
         $count = $this->contactService->autoAssignRoundRobin($warehouse);
 
         if ($count === 0) {
-            return response()->json(['success' => false, 'message' => 'No pending tasks to assign, or no eligible workers found.']);
+            return response()->json(['success' => false, 'reason' => 'not_assigned', 'message' => 'No tasks were assigned. Refresh and try again.']);
         }
 
         return response()->json(['success' => true, 'message' => "{$count} tasks auto-assigned to workers."]);

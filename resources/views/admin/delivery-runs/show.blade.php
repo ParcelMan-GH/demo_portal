@@ -108,12 +108,26 @@ $itemStatusColors = [
         data-assign-driver-url="{{ $deliveryRunRoutes['assignDriverUrl'] }}"
         data-dispatch-url="{{ $deliveryRunRoutes['dispatchUrl'] }}"
         data-resend-code-url-template="{{ $deliveryRunRoutes['resendCodeUrlTemplate'] }}"
+        data-eligible-items-url="{{ $deliveryRunRoutes['eligibleItemsUrl'] ?? '' }}"
+        data-add-items-url="{{ $deliveryRunRoutes['addItemsUrl'] ?? '' }}"
+        data-attach-sort-batch-url="{{ $deliveryRunRoutes['attachSortBatchUrl'] ?? '' }}"
         data-driver-options='@json($deliveryDriverOptions)'
+        data-local-delivery-batches='@json($localDeliveryBatches ?? [])'
         x-data="{
             actionLoading: false,
             showAssignModal: false,
             showDispatchConfirm: false,
             showNotesModal: false,
+            draftView: 'build',
+            builderMode: 'packages',
+            localDeliveryBatches: [],
+            selectedSortBatchId: '',
+            eligibleItems: [],
+            eligibleMeta: { total: 0, per_page: 20, current_page: 1, last_page: 1, from: 0, to: 0 },
+            eligibleLoading: false,
+            packageSearch: '',
+            packageSearchTimer: null,
+            selectedReceiptItemIds: [],
             selectedDriverId: '',
             selectedDriverLabel: '',
             driverSearch: '',
@@ -135,9 +149,149 @@ $itemStatusColors = [
                 } catch (error) {
                     this.drivers = [];
                 }
+                try {
+                    this.localDeliveryBatches = JSON.parse(this.$root.dataset.localDeliveryBatches || '[]');
+                } catch (error) {
+                    this.localDeliveryBatches = [];
+                }
             },
             csrfToken() {
                 return document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '';
+            },
+            openBuilderMode(mode) {
+                this.builderMode = mode;
+                if (mode === 'packages' && this.eligibleItems.length === 0) {
+                    this.loadEligibleRunItems(1);
+                }
+            },
+            selectedSortBatch() {
+                return this.localDeliveryBatches.find((batch) => String(batch.id) === String(this.selectedSortBatchId)) || null;
+            },
+            isPackageSelected(id) {
+                return this.selectedReceiptItemIds.includes(Number(id));
+            },
+            togglePackageSelection(id) {
+                const numericId = Number(id);
+                const index = this.selectedReceiptItemIds.indexOf(numericId);
+                if (index === -1) {
+                    this.selectedReceiptItemIds.push(numericId);
+                } else {
+                    this.selectedReceiptItemIds.splice(index, 1);
+                }
+            },
+            toggleAllEligible(event) {
+                const ids = this.eligibleItems.map((item) => Number(item.warehouse_receipt_item_id));
+                if (event.target.checked) {
+                    this.selectedReceiptItemIds = Array.from(new Set([...this.selectedReceiptItemIds, ...ids]));
+                    return;
+                }
+                this.selectedReceiptItemIds = this.selectedReceiptItemIds.filter((id) => !ids.includes(Number(id)));
+            },
+            allVisibleSelected() {
+                return this.eligibleItems.length > 0 && this.eligibleItems.every((item) => this.isPackageSelected(item.warehouse_receipt_item_id));
+            },
+            onPackageSearch() {
+                window.clearTimeout(this.packageSearchTimer);
+                this.packageSearchTimer = window.setTimeout(() => this.loadEligibleRunItems(1), 300);
+            },
+            async loadEligibleRunItems(page = 1) {
+                const endpoint = this.$root.dataset.eligibleItemsUrl;
+                if (!endpoint) return;
+
+                this.eligibleLoading = true;
+                try {
+                    const params = new URLSearchParams({
+                        page: String(page || 1),
+                        per_page: String(this.eligibleMeta.per_page || 20),
+                    });
+                    if (String(this.packageSearch || '').trim()) {
+                        params.set('search', String(this.packageSearch).trim());
+                    }
+                    const response = await fetch(`${endpoint}?${params.toString()}`, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    });
+                    const result = await response.json();
+                    if (!response.ok) {
+                        throw new Error(result.message || 'Unable to load packages.');
+                    }
+                    this.eligibleItems = Array.isArray(result.data) ? result.data : [];
+                    this.eligibleMeta = {
+                        total: Number(result.meta?.total || 0),
+                        per_page: Number(result.meta?.per_page || 20),
+                        current_page: Number(result.meta?.current_page || page || 1),
+                        last_page: Number(result.meta?.last_page || 1),
+                        from: Number(result.meta?.from || 0),
+                        to: Number(result.meta?.to || 0),
+                    };
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to load packages.', 'error');
+                } finally {
+                    this.eligibleLoading = false;
+                }
+            },
+            async addSelectedPackages() {
+                if (!this.selectedReceiptItemIds.length) {
+                    window.showToast?.('Select at least one package.', 'warning');
+                    return;
+                }
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(this.$root.dataset.addItemsUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': this.csrfToken(),
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ warehouse_receipt_item_ids: this.selectedReceiptItemIds }),
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Unable to add packages.');
+                    }
+                    window.showToast?.(result.message || 'Packages added to run.', 'success');
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to add packages.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
+            },
+            async attachSortBatch() {
+                if (!this.selectedSortBatchId) {
+                    window.showToast?.('Select a local delivery batch.', 'warning');
+                    return;
+                }
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(this.$root.dataset.attachSortBatchUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': this.csrfToken(),
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ sort_batch_id: Number(this.selectedSortBatchId) }),
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Unable to add sort batch.');
+                    }
+                    window.showToast?.(result.message || 'Sort batch added to run.', 'success');
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to add sort batch.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
             },
             openAssignRiderModal() {
                 this.selectedDriverId = '';
@@ -308,6 +462,18 @@ $itemStatusColors = [
                         <span class="mr-2 h-2 w-2 rounded-full {{ $dotColors }}"></span>
                         {{ $statusLabel }}
                     </span>
+                    @if($canAssignDriver)
+                        <button
+                            type="button"
+                            @@click="openAssignRiderModal()"
+                            class="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-orange-400/45 bg-orange-500/15 px-3 text-xs font-black text-orange-100 transition hover:bg-orange-500/25"
+                        >
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7Z"/>
+                            </svg>
+                            {{ $run->assignedDriver ? 'Reassign Rider' : 'Assign Rider' }}
+                        </button>
+                    @endif
                     @if($run->sortBatch)
                         <a
                             href="{{ $deliveryRunRoutes['sortBatchUrl'] }}"
@@ -360,18 +526,8 @@ $itemStatusColors = [
                             <span>Created {{ $run->created_at->format('d M Y, h:i A') }}</span>
                         </div>
 
-                        @if($canAssignDriver || $canDispatch)
+                        @if($canDispatch)
                             <div class="mt-5 flex flex-wrap gap-3">
-                                @if($canAssignDriver)
-                                    <button @@click="openAssignRiderModal()"
-                                        class="inline-flex h-12 items-center gap-2 rounded-2xl bg-orange-600 px-5 text-sm font-black text-white shadow-lg shadow-orange-600/25 transition hover:bg-orange-700">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                                        </svg>
-                                        {{ $run->assignedDriver ? 'Reassign Rider' : 'Assign Rider' }}
-                                    </button>
-                                @endif
-
                                 @if($canDispatch)
                                     <button @@click="confirmDispatch()"
                                         :disabled="actionLoading"
@@ -476,8 +632,194 @@ $itemStatusColors = [
     </section>
     @endif
 
+    @if($run->status === 'draft')
+    <section class="rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div class="flex flex-wrap items-center gap-2">
+            <button
+                type="button"
+                @@click="draftView = 'build'"
+                class="inline-flex w-auto items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition"
+                :class="draftView === 'build' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-600 hover:bg-slate-50'"
+            >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Build Run
+            </button>
+            <button
+                type="button"
+                @@click="draftView = 'stops'"
+                class="inline-flex w-auto items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition"
+                :class="draftView === 'stops' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-600 hover:bg-slate-50'"
+            >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657 13.414 20.9a2 2 0 0 1-2.828 0l-4.243-4.243a8 8 0 1 1 11.314 0Z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
+                </svg>
+                Preview Stops
+            </button>
+        </div>
+    </section>
+    @endif
+
+    @if($run->status === 'draft' && !empty($deliveryRunRoutes['addItemsUrl']))
+    <section x-show="draftView === 'build'" x-cloak class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-4 py-4 sm:px-5">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex min-w-0 items-center gap-3">
+                    <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7h-7m7 0v7m0-7-8 8-4-4-5 5"/>
+                        </svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 class="text-base font-black text-slate-950">Build Delivery Run</h3>
+                        <p class="mt-0.5 text-sm font-semibold text-slate-500">Add packages directly or import a sealed local delivery batch.</p>
+                    </div>
+                </div>
+
+                <div class="flex rounded-2xl bg-slate-100 p-1">
+                    <button type="button" @@click="openBuilderMode('packages')" class="rounded-xl px-4 py-2 text-sm font-black transition" :class="builderMode === 'packages' ? 'bg-white text-orange-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'">Packages</button>
+                    <button type="button" @@click="openBuilderMode('batch')" class="rounded-xl px-4 py-2 text-sm font-black transition" :class="builderMode === 'batch' ? 'bg-white text-orange-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'">Sort Batch</button>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="builderMode === 'packages'" x-init="loadEligibleRunItems(1)" class="p-4 sm:p-5">
+            <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div class="relative w-full lg:max-w-md">
+                    <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" x-model="packageSearch" @@input="onPackageSearch()" placeholder="Search packages..." class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                </div>
+                <button type="button" @@click="addSelectedPackages()" :disabled="actionLoading || selectedReceiptItemIds.length === 0" class="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
+                    <svg x-show="actionLoading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Add Selected (<span x-text="selectedReceiptItemIds.length"></span>)
+                </button>
+            </div>
+
+            <div class="overflow-hidden rounded-2xl border border-slate-200">
+                <div class="hidden overflow-x-auto lg:block">
+                    <table class="w-full table-auto divide-y divide-slate-200/60 text-xs">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="w-12 px-4 py-3 text-left">
+                                    <input type="checkbox" @@change="toggleAllEligible($event)" :checked="allVisibleSelected()" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500">
+                                </th>
+                                <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Package</th>
+                                <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Recipient</th>
+                                <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Location</th>
+                                <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Qty</th>
+                                <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Method</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            <template x-if="!eligibleLoading && eligibleItems.length === 0">
+                                <tr>
+                                    <td colspan="6" class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No eligible warehouse packages found.</td>
+                                </tr>
+                            </template>
+                            <template x-if="eligibleLoading">
+                                <tr>
+                                    <td colspan="6" class="px-4 py-10 text-center text-sm font-semibold text-slate-500">Loading packages...</td>
+                                </tr>
+                            </template>
+                            <template x-for="row in eligibleItems" :key="row.warehouse_receipt_item_id">
+                                <tr @@click="togglePackageSelection(row.warehouse_receipt_item_id)" class="cursor-pointer hover:bg-orange-50/40">
+                                    <td class="px-4 py-3">
+                                        <input type="checkbox" :checked="isPackageSelected(row.warehouse_receipt_item_id)" @@click.stop="togglePackageSelection(row.warehouse_receipt_item_id)" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500">
+                                    </td>
+                                    <td class="max-w-[320px] px-4 py-3">
+                                        <p class="truncate text-sm font-black text-slate-900" x-text="row.item_description || '-'"></p>
+                                        <div class="mt-1 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
+                                            <span x-text="row.shipment_number || '-'"></span>
+                                            <span class="text-slate-300">/</span>
+                                            <span class="font-mono" x-text="row.tracking_code || 'No tracking'"></span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <p class="font-bold text-slate-800" x-text="row.destination?.recipient_name || '-'"></p>
+                                        <p class="mt-1 text-[11px] font-semibold text-slate-500" x-text="row.destination?.recipient_phone || '-'"></p>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <p class="font-semibold text-slate-700" x-text="row.destination?.town || '-'"></p>
+                                        <p class="mt-1 text-[11px] text-slate-500" x-text="[row.destination?.district, row.destination?.region].filter(Boolean).join(', ') || '-'"></p>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <span class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-slate-100 px-2 font-black text-slate-700" x-text="row.received_quantity || 0"></span>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-600" x-text="row.delivery_method_label || 'Direct Delivery'"></span>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="divide-y divide-slate-100 lg:hidden">
+                    <template x-if="!eligibleLoading && eligibleItems.length === 0">
+                        <div class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No eligible warehouse packages found.</div>
+                    </template>
+                    <template x-for="row in eligibleItems" :key="row.warehouse_receipt_item_id">
+                        <button type="button" @@click="togglePackageSelection(row.warehouse_receipt_item_id)" class="flex w-full items-start gap-3 px-4 py-4 text-left">
+                            <span class="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded border" :class="isPackageSelected(row.warehouse_receipt_item_id) ? 'border-orange-600 bg-orange-600' : 'border-slate-300 bg-white'">
+                                <svg x-show="isPackageSelected(row.warehouse_receipt_item_id)" class="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="m5 13 4 4L19 7"/></svg>
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="flex min-w-0 items-start justify-between gap-3">
+                                    <span class="min-w-0 truncate text-sm font-black text-slate-900" x-text="row.item_description || '-'"></span>
+                                    <span class="inline-flex shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600" x-text="'Qty ' + (row.received_quantity || 0)"></span>
+                                </span>
+                                <span class="mt-1 block text-xs font-semibold text-slate-500" x-text="(row.destination?.recipient_name || '-') + ' / ' + (row.destination?.town || '-')"></span>
+                            </span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-xs font-bold text-slate-500">
+                    Showing <span x-text="eligibleMeta.from || 0"></span> to <span x-text="eligibleMeta.to || 0"></span> of <span x-text="eligibleMeta.total || 0"></span>
+                </p>
+                <div class="flex items-center gap-2">
+                    <button type="button" @@click="loadEligibleRunItems(eligibleMeta.current_page - 1)" :disabled="eligibleLoading || eligibleMeta.current_page <= 1" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 disabled:opacity-40">Previous</button>
+                    <span class="text-xs font-black text-slate-600">Page <span x-text="eligibleMeta.current_page || 1"></span> / <span x-text="eligibleMeta.last_page || 1"></span></span>
+                    <button type="button" @@click="loadEligibleRunItems(eligibleMeta.current_page + 1)" :disabled="eligibleLoading || eligibleMeta.current_page >= eligibleMeta.last_page" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 disabled:opacity-40">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="builderMode === 'batch'" x-cloak class="p-4 sm:p-5">
+            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                <div>
+                    <label class="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">Sealed Local Delivery Batch</label>
+                    <select x-model="selectedSortBatchId" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                        <option value="">Select a batch...</option>
+                        <template x-for="batch in localDeliveryBatches" :key="batch.id">
+                            <option :value="batch.id" x-text="`${batch.batch_number} / ${batch.items_count || 0} packages`"></option>
+                        </template>
+                    </select>
+                    <p x-show="localDeliveryBatches.length === 0" class="mt-2 text-xs font-bold text-amber-700">No sealed local delivery batches are available.</p>
+                    <p x-show="selectedSortBatch()" class="mt-2 text-xs font-semibold text-slate-500">
+                        <span x-text="selectedSortBatch()?.items_count || 0"></span> packages
+                        <span x-show="selectedSortBatch()?.sealed_at"> / sealed <span x-text="selectedSortBatch()?.sealed_at"></span></span>
+                    </p>
+                </div>
+                <button type="button" @@click="attachSortBatch()" :disabled="actionLoading || !selectedSortBatchId" class="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
+                    Add Batch
+                </button>
+            </div>
+        </div>
+    </section>
+    @endif
+
     <!-- Stops Section -->
-    <section class="space-y-4">
+    <section class="space-y-4" @if($run->status === 'draft') x-show="draftView === 'stops'" x-cloak @endif>
             <div class="flex items-center justify-between gap-3">
                 <div class="flex min-w-0 items-center gap-3">
                 <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600">
@@ -487,8 +829,8 @@ $itemStatusColors = [
                     </svg>
                 </div>
                 <div>
-                    <h3 class="text-base font-black text-slate-950">Delivery Stops</h3>
-                    <p class="mt-0.5 text-sm font-semibold text-slate-500">Recipients and package handoffs in this run.</p>
+                    <h3 class="text-base font-black text-slate-950">{{ $run->status === 'draft' ? 'Preview Stops' : 'Delivery Stops' }}</h3>
+                    <p class="mt-0.5 text-sm font-semibold text-slate-500">{{ $run->status === 'draft' ? 'Review how packages will be grouped before dispatch.' : 'Recipients and package handoffs in this run.' }}</p>
                 </div>
             </div>
             <span class="inline-flex h-10 w-fit shrink-0 items-center whitespace-nowrap rounded-full border border-orange-200 bg-orange-50 px-4 text-sm font-black text-orange-700">

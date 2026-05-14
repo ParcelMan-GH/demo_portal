@@ -51,6 +51,154 @@ class WarehouseDeliveryService
             ->where('warehouse_id', $warehouse->id);
     }
 
+    public function createDraftRun(Warehouse $warehouse, User $user): array
+    {
+        $run = DeliveryRun::query()->create([
+            'run_number' => $this->generateRunNumber($warehouse),
+            'warehouse_id' => $warehouse->id,
+            'status' => DeliveryRun::STATUS_DRAFT,
+            'created_by_user_id' => $user->id,
+        ]);
+
+        return [
+            'success' => true,
+            'message' => 'Draft delivery run created.',
+            'data' => [
+                'run' => $run->fresh(['warehouse', 'createdBy', 'stops', 'items']),
+            ],
+        ];
+    }
+
+    /**
+     * Add loose warehouse packages to a draft run while keeping the sorting pipeline intact.
+     *
+     * @param array<int, int|string> $warehouseReceiptItemIds
+     */
+    public function addItemsToDraftRun(
+        DeliveryRun $run,
+        Warehouse $warehouse,
+        User $user,
+        array $warehouseReceiptItemIds,
+        WarehouseSortingService $sortingService
+    ): array {
+        if ((int) $run->warehouse_id !== (int) $warehouse->id) {
+            return ['success' => false, 'message' => 'Cannot modify another warehouse run.'];
+        }
+
+        if ($run->status !== DeliveryRun::STATUS_DRAFT) {
+            return ['success' => false, 'message' => 'Packages can only be added while the run is still draft.'];
+        }
+
+        if (empty($warehouseReceiptItemIds)) {
+            return ['success' => false, 'message' => 'Select at least one package.'];
+        }
+
+        return DB::transaction(function () use ($run, $warehouse, $user, $warehouseReceiptItemIds, $sortingService) {
+            $run = DeliveryRun::query()->lockForUpdate()->findOrFail($run->id);
+            $batch = $run->sortBatch;
+
+            if ($batch && ((int) $batch->origin_warehouse_id !== (int) $warehouse->id || $batch->dispatch_mode !== SortBatch::DISPATCH_LOCAL_DELIVERY)) {
+                return ['success' => false, 'message' => 'This run is linked to an incompatible sort batch.'];
+            }
+
+            if ($batch && $batch->status !== SortBatch::STATUS_OPEN) {
+                return ['success' => false, 'message' => 'This run is already linked to a sealed batch. Create a new draft run to add loose packages.'];
+            }
+
+            if (!$batch) {
+                $batchResult = $sortingService->createBatch(
+                    originWarehouse: $warehouse,
+                    destinationWarehouse: null,
+                    user: $user,
+                    dispatchMode: SortBatch::DISPATCH_LOCAL_DELIVERY,
+                    notes: 'Draft package group for delivery run ' . $run->run_number . '.',
+                );
+
+                if (!$batchResult['success']) {
+                    return $batchResult;
+                }
+
+                $batch = $batchResult['data']['batch'];
+                $run->update(['sort_batch_id' => $batch->id]);
+            }
+
+            $addResult = $sortingService->addItems(
+                batch: $batch,
+                warehouse: $warehouse,
+                user: $user,
+                warehouseReceiptItemIds: $warehouseReceiptItemIds,
+            );
+
+            if (!$addResult['success']) {
+                return $addResult;
+            }
+
+            $this->rebuildDraftRunStopsFromBatch($run->fresh('sortBatch'), $batch->fresh(['activeItems.shipmentItem.shipment']));
+
+            return [
+                'success' => true,
+                'message' => 'Packages added to delivery run.',
+                'data' => [
+                    'run' => $run->fresh(['sortBatch', 'stops.items.shipmentItem', 'items.shipmentItem']),
+                ],
+            ];
+        });
+    }
+
+    public function attachSortBatchToDraftRun(DeliveryRun $run, SortBatch $batch, Warehouse $warehouse, User $user): array
+    {
+        if ((int) $run->warehouse_id !== (int) $warehouse->id) {
+            return ['success' => false, 'message' => 'Cannot modify another warehouse run.'];
+        }
+
+        if ($run->status !== DeliveryRun::STATUS_DRAFT) {
+            return ['success' => false, 'message' => 'Sort batches can only be added while the run is still draft.'];
+        }
+
+        if ((int) $batch->origin_warehouse_id !== (int) $warehouse->id) {
+            return ['success' => false, 'message' => 'Cannot use another warehouse batch.'];
+        }
+
+        if ($batch->dispatch_mode !== SortBatch::DISPATCH_LOCAL_DELIVERY) {
+            return ['success' => false, 'message' => 'Only local delivery batches can be used for delivery runs.'];
+        }
+
+        if ($batch->status !== SortBatch::STATUS_SEALED) {
+            return ['success' => false, 'message' => 'Only sealed local delivery batches can be attached.'];
+        }
+
+        if ($batch->deliveryRun()->whereKeyNot($run->id)->exists()) {
+            return ['success' => false, 'message' => 'This batch already has a delivery run.'];
+        }
+
+        if ($run->items()->exists()) {
+            return ['success' => false, 'message' => 'This draft run already has packages. Create a new run to use a sealed batch.'];
+        }
+
+        return DB::transaction(function () use ($run, $batch) {
+            $run = DeliveryRun::query()->lockForUpdate()->findOrFail($run->id);
+            $batch = SortBatch::query()
+                ->with(['activeItems.shipmentItem.shipment'])
+                ->lockForUpdate()
+                ->findOrFail($batch->id);
+
+            if ($batch->activeItems->isEmpty()) {
+                return ['success' => false, 'message' => 'Cannot attach an empty batch.'];
+            }
+
+            $run->update(['sort_batch_id' => $batch->id]);
+            $this->rebuildDraftRunStopsFromBatch($run, $batch);
+
+            return [
+                'success' => true,
+                'message' => 'Sort batch added to delivery run.',
+                'data' => [
+                    'run' => $run->fresh(['sortBatch', 'stops.items.shipmentItem', 'items.shipmentItem']),
+                ],
+            ];
+        });
+    }
+
     /**
      * Create a delivery run directly from eligible receipt items.
      * Auto-creates a sealed local-delivery sort batch behind the scenes.
@@ -230,15 +378,6 @@ class WarehouseDeliveryService
             ];
         }
 
-        $paymentBlock = $this->recipientPaymentService()->blockingSummaryForLocalDeliveryItems($warehouse, $shipmentItems);
-        if ($paymentBlock['blocked']) {
-            return [
-                'success' => false,
-                'message' => 'Recipient delivery fees must be paid, waived, or overridden before creating this delivery run.',
-                'data' => ['recipient_payment_blockers' => $paymentBlock['items']],
-            ];
-        }
-
         return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems, $claimedLabelIds, $allocatedQuantitiesByItemId) {
             $run = DeliveryRun::query()->create([
                 'run_number' => $this->generateRunNumber($warehouse),
@@ -368,15 +507,6 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Delivery run already exists for this batch.'];
         }
 
-        $paymentBlock = $this->recipientPaymentService()->blockingSummaryForBatch($batch);
-        if ($paymentBlock['blocked']) {
-            return [
-                'success' => false,
-                'message' => 'Recipient delivery fees must be paid, waived, or overridden before creating this delivery run.',
-                'data' => ['recipient_payment_blockers' => $paymentBlock['items']],
-            ];
-        }
-
         return DB::transaction(function () use ($batch, $warehouse, $user) {
             $batch = SortBatch::query()
                 ->with(['activeItems.shipmentItem.shipment'])
@@ -476,6 +606,75 @@ class WarehouseDeliveryService
     private function recipientPaymentService(): RecipientPaymentService
     {
         return $this->recipientPaymentService ??= app(RecipientPaymentService::class);
+    }
+
+    private function rebuildDraftRunStopsFromBatch(DeliveryRun $run, SortBatch $batch): void
+    {
+        DeliveryRunItem::query()->where('delivery_run_id', $run->id)->delete();
+        DeliveryRunStop::query()->where('delivery_run_id', $run->id)->delete();
+
+        $activeItems = $batch->activeItems()->with('shipmentItem.shipment')->get();
+        $grouped = [];
+
+        foreach ($activeItems as $batchItem) {
+            $shipmentItem = $batchItem->shipmentItem;
+            if (!$shipmentItem || !$shipmentItem->shipment) {
+                continue;
+            }
+
+            $destination = $this->resolveDeliveryDestination($shipmentItem);
+            $key = implode('|', [
+                mb_strtolower((string) ($destination['recipient_name'] ?? '')),
+                preg_replace('/\D/', '', (string) ($destination['recipient_phone'] ?? '')),
+                $destination['region_id'] ?? '',
+                $destination['district_id'] ?? '',
+                mb_strtolower((string) ($destination['town'] ?? '')),
+                (string) ($destination['latitude'] ?? ''),
+                (string) ($destination['longitude'] ?? ''),
+                mb_strtolower((string) ($destination['gh_post_address'] ?? '')),
+                mb_strtolower((string) ($destination['landmark'] ?? '')),
+            ]);
+
+            $grouped[$key] ??= [
+                'destination' => $destination,
+                'items' => [],
+            ];
+            $grouped[$key]['items'][] = $batchItem;
+        }
+
+        foreach ($grouped as $group) {
+            $destination = $group['destination'];
+            $deliveryMethod = collect($group['items'])
+                ->contains(fn ($batchItem) => ($batchItem->shipmentItem?->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT) === ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF)
+                ? DeliveryRunStop::METHOD_BUS_HANDOFF
+                : DeliveryRunStop::METHOD_DIRECT;
+
+            $stop = DeliveryRunStop::query()->create([
+                'delivery_run_id' => $run->id,
+                'recipient_name' => (string) ($destination['recipient_name'] ?? 'Recipient'),
+                'recipient_phone' => (string) ($destination['recipient_phone'] ?? ''),
+                'region_id' => $destination['region_id'],
+                'district_id' => $destination['district_id'],
+                'town' => $destination['town'],
+                'latitude' => $destination['latitude'],
+                'longitude' => $destination['longitude'],
+                'gh_post_address' => $destination['gh_post_address'],
+                'landmark' => $destination['landmark'],
+                'total_packages' => count($group['items']),
+                'delivery_method' => $deliveryMethod,
+                'status' => DeliveryRunStop::STATUS_PENDING,
+            ]);
+
+            foreach ($group['items'] as $batchItem) {
+                DeliveryRunItem::query()->create([
+                    'delivery_run_id' => $run->id,
+                    'delivery_run_stop_id' => $stop->id,
+                    'shipment_item_id' => $batchItem->shipment_item_id,
+                    'expected_quantity' => (int) $batchItem->quantity_allocated,
+                    'status' => DeliveryRunItem::STATUS_PENDING,
+                ]);
+            }
+        }
     }
 
     public function assignDriver(DeliveryRun $run, Driver $driver, Warehouse $warehouse): array

@@ -174,11 +174,19 @@ class DeliveryRunController extends Controller
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
 
         $validated = $request->validate([
-            'sort_batch_id' => ['required', 'integer', 'exists:sort_batches,id'],
+            'sort_batch_id' => ['nullable', 'integer', 'exists:sort_batches,id'],
         ]);
 
-        $batch = SortBatch::query()->findOrFail((int) $validated['sort_batch_id']);
-        $result = $this->deliveryService->createRun($batch, $warehouse, Auth::guard('admin')->user());
+        if (!empty($validated['sort_batch_id'])) {
+            $batch = SortBatch::query()->findOrFail((int) $validated['sort_batch_id']);
+            $result = $this->deliveryService->createRun($batch, $warehouse, Auth::guard('admin')->user());
+        } else {
+            $result = $this->deliveryService->createDraftRun($warehouse, Auth::guard('admin')->user());
+        }
+
+        if ($result['success'] && isset($result['data']['run'])) {
+            $result['data']['redirect_url'] = route('warehouse.deliveries.runs.show', $result['data']['run']);
+        }
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }
@@ -244,6 +252,94 @@ class DeliveryRunController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
+    public function eligibleItemsForRun(Request $request, DeliveryRun $run): JsonResponse
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+
+        if ((int) $run->warehouse_id !== (int) $warehouse->id) {
+            return response()->json(['success' => false, 'message' => 'Run not found.'], 404);
+        }
+
+        $query = $this->sortingService->eligibleItemsQuery($warehouse);
+
+        if ($search = trim((string) $request->input('search'))) {
+            $query->where(function (Builder $builder) use ($search) {
+                $builder->whereHas('shipmentItem.shipment', fn (Builder $q) => $q
+                    ->where('shipment_number', 'like', "%{$search}%")
+                    ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                    ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
+                    ->orWhere('delivery_town', 'like', "%{$search}%")
+                    ->orWhereHas('vendor', fn (Builder $vq) => $vq->where('name', 'like', "%{$search}%")))
+                    ->orWhereHas('shipmentItem', fn (Builder $q) => $q
+                        ->where('description', 'like', "%{$search}%")
+                        ->orWhere('tracking_code', 'like', "%{$search}%")
+                        ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                        ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
+                        ->orWhere('delivery_town', 'like', "%{$search}%")
+                    );
+            });
+        }
+
+        $query->latest('id');
+
+        $total = $query->count();
+        $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
+        $page = max((int) $request->input('page', 1), 1);
+        $offset = ($page - 1) * $perPage;
+        $rows = $query->skip($offset)->take($perPage)->get();
+
+        return response()->json([
+            'data' => $this->sortingService->mapEligibleItems($rows),
+            'meta' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => (int) ceil($total / $perPage) ?: 1,
+                'from' => $total > 0 ? $offset + 1 : 0,
+                'to' => min($offset + $perPage, $total),
+            ],
+        ]);
+    }
+
+    public function addItems(Request $request, DeliveryRun $run): JsonResponse
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        $user = Auth::guard('admin')->user();
+
+        $validated = $request->validate([
+            'warehouse_receipt_item_ids' => ['required', 'array', 'min:1'],
+            'warehouse_receipt_item_ids.*' => ['integer', 'exists:warehouse_receipt_items,id'],
+        ]);
+
+        $result = $this->deliveryService->addItemsToDraftRun(
+            run: $run,
+            warehouse: $warehouse,
+            user: $user,
+            warehouseReceiptItemIds: $validated['warehouse_receipt_item_ids'],
+            sortingService: $this->sortingService,
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function attachSortBatch(Request $request, DeliveryRun $run): JsonResponse
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        $user = Auth::guard('admin')->user();
+
+        $validated = $request->validate([
+            'sort_batch_id' => ['required', 'integer', 'exists:sort_batches,id'],
+        ]);
+
+        $batch = SortBatch::query()->findOrFail((int) $validated['sort_batch_id']);
+        $result = $this->deliveryService->attachSortBatchToDraftRun($run, $batch, $warehouse, $user);
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
     public function assignDriver(Request $request, DeliveryRun $run): JsonResponse
     {
         $this->authorizePermission('warehouse.delivery.assign');
@@ -304,11 +400,34 @@ class DeliveryRunController extends Controller
             'sortBatchUrl' => $run->sortBatch ? route('warehouse.sorting.show', $run->sortBatch) : null,
             'assignDriverUrl' => route('warehouse.deliveries.runs.assign-driver', $run),
             'dispatchUrl' => route('warehouse.deliveries.runs.dispatch', $run),
+            'eligibleItemsUrl' => route('warehouse.deliveries.runs.run-eligible-items', $run),
+            'addItemsUrl' => route('warehouse.deliveries.runs.items.store', $run),
+            'attachSortBatchUrl' => route('warehouse.deliveries.runs.attach-sort-batch', $run),
             'resendCodeUrlTemplate' => route('warehouse.deliveries.runs.stops.resend-code', ['run' => $run->id, 'stop' => '__STOP__']),
             'updateStopDeliveryMethodUrlTemplate' => route('warehouse.deliveries.runs.stops.update-delivery-method', ['run' => $run->id, 'stop' => '__STOP__']),
             'confirmHandoffItemUrlTemplate' => route('warehouse.deliveries.runs.stops.items.confirm-handoff', ['run' => $run->id, 'stop' => '__STOP__', 'item' => '__ITEM__']),
             'canResetCodes' => (bool) $user?->hasPermission('warehouse.delivery.code.reset'),
         ];
+
+        $localDeliveryBatches = SortBatch::query()
+            ->where('origin_warehouse_id', $warehouse->id)
+            ->where('dispatch_mode', SortBatch::DISPATCH_LOCAL_DELIVERY)
+            ->where('status', SortBatch::STATUS_SEALED)
+            ->where(function (Builder $query) use ($run) {
+                $query->whereDoesntHave('deliveryRun')
+                    ->orWhereHas('deliveryRun', fn (Builder $runQuery) => $runQuery->whereKey($run->id));
+            })
+            ->withCount('activeItems')
+            ->orderByDesc('sealed_at')
+            ->orderByDesc('id')
+            ->get(['id', 'batch_number', 'sealed_at'])
+            ->map(fn (SortBatch $batch) => [
+                'id' => $batch->id,
+                'batch_number' => $batch->batch_number,
+                'items_count' => (int) $batch->active_items_count,
+                'sealed_at' => optional($batch->sealed_at)?->format('d M Y, h:i A'),
+            ])
+            ->values();
 
         return view('admin.delivery-runs.show', [
             'layoutName' => 'warehouse.layouts.app',
@@ -317,6 +436,7 @@ class DeliveryRunController extends Controller
             'deliveryDrivers' => $deliveryDrivers,
             'deliveryRunRoutes' => $deliveryRunRoutes,
             'hideRunWarehouseMeta' => true,
+            'localDeliveryBatches' => $localDeliveryBatches,
         ]);
     }
 

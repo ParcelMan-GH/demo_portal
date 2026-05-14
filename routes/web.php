@@ -616,6 +616,9 @@ Route::prefix('warehouse')
         Route::get('deliveries/runs/eligible-items', [WarehouseDeliveryRunController::class, 'eligibleItems'])->name('deliveries.runs.eligible-items');
         Route::post('deliveries/runs', [WarehouseDeliveryRunController::class, 'store'])->name('deliveries.runs.store');
         Route::post('deliveries/runs/from-items', [WarehouseDeliveryRunController::class, 'storeFromItems'])->name('deliveries.runs.store-from-items');
+        Route::get('deliveries/runs/{run}/eligible-items', [WarehouseDeliveryRunController::class, 'eligibleItemsForRun'])->name('deliveries.runs.run-eligible-items');
+        Route::post('deliveries/runs/{run}/items', [WarehouseDeliveryRunController::class, 'addItems'])->name('deliveries.runs.items.store');
+        Route::post('deliveries/runs/{run}/attach-sort-batch', [WarehouseDeliveryRunController::class, 'attachSortBatch'])->name('deliveries.runs.attach-sort-batch');
         Route::post('deliveries/runs/{run}/assign-driver', [WarehouseDeliveryRunController::class, 'assignDriver'])->name('deliveries.runs.assign-driver');
         Route::post('deliveries/runs/{run}/dispatch', [WarehouseDeliveryRunController::class, 'dispatch'])->name('deliveries.runs.dispatch');
         Route::post('deliveries/runs/{run}/stops/{stop}/resend-code', [WarehouseDeliveryRunController::class, 'resendCode'])->name('deliveries.runs.stops.resend-code');

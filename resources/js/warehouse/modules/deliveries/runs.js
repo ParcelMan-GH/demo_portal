@@ -210,6 +210,43 @@ function registerWarehouseDeliveryRunsPage() {
                 return value;
             },
 
+            isSortable(key) {
+                const column = this.columns.find((item) => item.key === key);
+                return Boolean(column && column.sortable !== false);
+            },
+
+            isSortedColumn(key) {
+                const column = this.columns.find((item) => item.key === key);
+                return this.sortBy === (column?.sortKey || key);
+            },
+
+            sort(column) {
+                if (!this.isSortable(column)) return;
+
+                const sortKey = this.columns.find((item) => item.key === column)?.sortKey || column;
+                if (this.sortBy === sortKey) {
+                    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    this.sortBy = sortKey;
+                    this.sortDirection = 'asc';
+                }
+
+                this.meta.current_page = 1;
+                this.loadData();
+            },
+
+            tableHeaderClass(key) {
+                if (['status', 'stops_count', 'items_count'].includes(key)) return 'text-center';
+                if (key === 'actions') return 'text-right';
+                return 'text-left';
+            },
+
+            tableHeaderContentClass(key) {
+                if (['status', 'stops_count', 'items_count'].includes(key)) return 'justify-center';
+                if (key === 'actions') return 'justify-end';
+                return '';
+            },
+
             statusBadgeClass(status) {
                 switch ((status || '').toLowerCase()) {
                     case 'draft':
@@ -232,6 +269,22 @@ function registerWarehouseDeliveryRunsPage() {
             statusLabel(status) {
                 const normalized = String(status || '').toLowerCase();
                 return statuses.find(item => item.value === normalized)?.label || (status || '-');
+            },
+
+            formatDisplayDate(value) {
+                if (!value) return '-';
+
+                const normalized = String(value).replace(' ', 'T');
+                const date = new Date(normalized);
+                if (Number.isNaN(date.getTime())) return value;
+
+                return date.toLocaleString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                });
             },
 
             initDateRange() {
@@ -326,11 +379,6 @@ function registerWarehouseDeliveryRunsPage() {
             },
 
             async createRun() {
-                if (!this.newRunBatchId) {
-                    window.showToast?.('Select a sealed local delivery batch first.', 'warning');
-                    return;
-                }
-
                 this.loading = true;
                 try {
                     const response = await fetch(config.create_endpoint, {
@@ -341,9 +389,7 @@ function registerWarehouseDeliveryRunsPage() {
                             'X-CSRF-TOKEN': csrfToken(),
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({
-                            sort_batch_id: Number(this.newRunBatchId),
-                        }),
+                        body: JSON.stringify(this.newRunBatchId ? { sort_batch_id: Number(this.newRunBatchId) } : {}),
                     });
 
                     const result = await response.json();
@@ -351,7 +397,12 @@ function registerWarehouseDeliveryRunsPage() {
                         throw new Error(result.message || 'Failed to create delivery run.');
                     }
 
-                    window.showToast?.(result.message || 'Delivery run created successfully.', 'success');
+                    if (result.data?.redirect_url) {
+                        window.location.href = result.data.redirect_url;
+                        return;
+                    }
+
+                    window.showToast?.(result.message || 'Draft delivery run created.', 'success');
                     this.newRunBatchId = '';
                     this.showCreateModal = false;
                     await this.loadData();
