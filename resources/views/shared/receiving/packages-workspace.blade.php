@@ -26,46 +26,53 @@
     $finalizeSubtitle = $finalizeSubtitle ?? 'Mark all packages as received and move shipment to warehouse status.';
 @endphp
 
-<div class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-300/25">
-    <div class="flex flex-col gap-4 border-b border-slate-200/60 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+<section class="space-y-4">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div class="flex items-start gap-3">
-            <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
+            <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 shadow-sm ring-1 ring-orange-100">
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
             </span>
             <div>
-                <h3 class="text-base font-extrabold text-slate-950">{{ $title }}</h3>
-                <p class="mt-0.5 text-sm text-slate-500">{{ $subtitle }}</p>
+                <h3 class="text-lg font-black text-slate-950">{{ $title }}</h3>
+                <p class="mt-0.5 max-w-2xl text-sm font-medium text-slate-500">{{ $subtitle }}</p>
                 @if($showToolbar)
                     <p x-show="receiving.autoGroupLockReason" class="mt-1 text-[10px] text-amber-600" x-text="receiving.autoGroupLockReason" style="display:none"></p>
                 @endif
             </div>
         </div>
         @if($showToolbar)
-            <div class="flex flex-wrap items-center justify-end gap-3">
+            <div class="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
                 <button type="button"
                         @@click="openReceivingAddPackageModal()"
-                        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-700 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-orange-500/20 transition-all hover:from-orange-700 hover:to-orange-800">
+                        class="inline-flex h-10 items-center gap-2 rounded-xl bg-orange-600 px-4 text-sm font-black text-white shadow-sm shadow-orange-500/20 transition hover:bg-orange-700">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Add Package
                 </button>
                 <button type="button"
                         @@click="autoGroupReceivingPackagesByPhone()"
                         :disabled="receiving.autoGrouping || !receiving.canAutoGroup"
-                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50">
+                        class="inline-flex h-10 items-center gap-2 rounded-xl border border-orange-100 bg-orange-50 px-4 text-sm font-black text-orange-700 shadow-sm transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50">
                     <svg x-show="!receiving.autoGrouping" class="h-4 w-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                     <svg x-show="receiving.autoGrouping" class="h-4 w-4 animate-spin text-orange-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <span x-text="receiving.autoGrouping ? 'Grouping...' : 'Auto-group by Phone'"></span>
                 </button>
                 <button type="button"
                         @@click="loadReceiving()"
-                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-white/90">
+                        class="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
                     <svg class="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     Refresh
                 </button>
+                @if($showFinalize)
+                    <button @@click="{{ $finalizeClick }}" :disabled="{{ $finalizeDisabled }}"
+                            class="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-black text-white shadow-sm shadow-emerald-500/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+                        <span x-text="{{ $finalizeLabelExpr }}"></span>
+                    </button>
+                @endif
             </div>
         @endif
     </div>
-    <div class="grid gap-3 bg-slate-50/70 p-3 lg:hidden">
+
+    <div class="grid gap-3 lg:hidden">
         <template x-if="{{ $packagesExpr }}.length === 0">
             <div class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
                 <p class="text-sm font-semibold text-slate-600">{{ $emptyTitle }}</p>
@@ -74,7 +81,8 @@
         </template>
 
         <template x-for="pkg in {{ $packagesExpr }}" :key="'mobile-' + pkg.shipment_item_id">
-            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60">
+            <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-300/25">
+                <div class="border-b border-orange-100 bg-orange-50 px-4 py-4">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
                         <button type="button"
@@ -91,8 +99,9 @@
                                 : 'bg-orange-50 text-orange-700 ring-1 ring-orange-200')"
                           x-text="receivingPackageStatusLabel(pkg)"></span>
                 </div>
+                </div>
 
-                <div class="mt-4 grid grid-cols-3 rounded-2xl border border-slate-200 bg-slate-50/80 text-center">
+                <div class="m-4 grid grid-cols-3 rounded-2xl border border-slate-200 bg-slate-50/80 text-center">
                     <div class="px-2 py-3">
                         <p class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Expected Qty</p>
                         <p class="mt-1 text-base font-black text-slate-900" x-text="receivingExpectedQuantity(pkg)"></p>
@@ -107,7 +116,7 @@
                     </div>
                 </div>
 
-                <div class="mt-4 space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 text-[12px]">
+                <div class="mx-4 mb-4 space-y-2 rounded-2xl border border-slate-200 bg-white p-3 text-[12px]">
                     <div class="flex items-start gap-2">
                         <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 0115 0"/></svg>
                         <div class="min-w-0">
@@ -126,7 +135,7 @@
                     </div>
                 </div>
 
-                <div class="mt-4 grid grid-cols-3 gap-2">
+                <div class="mx-4 mb-4 grid grid-cols-3 gap-2">
                     <button type="button"
                             @@click="{{ $photosClick }}"
                             class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-50">
@@ -181,11 +190,11 @@
         </template>
     </div>
 
-    <div class="hidden p-4 lg:block">
-        <div class="relative overflow-hidden rounded-xl border border-slate-200/70">
+    <div class="hidden lg:block">
+        <div class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-300/25">
         <div class="overflow-x-auto">
         <table class="min-w-[1220px] w-full divide-y divide-slate-200/60 text-left text-xs">
-            <thead class="bg-slate-50/90">
+            <thead class="bg-orange-50">
                 <tr>
                     <th class="px-4 py-3 text-[10px] font-black uppercase tracking-wide text-slate-500">Package</th>
                     <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-wide text-slate-500">Expected Qty</th>
@@ -209,7 +218,7 @@
                     </tr>
                 </template>
                 <template x-for="pkg in {{ $packagesExpr }}" :key="pkg.shipment_item_id">
-                    <tr class="align-top transition hover:bg-orange-50/20">
+                    <tr class="align-top transition hover:bg-orange-50/30">
                         <td class="px-4 py-4">
                             <div class="min-w-0 space-y-1">
                                 <button type="button"
@@ -229,14 +238,22 @@
                             <span class="font-black text-amber-700" x-text="receivingPendingQuantity(pkg)"></span>
                         </td>
                         <td class="px-4 py-4 text-center">
-                            <span class="text-[10px] font-black uppercase tracking-wide"
-                                  :class="receivingPackageStatusTextClass(pkg)"
+                            <span class="inline-flex items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ring-1"
+                                  :class="receivingPackageIsReceived(pkg)
+                                    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                                    : (pkg.discrepancy_type && pkg.discrepancy_type !== 'none'
+                                        ? 'bg-amber-50 text-amber-700 ring-amber-200'
+                                        : 'bg-orange-50 text-orange-700 ring-orange-200')"
                                   x-text="receivingPackageStatusLabel(pkg)"></span>
                         </td>
                         <td class="px-4 py-4 text-center">
                             <span x-show="receivingPackageIsReceived(pkg)"
-                                  class="text-[10px] font-bold uppercase tracking-wide"
-                                  :class="receivingConditionTextClass(pkg.condition_status)"
+                                  class="inline-flex items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ring-1"
+                                  :class="pkg.condition_status === 'damaged'
+                                    ? 'bg-rose-50 text-rose-700 ring-rose-200'
+                                    : (pkg.condition_status === 'partial_damage'
+                                        ? 'bg-amber-50 text-amber-700 ring-amber-200'
+                                        : 'bg-emerald-50 text-emerald-700 ring-emerald-200')"
                                   x-text="receivingConditionLabel(pkg.condition_status)" style="display:none"></span>
                             <span x-show="!receivingPackageIsReceived(pkg)"
                                   class="text-[10px] font-bold uppercase tracking-wide text-slate-400" style="display:none">-</span>
@@ -296,13 +313,13 @@
                             <div class="flex flex-col items-end gap-1.5">
                                 <button type="button"
                                         @@click="{{ $receiveClick }}"
-                                        class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950">
+                                        class="inline-flex items-center gap-1 rounded-xl bg-orange-600 px-3 py-2 text-[11px] font-black text-white shadow-sm shadow-orange-500/20 transition hover:bg-orange-700">
                                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.5 7.125L16.875 4.5"/></svg>
                                     <span x-text="receivingPackageActionLabel(pkg)"></span>
                                 </button>
                                 <button type="button"
                                         @@click="{{ $photosClick }}"
-                                        class="inline-flex items-center gap-1 rounded-lg border border-orange-100 bg-orange-50 px-2.5 py-1.5 text-[11px] font-black text-orange-700 shadow-sm transition-colors hover:bg-orange-100">
+                                        class="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
                                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6.827 6.175A2.31 2.31 0 019.186 4.5h5.628a2.31 2.31 0 012.36 1.675l.365 1.286A1.875 1.875 0 0019.342 8.8H20.25A2.25 2.25 0 0122.5 11.05v6.2a2.25 2.25 0 01-2.25 2.25H3.75a2.25 2.25 0 01-2.25-2.25v-6.2A2.25 2.25 0 013.75 8.8h.908a1.875 1.875 0 001.803-1.339l.366-1.286z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 13.5a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                     View Photos
                                 </button>
@@ -346,16 +363,4 @@
         </div>
     </div>
 
-    @if($showFinalize)
-        <div class="sticky bottom-0 z-10 flex flex-col gap-3 border-t border-slate-200/70 bg-white/95 px-5 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] backdrop-blur sm:flex-row sm:items-center sm:justify-between lg:static lg:bg-slate-50/80 lg:shadow-none lg:backdrop-blur-0">
-            <div>
-                <p class="text-[11px] font-bold text-slate-800">{{ $finalizeTitle }}</p>
-                <p class="text-[10px] text-slate-500">{{ $finalizeSubtitle }}</p>
-            </div>
-            <button @@click="{{ $finalizeClick }}" :disabled="{{ $finalizeDisabled }}"
-                    class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-50">
-                <span x-text="{{ $finalizeLabelExpr }}"></span>
-            </button>
-        </div>
-    @endif
-</div>
+</section>

@@ -301,6 +301,10 @@ function registerWarehouseReceiptShowPage() {
             }, 0);
         },
 
+        receivingExpectedUnits() {
+            return this.items.reduce((total, item) => total + this.receivingExpectedQuantity(item), 0);
+        },
+
         receivingPendingUnits() {
             return this.items.reduce((total, item) => total + this.receivingPendingQuantity(item), 0);
         },
@@ -428,6 +432,10 @@ function registerWarehouseReceiptShowPage() {
 
         itemPhotoCount(item) {
             return this.itemPhotoList(item).length;
+        },
+
+        receivingPhotoCount() {
+            return this.items.reduce((total, item) => total + this.itemPhotoCount(item), 0);
         },
 
         openItemPhotos(item) {

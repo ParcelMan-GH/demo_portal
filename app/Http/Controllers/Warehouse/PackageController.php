@@ -713,6 +713,7 @@ class PackageController extends Controller
             ? $shipmentItem->deliveryRunItems->sortBy('id')->values()
             : collect();
         $latestTask = $this->latestPaymentTask($receiptItem);
+        $collection = $shipment?->collection;
 
         $sortHistory = $sortBatchItems->map(function ($item) {
             $batch = $item->sortBatch;
@@ -854,6 +855,15 @@ class PackageController extends Controller
                 'detail' => $entry['bus_handoff']['bus_station'] ?? $entry['number'],
                 'tone' => $entry['bus_handoff'] ? 'amber' : 'orange',
             ]))
+            ->when($collection, fn ($timeline) => $timeline->push([
+                'label' => $collection->isCollected() ? 'Collected at warehouse' : 'Ready for collection',
+                'at' => $this->humanDate($collection->collected_at ?: $collection->ready_at),
+                'actor' => $collection->handedOverBy?->name,
+                'detail' => $collection->isCollected()
+                    ? collect([$collection->collected_by_name, $collection->warehouse?->name])->filter()->join(' / ')
+                    : $collection->warehouse?->name,
+                'tone' => $collection->isCollected() ? 'emerald' : 'amber',
+            ]))
             ->filter(fn ($entry) => !empty($entry['at']) || !empty($entry['detail']))
             ->values();
         $lastSort = $sortHistory->last();
@@ -884,6 +894,22 @@ class PackageController extends Controller
                 'pickup_driver' => $receiptItem->receipt?->pickupAssignment?->driver?->name,
                 'pickup_driver_phone' => $receiptItem->receipt?->pickupAssignment?->driver?->phone,
             ],
+            'collection' => $collection ? [
+                'id' => $collection->id,
+                'status' => $collection->status,
+                'status_label' => $this->statusLabel($collection->status),
+                'is_collected' => $collection->isCollected(),
+                'warehouse' => $collection->warehouse?->name,
+                'warehouse_code' => $collection->warehouse?->code,
+                'ready_at' => $this->humanDate($collection->ready_at),
+                'collected_at' => $this->humanDate($collection->collected_at),
+                'collected_by_name' => $collection->collected_by_name,
+                'collected_by_phone' => $collection->collected_by_phone,
+                'collected_by_id_type' => $this->statusLabel($collection->collected_by_id_type),
+                'collected_by_id_number' => $collection->collected_by_id_number,
+                'handed_over_by' => $collection->handedOverBy?->name,
+                'notes' => $collection->notes,
+            ] : null,
             'payment_task_id' => $latestTask?->id,
             'payment_task' => [
                 'id' => $latestTask?->id,

@@ -3,8 +3,10 @@
 namespace App\Services\Warehouse;
 
 use App\Enums\FulfillmentType;
+use App\Enums\ItemStatus;
 use App\Models\PackageContactAttempt;
 use App\Models\PackageContactTask;
+use App\Models\ShipmentCollection;
 use App\Models\ShipmentItem;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -130,6 +132,34 @@ class PackageContactService
         return $attempt;
     }
 
+    public function syncWithPackageState(PackageContactTask $task): PackageContactTask
+    {
+        $task->loadMissing(['shipmentItem.deliveryRunItems', 'shipment.collection']);
+
+        if (!$this->isPackageDelivered($task) || $task->status === PackageContactTask::STATUS_RESOLVED) {
+            return $task;
+        }
+
+        $task->update([
+            'status' => PackageContactTask::STATUS_RESOLVED,
+            'outcome' => PackageContactTask::OUTCOME_DELIVER,
+            'resolved_at' => $this->deliveredAtFor($task) ?? now(),
+            'notes' => $task->notes ?: 'Closed automatically because the package is already delivered.',
+        ]);
+
+        return $task->fresh(['assignedTo', 'shipmentItem', 'shipment']);
+    }
+
+    public function isPackageDelivered(PackageContactTask $task): bool
+    {
+        $task->loadMissing('shipmentItem');
+
+        $status = $task->shipmentItem?->status;
+        $value = $status instanceof ItemStatus ? $status->value : (string) $status;
+
+        return $value === ItemStatus::DELIVERED->value;
+    }
+
     /**
      * Generate a fresh alphanumeric confirmation code, SMS it to the recipient,
      * and persist it on the task. Any prior unverified code is superseded.
@@ -201,6 +231,11 @@ class PackageContactService
         ?\DateTime $callbackAt = null,
         ?string $confirmationCode = null,
     ): array {
+        $task = $this->syncWithPackageState($task);
+        if ($this->isPackageDelivered($task)) {
+            return ['success' => false, 'message' => 'This package is already delivered, so the recipient call has been closed.'];
+        }
+
         if (in_array($outcome, PackageContactTask::VERIFIED_OUTCOMES, true)) {
             $verification = $this->verifyConfirmationCode($task, $confirmationCode);
             if (!$verification['success']) {
@@ -223,9 +258,37 @@ class PackageContactService
             if ($shipment->fulfillment_type?->value !== 'self_pickup') {
                 $shipment->update(['fulfillment_type' => FulfillmentType::SELF_PICKUP]);
             }
+
+            $task->shipmentItem->update([
+                'fulfillment_type' => FulfillmentType::SELF_PICKUP,
+                'delivery_preference' => 'self_pickup',
+            ]);
+
+            ShipmentCollection::firstOrCreate(
+                ['shipment_id' => $shipment->id],
+                [
+                    'warehouse_id' => $task->warehouse_id,
+                    'status' => ShipmentCollection::STATUS_READY,
+                    'ready_at' => now(),
+                ],
+            );
         }
 
         return ['success' => true, 'message' => 'Task resolved.'];
+    }
+
+    private function deliveredAtFor(PackageContactTask $task): mixed
+    {
+        $runDeliveredAt = $task->shipmentItem?->deliveryRunItems()
+            ->whereNotNull('delivered_at')
+            ->latest('delivered_at')
+            ->value('delivered_at');
+
+        if ($runDeliveredAt) {
+            return $runDeliveredAt;
+        }
+
+        return $task->shipment?->collection?->collected_at;
     }
 
     /**

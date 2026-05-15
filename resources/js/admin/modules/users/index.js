@@ -54,6 +54,8 @@ document.addEventListener('alpine:init', () => {
         roleFilter: '',
         roleFilterName: 'All roles',
         statusFilter: '',
+        statusFilterName: 'All statuses',
+        showFilters: false,
         createdFrom: '',
         createdTo: '',
         dateRangePicker: null,
@@ -65,6 +67,7 @@ document.addEventListener('alpine:init', () => {
             { key: 'role', label: 'Role' },
             { key: 'email', label: 'Email' },
             { key: 'phone', label: 'Phone' },
+            { key: 'status', label: 'Status' },
             { key: 'created_at', label: 'Created At' },
             { key: 'last_login_at', label: 'Last Login' },
             { key: 'actions', label: 'Actions' },
@@ -74,6 +77,7 @@ document.addEventListener('alpine:init', () => {
             role: true,
             email: true,
             phone: true,
+            status: true,
             created_at: true,
             last_login_at: true,
             actions: true,
@@ -289,6 +293,7 @@ document.addEventListener('alpine:init', () => {
 
                 if (this.search) params.append('search', this.search);
                 if (this.roleFilter) params.append('role', this.roleFilter);
+                if (this.statusFilter !== '' && this.statusFilter !== null) params.append('status', this.statusFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
 
@@ -407,6 +412,51 @@ document.addEventListener('alpine:init', () => {
             this.loadData();
         },
 
+        applyFilters() {
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        clearFilters() {
+            this.search = '';
+            this.roleFilter = '';
+            this.roleFilterName = 'All roles';
+            this.statusFilter = '';
+            this.statusFilterName = 'All statuses';
+            this.createdFrom = '';
+            this.createdTo = '';
+            if (this.$refs.createdRange) {
+                this.$refs.createdRange.value = '';
+            }
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        activeFilterChips() {
+            const chips = [];
+            if (this.roleFilter) chips.push({ key: 'role', label: this.roleFilterName });
+            if (this.statusFilter !== '' && this.statusFilter !== null) chips.push({ key: 'status', label: this.statusFilterName });
+            if (this.createdFrom && this.createdTo) chips.push({ key: 'date', label: `${this.createdFrom} - ${this.createdTo}` });
+            return chips;
+        },
+
+        clearFilter(key) {
+            if (key === 'role') {
+                this.roleFilter = '';
+                this.roleFilterName = 'All roles';
+            }
+            if (key === 'status') {
+                this.statusFilter = '';
+                this.statusFilterName = 'All statuses';
+            }
+            if (key === 'date') {
+                this.createdFrom = '';
+                this.createdTo = '';
+                if (this.$refs.createdRange) this.$refs.createdRange.value = '';
+            }
+            this.applyFilters();
+        },
+
         nextPage() {
             if (this.meta.current_page < this.meta.last_page) {
                 this.meta.current_page++;
@@ -479,6 +529,8 @@ document.addEventListener('alpine:init', () => {
                 if (this.statusFilter !== '' && this.statusFilter !== null) {
                     params.append('status', this.statusFilter);
                 }
+                if (this.createdFrom) params.append('date_from', this.createdFrom);
+                if (this.createdTo) params.append('date_to', this.createdTo);
                 params.append('format', format);
 
                 if (format === 'excel' || format === 'pdf') {
@@ -522,6 +574,8 @@ document.addEventListener('alpine:init', () => {
                 if (this.statusFilter !== '' && this.statusFilter !== null) {
                     params.append('status', this.statusFilter);
                 }
+                if (this.createdFrom) params.append('date_from', this.createdFrom);
+                if (this.createdTo) params.append('date_to', this.createdTo);
 
                 const response = await fetch(`${this.exportEndpoint}?${params.toString()}`, {
                     headers: {

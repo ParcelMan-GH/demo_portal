@@ -382,6 +382,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('delivery-runs/{run}/dispatch', [AdminDeliveryRunController::class, 'dispatch'])->name('delivery-runs.dispatch');
         Route::post('delivery-runs/{run}/stops/{stop}/resend-code', [AdminDeliveryRunController::class, 'resendCode'])->name('delivery-runs.stops.resend-code');
         Route::patch('delivery-runs/{run}/stops/{stop}/delivery-method', [AdminDeliveryRunController::class, 'updateStopDeliveryMethod'])->name('delivery-runs.stops.update-delivery-method');
+        Route::post('delivery-runs/{run}/stops/{stop}/confirm-handoff', [AdminDeliveryRunController::class, 'confirmHandoffStop'])->name('delivery-runs.stops.confirm-handoff');
         Route::post('delivery-runs/{run}/stops/{stop}/items/{item}/confirm-handoff', [AdminDeliveryRunController::class, 'confirmHandoffItem'])->name('delivery-runs.stops.items.confirm-handoff');
         Route::get('delivery-runs/{run}', [AdminDeliveryRunController::class, 'show'])->name('delivery-runs.show');
 
@@ -639,6 +640,7 @@ Route::prefix('warehouse')
         Route::post('contacts/{task}/log-call', [WarehouseContactQueueController::class, 'logCall'])->name('contacts.log-call');
         Route::post('contacts/{task}/send-code', [WarehouseContactQueueController::class, 'sendCode'])->name('contacts.send-code');
         Route::post('contacts/{task}/resolve', [WarehouseContactQueueController::class, 'resolve'])->name('contacts.resolve');
+        Route::post('contacts/{task}/handover', [WarehouseContactQueueController::class, 'handover'])->name('contacts.handover');
         Route::get('contacts/{task}/attempts', [WarehouseContactQueueController::class, 'attempts'])->name('contacts.attempts');
         Route::get('contacts/worker-stats', [WarehouseContactQueueController::class, 'workerStats'])->name('contacts.worker-stats');
 

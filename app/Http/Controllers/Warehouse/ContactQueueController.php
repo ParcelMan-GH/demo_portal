@@ -5,7 +5,11 @@ namespace App\Http\Controllers\Warehouse;
 use App\Http\Controllers\Controller;
 use App\Models\PackageContactAttempt;
 use App\Models\PackageContactTask;
+use App\Models\ShipmentCollection;
+use App\Models\ShipmentItem;
 use App\Models\User;
+use App\Services\ShipmentCollectionService;
+use App\Services\StorageService;
 use App\Services\Warehouse\PackageContactService;
 use App\Services\Warehouse\WarehousePortalService;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +21,7 @@ class ContactQueueController extends Controller
 {
     public function __construct(
         private PackageContactService $contactService,
+        private ShipmentCollectionService $collectionService,
         private WarehousePortalService $portalService,
     ) {}
 
@@ -42,8 +47,30 @@ class ContactQueueController extends Controller
         $admin = Auth::guard('admin')->user();
         $warehouse = $this->portalService->resolveWarehouse($admin);
 
+        $collectionItemIds = ShipmentCollection::where('warehouse_id', $warehouse->id)
+            ->whereIn('status', [ShipmentCollection::STATUS_READY, ShipmentCollection::STATUS_COLLECTED])
+            ->whereHas('shipment.items')
+            ->with('shipment.items:id,shipment_id')
+            ->get()
+            ->flatMap(fn (ShipmentCollection $collection) => $collection->shipment?->items?->pluck('id') ?? collect())
+            ->values()
+            ->all();
+
+        if ($collectionItemIds) {
+            $this->contactService->createTasksForWarehouseItems($warehouse, $collectionItemIds);
+        }
+
         $query = PackageContactTask::where('warehouse_id', $warehouse->id)
-            ->with(['assignedTo:id,name', 'shipmentItem:id,tracking_code,description', 'shipment:id,shipment_number']);
+            ->with([
+                'assignedTo:id,name',
+                'shipmentItem:id,shipment_id,tracking_code,description,quantity,status',
+                'shipment:id,shipment_number,fulfillment_type,delivery_recipient_name,delivery_recipient_phone',
+                'shipment.collection:id,shipment_id,warehouse_id,status,ready_at,collected_at,collected_by_name,collected_by_phone,handed_over_by_user_id',
+                'shipment.collection.handedOverBy:id,name',
+                'shipment.items.images',
+                'shipment.items.warehouseReceiptItems.photos',
+                'shipment.pickupAssignment.photos',
+            ]);
 
         if ($status = $request->get('status')) {
             if ($status === 'callbacks_due') {
@@ -78,16 +105,27 @@ class ContactQueueController extends Controller
             ->get();
 
         return response()->json([
-            'data' => $tasks->map(fn ($task) => [
+            'data' => $tasks->map(function ($task) {
+                $task = $this->contactService->syncWithPackageState($task);
+                $itemStatus = $task->shipmentItem?->status;
+
+                return [
                 'id' => $task->id,
                 'shipment_number' => $task->shipment?->shipment_number,
                 'tracking_code' => $task->shipmentItem?->tracking_code,
                 'description' => $task->shipmentItem?->description,
+                'item_name' => $task->shipmentItem?->description,
                 'recipient_name' => $task->recipient_name,
                 'recipient_phone' => $task->recipient_phone,
                 'delivery_town' => $task->delivery_town,
                 'status' => $task->status,
                 'outcome' => $task->outcome,
+                'package_status' => $itemStatus?->value ?? $task->shipmentItem?->getRawOriginal('status'),
+                'package_status_label' => ($itemStatus && method_exists($itemStatus, 'label')) ? $itemStatus->label() : str($task->shipmentItem?->getRawOriginal('status') ?? '')->headline()->toString(),
+                'is_package_delivered' => $this->contactService->isPackageDelivered($task),
+                'collection' => $this->collectionPayload($task),
+                'can_handover' => $this->canHandOverCollection($task),
+                'packages' => $task->shipment?->items?->map(fn (ShipmentItem $item) => $this->packagePayload($item, $task->shipment))?->values() ?? collect(),
                 'assigned_to' => $task->assignedTo?->name,
                 'assigned_to_id' => $task->assigned_to_user_id,
                 'assigned_at' => $task->assigned_at?->format('M d, H:i'),
@@ -98,7 +136,8 @@ class ContactQueueController extends Controller
                 'resolved_at' => $task->resolved_at?->format('M d, H:i'),
                 'notes' => $task->notes,
                 'created_at' => $task->created_at?->format('M d, H:i'),
-            ])->values(),
+                ];
+            })->values(),
             'meta' => [
                 'total' => $total,
                 'per_page' => $perPage,
@@ -197,10 +236,53 @@ class ContactQueueController extends Controller
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $task = $this->contactService->syncWithPackageState($task);
+        if ($this->contactService->isPackageDelivered($task)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This package is already delivered, so the recipient call has been closed.',
+            ], 422);
+        }
+
         $admin = Auth::guard('admin')->user();
         $this->contactService->logAttempt($task, $admin, $validated['call_outcome'], $validated['notes']);
 
         return response()->json(['success' => true, 'message' => 'Call attempt logged.', 'attempts_count' => $task->fresh()->attempts_count]);
+    }
+
+    public function handover(Request $request, PackageContactTask $task): JsonResponse
+    {
+        $this->authorizePermission('warehouse.contacts.manage');
+        $user = Auth::guard('admin')->user();
+        $warehouse = $this->portalService->resolveWarehouse($user);
+
+        $task->loadMissing('shipment.collection');
+        $shipment = $task->shipment;
+        $collection = $shipment?->collection;
+
+        if (!$shipment || !$collection || (int) $collection->warehouse_id !== (int) $warehouse->id) {
+            return response()->json(['success' => false, 'message' => 'This package is not ready for warehouse handover.'], 404);
+        }
+
+        if ($collection->isCollected()) {
+            return response()->json(['success' => false, 'message' => 'This shipment has already been handed over.'], 400);
+        }
+
+        $validated = $request->validate([
+            'collected_by_name'      => 'required|string|max:255',
+            'collected_by_phone'     => 'required|string|max:20',
+            'collected_by_id_type'   => 'nullable|string|max:50',
+            'collected_by_id_number' => 'nullable|string|max:100',
+            'notes'                  => 'nullable|string|max:1000',
+        ]);
+
+        $this->collectionService->recordHandover($shipment, $user, $validated);
+        $this->contactService->syncWithPackageState($task->fresh());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Package handed over successfully.',
+        ]);
     }
 
     public function resolve(Request $request, PackageContactTask $task): JsonResponse
@@ -261,6 +343,79 @@ class ContactQueueController extends Controller
                 'attempted_at' => $a->attempted_at?->format('M d, Y H:i'),
             ])->values(),
         ]);
+    }
+
+    private function canHandOverCollection(PackageContactTask $task): bool
+    {
+        $collection = $task->shipment?->collection;
+
+        return $collection
+            && !$collection->isCollected()
+            && !$this->contactService->isPackageDelivered($task);
+    }
+
+    private function collectionPayload(PackageContactTask $task): ?array
+    {
+        $collection = $task->shipment?->collection;
+        if (!$collection) {
+            return null;
+        }
+
+        return [
+            'id' => $collection->id,
+            'status' => $collection->status,
+            'ready_at' => $collection->ready_at?->format('d M Y, h:i A'),
+            'collected_at' => $collection->collected_at?->format('d M Y, h:i A'),
+            'collected_by_name' => $collection->collected_by_name,
+            'collected_by_phone' => $collection->collected_by_phone,
+            'handed_over_by' => $collection->handedOverBy?->name,
+        ];
+    }
+
+    private function packagePayload(ShipmentItem $item, $shipment = null): array
+    {
+        $vendorPhotos = $item->images
+            ?->map(fn ($image) => $image->getSignedUrl() + ['source' => 'Vendor'])
+            ->values() ?? collect();
+
+        $pickupPhotos = $shipment?->pickupAssignment?->photos
+            ?->filter(fn ($photo) => !$photo->shipment_item_id || (int) $photo->shipment_item_id === (int) $item->id)
+            ->map(fn ($photo) => $this->photoPayload($photo, 'Pickup photo', 'Pickup'))
+            ->values() ?? collect();
+
+        $receiptPhotos = $item->warehouseReceiptItems
+            ?->flatMap(fn ($receiptItem) => $receiptItem->photos ?? collect())
+            ->map(fn ($photo) => $this->photoPayload($photo, 'Receipt photo', 'Receipt'))
+            ->values() ?? collect();
+
+        $primaryPhotos = $vendorPhotos->isNotEmpty()
+            ? $vendorPhotos
+            : ($pickupPhotos->isNotEmpty() ? $pickupPhotos : $receiptPhotos);
+
+        return [
+            'id' => $item->id,
+            'description' => $item->description,
+            'tracking_code' => $item->tracking_code,
+            'quantity' => (int) $item->quantity,
+            'photos' => [
+                'primary' => $primaryPhotos->values(),
+                'primary_source' => $vendorPhotos->isNotEmpty() ? 'Vendor' : ($pickupPhotos->isNotEmpty() ? 'Pickup' : ($receiptPhotos->isNotEmpty() ? 'Receipt' : 'No photos')),
+                'vendor' => $vendorPhotos,
+                'pickup' => $pickupPhotos,
+                'receipt' => $receiptPhotos,
+                'total' => $vendorPhotos->count() + $pickupPhotos->count() + $receiptPhotos->count(),
+            ],
+        ];
+    }
+
+    private function photoPayload($photo, string $fallbackName, string $source): array
+    {
+        return [
+            'id' => $photo->id,
+            'url' => app(StorageService::class)->getUrl($photo->path),
+            'original_name' => $photo->original_name ?: $fallbackName,
+            'source' => $source,
+        ];
     }
 
     public function workerStats(): JsonResponse

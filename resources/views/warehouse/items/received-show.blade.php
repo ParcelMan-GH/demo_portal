@@ -104,6 +104,38 @@
                 </div>
             </section>
 
+            <section x-show="pkg.collection" x-cloak class="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50/60 px-5 py-4">
+                    <div>
+                        <h2 class="text-sm font-black uppercase tracking-wide text-emerald-800">Collection Handover</h2>
+                        <p class="mt-1 text-xs font-bold text-emerald-700">Self-pickup collection record for this package.</p>
+                    </div>
+                    <span class="rounded-full px-3 py-1 text-xs font-black" :class="pkg.collection?.is_collected ? 'bg-emerald-600 text-white' : 'bg-amber-100 text-amber-800'" x-text="pkg.collection?.status_label || '-'"></span>
+                </div>
+                <div class="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+                    <div class="rounded-2xl bg-slate-50 p-4">
+                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Collected At</p>
+                        <p class="mt-1 text-sm font-black text-slate-900" x-text="pkg.collection?.collected_at || '-'"></p>
+                        <p class="mt-1 text-xs font-bold text-slate-500" x-show="pkg.collection?.ready_at" x-text="'Ready ' + pkg.collection.ready_at"></p>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 p-4">
+                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Collected By</p>
+                        <p class="mt-1 text-sm font-black text-slate-900" x-text="pkg.collection?.collected_by_name || '-'"></p>
+                        <p class="mt-1 text-xs font-bold text-slate-500" x-text="pkg.collection?.collected_by_phone || ''"></p>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 p-4">
+                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Handed Over By</p>
+                        <p class="mt-1 text-sm font-black text-slate-900" x-text="pkg.collection?.handed_over_by || '-'"></p>
+                        <p class="mt-1 text-xs font-bold text-slate-500" x-text="[pkg.collection?.warehouse, pkg.collection?.warehouse_code].filter(Boolean).join(' / ') || ''"></p>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 p-4">
+                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Collector ID</p>
+                        <p class="mt-1 text-sm font-black text-slate-900" x-text="[pkg.collection?.collected_by_id_type, pkg.collection?.collected_by_id_number].filter(Boolean).join(' / ') || '-'"></p>
+                        <p class="mt-1 text-xs font-bold text-slate-500" x-show="pkg.collection?.notes" x-text="pkg.collection.notes"></p>
+                    </div>
+                </div>
+            </section>
+
             <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                     <h2 class="text-sm font-black uppercase tracking-wide text-slate-700">Warehouse Handling</h2>

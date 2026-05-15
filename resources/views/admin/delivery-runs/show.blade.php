@@ -22,6 +22,7 @@ $deliveryRunRoutes = $deliveryRunRoutes ?? [
     'dispatchUrl' => route('admin.delivery-runs.dispatch', $run),
     'resendCodeUrlTemplate' => route('admin.delivery-runs.stops.resend-code', ['run' => $run->id, 'stop' => '__STOP__']),
     'updateStopDeliveryMethodUrlTemplate' => route('admin.delivery-runs.stops.update-delivery-method', ['run' => $run->id, 'stop' => '__STOP__']),
+    'confirmHandoffStopUrlTemplate' => route('admin.delivery-runs.stops.confirm-handoff', ['run' => $run->id, 'stop' => '__STOP__']),
     'confirmHandoffItemUrlTemplate' => route('admin.delivery-runs.stops.items.confirm-handoff', ['run' => $run->id, 'stop' => '__STOP__', 'item' => '__ITEM__']),
 ];
 
@@ -118,6 +119,10 @@ $itemStatusColors = [
             showAssignModal: false,
             showDispatchConfirm: false,
             showNotesModal: false,
+            showHandoffActionModal: false,
+            handoffActionType: 'delivered',
+            handoffActionStop: null,
+            handoffActionNotes: '',
             draftView: 'build',
             builderMode: 'packages',
             localDeliveryBatches: [],
@@ -396,6 +401,65 @@ $itemStatusColors = [
                 } catch (error) {
                     console.error(error);
                     window.showToast?.(error.message || 'Unable to resend OTP.', 'error');
+                } finally {
+                    this.actionLoading = false;
+                }
+            },
+            openHandoffAction(stop, action) {
+                this.handoffActionStop = stop;
+                this.handoffActionType = action;
+                this.handoffActionNotes = '';
+                this.showHandoffActionModal = true;
+            },
+            closeHandoffAction(force = false) {
+                if (this.actionLoading && !force) return;
+                this.showHandoffActionModal = false;
+                this.handoffActionStop = null;
+                this.handoffActionNotes = '';
+                this.handoffActionType = 'delivered';
+            },
+            handoffActionTitle() {
+                if (this.handoffActionType === 'failed') return 'Mark Handoff Failed';
+                if (this.handoffActionType === 'pending') return 'Mark Pending';
+                return 'Confirm Delivered';
+            },
+            handoffActionDescription() {
+                if (this.handoffActionType === 'failed') return 'Record that the recipient did not receive this bus handoff.';
+                if (this.handoffActionType === 'pending') return 'Return this handoff to pending confirmation so it can be resolved again.';
+                return 'Confirm the recipient received this bus handoff.';
+            },
+            handoffActionButtonLabel() {
+                if (this.handoffActionType === 'failed') return 'Mark Failed';
+                if (this.handoffActionType === 'pending') return 'Mark Pending';
+                return 'Confirm Delivered';
+            },
+            async submitHandoffAction() {
+                if (!this.handoffActionStop?.url) return;
+                this.actionLoading = true;
+                try {
+                    const response = await fetch(this.handoffActionStop.url, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': this.csrfToken(),
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            action: this.handoffActionType,
+                            notes: this.handoffActionNotes,
+                        }),
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to update handoff.');
+                    }
+                    window.showToast?.(result.message || 'Handoff updated successfully.', 'success');
+                    this.closeHandoffAction(true);
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to update handoff.', 'error');
                 } finally {
                     this.actionLoading = false;
                 }
@@ -853,6 +917,9 @@ $itemStatusColors = [
                     $stopBadgeClass = $stopStatusColors[$stop->status]['badge'] ?? 'bg-slate-100 text-slate-600';
                     $stopDotClass   = $stopStatusColors[$stop->status]['dot']   ?? 'bg-slate-400';
                     $updateStopDeliveryMethodUrl = str_replace('__STOP__', $stop->id, $deliveryRunRoutes['updateStopDeliveryMethodUrlTemplate']);
+                    $confirmHandoffStopUrl = !empty($deliveryRunRoutes['confirmHandoffStopUrlTemplate'])
+                        ? str_replace('__STOP__', $stop->id, $deliveryRunRoutes['confirmHandoffStopUrlTemplate'])
+                        : null;
                     $stopStatusLabel = match($stop->status) {
                         'pending'   => 'Pending',
                         'arrived'   => 'Arrived',
@@ -951,7 +1018,68 @@ $itemStatusColors = [
                         </div>
 
                         <!-- Stop Meta (timestamps + OTP attempts) -->
-                        <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500 sm:flex-shrink-0">
+                        <div class="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500 sm:flex-shrink-0">
+                            @if(($stop->delivery_method ?? 'direct') === 'bus_handoff' && $confirmHandoffStopUrl)
+                                <div class="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+                                    @if($stop->status !== 'delivered')
+                                    <button
+                                        type="button"
+                                        @@click="openHandoffAction({{ \Illuminate\Support\Js::from([
+                                            'url' => $confirmHandoffStopUrl,
+                                            'recipient' => $stop->recipient_name,
+                                            'phone' => $stop->recipient_phone,
+                                            'packages' => (int) $stop->total_packages,
+                                            'courier' => $stop->handoff_courier_name,
+                                            'handedOffAt' => $stop->handoff_at?->format('d M Y, h:i A'),
+                                        ]) }}, 'delivered')"
+                                        class="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-700 transition hover:bg-emerald-100 hover:text-emerald-800"
+                                    >
+                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 13 4 4L19 7"/>
+                                        </svg>
+                                        Confirm Delivered
+                                    </button>
+                                    @endif
+                                    @if($stop->status !== 'failed')
+                                    <button
+                                        type="button"
+                                        @@click="openHandoffAction({{ \Illuminate\Support\Js::from([
+                                            'url' => $confirmHandoffStopUrl,
+                                            'recipient' => $stop->recipient_name,
+                                            'phone' => $stop->recipient_phone,
+                                            'packages' => (int) $stop->total_packages,
+                                            'courier' => $stop->handoff_courier_name,
+                                            'handedOffAt' => $stop->handoff_at?->format('d M Y, h:i A'),
+                                        ]) }}, 'failed')"
+                                        class="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl border border-rose-200 bg-rose-50 px-3 text-xs font-black text-rose-700 transition hover:bg-rose-100 hover:text-rose-800"
+                                    >
+                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+                                        </svg>
+                                        Mark Failed
+                                    </button>
+                                    @endif
+                                    @if(in_array($stop->status, ['delivered', 'failed'], true))
+                                    <button
+                                        type="button"
+                                        @@click="openHandoffAction({{ \Illuminate\Support\Js::from([
+                                            'url' => $confirmHandoffStopUrl,
+                                            'recipient' => $stop->recipient_name,
+                                            'phone' => $stop->recipient_phone,
+                                            'packages' => (int) $stop->total_packages,
+                                            'courier' => $stop->handoff_courier_name,
+                                            'handedOffAt' => $stop->handoff_at?->format('d M Y, h:i A'),
+                                        ]) }}, 'pending')"
+                                        class="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl border border-amber-200 bg-amber-50 px-3 text-xs font-black text-amber-700 transition hover:bg-amber-100 hover:text-amber-800"
+                                    >
+                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M5.64 18.36A9 9 0 0 0 18.36 5.64M18.36 5.64H14m4.36 0V10"/>
+                                        </svg>
+                                        Mark Pending
+                                    </button>
+                                    @endif
+                                </div>
+                            @endif
                             @if($stop->arrived_at)
                                 <span class="inline-flex items-center gap-1">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -974,14 +1102,6 @@ $itemStatusColors = [
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
                                     </svg>
                                     {{ $stop->verification_attempts }} OTP attempt(s)
-                                </span>
-                            @endif
-                            @if($stop->failure_reason)
-                                <span class="inline-flex items-center gap-1 text-red-500">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                    </svg>
-                                    {{ $stop->failure_reason }}
                                 </span>
                             @endif
                         </div>
@@ -1174,38 +1294,6 @@ $itemStatusColors = [
                                     @if($item->notes)
                                         <p class="mt-3 text-[11px] font-semibold text-slate-500">Note: {{ $item->notes }}</p>
                                     @endif
-                                    @if(($stop->delivery_method ?? 'direct') === 'bus_handoff' && $item->status === 'handed_off')
-                                        <div class="mt-3" x-data="{ action: null, notes: '', submitting: false }">
-                                            <template x-if="!action">
-                                                <div class="flex flex-wrap gap-2">
-                                                    <button @@click="action = 'delivered'" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition-colors">Confirm delivered</button>
-                                                    <button @@click="action = 'failed'" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-semibold transition-colors">Mark failed</button>
-                                                </div>
-                                            </template>
-                                            <template x-if="action">
-                                                <div class="flex flex-wrap items-center gap-2">
-                                                    <input type="text" x-model="notes" placeholder="Add notes" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg w-40 sm:w-auto focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none">
-                                                    <button @@click="
-                                                        submitting = true;
-                                                        fetch('{{ $confirmHandoffItemUrl }}', {
-                                                            method: 'POST',
-                                                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' },
-                                                            body: JSON.stringify({ action: action, notes: notes })
-                                                        }).then(r => r.json()).then(j => {
-                                                            if (j.success) { window.showToast?.(j.message, 'success'); setTimeout(() => window.location.reload(), 500); }
-                                                            else { window.showToast?.(j.message || 'Failed', 'error'); submitting = false; }
-                                                        }).catch(() => { window.showToast?.('Error', 'error'); submitting = false; });
-                                                    " :disabled="submitting"
-                                                    :class="action === 'delivered' ? 'bg-emerald-600' : 'bg-rose-600'"
-                                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-white text-[11px] font-semibold disabled:opacity-50">
-                                                        <span x-show="!submitting">Save</span>
-                                                        <span x-show="submitting">Saving...</span>
-                                                    </button>
-                                                    <button @@click="action = null" class="text-[11px] text-slate-500 hover:text-slate-700">Cancel</button>
-                                                </div>
-                                            </template>
-                                        </div>
-                                    @endif
                                     </div>
                                     @endforeach
                                 </div>
@@ -1391,6 +1479,101 @@ $itemStatusColors = [
     </div>
     @endif
 
+    <!-- Bus Handoff Confirmation Modal -->
+    <div x-show="showHandoffActionModal" x-cloak
+         class="fixed inset-0 z-[220] flex min-h-dvh w-screen items-center justify-center overflow-y-auto p-3 sm:p-4"
+         @@keydown.escape.window="closeHandoffAction()">
+        <div class="fixed inset-0 min-h-dvh bg-slate-950/60 backdrop-blur-sm" @@click="closeHandoffAction()"></div>
+        <div class="relative my-auto flex max-h-[88dvh] w-full max-w-lg flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl" @@click.stop>
+            <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-6">
+                <div class="flex min-w-0 items-start gap-4">
+                    <div
+                        class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-xl"
+                        :class="{
+                            'bg-rose-600 shadow-rose-600/20': handoffActionType === 'failed',
+                            'bg-amber-500 shadow-amber-500/20': handoffActionType === 'pending',
+                            'bg-emerald-600 shadow-emerald-600/20': handoffActionType === 'delivered'
+                        }"
+                    >
+                        <svg x-show="handoffActionType === 'delivered'" class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 13 4 4L19 7"/>
+                        </svg>
+                        <svg x-show="handoffActionType === 'failed'" class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+                        </svg>
+                        <svg x-show="handoffActionType === 'pending'" class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M5.64 18.36A9 9 0 0 0 18.36 5.64M18.36 5.64H14m4.36 0V10"/>
+                        </svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 class="text-2xl font-black leading-tight text-slate-950" x-text="handoffActionTitle()"></h3>
+                        <p class="mt-1 text-sm font-semibold leading-6 text-slate-500" x-text="handoffActionDescription()"></p>
+                    </div>
+                </div>
+                <button @@click="closeHandoffAction()"
+                    class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto bg-slate-50/70 px-5 py-5 sm:px-6">
+                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p class="text-xs font-black uppercase tracking-wide text-slate-400">Recipient</p>
+                    <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <p class="truncate text-base font-black text-slate-950" x-text="handoffActionStop?.recipient || '-'"></p>
+                            <p class="mt-0.5 text-sm font-semibold text-slate-500" x-text="handoffActionStop?.phone || '-'"></p>
+                        </div>
+                        <span class="inline-flex w-fit shrink-0 rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700" x-text="`${handoffActionStop?.packages || 0} package(s)`"></span>
+                    </div>
+                    <div class="mt-3 grid grid-cols-1 gap-3 border-t border-slate-100 pt-3 text-sm sm:grid-cols-2">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Courier</p>
+                            <p class="mt-0.5 font-bold text-slate-800" x-text="handoffActionStop?.courier || '-'"></p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Handed Off</p>
+                            <p class="mt-0.5 font-bold text-slate-800" x-text="handoffActionStop?.handedOffAt || '-'"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">Notes <span class="font-semibold normal-case tracking-normal text-slate-400">(optional)</span></label>
+                    <textarea
+                        x-model="handoffActionNotes"
+                        rows="4"
+                        placeholder="Add confirmation notes..."
+                        class="w-full resize-none rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-base font-black text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 sm:text-sm"
+                    ></textarea>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-3 rounded-b-[2rem] border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6">
+                <button @@click="closeHandoffAction()"
+                    class="inline-flex h-12 items-center justify-center whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 transition hover:bg-slate-100 sm:h-14 sm:px-7">
+                    Cancel
+                </button>
+                <button
+                    @@click="submitHandoffAction()"
+                    :disabled="actionLoading || !handoffActionStop?.url"
+                    class="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-5 text-sm font-black text-white shadow-lg transition disabled:cursor-not-allowed disabled:opacity-50 sm:h-14 sm:px-8"
+                    :class="{
+                        'bg-rose-600 shadow-rose-600/20 hover:bg-rose-700': handoffActionType === 'failed',
+                        'bg-amber-500 shadow-amber-500/20 hover:bg-amber-600': handoffActionType === 'pending',
+                        'bg-emerald-600 shadow-emerald-600/20 hover:bg-emerald-700': handoffActionType === 'delivered'
+                    }"
+                >
+                    <svg x-show="actionLoading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <span x-text="actionLoading ? 'Saving...' : handoffActionButtonLabel()"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Assign Rider Modal -->
     <div x-show="showAssignModal" x-cloak
          class="fixed inset-0 z-[220] flex min-h-dvh w-screen items-center justify-center overflow-y-auto p-3 sm:p-4"
@@ -1542,6 +1725,10 @@ function adminDeliveryRunPageFallback() {
         showAssignModal: false,
         showDispatchConfirm: false,
         showNotesModal: false,
+        showHandoffActionModal: false,
+        handoffActionType: 'delivered',
+        handoffActionStop: null,
+        handoffActionNotes: '',
         proofViewer: {
             open: false,
             title: '',
@@ -1560,6 +1747,40 @@ function adminDeliveryRunPageFallback() {
         async assignDriver() { this.actionLoading = false; },
         async dispatchRun() { this.actionLoading = false; },
         async resendCode() { this.actionLoading = false; },
+        async submitHandoffAction() { this.actionLoading = false; },
+
+        openHandoffAction(stop, action) {
+            this.handoffActionStop = stop;
+            this.handoffActionType = action;
+            this.handoffActionNotes = '';
+            this.showHandoffActionModal = true;
+        },
+
+        handoffActionTitle() {
+            if (this.handoffActionType === 'failed') return 'Mark Handoff Failed';
+            if (this.handoffActionType === 'pending') return 'Mark Pending';
+            return 'Confirm Delivered';
+        },
+
+        handoffActionDescription() {
+            if (this.handoffActionType === 'failed') return 'Record that the recipient did not receive this bus handoff.';
+            if (this.handoffActionType === 'pending') return 'Return this handoff to pending confirmation so it can be resolved again.';
+            return 'Confirm the recipient received this bus handoff.';
+        },
+
+        handoffActionButtonLabel() {
+            if (this.handoffActionType === 'failed') return 'Mark Failed';
+            if (this.handoffActionType === 'pending') return 'Mark Pending';
+            return 'Confirm Delivered';
+        },
+
+        closeHandoffAction(force = false) {
+            if (this.actionLoading && !force) return;
+            this.showHandoffActionModal = false;
+            this.handoffActionStop = null;
+            this.handoffActionNotes = '';
+            this.handoffActionType = 'delivered';
+        },
 
         openProofPhoto(payload) {
             const photos = Array.isArray(payload?.photos)
@@ -1694,6 +1915,38 @@ function adminDeliveryRunPage() {
             } catch (error) {
                 console.error(error);
                 window.showToast?.(error.message || 'Unable to resend OTP.', 'error');
+            } finally {
+                this.actionLoading = false;
+            }
+        },
+
+        async submitHandoffAction() {
+            if (!this.handoffActionStop?.url) return;
+            this.actionLoading = true;
+            try {
+                const response = await fetch(this.handoffActionStop.url, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrfToken(),
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: this.handoffActionType,
+                        notes: this.handoffActionNotes,
+                    }),
+                });
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || 'Failed to update handoff.');
+                }
+                window.showToast?.(result.message || 'Handoff updated successfully.', 'success');
+                this.closeHandoffAction(true);
+                window.location.reload();
+            } catch (error) {
+                console.error(error);
+                window.showToast?.(error.message || 'Unable to update handoff.', 'error');
             } finally {
                 this.actionLoading = false;
             }

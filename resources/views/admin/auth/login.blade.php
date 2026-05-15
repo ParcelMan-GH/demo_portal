@@ -96,7 +96,7 @@
                             required
                             autofocus
                             autocomplete="username"
-                            placeholder="name@example.com or 0241234567"
+                            placeholder="Enter email or phone number"
                             class="w-full rounded-lg border bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/60 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition
                                 {{ $errors->has('email') ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-200' : 'border-slate-300 focus:border-primary-400 focus:ring-primary-200' }}"
                         >

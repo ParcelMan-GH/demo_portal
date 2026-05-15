@@ -110,8 +110,8 @@
                 @if($canContacts)
                 <a href="{{ route('warehouse.contacts.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.contacts.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                     <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg></div>
-                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Contact Queue</span>
-                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Contact Queue</span></template>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Recipient Desk</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Recipient Desk</span></template>
                 </a>
                 @endif
                 @if($canRecipientPayments)
@@ -155,13 +155,6 @@
                     <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></div>
                     <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Pending Confirmations</span>
                     <template x-if="sidebarCollapsed"><span class="wh-tooltip">Pending Confirmations</span></template>
-                </a>
-                @endif
-                @if($canReceiving)
-                <a href="{{ route('warehouse.collections.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.collections.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/></svg></div>
-                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Collections</span>
-                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Collections</span></template>
                 </a>
                 @endif
                 @endif
