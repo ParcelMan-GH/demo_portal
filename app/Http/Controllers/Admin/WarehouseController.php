@@ -57,6 +57,30 @@ class WarehouseController extends Controller
             $query->where('is_active', $request->get('status') === 'active');
         }
 
+        if ($regionId = $request->get('region_id')) {
+            $query->where('region_id', $regionId);
+        }
+
+        if ($districtId = $request->get('district_id')) {
+            $query->where('district_id', $districtId);
+        }
+
+        if ($request->filled('capacity_min')) {
+            $query->where('capacity', '>=', (float) $request->get('capacity_min'));
+        }
+
+        if ($request->filled('capacity_max')) {
+            $query->where('capacity', '<=', (float) $request->get('capacity_max'));
+        }
+
+        if ($request->filled('users_min')) {
+            $query->having('users_count', '>=', (int) $request->get('users_min'));
+        }
+
+        if ($request->filled('users_max')) {
+            $query->having('users_count', '<=', (int) $request->get('users_max'));
+        }
+
         // Date range filter
         if ($dateFrom = $request->get('date_from')) {
             $query->whereDate('created_at', '>=', $dateFrom);
@@ -73,6 +97,8 @@ class WarehouseController extends Controller
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortDirection);
         }
+
+        $statsQuery = clone $query;
 
         // Pagination
         $perPage = min($request->get('per_page', 50), 100);
@@ -107,6 +133,9 @@ class WarehouseController extends Controller
                 'to' => $warehouses->lastItem() ?? 0,
                 'total' => $warehouses->total(),
                 'last_page' => $warehouses->lastPage(),
+                'active_count' => (clone $statsQuery)->where('is_active', true)->count(),
+                'inactive_count' => (clone $statsQuery)->where('is_active', false)->count(),
+                'users_count' => (int) (clone $statsQuery)->get()->sum('users_count'),
             ],
         ]);
     }
@@ -120,6 +149,7 @@ class WarehouseController extends Controller
 
         $currentAdmin = Auth::guard('admin')->user();
         $canManage = $currentAdmin->hasPermission('warehouses.edit');
+        $canManageCapabilities = $currentAdmin->isHqUser();
 
         $warehouseUsers = $warehouse->users()
             ->with('roles:id,name')
@@ -251,9 +281,17 @@ class WarehouseController extends Controller
             ->limit(200)
             ->get(['id', 'run_number', 'assigned_driver_id', 'status', 'dispatched_at', 'completed_at', 'created_at']);
 
+        $capabilityWarehouses = Warehouse::query()
+            ->where('is_active', true)
+            ->orderByDesc('is_hq')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'is_hq']);
+
         return view('admin.warehouses.show', [
             'warehouse'         => $warehouse,
             'canManage'         => $canManage,
+            'canManageCapabilities' => $canManageCapabilities,
+            'capabilityWarehouses' => $capabilityWarehouses,
             'warehouseStats'    => $warehouseStats,
             'warehouseUsers'    => $warehouseUsers,
             'userRoles'         => $userRoles,
@@ -421,6 +459,30 @@ class WarehouseController extends Controller
             $query->where('is_active', $request->get('status') === 'active');
         }
 
+        if ($regionId = $request->get('region_id')) {
+            $query->where('region_id', $regionId);
+        }
+
+        if ($districtId = $request->get('district_id')) {
+            $query->where('district_id', $districtId);
+        }
+
+        if ($request->filled('capacity_min')) {
+            $query->where('capacity', '>=', (float) $request->get('capacity_min'));
+        }
+
+        if ($request->filled('capacity_max')) {
+            $query->where('capacity', '<=', (float) $request->get('capacity_max'));
+        }
+
+        if ($request->filled('users_min')) {
+            $query->having('users_count', '>=', (int) $request->get('users_min'));
+        }
+
+        if ($request->filled('users_max')) {
+            $query->having('users_count', '<=', (int) $request->get('users_max'));
+        }
+
         if ($dateFrom = $request->get('date_from')) {
             $query->whereDate('created_at', '>=', $dateFrom);
         }
@@ -514,7 +576,7 @@ class WarehouseController extends Controller
 
         $currentUser = Auth::guard('admin')->user();
 
-        if ($currentUser->isSuperAdmin()) {
+        if ($currentUser->isHqUser()) {
             $query = User::query()
                 ->where('warehouse_id', $warehouse->id)
                 ->with(['creator', 'roles', 'warehouse']);
@@ -608,7 +670,7 @@ class WarehouseController extends Controller
 
         $currentUser = Auth::guard('admin')->user();
 
-        if ($currentUser->isSuperAdmin()) {
+        if ($currentUser->isHqUser()) {
             $query = User::query()
                 ->where('warehouse_id', $warehouse->id)
                 ->with(['creator', 'roles', 'warehouse']);
@@ -680,7 +742,9 @@ class WarehouseController extends Controller
      */
     protected function authorizePermission(string $permission): void
     {
-        if (!Auth::guard('admin')->user()->hasPermission($permission)) {
+        $user = Auth::guard('admin')->user();
+
+        if (!$user || !app(\App\Services\BackOfficeAccess::class)->canUsePermission($user, $permission)) {
             abort(403, 'Unauthorized action.');
         }
     }

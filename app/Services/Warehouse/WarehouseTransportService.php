@@ -263,15 +263,6 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Transport manifest already exists for this batch.'];
         }
 
-        $paymentBlock = $this->recipientPaymentService->blockingSummaryForBatch($batch);
-        if ($paymentBlock['blocked']) {
-            return [
-                'success' => false,
-                'message' => 'Recipient delivery fees must be paid, waived, or overridden before creating this transport manifest.',
-                'data' => ['recipient_payment_blockers' => $paymentBlock['items']],
-            ];
-        }
-
         return DB::transaction(function () use ($batch, $warehouse, $user) {
             $batch = SortBatch::query()
                 ->with(['activeItems.shipmentItem'])

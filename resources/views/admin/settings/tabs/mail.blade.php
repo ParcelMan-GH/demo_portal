@@ -2,18 +2,18 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         @foreach($settings as $key => $setting)
         <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1.5">{{ $setting['label'] }}</label>
+            <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">{{ $setting['label'] }}</label>
 
             @if($setting['type'] === 'text' || $setting['type'] === 'email' || $setting['type'] === 'number')
                 <input type="{{ $setting['type'] }}"
-                       x-model="settings.{{ $key }}"
-                       class="w-full px-3.5 py-2.5 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                       x-model="settings.{{ $key }}.value"
+                       class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                        placeholder="Enter {{ strtolower($setting['label']) }}">
             @elseif($setting['type'] === 'password')
                 <div x-data="{ show: false }" class="relative">
                     <input :type="show ? 'text' : 'password'"
-                           x-model="settings.{{ $key }}"
-                           class="w-full px-3.5 py-2.5 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                           x-model="settings.{{ $key }}.value"
+                           class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 pr-10 text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                            placeholder="Enter {{ strtolower($setting['label']) }}">
                     <button type="button" @@click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                         <svg x-show="!show" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -26,8 +26,8 @@
                     </button>
                 </div>
             @elseif($setting['type'] === 'select')
-                <select x-model="settings.{{ $key }}"
-                        class="w-full px-3.5 py-2.5 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors">
+                <select x-model="settings.{{ $key }}.value"
+                        class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                     @foreach($setting['options'] as $value => $label)
                         <option value="{{ $value }}">{{ $label }}</option>
                     @endforeach
@@ -38,16 +38,16 @@
     </div>
 
     <!-- Test Email -->
-    <div class="mt-8 p-6 bg-slate-50/70 rounded-2xl border border-slate-200/50" x-data="{ testEmail: '' }">
-        <h3 class="text-sm font-semibold text-slate-800 mb-4">Test Email Configuration</h3>
-        <div class="flex gap-3">
+    <div class="mt-8 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5" x-data="{ testEmailAddress: '' }">
+        <h3 class="mb-4 text-sm font-extrabold text-slate-800">Test Email Configuration</h3>
+        <div class="flex flex-col gap-3 sm:flex-row">
             <input type="email"
-                   x-model="testEmail"
-                   class="flex-1 px-3.5 py-2.5 border border-slate-200/70 rounded-xl bg-white backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                   x-model="testEmailAddress"
+                   class="min-w-0 flex-1 rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                    placeholder="Enter email address">
             <button type="button"
-                    @@click="testEmail(testEmail)"
-                    class="px-4 py-2.5 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 transition-colors">
+                    @@click="testEmail(testEmailAddress)"
+                    class="inline-flex items-center justify-center rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">
                 Send Test Email
             </button>
         </div>

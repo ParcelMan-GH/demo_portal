@@ -9,6 +9,7 @@ function buildDriversTable(config) {
         endpoint: config.endpoint,
         exportEndpoint: config.exportEndpoint,
         storeEndpoint: config.storeEndpoint,
+        baseEndpoint: config.baseEndpoint,
         csrfToken: config.csrfToken,
         drivers: [],
         meta: {
@@ -19,9 +20,14 @@ function buildDriversTable(config) {
             last_page: 1,
         },
         loading: false,
+        showFilters: false,
         search: '',
-        statusFilter: '',
-        statusFilterName: 'All statuses',
+        accountStatusFilter: '',
+        accountStatusFilterName: 'All account statuses',
+        availabilityFilter: '',
+        availabilityFilterName: 'All availability',
+        capabilityFilter: '',
+        capabilityFilterName: 'All capabilities',
         createdFrom: '',
         createdTo: '',
         dateRangePicker: null,
@@ -32,6 +38,7 @@ function buildDriversTable(config) {
             { key: 'name', label: 'Name' },
             { key: 'email', label: 'Email' },
             { key: 'phone', label: 'Phone' },
+            { key: 'capabilities', label: 'Capabilities' },
             { key: 'vehicle_type', label: 'Vehicle Type' },
             { key: 'status', label: 'Status' },
             { key: 'is_active', label: 'Active' },
@@ -43,6 +50,7 @@ function buildDriversTable(config) {
             name: true,
             email: true,
             phone: true,
+            capabilities: true,
             vehicle_type: true,
             status: true,
             is_active: true,
@@ -85,7 +93,9 @@ function buildDriversTable(config) {
                 });
 
                 if (this.search) params.append('search', this.search);
-                if (this.statusFilter) params.append('status', this.statusFilter);
+                if (this.accountStatusFilter) params.append('account_status', this.accountStatusFilter);
+                if (this.availabilityFilter) params.append('availability', this.availabilityFilter);
+                if (this.capabilityFilter) params.append('capability', this.capabilityFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
 
@@ -122,6 +132,185 @@ function buildDriversTable(config) {
                 this.sortDirection = 'asc';
             }
             this.loadData();
+        },
+
+        setAccountStatusFilter(value, label) {
+            this.accountStatusFilter = value;
+            this.accountStatusFilterName = label;
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        clearAccountStatusFilter() {
+            this.accountStatusFilter = '';
+            this.accountStatusFilterName = 'All account statuses';
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        setAvailabilityFilter(value, label) {
+            this.availabilityFilter = value;
+            this.availabilityFilterName = label;
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        applyFilters() {
+            this.accountStatusFilterName = this.accountStatusLabelForFilter(this.accountStatusFilter);
+            this.availabilityFilterName = this.availabilityLabelForFilter(this.availabilityFilter);
+            this.capabilityFilterName = this.capabilityLabelForFilter(this.capabilityFilter);
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        clearFilters() {
+            this.search = '';
+            this.accountStatusFilter = '';
+            this.accountStatusFilterName = 'All account statuses';
+            this.availabilityFilter = '';
+            this.availabilityFilterName = 'All availability';
+            this.capabilityFilter = '';
+            this.capabilityFilterName = 'All capabilities';
+            this.createdFrom = '';
+            this.createdTo = '';
+            if (this.$refs.createdRange) this.$refs.createdRange.value = '';
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        accountStatusLabelForFilter(value) {
+            switch (value) {
+                case 'active':
+                    return 'Active';
+                case 'inactive':
+                    return 'Inactive';
+                default:
+                    return 'All account statuses';
+            }
+        },
+
+        availabilityLabelForFilter(value) {
+            switch (value) {
+                case 'available':
+                    return 'Available';
+                case 'busy':
+                    return 'Busy';
+                case 'offline':
+                    return 'Offline';
+                default:
+                    return 'All availability';
+            }
+        },
+
+        capabilityLabelForFilter(value) {
+            const labels = {
+                pickup: 'Pickup',
+                transport: 'Transport',
+                delivery: 'Delivery',
+                bus_handoff: 'Bus Handoff',
+            };
+
+            return labels[value] || 'All capabilities';
+        },
+
+        clearFilter(key) {
+            if (key === 'all') {
+                this.search = '';
+                this.accountStatusFilter = '';
+                this.accountStatusFilterName = 'All account statuses';
+                this.availabilityFilter = '';
+                this.availabilityFilterName = 'All availability';
+                this.capabilityFilter = '';
+                this.capabilityFilterName = 'All capabilities';
+                this.createdFrom = '';
+                this.createdTo = '';
+                if (this.$refs.createdRange) this.$refs.createdRange.value = '';
+            }
+
+            if (key === 'account_status') {
+                this.accountStatusFilter = '';
+                this.accountStatusFilterName = 'All account statuses';
+            }
+
+            if (key === 'availability') {
+                this.availabilityFilter = '';
+                this.availabilityFilterName = 'All availability';
+            }
+
+            if (key === 'capability') {
+                this.capabilityFilter = '';
+                this.capabilityFilterName = 'All capabilities';
+            }
+
+            if (key === 'date') {
+                this.createdFrom = '';
+                this.createdTo = '';
+                if (this.$refs.createdRange) this.$refs.createdRange.value = '';
+            }
+
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        activeFilterChips() {
+            const chips = [];
+            if (this.accountStatusFilter) chips.push({ key: 'account_status', label: `Account: ${this.accountStatusFilterName}` });
+            if (this.availabilityFilter) chips.push({ key: 'availability', label: `Availability: ${this.availabilityFilterName}` });
+            if (this.capabilityFilter) chips.push({ key: 'capability', label: `Capability: ${this.capabilityFilterName}` });
+            if (this.createdFrom || this.createdTo) chips.push({ key: 'date', label: `Created: ${this.createdFrom || '...'} - ${this.createdTo || '...'}` });
+            return chips;
+        },
+
+        activeCount() {
+            return this.drivers.filter((driver) => driver.is_active).length;
+        },
+
+        inactiveCount() {
+            return this.drivers.filter((driver) => !driver.is_active).length;
+        },
+
+        availableCount() {
+            return this.drivers.filter((driver) => driver.status === 'available').length;
+        },
+
+        driverStatusLabel(driver) {
+            const value = driver.status || 'offline';
+            return value.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+        },
+
+        driverStatusBadgeClass(driver) {
+            if (driver.status === 'available') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+            if (driver.status === 'busy') return 'border-amber-200 bg-amber-50 text-amber-700';
+            return 'border-slate-200 bg-slate-50 text-slate-600';
+        },
+
+        activeBadgeClass(driver) {
+            return driver.is_active
+                ? 'border-orange-200 bg-orange-50 text-orange-700'
+                : 'border-amber-200 bg-amber-50 text-amber-700';
+        },
+
+        capabilitySummary(driver) {
+            return this.capabilityList(driver).map((capability) => capability.label).join(', ') || 'No capabilities';
+        },
+
+        capabilityList(driver) {
+            const labels = {
+                pickup: 'Pickup',
+                transport: 'Transport',
+                delivery: 'Delivery',
+                bus_handoff: 'Bus Handoff',
+            };
+
+            const capabilities = Array.isArray(driver.task_capabilities) ? driver.task_capabilities : [];
+            if (!capabilities.length) {
+                return [{ value: 'none', label: 'No capabilities' }];
+            }
+
+            return capabilities.map((capability) => ({
+                value: capability,
+                label: labels[capability] || capability.replace(/_/g, ' '),
+            }));
         },
 
         toggleColumn(key) {
@@ -216,6 +405,12 @@ function buildDriversTable(config) {
             if (this.$refs.createdRange) {
                 this.$refs.createdRange.value = '';
             }
+            this.loadData();
+        },
+
+        setPerPage(value) {
+            this.perPage = value;
+            this.meta.current_page = 1;
             this.loadData();
         },
 
@@ -318,7 +513,7 @@ function buildDriversTable(config) {
             try {
                 const url = this.modalMode === 'add'
                     ? this.storeEndpoint
-                    : `${window.location.origin}/admin/drivers/${this.editingDriverId}`;
+                    : `${this.baseEndpoint}/${this.editingDriverId}`;
 
                 const method = this.modalMode === 'add' ? 'POST' : 'PUT';
 
@@ -339,7 +534,7 @@ function buildDriversTable(config) {
                     if (response.status === 422) {
                         this.errors = result.errors || {};
                     } else {
-                        throw new Error(result.message || 'Failed to save driver');
+                        throw new Error(result.message || 'Failed to save rider/driver');
                     }
                     return;
                 }
@@ -347,7 +542,7 @@ function buildDriversTable(config) {
                 this.closeModal();
                 this.loadData();
             } catch (error) {
-                console.error('Error saving driver:', error);
+                console.error('Error saving rider/driver:', error);
             } finally {
                 this.saving = false;
             }
@@ -355,7 +550,7 @@ function buildDriversTable(config) {
 
         async toggleDriverStatus(driver) {
             try {
-                const response = await fetch(`${window.location.origin}/admin/drivers/${driver.id}/toggle-active`, {
+                const response = await fetch(`${this.baseEndpoint}/${driver.id}/toggle-active`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -369,7 +564,7 @@ function buildDriversTable(config) {
                     this.loadData();
                 }
             } catch (err) {
-                console.error('Failed to update driver status:', err);
+                console.error('Failed to update rider/driver status:', err);
             }
         },
 
@@ -388,7 +583,7 @@ function buildDriversTable(config) {
             store.deleting = true;
 
             try {
-                const response = await fetch(`${window.location.origin}/admin/drivers/${store.driver.id}`, {
+                const response = await fetch(`${this.baseEndpoint}/${store.driver.id}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
@@ -399,15 +594,15 @@ function buildDriversTable(config) {
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to delete driver');
+                    throw new Error('Failed to delete rider/driver');
                 }
 
                 store.show = false;
                 store.driver = null;
                 this.loadData();
             } catch (error) {
-                console.error('Error deleting driver:', error);
-                alert('Failed to delete driver. Please try again.');
+                console.error('Error deleting rider/driver:', error);
+                alert('Failed to delete rider/driver. Please try again.');
             } finally {
                 store.deleting = false;
             }
@@ -417,7 +612,9 @@ function buildDriversTable(config) {
             try {
                 const params = new URLSearchParams();
                 if (this.search) params.append('search', this.search);
-                if (this.statusFilter) params.append('status', this.statusFilter);
+                if (this.accountStatusFilter) params.append('account_status', this.accountStatusFilter);
+                if (this.availabilityFilter) params.append('availability', this.availabilityFilter);
+                if (this.capabilityFilter) params.append('capability', this.capabilityFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
                 params.append('format', format);
@@ -451,7 +648,9 @@ function buildDriversTable(config) {
             try {
                 const params = new URLSearchParams();
                 if (this.search) params.append('search', this.search);
-                if (this.statusFilter) params.append('status', this.statusFilter);
+                if (this.accountStatusFilter) params.append('account_status', this.accountStatusFilter);
+                if (this.availabilityFilter) params.append('availability', this.availabilityFilter);
+                if (this.capabilityFilter) params.append('capability', this.capabilityFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
 
@@ -486,7 +685,7 @@ function buildDriversTable(config) {
             const doc = printWindow.document;
             const headers = Object.keys(data[0]);
 
-            doc.title = 'Drivers Export';
+            doc.title = 'Riders & Drivers Export';
             doc.body.innerHTML = '';
 
             const style = doc.createElement('style');
@@ -501,7 +700,7 @@ function buildDriversTable(config) {
             doc.head.appendChild(style);
 
             const title = doc.createElement('h1');
-            title.textContent = 'Drivers List';
+            title.textContent = 'Riders & Drivers List';
             doc.body.appendChild(title);
 
             const meta = doc.createElement('p');
@@ -560,7 +759,7 @@ function buildDriversTable(config) {
                 )
             ].join('\n');
 
-            this.downloadFile(csvContent, 'drivers.csv', 'text/csv');
+            this.downloadFile(csvContent, 'riders-drivers.csv', 'text/csv');
         },
 
         downloadFile(content, filename, type) {
@@ -643,4 +842,3 @@ if (window.Alpine) {
 } else {
     document.addEventListener('alpine:init', registerDriversTable);
 }
-

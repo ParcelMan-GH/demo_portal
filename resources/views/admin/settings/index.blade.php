@@ -5,294 +5,185 @@
 @section('breadcrumb-current', 'Settings')
 
 @section('content')
-<div class="flex gap-6" x-data="settingsManager()">
-    <!-- Sidebar Navigation -->
-    <div class="w-72 flex-shrink-0">
-        <div class="bg-white/90 backdrop-blur-2xl rounded-3xl border border-slate-200/70 shadow-xl shadow-slate-200/50 sticky top-20 overflow-hidden">
-            <!-- Header with gradient -->
-            <div class="relative px-5 py-4 border-b border-slate-100">
-                <div class="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-slate-50/80"></div>
-                <div class="relative flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center shadow-lg shadow-slate-900/20">
-                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-base font-bold text-slate-800">Settings</h3>
-                        <p class="text-xs text-slate-500 font-medium">Configure your platform</p>
-                    </div>
-                </div>
+@php
+    $tabGroups = [
+        'General' => ['platform', 'delivery', 'pricing'],
+        'Communication' => ['sms', 'mail', 'push', 'email-templates'],
+        'Logs' => ['email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'notification-logs'],
+        'System' => ['health', 'logs'],
+    ];
+    $readOnlyTabs = ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates', 'notification-logs'];
+    $activeGroup = collect($tabGroups)->filter(fn ($keys) => in_array($activeTab, $keys, true))->keys()->first() ?? 'General';
+@endphp
+
+<div class="space-y-5" x-data="settingsManager()">
+    <div x-show="message" x-cloak
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+         x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+         x-transition:leave-end="opacity-0 translate-y-2 scale-95"
+         class="fixed right-5 top-5 z-[100] max-w-md rounded-2xl border bg-white px-4 py-3 shadow-2xl shadow-slate-900/15"
+         :class="messageType === 'success' ? 'border-emerald-200' : 'border-rose-200'">
+        <div class="flex items-start gap-3">
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" :class="messageType === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'">
+                <template x-if="messageType === 'success'">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </template>
+                <template x-if="messageType === 'error'">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                </template>
             </div>
-
-            <!-- Navigation Groups -->
-            <nav class="p-3 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
-                <!-- General Section -->
-                <div class="mb-4">
-                    <div class="px-3 mb-2">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">General</span>
-                    </div>
-                    <div class="space-y-1">
-                        @foreach(['platform' => $tabs['platform'], 'invoice' => $tabs['invoice'], 'delivery' => $tabs['delivery'], 'pricing' => $tabs['pricing']] as $key => $tab)
-                        <a href="{{ route('admin.settings.index', ['tab' => $key]) }}"
-                           class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 {{ $activeTab === $key ? 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg shadow-slate-900/25' : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900' }}">
-                            <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 {{ $activeTab === $key ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-slate-200' }}">
-                                @include('admin.settings.partials.tab-icon', ['icon' => $tab['icon'], 'active' => $activeTab === $key])
-                            </div>
-                            <span class="truncate">{{ $tab['label'] }}</span>
-                            @if($activeTab === $key)
-                            <div class="absolute right-3 w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
-                            @endif
-                        </a>
-                        @endforeach
-                    </div>
-                </div>
-
-                <!-- Communications Section -->
-                <div class="mb-4">
-                    <div class="px-3 mb-2">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Communications</span>
-                    </div>
-                    <div class="space-y-1">
-                        @foreach(['sms' => $tabs['sms'], 'mail' => $tabs['mail'], 'push' => $tabs['push'], 'email-templates' => $tabs['email-templates']] as $key => $tab)
-                        <a href="{{ route('admin.settings.index', ['tab' => $key]) }}"
-                           class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 {{ $activeTab === $key ? 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg shadow-slate-900/25' : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900' }}">
-                            <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 {{ $activeTab === $key ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-slate-200' }}">
-                                @include('admin.settings.partials.tab-icon', ['icon' => $tab['icon'], 'active' => $activeTab === $key])
-                            </div>
-                            <span class="truncate">{{ $tab['label'] }}</span>
-                            @if($activeTab === $key)
-                            <div class="absolute right-3 w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
-                            @endif
-                        </a>
-                        @endforeach
-                    </div>
-                </div>
-
-                <!-- Logs Section -->
-                <div class="mb-4">
-                    <div class="px-3 mb-2">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Activity Logs</span>
-                    </div>
-                    <div class="space-y-1">
-                        @foreach(['email-logs' => $tabs['email-logs'], 'sms-logs' => $tabs['sms-logs'], 'otp-logs' => $tabs['otp-logs'], 'admin-audit-logs' => $tabs['admin-audit-logs'], 'notification-logs' => $tabs['notification-logs']] as $key => $tab)
-                        <a href="{{ route('admin.settings.index', ['tab' => $key]) }}"
-                           class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 {{ $activeTab === $key ? 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg shadow-slate-900/25' : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900' }}">
-                            <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 {{ $activeTab === $key ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-slate-200' }}">
-                                @include('admin.settings.partials.tab-icon', ['icon' => $tab['icon'], 'active' => $activeTab === $key])
-                            </div>
-                            <span class="truncate">{{ $tab['label'] }}</span>
-                            @if($activeTab === $key)
-                            <div class="absolute right-3 w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
-                            @endif
-                        </a>
-                        @endforeach
-                    </div>
-                </div>
-
-                <!-- System Section -->
-                <div>
-                    <div class="px-3 mb-2">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">System</span>
-                    </div>
-                    <div class="space-y-1">
-                        @foreach(['health' => $tabs['health'], 'logs' => $tabs['logs']] as $key => $tab)
-                        <a href="{{ route('admin.settings.index', ['tab' => $key]) }}"
-                           class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 {{ $activeTab === $key ? 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg shadow-slate-900/25' : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900' }}">
-                            <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 {{ $activeTab === $key ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-slate-200' }}">
-                                @include('admin.settings.partials.tab-icon', ['icon' => $tab['icon'], 'active' => $activeTab === $key])
-                            </div>
-                            <span class="truncate">{{ $tab['label'] }}</span>
-                            @if($activeTab === $key)
-                            <div class="absolute right-3 w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
-                            @endif
-                        </a>
-                        @endforeach
-                    </div>
-                </div>
-
-                {{-- Data Management --}}
-                <div>
-                    <div class="px-3 mb-2">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Data Management</span>
-                    </div>
-                    <div class="space-y-1">
-                        <a href="{{ route('admin.warehouses.index') }}"
-                           class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 text-slate-600 hover:bg-slate-100/80 hover:text-slate-900">
-                            <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 group-hover:bg-slate-200 transition-all">
-                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
-                            </div>
-                            <span class="truncate">Warehouses</span>
-                            <svg class="w-4 h-4 ml-auto text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                        </a>
-                        <a href="{{ route('admin.locations.index') }}"
-                           class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 text-slate-600 hover:bg-slate-100/80 hover:text-slate-900">
-                            <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 group-hover:bg-slate-200 transition-all">
-                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            </div>
-                            <span class="truncate">Locations</span>
-                            <svg class="w-4 h-4 ml-auto text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                        </a>
-                    </div>
-                </div>
-            </nav>
-
-            <!-- Footer with version info -->
-            <div class="px-4 py-3 border-t border-slate-100 bg-gradient-to-br from-slate-50/80 to-white">
-                <div class="flex items-center justify-between text-xs text-slate-400">
-                    <span class="font-medium">ParcelMan v1.0</span>
-                    <span class="flex items-center gap-1">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span>All Systems OK</span>
-                    </span>
-                </div>
+            <div class="min-w-0">
+                <p class="text-sm font-extrabold text-slate-900" x-text="messageType === 'success' ? 'Done' : 'Needs attention'"></p>
+                <p class="mt-0.5 text-sm font-semibold text-slate-600" x-text="message"></p>
             </div>
         </div>
     </div>
 
-    <!-- Main Content Area -->
-    <div class="flex-1 min-w-0">
-        <div class="bg-white/90 backdrop-blur-2xl rounded-3xl border border-slate-200/70 shadow-xl shadow-slate-200/50 overflow-hidden">
-            <!-- Header with gradient background -->
-            <div class="relative px-6 py-5 border-b border-slate-100">
-                <div class="absolute inset-0 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80"></div>
-                <div class="relative flex items-center justify-between">
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center shadow-inner">
-                            @include('admin.settings.partials.tab-icon', ['icon' => $tabs[$activeTab]['icon'], 'active' => false])
+    <div class="grid gap-5 xl:grid-cols-[18rem_minmax(0,1fr)]">
+        <aside class="xl:sticky xl:top-20 xl:self-start">
+            <div class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-300/30">
+                <div class="border-b border-slate-200/60 px-5 py-4">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
                         </div>
-                        <div>
-                            <h2 class="text-xl font-bold text-slate-800">{{ $tabs[$activeTab]['label'] }}</h2>
-                            <p class="text-sm text-slate-500 font-medium mt-0.5">
-                                @if(in_array($activeTab, ['email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'notification-logs']))
-                                    View and search {{ strtolower($tabs[$activeTab]['label']) }}
-                                @else
-                                    Configure your {{ strtolower($tabs[$activeTab]['label']) }} settings
-                                @endif
-                            </p>
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-extrabold text-slate-900">Settings</h2>
+                            <p class="truncate text-sm text-slate-500">System controls</p>
                         </div>
                     </div>
-                    @if($activeTab === 'notification-logs')
-                    {{-- Notification Logs header controls (View, Export, Total) --}}
-                    <div x-data class="flex flex-wrap items-center gap-3">
-                        {{-- View (column visibility) --}}
+                </div>
+
+                <nav class="max-h-[calc(100vh-10rem)] overflow-y-auto p-3">
+                    @foreach($tabGroups as $group => $keys)
+                        <div class="{{ !$loop->first ? 'mt-4' : '' }}">
+                            <p class="mb-2 px-3 text-[10px] font-black uppercase tracking-wide text-slate-400">{{ $group }}</p>
+                            <div class="space-y-1">
+                                @foreach($keys as $key)
+                                    @continue(!isset($tabs[$key]))
+                                    <a href="{{ route('admin.settings.index', ['tab' => $key]) }}"
+                                       class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold transition {{ $activeTab === $key ? 'bg-orange-50 text-orange-700 ring-1 ring-orange-100' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' }}">
+                                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg {{ $activeTab === $key ? 'bg-white text-orange-700 ring-1 ring-orange-100' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-slate-700' }}">
+                                            @include('admin.settings.partials.tab-icon', ['icon' => $tabs[$key]['icon'], 'active' => false])
+                                        </span>
+                                        <span class="min-w-0 flex-1 truncate">{{ $tabs[$key]['label'] }}</span>
+                                        @if($activeTab === $key)
+                                            <span class="h-2 w-2 rounded-full bg-orange-500"></span>
+                                        @endif
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+
+                    <div class="mt-4 border-t border-slate-100 pt-4">
+                        <p class="mb-2 px-3 text-[10px] font-black uppercase tracking-wide text-slate-400">Data Management</p>
+                        <div class="space-y-1">
+                            <a href="{{ route('admin.locations.index') }}" class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-slate-700">
+                                    <svg class="h-[18px] w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657 13.414 20.9a2 2 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0Z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                                </span>
+                                <span class="min-w-0 flex-1 truncate">Locations</span>
+                            </a>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </aside>
+
+        <div class="min-w-0 overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-300/30">
+        <div class="border-b border-slate-200/60 px-5 py-4">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div class="flex min-w-0 items-center gap-3">
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
+                        @include('admin.settings.partials.tab-icon', ['icon' => $tabs[$activeTab]['icon'], 'active' => false])
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-black uppercase tracking-wide text-orange-600">{{ $activeGroup }}</p>
+                        <h1 class="text-lg font-extrabold text-slate-900">{{ $tabs[$activeTab]['label'] }}</h1>
+                        <p class="text-sm text-slate-500">
+                            @if(in_array($activeTab, ['email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'notification-logs'], true))
+                                Review platform activity and delivery traces.
+                            @elseif($activeTab === 'health')
+                                Check service health and operational readiness.
+                            @elseif($activeTab === 'logs')
+                                Inspect application logs and clear old entries.
+                            @elseif($activeTab === 'email-templates')
+                                Review available system email templates.
+                            @elseif($activeTab === 'pricing')
+                                Manage vendor commission and payout rules.
+                            @else
+                                Configure values used across the platform.
+                            @endif
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3 xl:justify-end">
+                    @if($activeTab === 'email-templates')
+                        <span class="inline-flex items-center rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">{{ $tabData['templates']->count() }} templates</span>
+                        <span class="inline-flex items-center rounded-xl bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100">{{ $tabData['templates']->where('is_enabled', true)->count() }} enabled</span>
+                        <button type="button"
+                                @@click="$dispatch('email-template-create')"
+                                class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Create Template
+                        </button>
+                    @elseif($activeTab === 'notification-logs')
                         <div x-data="{ open: false }" class="relative">
-                            <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
-                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/>
-                                </svg>
+                            <button @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/></svg>
                                 View
-                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                </svg>
                             </button>
-                            <div x-show="open" @@click.away="open = false" x-transition
-                                 class="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50"
-                                 style="display: none;">
+                            <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 z-50 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl" style="display: none;">
                                 <template x-for="col in $store.notifLogs?.columns || []" :key="col.key">
-                                    <button type="button" @@click="$dispatch('notif-toggle-column', col.key)"
-                                            class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70">
+                                    <button type="button" @@click="$dispatch('notif-toggle-column', col.key)" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                                         <span x-text="col.label"></span>
-                                        <svg x-show="$store.notifLogs?.visibleColumns?.[col.key]" class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                        </svg>
+                                        <svg x-show="$store.notifLogs?.visibleColumns?.[col.key]" class="h-4 w-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     </button>
                                 </template>
                             </div>
                         </div>
-
-                        {{-- Export --}}
                         <div x-data="{ open: false }" class="relative">
-                            <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
-                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
+                            <button @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 Export
-                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                </svg>
                             </button>
-                            <div x-show="open" @@click.away="open = false" x-transition
-                                 class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50"
-                                 style="display: none;">
-                                <button type="button" @@click="$dispatch('notif-export-csv'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                    </svg>
-                                    CSV
-                                </button>
-                                <div class="border-t border-slate-200/50 my-1"></div>
-                                <button type="button" @@click="$dispatch('notif-print'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                    <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                                    </svg>
-                                    Print
-                                </button>
+                            <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 z-50 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl" style="display: none;">
+                                <button type="button" @@click="$dispatch('notif-export-csv'); open = false" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">CSV</button>
+                                <button type="button" @@click="$dispatch('notif-print'); open = false" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Print</button>
                             </div>
                         </div>
-
-                        {{-- Total count badge --}}
-                        <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="($store.notifLogs?.total || 0) + ' Total Logs'"></span>
-                    </div>
-                    @elseif(!in_array($activeTab, ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates']))
-                    <button type="button"
-                            @@click="saveSettings()"
-                            :disabled="saving"
-                            class="group relative inline-flex items-center gap-2.5 px-5 py-2.5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-slate-900/25 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden">
-                        <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                        <template x-if="!saving">
-                            <svg class="w-4 h-4 relative" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                            </svg>
-                        </template>
-                        <template x-if="saving">
-                            <svg class="w-4 h-4 animate-spin relative" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                        </template>
-                        <span class="relative" x-text="saving ? 'Saving...' : 'Save Changes'"></span>
-                    </button>
+                        <span class="inline-flex items-center rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700" x-text="($store.notifLogs?.total || 0) + ' logs'"></span>
+                    @elseif(!in_array($activeTab, $readOnlyTabs, true))
+                        <button type="button"
+                                @@click="saveSettings()"
+                                :disabled="saving"
+                                class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
+                            <template x-if="!saving">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            </template>
+                            <template x-if="saving">
+                                <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                            </template>
+                            <span x-text="saving ? 'Saving...' : 'Save Changes'"></span>
+                        </button>
                     @endif
                 </div>
             </div>
+        </div>
 
-            <!-- Content -->
-            <div class="p-6">
-                <!-- Success/Error Messages -->
-                <div x-show="message" x-cloak
-                     x-transition:enter="transition ease-out duration-300"
-                     x-transition:enter-start="opacity-0 -translate-y-2 scale-95"
-                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                     x-transition:leave="transition ease-in duration-200"
-                     x-transition:leave-start="opacity-100 scale-100"
-                     x-transition:leave-end="opacity-0 scale-95"
-                     class="mb-6 p-4 rounded-2xl shadow-lg"
-                     :class="messageType === 'success' ? 'bg-gradient-to-r from-emerald-50 to-emerald-100/80 border border-emerald-200/70 text-emerald-800' : 'bg-gradient-to-r from-red-50 to-red-100/80 border border-red-200/70 text-red-800'">
-                    <div class="flex items-center gap-3">
-                        <template x-if="messageType === 'success'">
-                            <div class="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                            </div>
-                        </template>
-                        <template x-if="messageType === 'error'">
-                            <div class="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
-                                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                </svg>
-                            </div>
-                        </template>
-                        <span class="text-sm font-semibold" x-text="message"></span>
-                    </div>
-                </div>
-
-                @include('admin.settings.tabs.' . $activeTab, ['settings' => $settings, 'tabData' => $tabData])
-            </div>
+        <div class="p-5">
+            @include('admin.settings.tabs.' . $activeTab, ['settings' => $settings, 'tabData' => $tabData])
         </div>
     </div>
+</div>
 </div>
 
 @push('scripts')
@@ -314,6 +205,94 @@ window.settingsConfig = {
     clearCacheEndpoint: @json(route('admin.settings.clear-cache')),
     activeTab: @json($activeTab),
     csrfToken: @json(csrf_token())
+};
+
+window.setupSettingsDateRangePicker = function(component, input, fromField, toField, onChange) {
+    const setField = (path, value) => {
+        const parts = String(path).split('.');
+        let target = component;
+        while (parts.length > 1) {
+            target = target[parts.shift()];
+        }
+        target[parts[0]] = value;
+    };
+    const getField = (path) => String(path).split('.').reduce((target, key) => target?.[key], component);
+
+    const setupPicker = () => {
+        if (!input || !window.$ || !window.moment || !window.$.fn.daterangepicker) return;
+
+        const $input = window.$(input);
+        if ($input.data('daterangepicker')) {
+            $input.data('daterangepicker').remove();
+            $input.off('.daterangepicker');
+        }
+
+        $input.daterangepicker({
+            autoUpdateInput: false,
+            alwaysShowCalendars: true,
+            opens: 'right',
+            locale: {
+                format: 'YYYY-MM-DD',
+                cancelLabel: 'Clear',
+            },
+            ranges: {
+                'Today': [window.moment(), window.moment()],
+                'Yesterday': [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
+                'Last 7 Days': [window.moment().subtract(6, 'days'), window.moment()],
+                'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
+                'This Month': [window.moment().startOf('month'), window.moment().endOf('month')],
+                'Last Month': [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
+            },
+        });
+
+        $input.on('apply.daterangepicker', (ev, picker) => {
+            setField(fromField, picker.startDate.format('YYYY-MM-DD'));
+            setField(toField, picker.endDate.format('YYYY-MM-DD'));
+            $input.val(`${getField(fromField)} - ${getField(toField)}`);
+            if (typeof onChange === 'function') onChange();
+        });
+
+        $input.on('cancel.daterangepicker', () => {
+            setField(fromField, '');
+            setField(toField, '');
+            $input.val('');
+            if (typeof onChange === 'function') onChange();
+        });
+
+        component.dateRangePicker = $input.data('daterangepicker');
+    };
+
+    if (window.$ && window.moment && window.$.fn.daterangepicker) {
+        setupPicker();
+        return;
+    }
+
+    const cssId = 'daterangepicker-css';
+    if (!document.getElementById(cssId)) {
+        const link = document.createElement('link');
+        link.id = cssId;
+        link.rel = 'stylesheet';
+        link.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
+        document.head.appendChild(link);
+    }
+
+    const loadScript = (id, src) => new Promise((resolve) => {
+        if (document.getElementById(id)) return resolve();
+        const script = document.createElement('script');
+        script.id = id;
+        script.src = src;
+        script.onload = () => resolve();
+        document.body.appendChild(script);
+    });
+
+    loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
+        .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
+        .then(() => {
+            window.$ = window.jQuery = window.jQuery || window.$;
+            window.moment = window.moment || moment;
+            return loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js');
+        })
+        .then(setupPicker);
 };
 
 document.addEventListener('alpine:init', () => {

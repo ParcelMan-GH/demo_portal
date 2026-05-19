@@ -18,7 +18,7 @@ $invoiceConfig = [
     'adminAcceptEndpoint' => route('warehouse.invoices.admin-accept', $invoice),
     'updateEndpoint' => route('warehouse.invoices.update', $invoice),
     'canManage' => $canManage,
-    'isSuperAdmin' => auth('admin')->user()?->isSuperAdmin() ?? false,
+    'isSuperAdmin' => auth('admin')->user()?->isHqUser() ?? false,
 ];
 @endphp
 

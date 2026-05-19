@@ -17,6 +17,7 @@ use App\Services\StorageService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 
 class WarehouseReceivingService
@@ -30,14 +31,26 @@ class WarehouseReceivingService
 
     public function getOrCreateReceipt(PickupAssignment $assignment, Warehouse $warehouse, User $user): WarehouseReceipt
     {
+        $defaults = [
+            'warehouse_id' => $warehouse->id,
+            'status' => WarehouseReceipt::STATUS_DRAFT,
+        ];
+
+        if (Schema::hasColumn('warehouse_receipts', 'shipment_id')) {
+            $defaults['shipment_id'] = $assignment->shipment_id;
+        }
+
+        if (Schema::hasColumn('warehouse_receipts', 'started_by_user_id')) {
+            $defaults['started_by_user_id'] = $user->id;
+        }
+
+        if (Schema::hasColumn('warehouse_receipts', 'started_at')) {
+            $defaults['started_at'] = now();
+        }
+
         $receipt = WarehouseReceipt::query()->firstOrCreate(
             ['pickup_assignment_id' => $assignment->id],
-            [
-                'warehouse_id' => $warehouse->id,
-                'status' => WarehouseReceipt::STATUS_DRAFT,
-                'started_by_user_id' => $user->id,
-                'started_at' => now(),
-            ]
+            $defaults
         );
 
         if ((int) $receipt->warehouse_id !== (int) $warehouse->id) {
@@ -140,23 +153,29 @@ class WarehouseReceivingService
 
             $shipmentItem = $this->ensureShipmentItemTrackingCode($shipmentItem);
 
+            $receiptItemValues = [
+                'expected_quantity' => $expectedQuantity,
+                'received_quantity' => $receivedQuantity,
+                'damaged_quantity' => $damagedQuantity,
+                'discrepancy_type' => $discrepancyType,
+                'condition_status' => $effectiveConditionStatus,
+                'notes' => $notes,
+                'received_by_user_id' => $user->id,
+                'received_at' => now(),
+                'barcode_value' => $shipmentItem->tracking_code,
+                'barcode_format' => 'code128',
+            ];
+
+            $receiptItemValues = collect($receiptItemValues)
+                ->filter(fn ($value, $column) => Schema::hasColumn('warehouse_receipt_items', $column))
+                ->all();
+
             $receiptItem = WarehouseReceiptItem::query()->updateOrCreate(
                 [
                     'warehouse_receipt_id' => $receipt->id,
                     'shipment_item_id' => $shipmentItem->id,
                 ],
-                [
-                    'expected_quantity' => $expectedQuantity,
-                    'received_quantity' => $receivedQuantity,
-                    'damaged_quantity' => $damagedQuantity,
-                    'discrepancy_type' => $discrepancyType,
-                    'condition_status' => $effectiveConditionStatus,
-                    'notes' => $notes,
-                    'received_by_user_id' => $user->id,
-                    'received_at' => now(),
-                    'barcode_value' => $shipmentItem->tracking_code,
-                    'barcode_format' => 'code128',
-                ]
+                $receiptItemValues
             );
 
             $removeIds = collect($removePhotoIds)
@@ -470,7 +489,7 @@ class WarehouseReceivingService
                 if (!$user->hasPermission('warehouse.receiving.approve_discrepancy')) {
                     return [
                         'success' => false,
-                        'message' => 'Only warehouse manager/super admin can finalize discrepancy receipts.',
+                        'message' => 'Only a warehouse manager or HQ administrator can finalize discrepancy receipts.',
                     ];
                 }
 

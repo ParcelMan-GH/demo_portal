@@ -1,594 +1,450 @@
 @extends('admin.layouts.app')
+
 @section('title', 'Marketing Broadcasts')
 @section('breadcrumb-parent', 'System')
 @section('breadcrumb-current', 'Marketing')
 
+@php
+    $channelStats = [
+        [
+            'key' => 'total',
+            'label' => 'Broadcasts',
+            'value' => $totalBroadcasts,
+            'detail' => 'All channel sends',
+            'tone' => 'slate',
+            'icon' => 'megaphone',
+        ],
+        [
+            'key' => 'push',
+            'label' => 'Push Sent',
+            'value' => $broadcastsByChannel['push'] ?? 0,
+            'detail' => number_format($vendorCountPush + $driverCountPush) . ' reachable',
+            'tone' => 'amber',
+            'icon' => 'bell',
+        ],
+        [
+            'key' => 'sms',
+            'label' => 'SMS Sent',
+            'value' => $broadcastsByChannel['sms'] ?? 0,
+            'detail' => number_format($vendorCountSms + $driverCountSms) . ' reachable',
+            'tone' => 'emerald',
+            'icon' => 'chat',
+        ],
+        [
+            'key' => 'email',
+            'label' => 'Email Sent',
+            'value' => $broadcastsByChannel['email'] ?? 0,
+            'detail' => number_format($vendorCountEmail + $driverCountEmail) . ' reachable',
+            'tone' => 'blue',
+            'icon' => 'mail',
+        ],
+    ];
+@endphp
+
 @section('content')
-<div class="space-y-6" x-data="marketingPage()">
-
-    <!-- Page Header -->
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-2xl font-bold text-slate-900">Marketing Broadcasts</h1>
-            <p class="mt-1 text-sm text-slate-500">Send push notifications, emails, and SMS to vendors and drivers.</p>
-        </div>
-        <div class="flex items-center gap-2">
-            <span class="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Push
-            </span>
-            <span class="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> SMS
-            </span>
-            <span class="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Email
-            </span>
-        </div>
-    </div>
-
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white/90 backdrop-blur-2xl rounded-2xl border border-slate-200/70 p-5 shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center flex-shrink-0 shadow-inner">
-                <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
-                </svg>
-            </div>
-            <div>
-                <p class="text-2xl font-bold text-slate-900">{{ number_format($totalBroadcasts) }}</p>
-                <p class="text-xs text-slate-500 font-medium mt-0.5">Total Broadcasts</p>
-            </div>
-        </div>
-
-        <div class="bg-white/90 backdrop-blur-2xl rounded-2xl border border-slate-200/70 p-5 shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-50 to-amber-100 flex items-center justify-center flex-shrink-0 shadow-inner">
-                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                </svg>
-            </div>
-            <div>
-                <p class="text-2xl font-bold text-slate-900">{{ number_format($broadcastsByChannel['push'] ?? 0) }}</p>
-                <p class="text-xs text-slate-500 font-medium mt-0.5">Push Sent</p>
-            </div>
-        </div>
-
-        <div class="bg-white/90 backdrop-blur-2xl rounded-2xl border border-slate-200/70 p-5 shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center flex-shrink-0 shadow-inner">
-                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-                </svg>
-            </div>
-            <div>
-                <p class="text-2xl font-bold text-slate-900">{{ number_format($broadcastsByChannel['sms'] ?? 0) }}</p>
-                <p class="text-xs text-slate-500 font-medium mt-0.5">SMS Sent</p>
-            </div>
-        </div>
-
-        <div class="bg-white/90 backdrop-blur-2xl rounded-2xl border border-slate-200/70 p-5 shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0 shadow-inner">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                </svg>
-            </div>
-            <div>
-                <p class="text-2xl font-bold text-slate-900">{{ number_format($broadcastsByChannel['email'] ?? 0) }}</p>
-                <p class="text-xs text-slate-500 font-medium mt-0.5">Emails Sent</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Compose Broadcast -->
-    <div class="bg-white/90 backdrop-blur-2xl rounded-3xl border border-slate-200/70 shadow-xl shadow-slate-200/50 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center shadow-lg shadow-slate-900/20">
-                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h2 class="text-sm font-bold text-slate-800">Compose Broadcast</h2>
-                    <p class="text-[11px] text-slate-500 mt-0.5">Select a channel and compose your message</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="p-6">
-            <form @@submit.prevent="send()" class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-
-                <!-- Left: Form fields (3 cols) -->
-                <div class="lg:col-span-3 space-y-5">
-
-                    <!-- Channel Selector -->
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-2">Channel</label>
-                        <div class="flex gap-2">
-                            <button type="button" @@click="form.channel = 'push'"
-                                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200"
-                                :class="form.channel === 'push'
-                                    ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-900/20'
-                                    : 'bg-white/70 text-slate-600 border-slate-200/70 hover:bg-slate-50'">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                                </svg>
-                                Push
-                            </button>
-                            <button type="button" @@click="form.channel = 'sms'"
-                                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200"
-                                :class="form.channel === 'sms'
-                                    ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-900/20'
-                                    : 'bg-white/70 text-slate-600 border-slate-200/70 hover:bg-slate-50'">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-                                </svg>
-                                SMS
-                            </button>
-                            <button type="button" @@click="form.channel = 'email'"
-                                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200"
-                                :class="form.channel === 'email'
-                                    ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-900/20'
-                                    : 'bg-white/70 text-slate-600 border-slate-200/70 hover:bg-slate-50'">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                </svg>
-                                Email
-                            </button>
-                        </div>
+<div class="space-y-5" x-data="marketingPage()">
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-sm">
+        <div class="relative px-4 py-5 sm:px-6">
+            <div class="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.22),transparent_58%)]"></div>
+            <div class="relative flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div class="min-w-0 max-w-xl">
+                    <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-orange-200">
+                        Customer Messaging
                     </div>
+                    <h1 class="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">Marketing Broadcasts</h1>
+                    <p class="mt-2 text-sm font-medium leading-6 text-slate-300">Send push notifications, SMS, and email campaigns to active vendors and drivers.</p>
+                </div>
+                <div class="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 xl:mt-11 xl:max-w-[680px]">
+                    @foreach($channelStats as $stat)
+                        <button type="button" x-data="{ key: @js($stat['key']) }" @@click="filterByStat(key)" class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-2.5 py-3 text-left transition hover:border-orange-300/30 hover:bg-white/15 focus:outline-none focus:ring-4 focus:ring-orange-300/20">
+                            <div @class([
+                                'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ring-1',
+                                'bg-white/10 text-slate-200 ring-white/15' => $stat['tone'] === 'slate',
+                                'bg-amber-400/10 text-amber-200 ring-amber-300/20' => $stat['tone'] === 'amber',
+                                'bg-emerald-400/10 text-emerald-200 ring-emerald-300/20' => $stat['tone'] === 'emerald',
+                                'bg-blue-400/10 text-blue-200 ring-blue-300/20' => $stat['tone'] === 'blue',
+                            ])>
+                                @if($stat['icon'] === 'megaphone')
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M11 5.5v13a1.6 1.6 0 01-3.1.54L6.2 14H5a3 3 0 010-6h1.2C8.5 8 10.2 7.2 11 5.5zm0 0c2.9 0 5.3-1 7-2.5v18c-1.7-1.5-4.1-2.5-7-2.5M18 9a3 3 0 010 6"/></svg>
+                                @elseif($stat['icon'] === 'bell')
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 00-4-5.7V5a2 2 0 10-4 0v.3A6 6 0 006 11v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0a3 3 0 11-6 0"/></svg>
+                                @elseif($stat['icon'] === 'chat')
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.4-4 8-9 8-1.5 0-2.9-.3-4.2-.9L3 20l1.4-3.7A7.4 7.4 0 013 12c0-4.4 4-8 9-8s9 3.6 9 8z"/></svg>
+                                @else
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M3 8l8 5.2a2 2 0 002.1 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                @endif
+                            </div>
+                            <div class="min-w-0">
+                                <p class="truncate text-[9px] font-black uppercase leading-snug tracking-wide text-slate-400">{{ $stat['label'] }}</p>
+                                <p class="mt-0.5 text-lg font-extrabold text-white">{{ number_format($stat['value']) }}</p>
+                                <p class="mt-0.5 truncate text-[10px] font-semibold text-slate-300">{{ $stat['detail'] }}</p>
+                            </div>
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </section>
 
-                    <!-- Push: Title -->
+    <section class="rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="button" @@click="activeTab = 'compose'" class="inline-flex w-auto items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition" :class="activeTab === 'compose' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-600 hover:bg-slate-50'">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Compose
+            </button>
+            <button type="button" @@click="activeTab = 'recent'" class="inline-flex w-auto items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition" :class="activeTab === 'recent' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-600 hover:bg-slate-50'">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Broadcast Log
+                <span class="rounded-full px-2 py-0.5 text-[10px] font-black" :class="activeTab === 'recent' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'" x-text="tableMeta.total || 0"></span>
+            </button>
+        </div>
+    </section>
+
+    <div class="space-y-5">
+    <div x-show="activeTab === 'compose'" x-cloak class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-300/30">
+        <div class="border-b border-slate-200/60 px-5 py-4">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex min-w-0 items-center gap-3">
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-extrabold text-slate-900">Compose Broadcast</h2>
+                        <p class="truncate text-sm text-slate-500">Build the message, preview it, then confirm before sending.</p>
+                    </div>
+                </div>
+                <div class="flex overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-1">
+                    <template x-for="channel in channelOptions" :key="channel.value">
+                        <button type="button" @@click="setChannel(channel.value)" class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-black transition sm:text-sm" :class="form.channel === channel.value ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-white'">
+                            <span x-text="channel.label"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid gap-0 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <form @@submit.prevent="openConfirm()" class="space-y-5 p-5">
+                <div class="grid gap-4 md:grid-cols-2">
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Audience</label>
+                        <select x-model="form.audience" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="all_vendors" x-text="`All Vendors (${audienceCount('vendors')} reachable)`"></option>
+                            <option value="all_drivers" x-text="`All Drivers (${audienceCount('drivers')} reachable)`"></option>
+                            <option value="all" x-text="`Everyone (${audienceCount('vendors') + audienceCount('drivers')} reachable)`"></option>
+                        </select>
+                    </div>
+                    <div x-show="form.channel === 'email'" x-transition>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Email Template</label>
+                        <select x-model="form.email_template" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="custom">Custom Message</option>
+                            <template x-for="tpl in emailTemplates" :key="tpl.name">
+                                <option :value="tpl.name" x-text="tpl.name"></option>
+                            </template>
+                        </select>
+                    </div>
                     <div x-show="form.channel === 'push'" x-transition>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                            Notification Title <span class="text-red-500">*</span>
-                        </label>
-                        <input type="text" x-model="form.title" maxlength="200" placeholder="e.g. New Feature Available!"
-                            class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition">
-                        <p class="mt-1 text-[11px] text-slate-400" x-text="`${form.title.length}/200 characters`"></p>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Notification Title <span class="text-rose-500">*</span></label>
+                        <input type="text" x-model="form.title" maxlength="200" placeholder="Short push title" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                     </div>
-
-                    <!-- Email: Subject -->
                     <div x-show="form.channel === 'email'" x-transition>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                            Email Subject <span class="text-red-500">*</span>
-                        </label>
-                        <input type="text" x-model="form.subject" maxlength="200" placeholder="e.g. Important Update for You"
-                            class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition">
-                        <p class="mt-1 text-[11px] text-slate-400" x-text="`${form.subject.length}/200 characters`"></p>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Email Subject <span class="text-rose-500">*</span></label>
+                        <input type="text" x-model="form.subject" maxlength="200" placeholder="Email subject" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                     </div>
+                </div>
 
-                    <!-- Email: Template Picker -->
-                    <div x-show="form.channel === 'email'" x-transition>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Email Template</label>
-                        <div class="relative">
-                            <select x-model="form.email_template"
-                                class="w-full appearance-none px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition pr-10">
-                                <option value="custom">Custom Message</option>
-                                <template x-for="tpl in emailTemplates" :key="tpl.name">
-                                    <option :value="tpl.name" x-text="tpl.name"></option>
-                                </template>
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                </svg>
+                <div>
+                    <div class="mb-2 flex items-center justify-between gap-3">
+                        <label class="block text-xs font-extrabold uppercase tracking-wide text-slate-600">
+                            <span x-text="messageLabel()"></span> <span class="text-rose-500">*</span>
+                        </label>
+                        <span class="text-[11px] font-bold text-slate-400" x-text="messageCounter()"></span>
+                    </div>
+                    <textarea x-model="form.body" :rows="form.channel === 'sms' ? 4 : 7" placeholder="Write the message recipients will receive..." class="w-full resize-none rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100"></textarea>
+                </div>
+
+                <template x-if="result">
+                    <div class="rounded-2xl border p-4 text-sm font-semibold" :class="result.success ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'">
+                        <div class="flex items-start gap-3">
+                            <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" :class="result.success ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'">
+                                <svg x-show="result.success" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <svg x-show="!result.success" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
                             </div>
-                        </div>
-                        <p class="mt-1 text-[11px] text-slate-400" x-show="form.email_template !== 'custom'">Template will be rendered with the subject and recipient name.</p>
-                    </div>
-
-                    <!-- Message Body -->
-                    <div x-show="form.channel !== 'email' || form.email_template === 'custom'" x-transition>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                            <span x-text="form.channel === 'sms' ? 'SMS Message' : (form.channel === 'email' ? 'Email Body' : 'Message Body')"></span>
-                            <span class="text-red-500">*</span>
-                        </label>
-                        <textarea x-model="form.body" :rows="form.channel === 'sms' ? 3 : 5" placeholder="Enter your message here..."
-                            class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition resize-none"></textarea>
-                        <div class="mt-1 flex items-center justify-between">
-                            <p class="text-[11px] text-slate-400" x-show="form.channel === 'sms'" x-text="`${form.body.length}/160 (${smsSegments()} segment${smsSegments() > 1 ? 's' : ''})`"></p>
-                            <p class="text-[11px] text-slate-400" x-show="form.channel !== 'sms'" x-text="`${form.body.length} characters`"></p>
-                        </div>
-                    </div>
-
-                    <!-- Body for email with template (optional extra content) -->
-                    <div x-show="form.channel === 'email' && form.email_template !== 'custom'" x-transition>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                            Message Content <span class="text-red-500">*</span>
-                        </label>
-                        <textarea x-model="form.body" rows="4" placeholder="Content to pass to the template..."
-                            class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition resize-none"></textarea>
-                        <p class="mt-1 text-[11px] text-slate-400">This content will be available as the body variable in the template.</p>
-                    </div>
-
-                    <!-- Audience Select -->
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                            Target Audience <span class="text-red-500">*</span>
-                        </label>
-                        <div class="relative">
-                            <select x-model="form.audience"
-                                class="w-full appearance-none px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition pr-10">
-                                <option value="all_vendors" x-text="`All Vendors (${audienceCount('vendors')} reachable)`"></option>
-                                <option value="all_drivers" x-text="`All Drivers (${audienceCount('drivers')} reachable)`"></option>
-                                <option value="all" x-text="`Everyone (${audienceCount('vendors') + audienceCount('drivers')} reachable)`"></option>
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <p class="mt-1.5 text-[11px] text-slate-400">
-                            Only active recipients with a registered
-                            <span x-text="form.channel === 'push' ? 'FCM token' : (form.channel === 'sms' ? 'phone number' : 'email address')"></span>
-                            will be reached.
-                        </p>
-                    </div>
-
-                    <!-- Submit Button -->
-                    <div class="pt-1">
-                        <button type="submit" :disabled="form.submitting || !canSend()"
-                            class="group relative flex items-center gap-2.5 px-6 py-2.5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-slate-900/25 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden">
-                            <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                            <template x-if="form.submitting">
-                                <svg class="w-4 h-4 animate-spin relative" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                </svg>
-                            </template>
-                            <template x-if="!form.submitting">
-                                <svg class="w-4 h-4 relative" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
-                                </svg>
-                            </template>
-                            <span class="relative" x-text="form.submitting ? 'Sending...' : 'Send Broadcast'"></span>
-                        </button>
-                    </div>
-
-                    <!-- Result message -->
-                    <template x-if="result">
-                        <div class="flex items-start gap-3 p-4 rounded-xl border text-sm"
-                            :class="result.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'">
-                            <template x-if="result.success">
-                                <svg class="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                            </template>
-                            <template x-if="!result.success">
-                                <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                            </template>
                             <div>
-                                <p class="font-semibold" x-text="result.success ? 'Broadcast Sent!' : 'Error'"></p>
-                                <p class="mt-0.5 text-xs opacity-80" x-text="result.message"></p>
-                                <template x-if="result.success && result.data">
-                                    <div class="mt-2 flex items-center gap-4 text-xs font-medium">
-                                        <span class="flex items-center gap-1">
-                                            <span class="w-2 h-2 bg-emerald-500 rounded-full inline-block"></span>
-                                            <span x-text="`${result.data.sent} delivered`"></span>
-                                        </span>
-                                        <span class="flex items-center gap-1" x-show="result.data.failed > 0">
-                                            <span class="w-2 h-2 bg-amber-400 rounded-full inline-block"></span>
-                                            <span x-text="`${result.data.failed} failed`"></span>
-                                        </span>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-
-                <!-- Right: Live Preview (2 cols) -->
-                <div class="lg:col-span-2 flex flex-col">
-                    <p class="text-xs font-semibold text-slate-700 mb-3">Live Preview</p>
-                    <div class="flex-1 bg-slate-100/60 rounded-2xl p-5 flex items-center justify-center min-h-[320px]">
-                        <div class="w-full max-w-xs">
-
-                            <!-- Push Preview -->
-                            <div x-show="form.channel === 'push'" x-transition>
-                                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-200">
-                                    <div class="bg-slate-800 px-4 py-1.5 flex items-center justify-between">
-                                        <span class="text-white text-[10px] font-medium">9:41 AM</span>
-                                        <div class="flex items-center gap-1.5">
-                                            <div class="w-2.5 h-2.5 rounded-full bg-white/30"></div>
-                                            <div class="w-2.5 h-2.5 rounded-full bg-white/30"></div>
-                                            <div class="w-2.5 h-2.5 rounded-full bg-white/30"></div>
-                                        </div>
-                                    </div>
-                                    <div class="p-4">
-                                        <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 shadow-sm">
-                                            <div class="flex items-start gap-3">
-                                                <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center flex-shrink-0">
-                                                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                                    </svg>
-                                                </div>
-                                                <div class="min-w-0 flex-1">
-                                                    <div class="flex items-center justify-between gap-2">
-                                                        <p class="text-[11px] font-bold text-slate-900 truncate" x-text="form.title || 'Notification Title'"></p>
-                                                        <span class="text-[10px] text-slate-400 whitespace-nowrap">now</span>
-                                                    </div>
-                                                    <p class="text-[11px] text-slate-600 mt-0.5 line-clamp-3" x-text="form.body || 'Your notification message will appear here...'"></p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <p class="mt-3 text-center text-[10px] text-slate-400">
-                                            Sending to: <span class="font-semibold text-slate-600" x-text="audienceLabel()"></span>
-                                        </p>
-                                    </div>
+                                <p class="font-black" x-text="result.success ? 'Broadcast sent' : 'Broadcast failed'"></p>
+                                <p class="mt-1 text-xs opacity-80" x-text="result.message"></p>
+                                <div x-show="result.success && result.data" class="mt-2 flex flex-wrap gap-2 text-xs">
+                                    <span class="rounded-full bg-white/70 px-2 py-1" x-text="`${result.data?.sent || 0} delivered`"></span>
+                                    <span class="rounded-full bg-white/70 px-2 py-1" x-show="(result.data?.failed || 0) > 0" x-text="`${result.data?.failed || 0} failed`"></span>
                                 </div>
                             </div>
-
-                            <!-- SMS Preview -->
-                            <div x-show="form.channel === 'sms'" x-transition>
-                                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-200">
-                                    <div class="bg-emerald-600 px-4 py-2 flex items-center gap-2.5">
-                                        <svg class="w-4 h-4 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                                        </svg>
-                                        <span class="text-white text-xs font-semibold">Messages</span>
-                                    </div>
-                                    <div class="p-4 bg-slate-50 min-h-[160px] flex flex-col justify-end">
-                                        <div class="flex justify-start mb-2">
-                                            <div class="max-w-[85%] bg-white rounded-2xl rounded-bl-md px-3.5 py-2.5 shadow-sm border border-slate-100">
-                                                <p class="text-[11px] text-slate-800 whitespace-pre-wrap" x-text="form.body || 'Your SMS message will appear here...'"></p>
-                                                <p class="text-[9px] text-slate-400 mt-1 text-right">now</p>
-                                            </div>
-                                        </div>
-                                        <p class="text-center text-[10px] text-slate-400 mt-2">
-                                            Sending to: <span class="font-semibold text-slate-600" x-text="audienceLabel()"></span>
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Email Preview -->
-                            <div x-show="form.channel === 'email'" x-transition>
-                                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-200">
-                                    <div class="bg-blue-600 px-4 py-2 flex items-center gap-2.5">
-                                        <svg class="w-4 h-4 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                        </svg>
-                                        <span class="text-white text-xs font-semibold">Email</span>
-                                    </div>
-                                    <div class="p-4 space-y-3">
-                                        <div class="space-y-1.5">
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-[10px] text-slate-400 font-medium w-10">From:</span>
-                                                <span class="text-[11px] text-slate-700 font-medium">{{ config('mail.from.name', 'Parcelman') }}</span>
-                                            </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-[10px] text-slate-400 font-medium w-10">Subj:</span>
-                                                <span class="text-[11px] text-slate-800 font-semibold truncate" x-text="form.subject || 'Email Subject'"></span>
-                                            </div>
-                                        </div>
-                                        <div class="border-t border-slate-100 pt-3">
-                                            <template x-if="form.email_template !== 'custom'">
-                                                <div class="text-center py-4">
-                                                    <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mx-auto mb-2">
-                                                        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"/>
-                                                        </svg>
-                                                    </div>
-                                                    <p class="text-[11px] text-slate-500">Using template:</p>
-                                                    <p class="text-[11px] font-semibold text-slate-800" x-text="form.email_template"></p>
-                                                </div>
-                                            </template>
-                                            <template x-if="form.email_template === 'custom'">
-                                                <p class="text-[11px] text-slate-600 line-clamp-6 whitespace-pre-wrap" x-text="form.body || 'Your email body will appear here...'"></p>
-                                            </template>
-                                        </div>
-                                        <p class="text-center text-[10px] text-slate-400 pt-1 border-t border-slate-100">
-                                            Sending to: <span class="font-semibold text-slate-600" x-text="audienceLabel()"></span>
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
                         </div>
                     </div>
-                </div>
+                </template>
 
+                <div class="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-end">
+                    <button type="button" @@click="resetForm(true)" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50">Reset</button>
+                    <button type="submit" :disabled="form.submitting || !canSend()" class="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
+                        <svg x-show="form.submitting" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
+                        <svg x-show="!form.submitting" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                        <span x-text="form.submitting ? 'Sending...' : 'Review & Send'"></span>
+                    </button>
+                </div>
             </form>
-        </div>
-    </div>
 
-    <!-- Recent Broadcasts Table -->
-    <div class="bg-white/90 backdrop-blur-2xl rounded-3xl border border-slate-200/70 shadow-xl shadow-slate-200/50 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center shadow-inner">
-                        <svg class="w-4.5 h-4.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                    </div>
-                    <h2 class="text-sm font-bold text-slate-800">Recent Broadcasts</h2>
-                </div>
-                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700" x-text="tableMeta.total + ' Total'"></span>
-            </div>
-        </div>
-
-        <!-- Filters -->
-        <div class="px-6 py-3 border-b border-slate-100 bg-slate-50/30">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <!-- Search -->
-                <div class="relative flex-1 max-w-xs">
-                    <input type="text" x-model="filters.search" @@input.debounce.500ms="applyFilters()" placeholder="Search broadcasts..."
-                        class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400 transition-colors">
-                    <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                    </svg>
+            <aside class="border-t border-slate-100 bg-slate-50/70 p-5 xl:border-l xl:border-t-0">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <p class="text-xs font-extrabold uppercase tracking-wide text-slate-600">Live Preview</p>
+                    <span class="rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase text-slate-500 ring-1 ring-slate-200" x-text="audienceLabel()"></span>
                 </div>
 
-                <!-- Channel Filter -->
-                <div x-data="{ open: false }" class="relative">
-                    <button type="button" @@click="open = !open"
-                        class="inline-flex items-center justify-between gap-2 px-3 py-2 min-w-[140px] border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors">
-                        <span x-text="filters.channelLabel || 'All channels'"></span>
-                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                        </svg>
-                    </button>
-                    <div x-show="open" @@click.away="open = false" x-transition
-                        class="absolute left-0 mt-2 w-40 rounded-2xl border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-2xl p-2 z-50" style="display: none;">
-                        <button type="button" @@click="filters.channel = ''; filters.channelLabel = ''; applyFilters(); open = false"
-                            class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100/70"
-                            :class="!filters.channel ? 'bg-slate-100/70' : ''">All channels</button>
-                        <button type="button" @@click="filters.channel = 'push'; filters.channelLabel = 'Push'; applyFilters(); open = false"
-                            class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100/70"
-                            :class="filters.channel === 'push' ? 'bg-slate-100/70' : ''">Push</button>
-                        <button type="button" @@click="filters.channel = 'sms'; filters.channelLabel = 'SMS'; applyFilters(); open = false"
-                            class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100/70"
-                            :class="filters.channel === 'sms' ? 'bg-slate-100/70' : ''">SMS</button>
-                        <button type="button" @@click="filters.channel = 'email'; filters.channelLabel = 'Email'; applyFilters(); open = false"
-                            class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100/70"
-                            :class="filters.channel === 'email' ? 'bg-slate-100/70' : ''">Email</button>
-                    </div>
-                </div>
-
-                <!-- Status Filter -->
-                <div x-data="{ open: false }" class="relative">
-                    <button type="button" @@click="open = !open"
-                        class="inline-flex items-center justify-between gap-2 px-3 py-2 min-w-[130px] border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors">
-                        <span x-text="filters.statusLabel || 'All statuses'"></span>
-                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                        </svg>
-                    </button>
-                    <div x-show="open" @@click.away="open = false" x-transition
-                        class="absolute left-0 mt-2 w-36 rounded-2xl border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-2xl p-2 z-50" style="display: none;">
-                        <button type="button" @@click="filters.status = ''; filters.statusLabel = ''; applyFilters(); open = false"
-                            class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100/70"
-                            :class="!filters.status ? 'bg-slate-100/70' : ''">All statuses</button>
-                        <button type="button" @@click="filters.status = 'sent'; filters.statusLabel = 'Sent'; applyFilters(); open = false"
-                            class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100/70"
-                            :class="filters.status === 'sent' ? 'bg-slate-100/70' : ''">Sent</button>
-                        <button type="button" @@click="filters.status = 'failed'; filters.statusLabel = 'Failed'; applyFilters(); open = false"
-                            class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100/70"
-                            :class="filters.status === 'failed' ? 'bg-slate-100/70' : ''">Failed</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Table -->
-        <div class="overflow-x-auto relative">
-            <div x-show="tableLoading" x-cloak x-transition.opacity.duration.150ms class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10"></div>
-
-            <table class="w-full">
-                <thead>
-                    <tr class="bg-slate-50/70 border-b border-slate-200/50">
-                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Sent At</th>
-                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Channel</th>
-                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Title</th>
-                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Message</th>
-                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Recipient</th>
-                        <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100/70">
-                    <template x-if="!tableLoading && broadcasts.length === 0">
-                        <tr>
-                            <td colspan="6" class="px-6 py-12 text-center">
-                                <div class="flex flex-col items-center gap-2">
-                                    <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
-                                        <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
-                                        </svg>
+                <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div x-show="form.channel === 'push'" x-transition>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-950 p-3">
+                            <div class="mb-3 flex items-center justify-between text-[10px] font-bold text-white/80"><span>9:41 AM</span><span>Parcelman</span></div>
+                            <div class="rounded-2xl bg-white p-3 shadow-lg">
+                                <div class="flex items-start gap-3">
+                                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                     </div>
-                                    <p class="text-sm font-medium text-slate-500">No broadcasts found</p>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate text-xs font-black text-slate-900" x-text="form.title || 'Notification title'"></p>
+                                        <p class="mt-1 line-clamp-4 whitespace-pre-wrap text-xs font-medium text-slate-600" x-text="form.body || 'Your push message will appear here.'"></p>
+                                    </div>
                                 </div>
-                            </td>
-                        </tr>
-                    </template>
+                            </div>
+                        </div>
+                    </div>
 
-                    <template x-for="log in broadcasts" :key="log.id">
-                        <tr class="hover:bg-slate-50/70">
-                            <td class="px-4 py-3 whitespace-nowrap">
-                                <span class="text-xs text-slate-700 font-medium" x-text="formatDate(log.created_at)"></span>
-                                <span class="block text-[10px] text-slate-400" x-text="formatTime(log.created_at)"></span>
-                            </td>
-                            <td class="px-4 py-3 whitespace-nowrap">
-                                <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                                    :class="{
-                                        'bg-amber-100 text-amber-700':   log.channel === 'push',
-                                        'bg-emerald-100 text-emerald-700': log.channel === 'sms',
-                                        'bg-blue-100 text-blue-700':     log.channel === 'email'
-                                    }"
-                                    x-text="log.channel ? log.channel.toUpperCase() : '—'"></span>
-                            </td>
-                            <td class="px-4 py-3 max-w-[180px]">
-                                <p class="text-xs font-medium text-slate-800 truncate" x-text="log.title || '—'"></p>
-                            </td>
-                            <td class="px-4 py-3 max-w-[260px]">
-                                <p class="text-xs text-slate-500 truncate" x-text="log.body || '—'"></p>
-                            </td>
-                            <td class="px-4 py-3 whitespace-nowrap">
-                                <span class="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                                    :class="log.notifiable_type === 'Vendor' ? 'bg-blue-50 text-blue-700' : 'bg-violet-50 text-violet-700'"
-                                    x-text="log.notifiable_type || '—'"></span>
-                            </td>
-                            <td class="px-4 py-3 whitespace-nowrap text-center">
-                                <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                                    :class="{
-                                        'bg-emerald-100 text-emerald-700': log.status === 'sent',
-                                        'bg-rose-100 text-rose-700':      log.status === 'failed',
-                                        'bg-slate-100 text-slate-600':    log.status !== 'sent' && log.status !== 'failed'
-                                    }">
-                                    <span class="w-1.5 h-1.5 rounded-full"
-                                        :class="{
-                                            'bg-emerald-500': log.status === 'sent',
-                                            'bg-rose-500':    log.status === 'failed',
-                                            'bg-slate-400':   log.status !== 'sent' && log.status !== 'failed'
-                                        }"></span>
-                                    <span x-text="log.status ? log.status.charAt(0).toUpperCase() + log.status.slice(1) : '—'"></span>
-                                </span>
-                            </td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
+                    <div x-show="form.channel === 'sms'" x-transition>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-100 p-3">
+                            <div class="mb-3 text-xs font-black text-slate-700">Messages</div>
+                            <div class="min-h-40 rounded-2xl bg-white p-4">
+                                <div class="max-w-[86%] rounded-2xl rounded-bl-md border border-slate-100 bg-slate-50 px-3 py-2 shadow-sm">
+                                    <p class="whitespace-pre-wrap text-xs font-medium leading-5 text-slate-800" x-text="form.body || 'Your SMS message will appear here.'"></p>
+                                    <p class="mt-1 text-right text-[10px] font-semibold text-slate-400">now</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div x-show="form.channel === 'email'" x-transition>
+                        <div class="rounded-2xl border border-slate-200 bg-white">
+                            <div class="border-b border-slate-100 px-4 py-3">
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">From</p>
+                                <p class="text-sm font-bold text-slate-900">{{ config('mail.from.name', 'Parcelman') }}</p>
+                            </div>
+                            <div class="border-b border-slate-100 px-4 py-3">
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Subject</p>
+                                <p class="truncate text-sm font-bold text-slate-900" x-text="form.subject || 'Email subject'"></p>
+                            </div>
+                            <div class="min-h-48 px-4 py-4">
+                                <div x-show="form.email_template !== 'custom'" class="mb-3 rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700" x-text="`Template: ${form.email_template}`"></div>
+                                <p class="whitespace-pre-wrap text-sm font-medium leading-6 text-slate-700" x-text="form.body || 'Your email body will appear here.'"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <div x-show="activeTab === 'recent'" x-cloak class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-300/30">
+        <div class="border-b border-slate-200/60 px-5 py-4">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex min-w-0 items-center gap-3">
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 ring-1 ring-slate-200">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-extrabold text-slate-900">Broadcast Log</h2>
+                        <p class="truncate text-sm text-slate-500">Search every broadcast and filter by channel, recipient, status, date, audience, or template.</p>
+                    </div>
+                </div>
+                <span class="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700" x-text="`${tableMeta.total || 0} records`"></span>
+            </div>
         </div>
 
-        <!-- Pagination -->
-        <div class="px-4 py-2.5 border-t border-slate-200/50 bg-slate-50/30">
-            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div class="text-xs text-slate-600">
-                    Showing <span x-text="tableMeta.from || 0"></span> to <span x-text="tableMeta.to || 0"></span> of <span x-text="tableMeta.total || 0"></span> results
-                </div>
-                <div class="flex items-center gap-3">
-                    <div class="text-xs font-medium text-slate-600">
-                        Page <span x-text="tableMeta.current_page || 1"></span> of <span x-text="tableMeta.last_page || 1"></span>
+        <div class="border-b border-slate-100 px-5 py-4">
+            <div class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+                <div class="w-full xl:max-w-md">
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" x-model="filters.search" @@input.debounce.500ms="applyFilters()" placeholder="Search broadcast log" class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                     </div>
-                    <div class="flex space-x-1">
-                        <button @@click="goToPage(1)" :disabled="tableMeta.current_page === 1"
-                            :class="tableMeta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                            class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/>
-                            </svg>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 xl:justify-end">
+                    <button type="button" @@click="showFilters = !showFilters" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50" :class="showFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+                        <span x-text="showFilters ? 'Hide Filters' : 'Filters'"></span>
+                    </button>
+                    <button type="button" @@click="clearFilters()" class="rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">Clear</button>
+                </div>
+            </div>
+
+            <div x-show="showFilters" x-transition class="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4" style="display:none">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Sent Date</label>
+                        <input type="text" x-ref="sentDateRange" placeholder="Select date range" readonly class="w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Channel</label>
+                        <select x-model="filters.channel" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All channels</option>
+                            <option value="push">Push</option>
+                            <option value="sms">SMS</option>
+                            <option value="email">Email</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Status</label>
+                        <select x-model="filters.status" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All statuses</option>
+                            <option value="sent">Sent</option>
+                            <option value="failed">Failed</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Audience</label>
+                        <select x-model="filters.audience" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All audiences</option>
+                            <option value="all_vendors">All Vendors</option>
+                            <option value="all_drivers">All Drivers</option>
+                            <option value="all">Vendors & Drivers</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Email Template</label>
+                        <select x-model="filters.template" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All templates</option>
+                            <option value="custom">Custom</option>
+                            <template x-for="tpl in emailTemplates" :key="tpl.name">
+                                <option :value="tpl.name" x-text="tpl.name"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Error State</label>
+                        <select x-model="filters.has_error" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All records</option>
+                            <option value="1">Has error</option>
+                            <option value="0">No error</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                    <button type="button" @@click="showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
+                    <button type="button" @@click="clearFilters()" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
+                    <button type="button" @@click="applyFilters()" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">Apply Filters</button>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2" x-show="activeFilterChips().length">
+                <template x-for="chip in activeFilterChips()" :key="chip.key">
+                    <span class="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-700 ring-1 ring-orange-200">
+                        <span x-text="chip.label"></span>
+                        <button type="button" @@click="clearFilter(chip.key)" class="text-orange-500 hover:text-orange-800">&times;</button>
+                    </span>
+                </template>
+            </div>
+        </div>
+
+        <div class="relative overflow-hidden">
+            <div x-show="tableLoading" x-cloak x-transition.opacity.duration.150ms class="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px]"></div>
+
+            <div class="hidden overflow-x-auto lg:block">
+                <table class="w-full table-auto divide-y divide-slate-200/50 text-xs">
+                    <thead class="bg-slate-50/50">
+                        <tr>
+                            <th class="whitespace-nowrap px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Sent At</th>
+                            <th class="whitespace-nowrap px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Channel</th>
+                            <th class="whitespace-nowrap px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Message</th>
+                            <th class="whitespace-nowrap px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Recipient</th>
+                            <th class="whitespace-nowrap px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Audience</th>
+                            <th class="whitespace-nowrap px-4 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100/50 bg-transparent">
+                        <template x-if="!tableLoading && broadcasts.length === 0">
+                            <tr>
+                                <td colspan="6" class="px-4 py-10 text-center">
+                                    <div class="flex flex-col items-center gap-2">
+                                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M11 5.5v13a1.6 1.6 0 01-3.1.54L6.2 14H5a3 3 0 010-6h1.2C8.5 8 10.2 7.2 11 5.5zm0 0c2.9 0 5.3-1 7-2.5v18c-1.7-1.5-4.1-2.5-7-2.5"/></svg>
+                                        </div>
+                                        <p class="text-sm font-medium text-slate-500">No broadcasts match the current filters</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                        <template x-for="log in broadcasts" :key="log.id">
+                            <tr class="hover:bg-slate-50/70">
+                                <td class="whitespace-nowrap px-4 py-3">
+                                    <p class="font-semibold text-slate-700" x-text="formatDate(log.created_at)"></p>
+                                    <p class="text-[11px] font-medium text-slate-400" x-text="formatTime(log.created_at)"></p>
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-3">
+                                    <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase" :class="channelBadgeClass(log.channel)" x-text="log.channel || '-'"></span>
+                                </td>
+                                <td class="max-w-[460px] px-4 py-3">
+                                    <p class="truncate text-sm font-bold text-slate-900" x-text="log.title || '-'"></p>
+                                    <p class="mt-0.5 line-clamp-2 text-xs font-medium leading-5 text-slate-500" x-text="log.body || '-'"></p>
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-3">
+                                    <p class="text-xs font-black text-slate-900" x-text="log.recipient_name || '-'"></p>
+                                    <p class="mt-0.5 text-[11px] font-semibold text-slate-500" x-text="log.recipient_phone || log.recipient_email || log.notifiable_type || '-'"></p>
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-3">
+                                    <p class="text-xs font-bold text-slate-700" x-text="audienceText(log.audience)"></p>
+                                    <p class="mt-0.5 text-[11px] font-semibold text-slate-400" x-show="log.template" x-text="`Template: ${log.template}`"></p>
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-3 text-center">
+                                    <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black" :class="statusBadgeClass(log.status)" x-text="statusLabel(log.status)"></span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="divide-y divide-slate-100 lg:hidden">
+                <template x-if="!tableLoading && broadcasts.length === 0">
+                    <div class="px-4 py-12 text-center text-sm font-semibold text-slate-400">No broadcasts match the current filters.</div>
+                </template>
+                <template x-for="log in broadcasts" :key="log.id">
+                    <article class="p-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-extrabold text-slate-900" x-text="log.title || 'Broadcast'"></p>
+                                <p class="mt-1 text-xs font-semibold text-slate-500" x-text="`${formatDate(log.created_at)} ${formatTime(log.created_at)}`"></p>
+                            </div>
+                            <span class="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase" :class="channelBadgeClass(log.channel)" x-text="log.channel || '-'"></span>
+                        </div>
+                        <p class="mt-3 line-clamp-3 text-sm font-medium leading-6 text-slate-600" x-text="log.body || '-'"></p>
+                        <div class="mt-4 flex items-center justify-between gap-3">
+                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600" x-text="log.recipient_name || log.notifiable_type || '-'"></span>
+                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600" x-text="audienceText(log.audience)"></span>
+                            <span class="rounded-full border px-2.5 py-1 text-[10px] font-black" :class="statusBadgeClass(log.status)" x-text="statusLabel(log.status)"></span>
+                        </div>
+                    </article>
+                </template>
+            </div>
+
+            <div class="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="text-xs font-semibold text-slate-600">
+                        Showing <span x-text="tableMeta.from || 0"></span> to <span x-text="tableMeta.to || 0"></span> of <span x-text="tableMeta.total || 0"></span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button @@click="goToPage(tableMeta.current_page - 1)" :disabled="tableMeta.current_page <= 1" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                         </button>
-                        <button @@click="goToPage(tableMeta.current_page - 1)" :disabled="tableMeta.current_page === 1"
-                            :class="tableMeta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                            class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                            </svg>
-                        </button>
-                        <button @@click="goToPage(tableMeta.current_page + 1)" :disabled="tableMeta.current_page >= tableMeta.last_page"
-                            :class="tableMeta.current_page >= tableMeta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                            class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                            </svg>
-                        </button>
-                        <button @@click="goToPage(tableMeta.last_page)" :disabled="tableMeta.current_page >= tableMeta.last_page"
-                            :class="tableMeta.current_page >= tableMeta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                            class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/>
-                            </svg>
+                        <div class="px-2 text-xs font-black text-slate-700">Page <span x-text="tableMeta.current_page || 1"></span> / <span x-text="tableMeta.last_page || 1"></span></div>
+                        <button @@click="goToPage(tableMeta.current_page + 1)" :disabled="tableMeta.current_page >= tableMeta.last_page" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </button>
                     </div>
                 </div>
@@ -596,12 +452,63 @@
         </div>
     </div>
 
+    <template x-teleport="body">
+        <div x-show="confirmOpen" x-cloak x-transition.opacity class="fixed inset-0 z-[220] flex min-h-screen items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" style="display:none">
+            <div @@click.stop x-transition.scale.origin.center class="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
+                <div class="flex items-start justify-between border-b border-slate-100 p-5">
+                    <div class="flex items-start gap-3">
+                        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
+                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-extrabold text-slate-900">Send Broadcast</h3>
+                            <p class="mt-1 text-sm font-medium text-slate-500">Confirm the channel and audience before sending.</p>
+                        </div>
+                    </div>
+                    <button type="button" @@click="confirmOpen = false" class="rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:text-slate-700">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="space-y-4 p-5">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="rounded-2xl bg-slate-50 p-4">
+                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Channel</p>
+                            <p class="mt-1 text-sm font-black uppercase text-slate-900" x-text="form.channel"></p>
+                        </div>
+                        <div class="rounded-2xl bg-slate-50 p-4">
+                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Reachable</p>
+                            <p class="mt-1 text-sm font-black text-slate-900" x-text="audienceReachable()"></p>
+                        </div>
+                    </div>
+                    <div class="rounded-2xl border border-slate-200 p-4">
+                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400" x-text="form.channel === 'email' ? 'Subject / Message' : 'Message'"></p>
+                        <p x-show="form.channel === 'push'" class="mt-2 text-sm font-black text-slate-900" x-text="form.title"></p>
+                        <p x-show="form.channel === 'email'" class="mt-2 text-sm font-black text-slate-900" x-text="form.subject"></p>
+                        <p class="mt-2 line-clamp-5 whitespace-pre-wrap text-sm font-medium leading-6 text-slate-600" x-text="form.body"></p>
+                    </div>
+                </div>
+                <div class="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end">
+                    <button type="button" @@click="confirmOpen = false" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50">Cancel</button>
+                    <button type="button" @@click="send()" :disabled="form.submitting" class="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700 disabled:opacity-50">
+                        <svg x-show="form.submitting" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
+                        <span x-text="form.submitting ? 'Sending...' : 'Send Now'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
 </div>
 
 @push('scripts')
 <script>
 function marketingPage() {
     return {
+        activeTab: 'compose',
+        channelOptions: [
+            { value: 'push', label: 'Push' },
+            { value: 'sms', label: 'SMS' },
+            { value: 'email', label: 'Email' },
+        ],
         form: {
             channel: 'push',
             title: '',
@@ -612,28 +519,46 @@ function marketingPage() {
             submitting: false,
         },
         result: null,
-
-        // Audience counts per channel
+        confirmOpen: false,
+        showFilters: false,
         counts: {
             push:  { vendors: {{ $vendorCountPush }},  drivers: {{ $driverCountPush }} },
             sms:   { vendors: {{ $vendorCountSms }},   drivers: {{ $driverCountSms }} },
             email: { vendors: {{ $vendorCountEmail }},  drivers: {{ $driverCountEmail }} },
         },
-
         emailTemplates: @json($emailTemplates),
-
-        // Broadcasts table
         broadcasts: [],
         tableLoading: false,
         tableMeta: { total: 0, per_page: 20, current_page: 1, last_page: 1, from: 0, to: 0 },
-        filters: { search: '', channel: '', channelLabel: '', status: '', statusLabel: '' },
+        filters: {
+            search: '',
+            date_from: '',
+            date_to: '',
+            channel: '',
+            status: '',
+            audience: '',
+            template: '',
+            has_error: '',
+        },
 
         init() {
             this.loadBroadcasts();
+            this.initDateRange();
+        },
+
+        setChannel(channel) {
+            this.form.channel = channel;
+            this.result = null;
         },
 
         audienceCount(type) {
             return this.counts[this.form.channel]?.[type] || 0;
+        },
+
+        audienceReachable() {
+            if (this.form.audience === 'all_vendors') return `${this.audienceCount('vendors')} vendors`;
+            if (this.form.audience === 'all_drivers') return `${this.audienceCount('drivers')} drivers`;
+            return `${this.audienceCount('vendors') + this.audienceCount('drivers')} people`;
         },
 
         audienceLabel() {
@@ -645,12 +570,35 @@ function marketingPage() {
             return Math.ceil(this.form.body.length / 160) || 1;
         },
 
+        messageLabel() {
+            if (this.form.channel === 'sms') return 'SMS Message';
+            if (this.form.channel === 'email') return this.form.email_template === 'custom' ? 'Email Body' : 'Template Content';
+            return 'Push Message';
+        },
+
+        messageCounter() {
+            if (this.form.channel === 'sms') return `${this.form.body.length}/160 (${this.smsSegments()} segment${this.smsSegments() > 1 ? 's' : ''})`;
+            return `${this.form.body.length}/5000`;
+        },
+
         canSend() {
-            if (!this.form.body.trim() && (this.form.channel !== 'email' || this.form.email_template === 'custom')) return false;
+            if (!this.form.body.trim()) return false;
             if (this.form.channel === 'push' && !this.form.title.trim()) return false;
             if (this.form.channel === 'email' && !this.form.subject.trim()) return false;
-            if (this.form.channel === 'email' && this.form.email_template !== 'custom' && !this.form.body.trim()) return false;
             return true;
+        },
+
+        openConfirm() {
+            if (!this.canSend()) return;
+            this.confirmOpen = true;
+        },
+
+        resetForm(clearResult = false) {
+            this.form.title = '';
+            this.form.body = '';
+            this.form.subject = '';
+            this.form.email_template = 'custom';
+            if (clearResult) this.result = null;
         },
 
         async send() {
@@ -666,11 +614,11 @@ function marketingPage() {
                         'Accept': 'application/json',
                     },
                     body: JSON.stringify({
-                        channel:        this.form.channel,
-                        title:          this.form.title,
-                        body:           this.form.body,
-                        subject:        this.form.subject,
-                        audience:       this.form.audience,
+                        channel: this.form.channel,
+                        title: this.form.title,
+                        body: this.form.body,
+                        subject: this.form.subject,
+                        audience: this.form.audience,
                         email_template: this.form.email_template,
                     }),
                 });
@@ -679,25 +627,24 @@ function marketingPage() {
 
                 if (!resp.ok) {
                     this.result = { success: false, message: data.message || 'Validation failed.' };
+                    this.confirmOpen = false;
                     return;
                 }
 
                 this.result = data;
+                this.confirmOpen = false;
 
                 if (data.success) {
-                    this.form.title   = '';
-                    this.form.body    = '';
-                    this.form.subject = '';
+                    this.resetForm(false);
                     this.loadBroadcasts();
                 }
             } catch (e) {
                 this.result = { success: false, message: 'Request failed. Please try again.' };
+                this.confirmOpen = false;
             } finally {
                 this.form.submitting = false;
             }
         },
-
-        // ── Table methods ──────────────────────────────
 
         async loadBroadcasts() {
             this.tableLoading = true;
@@ -707,20 +654,25 @@ function marketingPage() {
                 per_page: this.tableMeta.per_page,
             });
 
-            if (this.filters.search)  params.set('search',  this.filters.search);
+            if (this.filters.search) params.set('search', this.filters.search);
             if (this.filters.channel) params.set('channel', this.filters.channel);
-            if (this.filters.status)  params.set('status',  this.filters.status);
+            if (this.filters.status) params.set('status', this.filters.status);
+            if (this.filters.date_from) params.set('date_from', this.filters.date_from);
+            if (this.filters.date_to) params.set('date_to', this.filters.date_to);
+            if (this.filters.audience) params.set('audience', this.filters.audience);
+            if (this.filters.template) params.set('template', this.filters.template);
+            if (this.filters.has_error !== '') params.set('has_error', this.filters.has_error);
 
             try {
                 const resp = await fetch('{{ route("admin.marketing.data") }}?' + params.toString(), {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 });
 
-                if (!resp.ok) throw new Error('Failed to fetch');
+                if (!resp.ok) throw new Error('Failed to fetch broadcasts.');
 
                 const json = await resp.json();
-                this.broadcasts = json.data;
-                this.tableMeta  = json.meta;
+                this.broadcasts = json.data || [];
+                this.tableMeta = json.meta || this.tableMeta;
             } catch (e) {
                 console.error('Failed to load broadcasts:', e);
             } finally {
@@ -733,22 +685,147 @@ function marketingPage() {
             this.loadBroadcasts();
         },
 
+        clearFilters() {
+            Object.keys(this.filters).forEach((key) => this.filters[key] = '');
+            if (this.$refs.sentDateRange) this.$refs.sentDateRange.value = '';
+            this.applyFilters();
+        },
+
+        filterByStat(key) {
+            this.filters.search = '';
+            this.filters.status = '';
+            this.filters.audience = '';
+            this.filters.template = '';
+            this.filters.has_error = '';
+            this.filters.date_from = '';
+            this.filters.date_to = '';
+            if (this.$refs.sentDateRange) this.$refs.sentDateRange.value = '';
+            this.filters.channel = key === 'total' ? '' : key;
+            this.activeTab = 'recent';
+            this.applyFilters();
+        },
+
+        activeFilterChips() {
+            const chips = [];
+            if (this.filters.search) chips.push({ key: 'search', label: `Search: ${this.filters.search}` });
+            if (this.filters.channel) chips.push({ key: 'channel', label: `Channel: ${this.filters.channel.toUpperCase()}` });
+            if (this.filters.status) chips.push({ key: 'status', label: `Status: ${this.statusLabel(this.filters.status)}` });
+            if (this.filters.date_from) chips.push({ key: 'date_from', label: `From: ${this.filters.date_from}` });
+            if (this.filters.date_to) chips.push({ key: 'date_to', label: `To: ${this.filters.date_to}` });
+            if (this.filters.audience) chips.push({ key: 'audience', label: `Audience: ${this.audienceText(this.filters.audience)}` });
+            if (this.filters.template) chips.push({ key: 'template', label: `Template: ${this.filters.template}` });
+            if (this.filters.has_error !== '') chips.push({ key: 'has_error', label: this.filters.has_error === '1' ? 'Has error' : 'No error' });
+            return chips;
+        },
+
+        clearFilter(key) {
+            this.filters[key] = '';
+            if ((key === 'date_from' || key === 'date_to') && this.$refs.sentDateRange) this.$refs.sentDateRange.value = '';
+            this.applyFilters();
+        },
+
+        initDateRange() {
+            const setupPicker = () => {
+                if (!this.$refs.sentDateRange || !window.$ || !window.moment || !window.$.fn.daterangepicker) return;
+                const $input = window.$(this.$refs.sentDateRange);
+                $input.daterangepicker({
+                    autoUpdateInput: false,
+                    alwaysShowCalendars: true,
+                    opens: 'left',
+                    locale: { format: 'YYYY-MM-DD', cancelLabel: 'Clear' },
+                    ranges: {
+                        Today: [window.moment(), window.moment()],
+                        Yesterday: [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
+                        'Last 7 Days': [window.moment().subtract(6, 'days'), window.moment()],
+                        'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
+                        'This Month': [window.moment().startOf('month'), window.moment().endOf('month')],
+                        'Last Month': [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
+                    },
+                });
+                $input.on('apply.daterangepicker', (ev, picker) => {
+                    this.filters.date_from = picker.startDate.format('YYYY-MM-DD');
+                    this.filters.date_to = picker.endDate.format('YYYY-MM-DD');
+                    $input.val(`${this.filters.date_from} - ${this.filters.date_to}`);
+                });
+                $input.on('cancel.daterangepicker', () => {
+                    this.filters.date_from = '';
+                    this.filters.date_to = '';
+                    $input.val('');
+                });
+            };
+            if (window.$ && window.moment && window.$.fn.daterangepicker) {
+                setupPicker();
+                return;
+            }
+            const cssId = 'daterangepicker-css';
+            if (!document.getElementById(cssId)) {
+                const link = document.createElement('link');
+                link.id = cssId;
+                link.rel = 'stylesheet';
+                link.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
+                document.head.appendChild(link);
+            }
+            const loadScript = (id, src) => new Promise((resolve) => {
+                if (document.getElementById(id)) return resolve();
+                const script = document.createElement('script');
+                script.id = id;
+                script.src = src;
+                script.onload = () => resolve();
+                document.body.appendChild(script);
+            });
+            loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
+                .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
+                .then(() => {
+                    window.$ = window.jQuery = window.jQuery || window.$;
+                    window.moment = window.moment || moment;
+                    return loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js');
+                })
+                .then(setupPicker);
+        },
+
         goToPage(page) {
             if (page < 1 || page > this.tableMeta.last_page) return;
             this.tableMeta.current_page = page;
             this.loadBroadcasts();
         },
 
+        channelBadgeClass(channel) {
+            return {
+                push: 'border-amber-200 bg-amber-50 text-amber-700',
+                sms: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                email: 'border-blue-200 bg-blue-50 text-blue-700',
+            }[channel] || 'border-slate-200 bg-slate-100 text-slate-600';
+        },
+
+        statusBadgeClass(status) {
+            return {
+                sent: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                failed: 'border-rose-200 bg-rose-50 text-rose-700',
+                pending: 'border-amber-200 bg-amber-50 text-amber-700',
+            }[status] || 'border-slate-200 bg-slate-100 text-slate-600';
+        },
+
+        statusLabel(status) {
+            if (!status) return '-';
+            return status.charAt(0).toUpperCase() + status.slice(1);
+        },
+
+        audienceText(audience) {
+            return {
+                all_vendors: 'All Vendors',
+                all_drivers: 'All Drivers',
+                all: 'Vendors & Drivers',
+            }[audience] || '-';
+        },
+
         formatDate(val) {
-            if (!val) return '—';
-            const d = new Date(val);
-            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            if (!val) return '-';
+            return new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         },
 
         formatTime(val) {
             if (!val) return '';
-            const d = new Date(val);
-            return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            return new Date(val).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
         },
     };
 }

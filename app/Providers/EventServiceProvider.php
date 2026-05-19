@@ -30,6 +30,7 @@ use App\Listeners\SendDriverTransportNotification;
 use App\Listeners\SendDriverUnassignedNotification;
 use App\Listeners\SendAdminWarehouseInvoiceNotification;
 use App\Listeners\SendCollectionNotifications;
+use App\Listeners\SendCustomerEmailTemplateNotification;
 use App\Listeners\SendVendorInvoiceNotification;
 use App\Listeners\SendVendorShipmentNotification;
 use App\Listeners\SendWalkinShipmentNotifications;
@@ -42,11 +43,13 @@ class EventServiceProvider extends ServiceProvider
         ShipmentStatusChanged::class => [
             SendVendorShipmentNotification::class,
             SendAdminShipmentNotification::class,
+            SendCustomerEmailTemplateNotification::class,
         ],
 
         // Pickup events
         DriverAssignedToPickup::class => [
             SendDriverAssignmentNotification::class,
+            SendCustomerEmailTemplateNotification::class,
         ],
         PickupAssignmentStatusChanged::class => [
             SendAdminPickupNotification::class,
@@ -69,6 +72,7 @@ class EventServiceProvider extends ServiceProvider
         // Delivery run events
         DeliveryRunStopStatusChanged::class => [
             SendAdminDeliveryNotification::class,
+            SendCustomerEmailTemplateNotification::class,
         ],
 
         // Invoice events
@@ -82,7 +86,7 @@ class EventServiceProvider extends ServiceProvider
             SendAdminInvoiceResponseNotification::class,
         ],
 
-        // Warehouse invoice events (notify super admins)
+        // Warehouse invoice events (notify HQ operators)
         WarehouseInvoiceCreated::class => [
             SendAdminWarehouseInvoiceNotification::class,
         ],
@@ -98,6 +102,7 @@ class EventServiceProvider extends ServiceProvider
         // Collection (self-pickup)
         ShipmentReadyForCollection::class => [
             SendCollectionNotifications::class,
+            SendCustomerEmailTemplateNotification::class,
         ],
         ShipmentCollected::class => [
             SendCollectionNotifications::class,
@@ -106,6 +111,7 @@ class EventServiceProvider extends ServiceProvider
         // Vendor registration
         VendorRegistered::class => [
             SendAdminVendorRegisteredNotification::class,
+            SendCustomerEmailTemplateNotification::class,
         ],
     ];
 

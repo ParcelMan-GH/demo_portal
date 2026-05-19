@@ -9,13 +9,24 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
+use App\Services\BackOfficeAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class WarehousePortalService
 {
+    public function __construct(private readonly BackOfficeAccess $access)
+    {
+    }
+
     public function resolveWarehouse(User $user): Warehouse
     {
+        $selectedWarehouse = $this->access->selectedWarehouse($user, 'warehouse');
+
+        if ($selectedWarehouse) {
+            return $selectedWarehouse;
+        }
+
         return Warehouse::query()
             ->whereKey($user->warehouse_id)
             ->where('is_active', true)
@@ -32,11 +43,17 @@ class WarehousePortalService
         ];
     }
 
-    public function getAssignableWarehouseRoles(): Collection
+    public function getAssignableWarehouseRoles(?User $actor = null): Collection
     {
-        return Role::query()
+        $query = Role::query()
             ->active()
-            ->warehouseRoles()
+            ->warehouseRoles();
+
+        if (!$actor?->isHqUser()) {
+            $query->where('is_assignable_by_warehouse_manager', true);
+        }
+
+        return $query
             ->orderBy('name')
             ->get(['id', 'name', 'slug', 'is_assignable_by_warehouse_manager']);
     }

@@ -41,18 +41,16 @@ class RoleController extends Controller implements HasMiddleware
     public function index(Request $request): View
     {
         return view('admin.roles.index', [
-            'roleScope' => $this->resolveScope($request),
+            'roleScope' => $this->resolveScope($request, true),
         ]);
     }
 
     /**
      * Display a listing of warehouse roles.
      */
-    public function warehouseIndex(Request $request): View
+    public function warehouseIndex(Request $request): RedirectResponse
     {
-        return view('admin.roles.index', [
-            'roleScope' => $this->resolveScope($request, true),
-        ]);
+        return redirect()->route('admin.roles.index');
     }
 
     /**
@@ -87,7 +85,7 @@ class RoleController extends Controller implements HasMiddleware
         $roles = $query->skip($offset)->take($perPage)->get();
 
         $data = $roles->map(function (Role $role) use ($scope, $currentUser) {
-            $canManage = $currentUser->can('manage-role', $role);
+            $canManage = $currentUser->isHqUser() && $currentUser->can('manage-role', $role);
             $canDelete = $currentUser->hasPermission('roles.delete')
                 && $canManage
                 && $role->canBeDeleted()
@@ -95,9 +93,9 @@ class RoleController extends Controller implements HasMiddleware
 
             $typeLabel = 'Custom';
             if ($role->is_system_role) {
-                $typeLabel = 'System';
+                $typeLabel = 'Default';
             } elseif ($role->is_warehouse_role) {
-                $typeLabel = 'Warehouse';
+                $typeLabel = 'Role';
             }
 
             return [
@@ -110,14 +108,16 @@ class RoleController extends Controller implements HasMiddleware
                 'is_active' => (bool) $role->is_active,
                 'is_system_role' => (bool) $role->is_system_role,
                 'is_warehouse_role' => (bool) $role->is_warehouse_role,
+                'is_assignable_by_warehouse_manager' => (bool) $role->is_assignable_by_warehouse_manager,
                 'type_label' => $typeLabel,
+                'assignable_label' => $role->is_assignable_by_warehouse_manager ? 'Warehouse assignable' : 'Restricted assignment',
                 'status_label' => $role->is_active ? 'Active' : 'Inactive',
-                'created_at' => $role->created_at?->format('d/m/Y, H:i:s') ?? '-',
+                'created_at' => $role->created_at?->format('M j, Y, h:i A') ?? '-',
                 'can_edit' => $canManage,
                 'can_delete' => $canDelete,
-                'view_url' => route('admin.roles.show', ['role' => $role, 'scope' => $scope]),
-                'edit_url' => route('admin.roles.edit', ['role' => $role, 'scope' => $scope]),
-                'delete_url' => route('admin.roles.destroy', ['role' => $role, 'scope' => $scope]),
+                'view_url' => route('admin.roles.show', $role),
+                'edit_url' => route('admin.roles.edit', $role),
+                'delete_url' => route('admin.roles.destroy', $role),
             ];
         });
 
@@ -151,9 +151,9 @@ class RoleController extends Controller implements HasMiddleware
         $rows = $query->get()->map(function (Role $role) {
             $typeLabel = 'Custom';
             if ($role->is_system_role) {
-                $typeLabel = 'System';
+                $typeLabel = 'Default';
             } elseif ($role->is_warehouse_role) {
-                $typeLabel = 'Warehouse';
+                $typeLabel = 'Role';
             }
 
             return [
@@ -163,6 +163,7 @@ class RoleController extends Controller implements HasMiddleware
                 'Users' => (int) $role->users_count,
                 'Permissions' => (int) $role->permissions_count,
                 'Type' => $typeLabel,
+                'Assignment' => $role->is_assignable_by_warehouse_manager ? 'Warehouse assignable' : 'Restricted assignment',
                 'Status' => $role->is_active ? 'Active' : 'Inactive',
                 'Created At' => $role->created_at?->format('Y-m-d H:i:s') ?? '-',
             ];
@@ -185,8 +186,14 @@ class RoleController extends Controller implements HasMiddleware
     /**
      * Show the form for creating a new role.
      */
-    public function create(Request $request): View
+    public function create(Request $request): View|RedirectResponse
     {
+        if ($request->has('scope')) {
+            return redirect()->route('admin.roles.create');
+        }
+
+        $this->authorizeRoleDefinitionManagement();
+
         $scope = $this->resolveScope($request);
         $permissions = $this->getPermissionsForScope($scope);
 
@@ -201,6 +208,8 @@ class RoleController extends Controller implements HasMiddleware
      */
     public function store(StoreRoleRequest $request): RedirectResponse|JsonResponse
     {
+        $this->authorizeRoleDefinitionManagement();
+
         $scope = $this->resolveScope($request);
 
         $role = Role::create([
@@ -209,7 +218,8 @@ class RoleController extends Controller implements HasMiddleware
             'description' => $request->description,
             'is_active' => $request->boolean('is_active', true),
             'is_system_role' => false, // User-created roles are never system roles
-            'is_warehouse_role' => $scope === 'warehouse',
+            'is_warehouse_role' => true,
+            'is_assignable_by_warehouse_manager' => $request->boolean('is_assignable_by_warehouse_manager', true),
         ]);
 
         // Attach selected permissions
@@ -218,7 +228,7 @@ class RoleController extends Controller implements HasMiddleware
             $role->syncPermissions($permissionIds);
         }
 
-        $redirectUrl = route($scope === 'warehouse' ? 'admin.roles.warehouse.index' : 'admin.roles.index');
+        $redirectUrl = route('admin.roles.index');
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -241,7 +251,7 @@ class RoleController extends Controller implements HasMiddleware
      */
     public function show(Role $role, Request $request): View
     {
-        $role->load(['permissions', 'users']);
+        $role->load(['permissions', 'users.warehouse']);
 
         return view('admin.roles.show', [
             'role' => $role,
@@ -252,8 +262,14 @@ class RoleController extends Controller implements HasMiddleware
     /**
      * Show the form for editing the specified role.
      */
-    public function edit(Role $role, Request $request): View
+    public function edit(Role $role, Request $request): View|RedirectResponse
     {
+        if ($request->has('scope')) {
+            return redirect()->route('admin.roles.edit', $role);
+        }
+
+        $this->authorizeRoleDefinitionManagement();
+
         // Check authorization using the manage-role gate
         $this->authorize('manage-role', $role);
 
@@ -274,6 +290,8 @@ class RoleController extends Controller implements HasMiddleware
      */
     public function update(UpdateRoleRequest $request, Role $role): RedirectResponse|JsonResponse
     {
+        $this->authorizeRoleDefinitionManagement();
+
         // Check authorization using the manage-role gate
         $this->authorize('manage-role', $role);
         $scope = $this->resolveScope($request, $role->is_warehouse_role);
@@ -283,6 +301,7 @@ class RoleController extends Controller implements HasMiddleware
             'slug' => Str::slug($request->name),
             'description' => $request->description,
             'is_active' => $request->boolean('is_active'),
+            'is_assignable_by_warehouse_manager' => $request->boolean('is_assignable_by_warehouse_manager'),
         ]);
 
         // Sync permissions
@@ -293,7 +312,7 @@ class RoleController extends Controller implements HasMiddleware
             $user->flushPermissionCache();
         }
 
-        $redirectUrl = route($scope === 'warehouse' ? 'admin.roles.warehouse.index' : 'admin.roles.index');
+        $redirectUrl = route('admin.roles.index');
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -316,6 +335,8 @@ class RoleController extends Controller implements HasMiddleware
      */
     public function destroy(Role $role, Request $request): RedirectResponse|JsonResponse
     {
+        $this->authorizeRoleDefinitionManagement();
+
         $scope = $this->resolveScope($request, $role->is_warehouse_role);
 
         // Check if role can be deleted (not a system role)
@@ -346,7 +367,7 @@ class RoleController extends Controller implements HasMiddleware
         }
 
         return redirect()
-            ->route($scope === 'warehouse' ? 'admin.roles.warehouse.index' : 'admin.roles.index')
+            ->route('admin.roles.index')
             ->with('success', 'Role deleted successfully.');
     }
 
@@ -377,6 +398,27 @@ class RoleController extends Controller implements HasMiddleware
             $query->where('is_system_role', false);
         }
 
+        $assignable = $request->input('assignable');
+        if ($assignable === '1' || $assignable === '0') {
+            $query->where('is_assignable_by_warehouse_manager', $assignable === '1');
+        }
+
+        if ($request->filled('users_min')) {
+            $query->having('users_count', '>=', max((int) $request->input('users_min'), 0));
+        }
+
+        if ($request->filled('users_max')) {
+            $query->having('users_count', '<=', max((int) $request->input('users_max'), 0));
+        }
+
+        if ($request->filled('permissions_min')) {
+            $query->having('permissions_count', '>=', max((int) $request->input('permissions_min'), 0));
+        }
+
+        if ($request->filled('permissions_max')) {
+            $query->having('permissions_count', '<=', max((int) $request->input('permissions_max'), 0));
+        }
+
         if ($dateFrom = $request->input('date_from')) {
             $query->whereDate('created_at', '>=', $dateFrom);
         }
@@ -384,6 +426,11 @@ class RoleController extends Controller implements HasMiddleware
         if ($dateTo = $request->input('date_to')) {
             $query->whereDate('created_at', '<=', $dateTo);
         }
+    }
+
+    private function authorizeRoleDefinitionManagement(): void
+    {
+        abort_unless(Auth::guard('admin')->user()?->isHqUser(), 403);
     }
 
     /**
@@ -408,23 +455,24 @@ class RoleController extends Controller implements HasMiddleware
             return 'system';
         }
 
-        return 'system';
+        return 'warehouse';
     }
 
     /**
-     * Get grouped permissions constrained by role scope.
+     * Get grouped permissions for role templates. Roles are universal across
+     * warehouses now, so HQ can compose templates from any module permission.
      */
     private function getPermissionsForScope(string $scope): Collection
     {
-        $permissions = Permission::getGroupedByModule()->toBase();
-
-        if ($scope === 'system') {
-            $permissions = $permissions->except(['warehouse_roles', 'warehouse']);
-        } elseif ($scope === 'warehouse') {
-            $permissions = $permissions->only(['warehouse']);
-        }
-
-        return $permissions;
+        return Permission::query()
+            ->where('module', '!=', 'invoices')
+            ->where('name', 'not like', 'warehouse.invoices.%')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->groupBy(fn (Permission $permission) => $permission->displayModule())
+            ->sortKeys()
+            ->toBase();
     }
 
     /**
@@ -436,14 +484,12 @@ class RoleController extends Controller implements HasMiddleware
             return [];
         }
 
-        $query = Permission::query()->whereIn('id', $permissionIds);
-
-        if ($scope === 'system') {
-            $query->whereNotIn('module', ['warehouse_roles', 'warehouse']);
-        } elseif ($scope === 'warehouse') {
-            $query->where('module', 'warehouse');
-        }
-
-        return $query->pluck('id')->map(static fn ($id) => (int) $id)->all();
+        return Permission::query()
+            ->whereIn('id', $permissionIds)
+            ->where('module', '!=', 'invoices')
+            ->where('name', 'not like', 'warehouse.invoices.%')
+            ->pluck('id')
+            ->map(static fn ($id) => (int) $id)
+            ->all();
     }
 }

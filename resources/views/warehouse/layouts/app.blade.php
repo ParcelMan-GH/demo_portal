@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Warehouse Portal') - Parcelman Express</title>
+    <title>@yield('title', 'Back Office') - Parcelman Express</title>
     <link rel="icon" type="image/jpeg" href="{{ asset('favicon.jpg') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,10 +17,13 @@
       x-data="{ sidebarOpen: false, sidebarCollapsed: localStorage.getItem('whSidebarCollapsed') === 'true' }" x-init="$watch('sidebarCollapsed', val => localStorage.setItem('whSidebarCollapsed', val))">
     @php
         $authUser = Auth::guard('admin')->user();
-        $warehouse = $authUser?->warehouse;
+        $warehouse = $backOfficeSelectedWarehouse ?? $backOfficeCurrentWarehouse ?? $authUser?->warehouse;
+        $warehouseLabel = $backOfficeScopeLabel ?? ($warehouse?->name ?? 'Warehouse');
 
+        $backOfficeAccess = app(\App\Services\BackOfficeAccess::class);
         $canDashboard = $authUser?->hasPermission('warehouse.dashboard.view');
         $canUsers = $authUser?->hasPermission('warehouse.users.view');
+        $canRoles = $authUser ? $backOfficeAccess->canUsePermission($authUser, 'roles.view') : false;
         $canReceiving = $authUser?->hasPermission('warehouse.receiving.manage');
         $canItems = $authUser?->hasPermission('warehouse.items.scan');
         $canSorting = $authUser?->hasPermission('warehouse.sorting.manage');
@@ -47,7 +50,7 @@
                 </div>
                 <div class="ml-3 min-w-0 overflow-hidden transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'w-auto opacity-100'">
                     <span class="text-white text-[16px] font-extrabold tracking-tight block whitespace-nowrap">Parcelman</span>
-                    <span class="wh-brand-kicker block max-w-[190px] truncate text-[10px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap" title="{{ $warehouse?->name ?? 'Warehouse' }}">{{ $warehouse?->name ?? 'Warehouse' }}</span>
+                    <span class="wh-brand-kicker block max-w-[190px] truncate text-[10px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap" title="{{ $warehouseLabel }}">{{ $warehouseLabel }}</span>
                 </div>
             </div>
 
@@ -159,16 +162,60 @@
                 @endif
                 @endif
 
-                {{-- ═══════════ SYSTEM ═══════════ --}}
-                @if($canUsers)
-                <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">System</div>
+                {{-- ═══════════ TEAM ═══════════ --}}
+                @if($canUsers || $canRoles)
+                <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">Team</div>
                 <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
 
+                @if($canUsers)
                 <a href="{{ route('warehouse.users.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.users.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                     <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
                     <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Users</span>
                     <template x-if="sidebarCollapsed"><span class="wh-tooltip">Users</span></template>
                 </a>
+                @endif
+
+                @if($canRoles)
+                <a href="{{ route('admin.roles.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.roles.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2Zm10-10V7a4 4 0 00-8 0v4"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Roles</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Roles</span></template>
+                </a>
+                @endif
+                @endif
+
+                @if(($backOfficeIsHq ?? false) || $authUser?->hasAnyPermission(['vendors.view', 'drivers.view', 'settings.view']))
+                <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">HQ Controls</div>
+                <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
+
+                @hasPermission('vendors.view')
+                <a href="{{ route('admin.vendors.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.vendors.*') || request()->routeIs('admin.vendor-payouts.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Vendors</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Vendors</span></template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('drivers.view')
+                <a href="{{ route('admin.drivers.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.drivers.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Riders & Drivers</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Riders & Drivers</span></template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('settings.view')
+                <a href="{{ route('admin.marketing.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.marketing.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Marketing</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Marketing</span></template>
+                </a>
+                <a href="{{ route('admin.settings.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Settings</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Settings</span></template>
+                </a>
+                @endhasPermission
                 @endif
 
             </nav>
@@ -269,11 +316,7 @@
                     {{-- Separator --}}
                     <div class="w-px h-6 bg-slate-200/60 mx-1"></div>
 
-                    {{-- Warehouse badge --}}
-                    <div class="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-slate-50/80 border-slate-200/60">
-                        <div class="w-2 h-2 rounded-full animate-pulse bg-orange-500"></div>
-                        <span class="text-[11px] font-semibold text-slate-600">{{ $warehouse?->name ?? 'Warehouse' }}</span>
-                    </div>
+                    @include('admin.shared.warehouse-context-selector')
 
                     {{-- User Avatar Dropdown --}}
                     <div class="relative">
@@ -314,7 +357,7 @@
                             <div class="px-4 py-2 border-b border-slate-100/80">
                                 <div class="flex items-center gap-2">
                                     <div class="w-2 h-2 rounded-full bg-orange-500"></div>
-                                    <span class="text-[11px] font-medium text-slate-500">{{ $warehouse?->name ?? 'Warehouse' }}</span>
+                                    <span class="text-[11px] font-medium text-slate-500">{{ $warehouseLabel }}</span>
                                 </div>
                             </div>
 

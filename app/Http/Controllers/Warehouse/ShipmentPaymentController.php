@@ -149,16 +149,16 @@ class ShipmentPaymentController extends Controller
     }
 
     /**
-     * Void a payment. Super admin only.
+     * Void a payment. HQ only.
      */
     public function destroy(ShipmentPayment $payment): JsonResponse
     {
         $admin = Auth::guard('admin')->user();
 
-        if (!$admin->isSuperAdmin()) {
+        if (!$admin->isHqUser()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Only super admins can void payments.',
+                'message' => 'Only HQ administrators can void payments.',
             ], 403);
         }
 

@@ -36,6 +36,7 @@ function buildRoleShowPage(config) {
         filteredRows: [],
         users: [],
         search: '',
+        showFilters: false,
         statusFilter: '',
         statusFilterName: 'All statuses',
         sortBy: 'created_at',
@@ -52,6 +53,7 @@ function buildRoleShowPage(config) {
             { key: 'name', label: 'Name' },
             { key: 'role', label: 'Role' },
             { key: 'email', label: 'Email' },
+            { key: 'warehouse', label: 'Warehouse' },
             { key: 'created_at', label: 'Created At' },
             { key: 'last_login_at', label: 'Last Login' },
             { key: 'actions', label: 'Actions' },
@@ -60,6 +62,7 @@ function buildRoleShowPage(config) {
             name: true,
             role: true,
             email: true,
+            warehouse: true,
             created_at: true,
             last_login_at: true,
             actions: true,
@@ -81,6 +84,14 @@ function buildRoleShowPage(config) {
         setStatusFilter(value, label) {
             this.statusFilter = value;
             this.statusFilterName = label;
+            this.meta.current_page = 1;
+            this.applyFilters();
+        },
+
+        clearFilters() {
+            this.search = '';
+            this.statusFilter = '';
+            this.statusFilterName = 'All statuses';
             this.meta.current_page = 1;
             this.applyFilters();
         },
@@ -121,6 +132,7 @@ function buildRoleShowPage(config) {
                     const haystack = [
                         user.name,
                         user.email,
+                        user.warehouse_name,
                         user.role_name,
                         user.status_label,
                     ].map(normalizeText).join(' ');
@@ -150,6 +162,9 @@ function buildRoleShowPage(config) {
                 } else if (this.sortBy === 'email') {
                     valueA = normalizeText(a.email);
                     valueB = normalizeText(b.email);
+                } else if (this.sortBy === 'warehouse_name') {
+                    valueA = normalizeText(a.warehouse_name);
+                    valueB = normalizeText(b.warehouse_name);
                 } else {
                     valueA = normalizeText(a[this.sortBy]);
                     valueB = normalizeText(b[this.sortBy]);
@@ -247,7 +262,7 @@ function buildRoleShowPage(config) {
         },
 
         downloadCsv(rows, filename) {
-            const headers = ['Name', 'Role', 'Email', 'Status', 'Created At', 'Last Login'];
+            const headers = ['Name', 'Role', 'Email', 'Warehouse', 'Status', 'Created At', 'Last Login'];
             let csvContent = `${headers.map(toCsvValue).join(',')}\n`;
 
             rows.forEach((row) => {
@@ -255,6 +270,7 @@ function buildRoleShowPage(config) {
                     toCsvValue(row.name),
                     toCsvValue(row.role_name),
                     toCsvValue(row.email),
+                    toCsvValue(row.warehouse_name),
                     toCsvValue(row.status_label),
                     toCsvValue(row.created_at),
                     toCsvValue(row.last_login_at),
@@ -287,6 +303,7 @@ function buildRoleShowPage(config) {
                     <td>${row.name || '-'}</td>
                     <td>${row.role_name || '-'}</td>
                     <td>${row.email || '-'}</td>
+                    <td>${row.warehouse_name || '-'}</td>
                     <td>${row.status_label || '-'}</td>
                     <td>${row.created_at || '-'}</td>
                     <td>${row.last_login_at || '-'}</td>
@@ -313,6 +330,7 @@ function buildRoleShowPage(config) {
                                     <th>Name</th>
                                     <th>Role</th>
                                     <th>Email</th>
+                                    <th>Warehouse</th>
                                     <th>Status</th>
                                     <th>Created At</th>
                                     <th>Last Login</th>

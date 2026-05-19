@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
             WarehouseSeeder::class,
             DriversSeeder::class,
             ShipmentSettingsSeeder::class,
+            EmailTemplateSeeder::class,
         ]);
     }
 }

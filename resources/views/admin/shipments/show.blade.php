@@ -45,7 +45,7 @@ $shipmentConfig = [
     'canApproveReceivingDiscrepancy' => Auth::guard('admin')->user()?->hasPermission('warehouse.receiving.approve_discrepancy') ?? false,
     'canManage' => $canManage,
     'canManageCharges' => $canManageCharges ?? false,
-    'isSuperAdmin' => auth('admin')->user()?->isSuperAdmin() ?? false,
+    'isSuperAdmin' => auth('admin')->user()?->isHqUser() ?? false,
     'paymentsDataEndpoint' => route('admin.shipments.payments.data', $shipment),
     'storePaymentEndpoint' => route('admin.shipments.payments.store', $shipment),
     'destroyPaymentEndpointTemplate' => route('admin.payments.destroy', ['payment' => '__PAYMENT__']),
@@ -4212,7 +4212,7 @@ $shipmentConfig = [
 
                                     <template x-if="!canApproveReceivingDiscrepancy">
                                         <div class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
-                                            You do not have permission to approve discrepancy finalization. A warehouse manager or super admin needs to finalize this receipt.
+                                            You do not have permission to approve discrepancy finalization. A warehouse manager or HQ administrator needs to finalize this receipt.
                                         </div>
                                     </template>
 

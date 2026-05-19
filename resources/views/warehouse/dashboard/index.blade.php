@@ -12,6 +12,7 @@
     $workflowLanes = $dashboard['workflow_lanes'] ?? [];
     $exceptions = $dashboard['exceptions'] ?? [];
     $activity = $dashboard['activity'] ?? [];
+    $activityPages = collect($activity)->chunk(5)->values();
     $actions = collect($dashboard['actions'] ?? [])->filter(fn ($action) => Auth::guard('admin')->user()?->hasPermission($action['permission'] ?? ''))->values();
     $toneClasses = [
         'orange' => ['icon' => 'bg-orange-50 text-orange-700 ring-orange-200', 'bar' => 'bg-orange-500', 'text' => 'text-orange-700', 'panel' => 'bg-orange-50/70 border-orange-100'],
@@ -102,17 +103,17 @@
                 <div class="border-b border-slate-100 px-5 py-4">
                     <h2 class="text-sm font-black uppercase tracking-wide text-slate-700">Workflow Lanes</h2>
                 </div>
-                <div class="grid gap-4 p-5 lg:grid-cols-5">
+                <div class="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
                     @foreach($workflowLanes as $lane)
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <div class="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                             <h3 class="text-sm font-black text-slate-900">{{ $lane['label'] }}</h3>
                             <p class="mt-1 min-h-10 text-xs font-bold leading-5 text-slate-500">{{ $lane['detail'] }}</p>
                             <div class="mt-4 grid gap-2">
                                 @foreach($lane['items'] as $item)
-                                    <a href="{{ $item['url'] }}" class="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-3 text-xs font-black text-slate-700 ring-1 ring-slate-200 transition hover:ring-orange-200 hover:text-orange-800">
-                                        <span>{{ $item['label'] }}</span>
+                                    <a href="{{ $item['url'] }}" class="flex min-h-14 items-center justify-between gap-3 rounded-xl bg-white px-3 py-3 text-xs font-black leading-5 text-slate-700 ring-1 ring-slate-200 transition hover:ring-orange-200 hover:text-orange-800">
+                                        <span class="min-w-0 break-words">{{ $item['label'] }}</span>
                                         @if($item['value'] !== null)
-                                            <span class="rounded-lg bg-slate-100 px-2 py-1 text-[11px] text-slate-700">{{ number_format($item['value']) }}</span>
+                                            <span class="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-[11px] text-slate-700">{{ number_format($item['value']) }}</span>
                                         @endif
                                     </a>
                                 @endforeach
@@ -143,25 +144,43 @@
                 </div>
             </section>
 
-            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div class="border-b border-slate-100 px-5 py-4">
+            <section x-data="{ page: 1, total: {{ max($activityPages->count(), 1) }} }" class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
                     <h2 class="text-sm font-black uppercase tracking-wide text-slate-700">Recent Activity</h2>
+                    @if($activityPages->count() > 1)
+                        <span class="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600">
+                            <span x-text="page"></span> / {{ $activityPages->count() }}
+                        </span>
+                    @endif
                 </div>
                 <div class="divide-y divide-slate-100">
-                    @forelse($activity as $event)
-                        @php $tone = $toneClasses[$event['tone']] ?? $toneClasses['slate']; @endphp
-                        <a href="{{ $event['url'] }}" class="flex gap-3 px-5 py-4 transition hover:bg-slate-50">
-                            <span class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full {{ $tone['bar'] }} ring-4 ring-slate-100"></span>
-                            <div class="min-w-0">
-                                <p class="text-sm font-black text-slate-900">{{ $event['label'] }}</p>
-                                <p class="mt-1 truncate text-xs font-bold text-slate-500">{{ $event['detail'] ?: '-' }}</p>
-                                <p class="mt-1 text-[11px] font-semibold text-slate-400">{{ collect([$event['actor'], $event['time']])->filter()->join(' / ') }}</p>
+                    @if($activityPages->isNotEmpty())
+                        @foreach($activityPages as $pageIndex => $events)
+                            <div x-show="page === {{ $pageIndex + 1 }}" x-cloak>
+                                @foreach($events as $event)
+                                    @php $tone = $toneClasses[$event['tone']] ?? $toneClasses['slate']; @endphp
+                                    <a href="{{ $event['url'] }}" class="flex gap-3 px-5 py-4 transition hover:bg-slate-50">
+                                        <span class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full {{ $tone['bar'] }} ring-4 ring-slate-100"></span>
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-black text-slate-900">{{ $event['label'] }}</p>
+                                            <p class="mt-1 truncate text-xs font-bold text-slate-500">{{ $event['detail'] ?: '-' }}</p>
+                                            <p class="mt-1 text-[11px] font-semibold text-slate-400">{{ collect([$event['actor'], $event['time']])->filter()->join(' / ') }}</p>
+                                        </div>
+                                    </a>
+                                @endforeach
                             </div>
-                        </a>
-                    @empty
+                        @endforeach
+                    @else
                         <div class="px-5 py-8 text-center text-sm font-bold text-slate-400">No recent activity yet.</div>
-                    @endforelse
+                    @endif
                 </div>
+                @if($activityPages->count() > 1)
+                    <div class="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-5 py-3">
+                        <button type="button" @click="page = Math.max(1, page - 1)" :disabled="page <= 1" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">Prev</button>
+                        <p class="text-xs font-black text-slate-500">Showing 5 per page</p>
+                        <button type="button" @click="page = Math.min(total, page + 1)" :disabled="page >= total" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
+                    </div>
+                @endif
             </section>
         </aside>
     </section>

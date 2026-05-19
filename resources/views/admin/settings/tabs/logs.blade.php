@@ -1,95 +1,54 @@
-<div x-data="systemLogsTable()" x-init="loadData()">
-    <!-- Controls -->
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-6">
-        <div class="flex flex-1 flex-wrap items-center gap-3">
-            <!-- Search -->
-            <div class="relative flex-1 min-w-[200px] max-w-xs">
-                <input type="text"
-                       x-model="search"
-                       @@input.debounce.500ms="loadData()"
-                       placeholder="Search logs..."
-                       class="w-full px-3.5 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors">
-                <svg class="absolute right-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-            </div>
-
-            <!-- Level Filter -->
-            <select x-model="levelFilter"
-                    @@change="loadData()"
-                    class="px-3.5 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors">
-                <option value="">All Levels</option>
-                <option value="emergency">Emergency</option>
-                <option value="alert">Alert</option>
-                <option value="critical">Critical</option>
-                <option value="error">Error</option>
-                <option value="warning">Warning</option>
-                <option value="notice">Notice</option>
-                <option value="info">Info</option>
-                <option value="debug">Debug</option>
-            </select>
-
-            <!-- Date Range -->
-            <input type="date"
-                   x-model="dateFrom"
-                   @@change="loadData()"
-                   class="px-3.5 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
-                   placeholder="From">
-            <input type="date"
-                   x-model="dateTo"
-                   @@change="loadData()"
-                   class="px-3.5 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
-                   placeholder="To">
-        </div>
-
-        <!-- Actions -->
-        <div class="flex items-center gap-2">
-            <!-- Export -->
-            <div x-data="{ open: false }" class="relative">
-                <button @@click="open = !open"
-                        class="inline-flex items-center gap-2 px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                    Export
-                </button>
-                <div x-show="open" @@click.away="open = false" x-transition
-                     class="absolute right-0 mt-2 w-36 bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-slate-200/60 py-1 z-50">
-                    <button type="button" @@click="exportLogs('txt'); open = false"
-                            class="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                        Text (.log)
-                    </button>
-                    <button type="button" @@click="exportLogs('json'); open = false"
-                            class="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
-                        </svg>
-                        JSON
-                    </button>
+<div x-data="systemLogsTable()" x-init="loadData(); initDateRange()">
+    <div class="mb-5 space-y-4">
+        <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div class="w-full xl:max-w-md">
+                <div class="relative">
+                    <input type="text" x-model="search" @@input.debounce.500ms="refreshData()" placeholder="Search logs..." class="w-full rounded-xl border-2 border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 </div>
             </div>
+            <div class="flex flex-wrap items-center gap-2 xl:justify-end">
+                <button type="button" @@click="showFilters = !showFilters" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50" :class="showFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+                    <span x-text="showFilters ? 'Hide Filters' : 'Filters'"></span>
+                </button>
+                <div x-data="{ open: false }" class="relative">
+                    <button @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        Export
+                    </button>
+                    <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-36 bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-slate-200/60 py-1 z-50">
+                        <button type="button" @@click="exportLogs('txt'); open = false" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">Text (.log)</button>
+                        <button type="button" @@click="exportLogs('json'); open = false" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">JSON</button>
+                    </div>
+                </div>
+                <button type="button" @@click="loadData()" title="Refresh logs" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200/70 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    <svg class="w-4 h-4" :class="loading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
+                <button type="button" @@click="clearLogs()" title="Clear all logs" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm transition hover:bg-red-100">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+            </div>
+        </div>
 
-            <!-- Refresh -->
-            <button type="button"
-                    @@click="loadData()"
-                    class="inline-flex items-center gap-2 px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors">
-                <svg class="w-4 h-4" :class="loading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-            </button>
-
-            <!-- Clear Logs -->
-            <button type="button"
-                    @@click="clearLogs()"
-                    class="inline-flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200/70 rounded-xl text-sm font-medium text-red-600 hover:bg-red-100 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                </svg>
-                Clear All
-            </button>
+        <div x-show="showFilters" x-transition class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4" style="display:none">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Level</label>
+                    <select x-model="levelFilter" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                        <option value="">All Levels</option><option value="emergency">Emergency</option><option value="alert">Alert</option><option value="critical">Critical</option><option value="error">Error</option><option value="warning">Warning</option><option value="notice">Notice</option><option value="info">Info</option><option value="debug">Debug</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Date Range</label>
+                    <input type="text" x-ref="dateRange" placeholder="Select date range" readonly class="w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                </div>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                <button type="button" @@click="showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
+                <button type="button" @@click="clearFilters()" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
+                <button type="button" @@click="applyFilters()" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">Apply Filters</button>
+            </div>
         </div>
     </div>
 
@@ -114,7 +73,7 @@
     </div>
 
     <!-- Table -->
-    <div class="overflow-hidden rounded-xl border border-slate-200/50 relative">
+    <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <!-- Loading Overlay -->
         <div x-show="loading" x-transition.opacity class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
             <svg class="w-6 h-6 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
@@ -134,7 +93,7 @@
         </template>
 
         <table x-show="logs.length > 0" class="min-w-full divide-y divide-slate-200/50 text-xs">
-            <thead class="bg-slate-50/50">
+            <thead class="bg-slate-50/70">
                 <tr>
                     <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider w-40">Date</th>
                     <th class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider w-24">Level</th>
@@ -144,7 +103,7 @@
             </thead>
             <tbody class="divide-y divide-slate-100/50">
                 <template x-for="log in logs" :key="log.id">
-                    <tr class="hover:bg-slate-50/50">
+                    <tr class="hover:bg-slate-50/70">
                         <td class="px-4 py-2.5 text-xs text-slate-500 whitespace-nowrap" x-text="log.date"></td>
                         <td class="px-4 py-2.5">
                             <span class="inline-flex px-2 py-0.5 text-[10px] font-semibold rounded-full uppercase"
@@ -176,41 +135,22 @@
         </table>
 
         <!-- Pagination -->
-        <div x-show="logs.length > 0" class="px-4 py-3 border-t border-slate-200/50 bg-slate-50/30">
+        <div x-show="logs.length > 0" class="border-t border-slate-200/70 bg-slate-50/40 px-4 py-3">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div class="text-xs text-slate-600">
-                    Showing <span x-text="meta.from"></span> to <span x-text="meta.to"></span> of <span x-text="meta.total"></span> entries
+                <div class="text-sm font-semibold text-slate-600">
+                    Showing <span x-text="meta.from"></span> to <span x-text="meta.to"></span> of <span x-text="meta.total"></span>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-3">
                     <select x-model="perPage" @@change="loadData()"
-                            class="px-2 py-1 border border-slate-200/70 rounded-lg bg-white/70 text-xs text-slate-700">
+                            class="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700">
+                        <option value="10">10</option>
                         <option value="25">25</option>
                         <option value="50">50</option>
                         <option value="100">100</option>
                     </select>
-                    <div class="flex gap-1">
-                        <button @@click="goToPage(1)" :disabled="meta.current_page === 1"
-                                :class="meta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center text-xs">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/></svg>
-                        </button>
-                        <button @@click="goToPage(meta.current_page - 1)" :disabled="meta.current_page === 1"
-                                :class="meta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center text-xs">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                        </button>
-                        <span class="px-3 py-1 text-xs text-slate-600" x-text="meta.current_page + ' / ' + meta.last_page"></span>
-                        <button @@click="goToPage(meta.current_page + 1)" :disabled="meta.current_page === meta.last_page"
-                                :class="meta.current_page === meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center text-xs">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                        </button>
-                        <button @@click="goToPage(meta.last_page)" :disabled="meta.current_page === meta.last_page"
-                                :class="meta.current_page === meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center text-xs">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg>
-                        </button>
-                    </div>
+                    <button type="button" @@click="goToPage(meta.current_page - 1)" :disabled="meta.current_page <= 1" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Prev</button>
+                    <span class="text-sm font-bold text-slate-600">Page <span x-text="meta.current_page"></span> of <span x-text="meta.last_page"></span></span>
+                    <button type="button" @@click="goToPage(meta.current_page + 1)" :disabled="meta.current_page >= meta.last_page" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
                 </div>
             </div>
         </div>
@@ -302,11 +242,34 @@ document.addEventListener('alpine:init', () => {
         levelFilter: '',
         dateFrom: '',
         dateTo: '',
+        dateRangePicker: null,
+        showFilters: false,
         perPage: 50,
         meta: { total: 0, current_page: 1, last_page: 1, from: 0, to: 0 },
         stats: { error: 0, warning: 0, info: 0, debug: 0 },
         showModal: false,
         selectedLog: null,
+
+        initDateRange() {
+            this.$nextTick(() => window.setupSettingsDateRangePicker?.(this, this.$refs.dateRange, 'dateFrom', 'dateTo', () => { this.meta.current_page = 1; this.loadData(); }));
+        },
+
+        refreshData() {
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        applyFilters() {
+            this.refreshData();
+        },
+
+        clearFilters() {
+            this.levelFilter = '';
+            this.dateFrom = '';
+            this.dateTo = '';
+            if (this.$refs.dateRange) this.$refs.dateRange.value = '';
+            this.refreshData();
+        },
 
         async loadData() {
             this.loading = true;

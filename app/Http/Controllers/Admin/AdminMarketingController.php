@@ -51,12 +51,25 @@ class AdminMarketingController extends Controller
 
     public function data(Request $request): JsonResponse
     {
-        $query = NotificationLog::where('type', 'broadcast')->latest();
+        $query = NotificationLog::query()
+            ->where('type', 'broadcast')
+            ->with('notifiable')
+            ->latest();
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('body', 'like', "%{$search}%");
+                  ->orWhere('body', 'like', "%{$search}%")
+                  ->orWhere('error', 'like', "%{$search}%")
+                  ->orWhereHasMorph('notifiable', [Vendor::class, Driver::class], function ($recipientQuery) use ($search) {
+                      $recipientQuery->where('name', 'like', "%{$search}%")
+                          ->orWhere('phone', 'like', "%{$search}%")
+                          ->orWhere('email', 'like', "%{$search}%");
+
+                      if ($recipientQuery->getModel() instanceof Vendor) {
+                          $recipientQuery->orWhere('business_name', 'like', "%{$search}%");
+                      }
+                  });
             });
         }
 
@@ -66,6 +79,30 @@ class AdminMarketingController extends Controller
 
         if ($status = $request->input('status')) {
             $query->where('status', $status);
+        }
+
+        if ($audience = $request->input('audience')) {
+            $query->where('data->audience', $audience);
+        }
+
+        if ($template = $request->input('template')) {
+            $query->where('data->template', $template);
+        }
+
+        if ($request->filled('has_error')) {
+            $request->boolean('has_error')
+                ? $query->whereNotNull('error')->where('error', '!=', '')
+                : $query->where(function ($errorQuery) {
+                    $errorQuery->whereNull('error')->orWhere('error', '');
+                });
+        }
+
+        if ($dateFrom = $request->date('date_from')) {
+            $query->where('created_at', '>=', $dateFrom->startOfDay());
+        }
+
+        if ($dateTo = $request->date('date_to')) {
+            $query->where('created_at', '<=', $dateTo->endOfDay());
         }
 
         $perPage = min((int) $request->input('per_page', 20), 100);
@@ -83,6 +120,11 @@ class AdminMarketingController extends Controller
                 'error'           => $log->error,
                 'notifiable_type' => class_basename($log->notifiable_type ?? ''),
                 'notifiable_id'   => $log->notifiable_id,
+                'recipient_name'   => $this->recipientName($log->notifiable),
+                'recipient_phone'  => $log->notifiable?->phone,
+                'recipient_email'  => $log->notifiable?->email,
+                'audience'         => $log->data['audience'] ?? null,
+                'template'         => $log->data['template'] ?? null,
                 'created_at'      => $log->created_at?->toISOString(),
             ]),
             'meta' => [
@@ -94,6 +136,17 @@ class AdminMarketingController extends Controller
                 'to'           => min($page * $perPage, $total),
             ],
         ]);
+    }
+
+    private function recipientName(mixed $recipient): ?string
+    {
+        if (!$recipient) {
+            return null;
+        }
+
+        return $recipient->business_name
+            ?? $recipient->name
+            ?? null;
     }
 
     public function emailTemplates(): JsonResponse
@@ -211,7 +264,7 @@ class AdminMarketingController extends Controller
             'notifiable_id'   => $recipient->id,
             'type'            => 'broadcast',
             'channel'         => 'sms',
-            'title'           => null,
+            'title'           => 'SMS Broadcast',
             'body'            => $data['body'],
             'data'            => ['audience' => $data['audience']],
             'status'          => $success ? 'sent' : 'failed',

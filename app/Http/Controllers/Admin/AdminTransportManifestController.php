@@ -13,6 +13,7 @@ use App\Models\TransportLoadingException;
 use App\Models\TransportManifest;
 use App\Models\TransportManifestItem;
 use App\Models\Warehouse;
+use App\Services\BackOfficeAccess;
 use App\Services\Warehouse\BarcodeService;
 use App\Services\Warehouse\PackageContactService;
 use App\Services\Warehouse\WarehouseTransportReceivingService;
@@ -31,7 +32,8 @@ class AdminTransportManifestController extends Controller
     public function __construct(
         private WarehouseTransportService $transportService,
         private WarehouseTransportReceivingService $receivingService,
-        private BarcodeService $barcodeService
+        private BarcodeService $barcodeService,
+        private readonly BackOfficeAccess $access,
     )
     {
     }
@@ -41,12 +43,15 @@ class AdminTransportManifestController extends Controller
      */
     public function index(): View
     {
-        $warehouses = Warehouse::orderBy('name')->get(['id', 'name', 'code']);
+        $user = Auth::guard('admin')->user();
+        $warehouses = $this->access->warehousesFor($user, 'warehouse');
+        $warehouseIds = $this->access->scopedWarehouseIdsFor($user, 'warehouse');
         $drivers    = Driver::where('is_active', true)->orderBy('name')->get(['id', 'name', 'phone']);
         $transferBatches = SortBatch::query()
             ->with(['originWarehouse:id,name,code', 'destinationWarehouse:id,name,code'])
             ->where('dispatch_mode', SortBatch::DISPATCH_TRANSFER)
             ->where('status', SortBatch::STATUS_SEALED)
+            ->whereIn('origin_warehouse_id', $warehouseIds)
             ->whereDoesntHave('transportManifest')
             ->orderByDesc('id')
             ->get(['id', 'batch_number', 'origin_warehouse_id', 'destination_warehouse_id']);
@@ -74,6 +79,8 @@ class AdminTransportManifestController extends Controller
             ->with(['originWarehouse', 'destinationWarehouse'])
             ->findOrFail((int) $validated['sort_batch_id']);
 
+        $this->access->assertCanUseWarehouse(Auth::guard('admin')->user(), (int) $batch->origin_warehouse_id, 'warehouse');
+
         if (!$batch->originWarehouse) {
             return response()->json(['success' => false, 'message' => 'Selected batch has no origin warehouse.'], 422);
         }
@@ -94,6 +101,13 @@ class AdminTransportManifestController extends Controller
     {
         $query = TransportManifest::with(['originWarehouse', 'destinationWarehouse', 'assignedDriver'])
             ->withCount('items');
+
+        $warehouseIds = $this->access->scopedWarehouseIdsFor(Auth::guard('admin')->user(), 'warehouse');
+        abort_if($warehouseIds === [], 403);
+        $query->where(function (Builder $builder) use ($warehouseIds) {
+            $builder->whereIn('origin_warehouse_id', $warehouseIds)
+                ->orWhereIn('destination_warehouse_id', $warehouseIds);
+        });
 
         // Search by manifest number
         if ($search = $request->get('search')) {
@@ -198,6 +212,8 @@ class AdminTransportManifestController extends Controller
      */
     public function show(TransportManifest $manifest): View
     {
+        $this->assertCanUseManifest($manifest);
+
         $this->transportService->ensureDefaultContainer($manifest->fresh('items'));
 
         $manifest->load([
@@ -951,6 +967,13 @@ class AdminTransportManifestController extends Controller
         $query = TransportManifest::with(['originWarehouse', 'destinationWarehouse', 'assignedDriver'])
             ->withCount('items');
 
+        $warehouseIds = $this->access->scopedWarehouseIdsFor(Auth::guard('admin')->user(), 'warehouse');
+        abort_if($warehouseIds === [], 403);
+        $query->where(function (Builder $builder) use ($warehouseIds) {
+            $builder->whereIn('origin_warehouse_id', $warehouseIds)
+                ->orWhereIn('destination_warehouse_id', $warehouseIds);
+        });
+
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('manifest_number', 'like', "%{$search}%")
@@ -1024,5 +1047,16 @@ class AdminTransportManifestController extends Controller
             TransportManifest::STATUS_CANCELLED  => 'Cancelled',
             default                              => ucwords(str_replace('_', ' ', $status)),
         };
+    }
+
+    private function assertCanUseManifest(TransportManifest $manifest): void
+    {
+        $warehouseIds = $this->access->warehouseIdsFor(Auth::guard('admin')->user(), 'warehouse');
+
+        abort_unless(
+            in_array((int) $manifest->origin_warehouse_id, $warehouseIds, true)
+            || in_array((int) $manifest->destination_warehouse_id, $warehouseIds, true),
+            403
+        );
     }
 }

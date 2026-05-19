@@ -55,10 +55,18 @@ document.addEventListener('alpine:init', () => {
         roleFilterName: 'All roles',
         statusFilter: '',
         statusFilterName: 'All statuses',
+        loginStateFilter: '',
+        loginStateFilterName: 'All login states',
+        emailFilter: '',
+        phoneFilter: '',
+        createdByFilter: '',
         showFilters: false,
         createdFrom: '',
         createdTo: '',
+        lastLoginFrom: '',
+        lastLoginTo: '',
         dateRangePicker: null,
+        lastLoginDateRangePicker: null,
         perPage: 50,
         sortBy: 'created_at',
         sortDirection: 'desc',
@@ -294,8 +302,14 @@ document.addEventListener('alpine:init', () => {
                 if (this.search) params.append('search', this.search);
                 if (this.roleFilter) params.append('role', this.roleFilter);
                 if (this.statusFilter !== '' && this.statusFilter !== null) params.append('status', this.statusFilter);
+                if (this.loginStateFilter) params.append('login_state', this.loginStateFilter);
+                if (this.emailFilter) params.append('email', this.emailFilter);
+                if (this.phoneFilter) params.append('phone', this.phoneFilter);
+                if (this.createdByFilter) params.append('created_by', this.createdByFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
+                if (this.lastLoginFrom) params.append('last_login_from', this.lastLoginFrom);
+                if (this.lastLoginTo) params.append('last_login_to', this.lastLoginTo);
 
                 const response = await fetch(`${this.endpoint}?${params.toString()}`, {
                     headers: {
@@ -344,12 +358,12 @@ document.addEventListener('alpine:init', () => {
         },
 
         initDateRange() {
-            if (!this.$refs.createdRange) return;
+            if (!this.$refs.createdRange && !this.$refs.lastLoginRange) return;
 
-            const setupPicker = () => {
-                if (!window.$ || !window.moment || !window.$.fn.daterangepicker) return;
+            const setupPicker = (refName, fromKey, toKey, pickerKey) => {
+                if (!window.$ || !window.moment || !window.$.fn.daterangepicker || !this.$refs[refName]) return;
 
-                const $input = window.$(this.$refs.createdRange);
+                const $input = window.$(this.$refs[refName]);
 
                 $input.daterangepicker({
                     autoUpdateInput: false,
@@ -370,21 +384,25 @@ document.addEventListener('alpine:init', () => {
                 });
 
                 $input.on('apply.daterangepicker', (ev, picker) => {
-                    this.createdFrom = picker.startDate.format('YYYY-MM-DD');
-                    this.createdTo = picker.endDate.format('YYYY-MM-DD');
-                    $input.val(`${this.createdFrom} - ${this.createdTo}`);
-                    this.loadData();
+                    this[fromKey] = picker.startDate.format('YYYY-MM-DD');
+                    this[toKey] = picker.endDate.format('YYYY-MM-DD');
+                    $input.val(`${this[fromKey]} - ${this[toKey]}`);
                 });
 
                 $input.on('cancel.daterangepicker', () => {
-                    this.clearDateFilter();
+                    this.clearDateFilter(fromKey, toKey, refName, pickerKey);
                 });
 
-                this.dateRangePicker = $input.data('daterangepicker');
+                this[pickerKey] = $input.data('daterangepicker');
+            };
+
+            const setupPickers = () => {
+                setupPicker('createdRange', 'createdFrom', 'createdTo', 'dateRangePicker');
+                setupPicker('lastLoginRange', 'lastLoginFrom', 'lastLoginTo', 'lastLoginDateRangePicker');
             };
 
             if (window.$ && window.moment && window.$.fn.daterangepicker) {
-                setupPicker();
+                setupPickers();
                 return;
             }
 
@@ -392,24 +410,23 @@ document.addEventListener('alpine:init', () => {
                 .then(() => {
                     window.$ = window.jQuery = window.$ || window.jQuery;
                     window.moment = window.moment || moment;
-                    setupPicker();
+                    setupPickers();
                 })
                 .catch((error) => {
                     console.error('Failed to initialize date range picker:', error);
                 });
         },
 
-        clearDateFilter() {
-            this.createdFrom = '';
-            this.createdTo = '';
-            if (this.dateRangePicker) {
-                this.dateRangePicker.setStartDate(window.moment());
-                this.dateRangePicker.setEndDate(window.moment());
+        clearDateFilter(fromKey = 'createdFrom', toKey = 'createdTo', refName = 'createdRange', pickerKey = 'dateRangePicker') {
+            this[fromKey] = '';
+            this[toKey] = '';
+            if (this[pickerKey] && window.moment) {
+                this[pickerKey].setStartDate(window.moment());
+                this[pickerKey].setEndDate(window.moment());
             }
-            if (this.$refs.createdRange) {
-                this.$refs.createdRange.value = '';
+            if (this.$refs[refName]) {
+                this.$refs[refName].value = '';
             }
-            this.loadData();
         },
 
         applyFilters() {
@@ -423,10 +440,20 @@ document.addEventListener('alpine:init', () => {
             this.roleFilterName = 'All roles';
             this.statusFilter = '';
             this.statusFilterName = 'All statuses';
+            this.loginStateFilter = '';
+            this.loginStateFilterName = 'All login states';
+            this.emailFilter = '';
+            this.phoneFilter = '';
+            this.createdByFilter = '';
             this.createdFrom = '';
             this.createdTo = '';
+            this.lastLoginFrom = '';
+            this.lastLoginTo = '';
             if (this.$refs.createdRange) {
                 this.$refs.createdRange.value = '';
+            }
+            if (this.$refs.lastLoginRange) {
+                this.$refs.lastLoginRange.value = '';
             }
             this.meta.current_page = 1;
             this.loadData();
@@ -436,7 +463,12 @@ document.addEventListener('alpine:init', () => {
             const chips = [];
             if (this.roleFilter) chips.push({ key: 'role', label: this.roleFilterName });
             if (this.statusFilter !== '' && this.statusFilter !== null) chips.push({ key: 'status', label: this.statusFilterName });
-            if (this.createdFrom && this.createdTo) chips.push({ key: 'date', label: `${this.createdFrom} - ${this.createdTo}` });
+            if (this.loginStateFilter) chips.push({ key: 'login_state', label: this.loginStateFilterName });
+            if (this.emailFilter) chips.push({ key: 'email', label: `Email: ${this.emailFilter}` });
+            if (this.phoneFilter) chips.push({ key: 'phone', label: `Phone: ${this.phoneFilter}` });
+            if (this.createdByFilter) chips.push({ key: 'created_by', label: `Created by: ${this.createdByFilter}` });
+            if (this.createdFrom && this.createdTo) chips.push({ key: 'date', label: `Created: ${this.createdFrom} - ${this.createdTo}` });
+            if (this.lastLoginFrom && this.lastLoginTo) chips.push({ key: 'last_login', label: `Last login: ${this.lastLoginFrom} - ${this.lastLoginTo}` });
             return chips;
         },
 
@@ -449,10 +481,22 @@ document.addEventListener('alpine:init', () => {
                 this.statusFilter = '';
                 this.statusFilterName = 'All statuses';
             }
+            if (key === 'login_state') {
+                this.loginStateFilter = '';
+                this.loginStateFilterName = 'All login states';
+            }
+            if (key === 'email') this.emailFilter = '';
+            if (key === 'phone') this.phoneFilter = '';
+            if (key === 'created_by') this.createdByFilter = '';
             if (key === 'date') {
                 this.createdFrom = '';
                 this.createdTo = '';
                 if (this.$refs.createdRange) this.$refs.createdRange.value = '';
+            }
+            if (key === 'last_login') {
+                this.lastLoginFrom = '';
+                this.lastLoginTo = '';
+                if (this.$refs.lastLoginRange) this.$refs.lastLoginRange.value = '';
             }
             this.applyFilters();
         },
@@ -529,8 +573,14 @@ document.addEventListener('alpine:init', () => {
                 if (this.statusFilter !== '' && this.statusFilter !== null) {
                     params.append('status', this.statusFilter);
                 }
+                if (this.loginStateFilter) params.append('login_state', this.loginStateFilter);
+                if (this.emailFilter) params.append('email', this.emailFilter);
+                if (this.phoneFilter) params.append('phone', this.phoneFilter);
+                if (this.createdByFilter) params.append('created_by', this.createdByFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
+                if (this.lastLoginFrom) params.append('last_login_from', this.lastLoginFrom);
+                if (this.lastLoginTo) params.append('last_login_to', this.lastLoginTo);
                 params.append('format', format);
 
                 if (format === 'excel' || format === 'pdf') {
@@ -574,8 +624,14 @@ document.addEventListener('alpine:init', () => {
                 if (this.statusFilter !== '' && this.statusFilter !== null) {
                     params.append('status', this.statusFilter);
                 }
+                if (this.loginStateFilter) params.append('login_state', this.loginStateFilter);
+                if (this.emailFilter) params.append('email', this.emailFilter);
+                if (this.phoneFilter) params.append('phone', this.phoneFilter);
+                if (this.createdByFilter) params.append('created_by', this.createdByFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
+                if (this.lastLoginFrom) params.append('last_login_from', this.lastLoginFrom);
+                if (this.lastLoginTo) params.append('last_login_to', this.lastLoginTo);
 
                 const response = await fetch(`${this.exportEndpoint}?${params.toString()}`, {
                     headers: {

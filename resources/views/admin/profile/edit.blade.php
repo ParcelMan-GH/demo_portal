@@ -40,7 +40,7 @@
                     <p class="text-[15px] font-bold text-slate-800">{{ $admin->name }}</p>
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 mt-1 bg-slate-100 text-slate-600 text-[11px] font-semibold rounded-full">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                        {{ $admin->roles->first()?->name ?? ($admin->isSuperAdmin() ? 'Super Admin' : 'Admin') }}
+                        {{ $admin->roles->first()?->name ?? ($admin->isHqUser() ? 'Administrator' : 'Staff') }}
                     </span>
                 </div>
             </div>
@@ -114,7 +114,7 @@
     <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
             <h2 class="text-[14px] font-semibold text-slate-800">Roles & Permissions</h2>
-            <p class="text-[12px] text-slate-500 mt-0.5">Your assigned role and permissions (managed by super admin).</p>
+            <p class="text-[12px] text-slate-500 mt-0.5">Your assigned role and permissions are managed by your warehouse administrator.</p>
         </div>
         <div class="px-6 py-5">
             @foreach($admin->roles as $role)

@@ -40,7 +40,7 @@ class SendAdminTransportNotification
             return;
         }
 
-        // Send to warehouse admins + super admins (sendToWarehouseAdmins covers both)
+        // Send to warehouse operators.
         $this->pushService->sendToWarehouseAdmins(
             title: $title,
             body: $body,

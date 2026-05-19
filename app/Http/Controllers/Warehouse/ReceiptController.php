@@ -187,7 +187,8 @@ class ReceiptController extends AdminShipmentController
         $receiptConfig['can_create_invoice']      = $admin->hasPermission('warehouse.invoices.create');
         $receiptConfig['can_edit_invoice']        = $admin->hasPermission('warehouse.invoices.edit');
         $receiptConfig['can_view_invoice']        = $admin->hasPermission('warehouse.invoices.view');
-        $receiptConfig['is_super_admin']          = $admin->isSuperAdmin();
+        $receiptConfig['is_hq_user']              = $admin->isHqUser();
+        $receiptConfig['is_super_admin']          = $admin->isHqUser();
         $receiptConfig['invoice']                 = $invoice ? [
             'id'                => $invoice->id,
             'invoice_number'    => $invoice->invoice_number,
@@ -758,7 +759,8 @@ class ReceiptController extends AdminShipmentController
         $receiptConfig['can_create_invoice']  = $admin->hasPermission('warehouse.invoices.create');
         $receiptConfig['can_edit_invoice']    = $admin->hasPermission('warehouse.invoices.edit');
         $receiptConfig['can_view_invoice']    = $admin->hasPermission('warehouse.invoices.view');
-        $receiptConfig['is_super_admin']      = $admin->isSuperAdmin();
+        $receiptConfig['is_hq_user']          = $admin->isHqUser();
+        $receiptConfig['is_super_admin']      = $admin->isHqUser();
         $receiptConfig['invoice']             = $invoice ? [
             'id'             => $invoice->id,
             'invoice_number' => $invoice->invoice_number,

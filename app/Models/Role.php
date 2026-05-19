@@ -68,12 +68,17 @@ class Role extends Model
         return $query->where('is_warehouse_role', true);
     }
 
+    public function isAdministrator(): bool
+    {
+        return in_array($this->slug, ['administrator', 'super_admin'], true);
+    }
+
     /**
-     * Check if this is the super admin role.
+     * @deprecated Use isAdministrator().
      */
     public function isSuperAdmin(): bool
     {
-        return $this->slug === 'super_admin';
+        return $this->isAdministrator();
     }
 
     /**

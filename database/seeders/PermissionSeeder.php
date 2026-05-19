@@ -44,6 +44,7 @@ class PermissionSeeder extends Seeder
             ['module' => 'vendors', 'action' => 'edit', 'name' => 'vendors.edit', 'description' => 'Edit existing vendors', 'sort_order' => 52],
             ['module' => 'vendors', 'action' => 'delete', 'name' => 'vendors.delete', 'description' => 'Delete vendors', 'sort_order' => 53],
             ['module' => 'vendors', 'action' => 'activate', 'name' => 'vendors.activate', 'description' => 'Activate/deactivate vendors', 'sort_order' => 54],
+            ['module' => 'vendors', 'action' => 'manage', 'name' => 'vendors.manage', 'description' => 'Manage vendor payouts and finance actions', 'sort_order' => 55],
 
             // Drivers (5)
             ['module' => 'drivers', 'action' => 'view', 'name' => 'drivers.view', 'description' => 'View drivers list', 'sort_order' => 60],
@@ -51,12 +52,6 @@ class PermissionSeeder extends Seeder
             ['module' => 'drivers', 'action' => 'edit', 'name' => 'drivers.edit', 'description' => 'Edit existing drivers', 'sort_order' => 62],
             ['module' => 'drivers', 'action' => 'delete', 'name' => 'drivers.delete', 'description' => 'Delete drivers', 'sort_order' => 63],
             ['module' => 'drivers', 'action' => 'assign', 'name' => 'drivers.assign', 'description' => 'Assign drivers to tasks', 'sort_order' => 64],
-
-            // Invoices (4)
-            ['module' => 'invoices', 'action' => 'view', 'name' => 'invoices.view', 'description' => 'View invoices', 'sort_order' => 70],
-            ['module' => 'invoices', 'action' => 'create', 'name' => 'invoices.create', 'description' => 'Create invoices', 'sort_order' => 71],
-            ['module' => 'invoices', 'action' => 'edit', 'name' => 'invoices.edit', 'description' => 'Edit invoices', 'sort_order' => 72],
-            ['module' => 'invoices', 'action' => 'delete', 'name' => 'invoices.delete', 'description' => 'Delete invoices', 'sort_order' => 73],
 
             // Charges ledger (admin-side: pickup/delivery/station/handling fees per shipment)
             ['module' => 'charges', 'action' => 'view', 'name' => 'charges.view', 'description' => 'View shipment charges ledger', 'sort_order' => 75],
@@ -84,10 +79,6 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouse', 'action' => 'delivery_assign', 'name' => 'warehouse.delivery.assign', 'description' => 'Assign delivery drivers', 'sort_order' => 130],
             ['module' => 'warehouse', 'action' => 'delivery_code_reset', 'name' => 'warehouse.delivery.code.reset', 'description' => 'Regenerate delivery verification codes', 'sort_order' => 1301],
             ['module' => 'warehouse', 'action' => 'items_scan', 'name' => 'warehouse.items.scan', 'description' => 'Scan warehouse items in/out', 'sort_order' => 131],
-            ['module' => 'warehouse', 'action' => 'invoices_view', 'name' => 'warehouse.invoices.view', 'description' => 'View warehouse invoices', 'sort_order' => 132],
-            ['module' => 'warehouse', 'action' => 'invoices_create', 'name' => 'warehouse.invoices.create', 'description' => 'Create warehouse invoices', 'sort_order' => 133],
-            ['module' => 'warehouse', 'action' => 'invoices_edit', 'name' => 'warehouse.invoices.edit', 'description' => 'Edit warehouse invoices', 'sort_order' => 134],
-            ['module' => 'warehouse', 'action' => 'invoices_delete', 'name' => 'warehouse.invoices.delete', 'description' => 'Cancel warehouse invoices', 'sort_order' => 135],
             ['module' => 'warehouse', 'action' => 'contacts_manage', 'name' => 'warehouse.contacts.manage', 'description' => 'Manage package contact queue and log calls', 'sort_order' => 136],
             ['module' => 'warehouse', 'action' => 'charges_view', 'name' => 'warehouse.charges.view', 'description' => 'View shipment charges at this warehouse', 'sort_order' => 137],
             ['module' => 'warehouse', 'action' => 'charges_manage', 'name' => 'warehouse.charges.manage', 'description' => 'Add / edit / mark paid / waive charges on shipments at this warehouse', 'sort_order' => 138],

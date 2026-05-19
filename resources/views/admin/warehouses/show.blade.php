@@ -9,6 +9,16 @@ $warehouseConfig = [
     'warehouse' => $warehouse,
     'updateEndpoint' => route('admin.warehouses.update', $warehouse),
     'toggleActiveEndpoint' => route('admin.warehouses.toggle-active', $warehouse),
+    'capabilitiesEndpoint' => route('admin.warehouses.capabilities.index', $warehouse),
+    'capabilitiesUpdateEndpoint' => route('admin.warehouses.capabilities.update', $warehouse),
+    'capabilityWarehouses' => $capabilityWarehouses->map(fn($item) => [
+        'id' => $item->id,
+        'name' => $item->name,
+        'code' => $item->code,
+        'is_hq' => (bool) $item->is_hq,
+    ])->values(),
+    'canManageCapabilities' => $canManageCapabilities,
+    'isHqWarehouse' => (bool) ($warehouse->is_hq && $warehouse->can_administer_system),
     'canManage' => $canManage,
 ];
 
@@ -244,6 +254,23 @@ $warehouseUsersTableConfig = [
                 <span class="inline-flex items-center justify-center min-w-[1.125rem] h-4 px-1 text-[9px] font-bold rounded-full transition-all"
                     :class="activeTab === 'users' ? 'bg-violet-500 text-white' : 'bg-slate-100 text-slate-500'">{{ $warehouseUsers->count() }}</span>
             </button>
+
+            {{-- Capabilities --}}
+            @if($canManageCapabilities)
+            <button @@click="activeTab = 'capabilities'; loadCapabilities()"
+                class="group flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-0.5 transition-all duration-150 text-left"
+                :class="activeTab === 'capabilities' ? 'bg-orange-50 ring-1 ring-orange-100 shadow-sm' : 'hover:bg-slate-50'">
+                <div class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                    :class="activeTab === 'capabilities' ? 'bg-orange-500 shadow-sm shadow-orange-200' : 'bg-slate-100 group-hover:bg-slate-200'">
+                    <svg class="w-3 h-3 transition-colors" :class="activeTab === 'capabilities' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2Zm10-10V7a4 4 0 00-8 0v4"/>
+                    </svg>
+                </div>
+                <span class="text-xs transition-colors flex-1" :class="activeTab === 'capabilities' ? 'font-bold text-orange-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Capabilities</span>
+                <span class="inline-flex items-center justify-center min-w-[1.125rem] h-4 px-1 text-[9px] font-bold rounded-full transition-all"
+                    :class="activeTab === 'capabilities' ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-500'" x-text="enabledCapabilitiesCount()"></span>
+            </button>
+            @endif
 
             {{-- Divider --}}
             <div class="flex items-center gap-2 mt-3 mb-1.5 px-1">
@@ -989,6 +1016,91 @@ $warehouseUsersTableConfig = [
                     </div>
                 </div>
             </div>
+
+            @if($canManageCapabilities)
+            <div x-show="activeTab === 'capabilities'" x-cloak class="space-y-5">
+                <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="border-b border-slate-100 bg-gradient-to-r from-orange-50 to-white px-5 py-4">
+                        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2Zm10-10V7a4 4 0 00-8 0v4"/>
+                                    </svg>
+                                </div>
+                                <div class="min-w-0">
+                                    <h2 class="text-base font-extrabold text-slate-900">Warehouse Capabilities</h2>
+                                    <p class="text-sm font-medium text-slate-500">Control which admin modules this warehouse can use and which warehouse data it can operate on.</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                @@click="saveCapabilities()"
+                                x-show="!config.isHqWarehouse"
+                                :disabled="savingCapabilities || loadingCapabilities"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-extrabold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                <svg x-show="!savingCapabilities" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <svg x-show="savingCapabilities" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                </svg>
+                                Save Capabilities
+                            </button>
+                        </div>
+                    </div>
+
+                    <template x-if="config.isHqWarehouse">
+                        <div class="m-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+                            <p class="text-sm font-extrabold text-emerald-800">HQ warehouse has full access.</p>
+                            <p class="mt-1 text-sm font-medium text-emerald-700">Capabilities are not editable here because this warehouse administers the full back office.</p>
+                        </div>
+                    </template>
+
+                    <template x-if="!config.isHqWarehouse">
+                        <div class="divide-y divide-slate-100">
+                            <div x-show="loadingCapabilities" class="px-5 py-8 text-center text-sm font-bold text-slate-500">Loading capabilities...</div>
+
+                            <template x-for="module in capabilityModules" :key="module.key">
+                                <div class="px-5 py-4">
+                                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_320px] lg:items-center">
+                                        <label class="flex min-w-0 cursor-pointer items-start gap-3">
+                                            <input type="checkbox" class="mt-1 h-5 w-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500" :checked="isCapabilityEnabled(module.key)" @@change="toggleCapability(module.key, $event.target.checked)">
+                                            <span class="min-w-0">
+                                                <span class="block text-sm font-extrabold text-slate-900" x-text="module.label"></span>
+                                                <span class="mt-1 block text-xs font-semibold text-slate-500" x-text="capabilityDescription(module.key)"></span>
+                                            </span>
+                                        </label>
+
+                                        <div>
+                                            <label class="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Scope</label>
+                                            <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 disabled:bg-slate-50 disabled:text-slate-400" :disabled="!isCapabilityEnabled(module.key)" x-model="capabilityForm[module.key].scope">
+                                                <option value="own">Own warehouse</option>
+                                                <option value="selected">Selected warehouses</option>
+                                                <option value="global">All warehouses</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label class="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Allowed Warehouses</label>
+                                            <select multiple class="min-h-[46px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 disabled:bg-slate-50 disabled:text-slate-400" :disabled="!isCapabilityEnabled(module.key) || capabilityForm[module.key].scope !== 'selected'" x-model="capabilityForm[module.key].allowed_warehouse_ids">
+                                                <template x-for="option in config.capabilityWarehouses" :key="option.id">
+                                                    <option :value="String(option.id)" x-text="option.name"></option>
+                                                </template>
+                                            </select>
+                                            <p class="mt-1 text-[11px] font-semibold text-slate-400" x-show="isCapabilityEnabled(module.key) && capabilityForm[module.key].scope === 'selected'">Hold Command/Ctrl to select more than one.</p>
+                                            <p class="mt-1 text-[11px] font-semibold text-slate-400" x-show="!isCapabilityEnabled(module.key) || capabilityForm[module.key].scope !== 'selected'">Used only when scope is selected warehouses.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            @endif
 
             @php
                 // Flat data for client-side inventory tables
@@ -1894,5 +2006,3 @@ $warehouseUsersTableConfig = [
 </div>
 
 @endsection
-
-

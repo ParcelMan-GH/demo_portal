@@ -391,7 +391,7 @@ class RecipientPaymentService
             return ['success' => false, 'message' => 'Cleared recipient payment tasks cannot be edited.'];
         }
 
-        return DB::transaction(function () use ($task, $amount, $user, $notes) {
+        $result = DB::transaction(function () use ($task, $amount, $user, $notes) {
             $task = RecipientPaymentTask::query()->lockForUpdate()->findOrFail($task->id);
             $item = ShipmentItem::query()->with('shipment')->findOrFail($task->shipment_item_id);
             $charge = $task->shipmentCharge ?: $this->deliveryFeeChargeForItem($item);
@@ -431,6 +431,12 @@ class RecipientPaymentService
 
             return ['success' => true, 'message' => 'Delivery fee saved.', 'task' => $task->fresh('shipmentCharge')];
         });
+
+        if (($result['success'] ?? false) && isset($result['task'])) {
+            app(\App\Listeners\SendCustomerEmailTemplateNotification::class)->paymentRequired($result['task']);
+        }
+
+        return $result;
     }
 
     public function markPaid(RecipientPaymentTask $task, PaymentWallet $wallet, User $user, ?string $reference, ?string $notes = null, bool $requireAssignedWallet = true): array
@@ -443,7 +449,7 @@ class RecipientPaymentService
             return ['success' => false, 'message' => 'You can only record payments into an approved wallet assigned to you.'];
         }
 
-        return DB::transaction(function () use ($task, $wallet, $user, $reference, $notes) {
+        $result = DB::transaction(function () use ($task, $wallet, $user, $reference, $notes) {
             $task = RecipientPaymentTask::query()->lockForUpdate()->findOrFail($task->id);
             $wallet = PaymentWallet::query()->lockForUpdate()->findOrFail($wallet->id);
 
@@ -498,6 +504,12 @@ class RecipientPaymentService
 
             return ['success' => true, 'message' => 'Recipient payment marked paid.', 'task' => $task->fresh(['shipmentCharge', 'paymentWallet'])];
         });
+
+        if (($result['success'] ?? false) && isset($result['task'])) {
+            app(\App\Listeners\SendCustomerEmailTemplateNotification::class)->paymentReceived($result['task']);
+        }
+
+        return $result;
     }
 
     public function updateRecipientDetails(Collection $tasks, User $user, ?string $phone = null, ?string $deliveryTown = null): array
@@ -539,7 +551,7 @@ class RecipientPaymentService
             return ['success' => false, 'message' => 'You can only record payments into an approved wallet assigned to you.'];
         }
 
-        return DB::transaction(function () use ($tasks, $amount, $wallet, $user, $reference, $notes, $receiptPath) {
+        $result = DB::transaction(function () use ($tasks, $amount, $wallet, $user, $reference, $notes, $receiptPath) {
             $wallet = PaymentWallet::query()->lockForUpdate()->findOrFail($wallet->id);
             if (!$wallet->is_active) {
                 return ['success' => false, 'message' => 'This wallet is inactive.'];
@@ -687,6 +699,15 @@ class RecipientPaymentService
 
             return ['success' => true, 'message' => 'Recipient payment recorded for this delivery.', 'group' => $group->fresh()];
         });
+
+        if ($result['success'] ?? false) {
+            RecipientPaymentTask::query()
+                ->whereIn('id', $tasks->pluck('id')->all())
+                ->get()
+                ->each(fn (RecipientPaymentTask $task) => app(\App\Listeners\SendCustomerEmailTemplateNotification::class)->paymentReceived($task));
+        }
+
+        return $result;
     }
 
     private function correctRecipientGroupPayment(Collection $tasks, float $amount, PaymentWallet $wallet, User $user, ?string $reference, ?string $notes = null, ?string $receiptPath = null): array

@@ -18,7 +18,7 @@ $invoiceConfig = [
     'adminAcceptEndpoint' => route('admin.invoices.admin-accept', $invoice),
     'updateEndpoint' => route('admin.invoices.update', $invoice),
     'canManage' => $canManage,
-    'isSuperAdmin' => auth('admin')->user()?->isSuperAdmin() ?? false,
+    'isSuperAdmin' => auth('admin')->user()?->isHqUser() ?? false,
 ];
 @endphp
 

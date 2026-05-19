@@ -52,11 +52,18 @@ function buildRolesTable(config) {
         },
         loading: false,
         exporting: false,
+        showFilters: false,
         search: '',
         statusFilter: '',
         statusFilterName: 'All statuses',
         typeFilter: '',
-        typeFilterName: 'All types',
+        typeFilterName: 'All definitions',
+        assignableFilter: '',
+        assignableFilterName: 'All assignment states',
+        usersMin: '',
+        usersMax: '',
+        permissionsMin: '',
+        permissionsMax: '',
         createdFrom: '',
         createdTo: '',
         dateRangePicker: null,
@@ -67,7 +74,8 @@ function buildRolesTable(config) {
             { key: 'name', label: 'Role Name' },
             { key: 'users_count', label: 'Users' },
             { key: 'permissions_count', label: 'Permissions' },
-            { key: 'type_label', label: 'Type' },
+            { key: 'assignable_label', label: 'Assignment' },
+            { key: 'type_label', label: 'Definition' },
             { key: 'status_label', label: 'Status' },
             { key: 'created_at', label: 'Created At' },
             { key: 'actions', label: 'Actions' },
@@ -76,6 +84,7 @@ function buildRolesTable(config) {
             name: true,
             users_count: true,
             permissions_count: true,
+            assignable_label: true,
             type_label: true,
             status_label: true,
             created_at: true,
@@ -94,13 +103,67 @@ function buildRolesTable(config) {
         setStatusFilter(value, label) {
             this.statusFilter = value;
             this.statusFilterName = label;
-            this.meta.current_page = 1;
-            this.loadData();
         },
 
         setTypeFilter(value, label) {
             this.typeFilter = value;
             this.typeFilterName = label;
+        },
+
+        applyFilters() {
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        clearFilters() {
+            this.statusFilter = '';
+            this.statusFilterName = 'All statuses';
+            this.typeFilter = '';
+            this.typeFilterName = 'All definitions';
+            this.assignableFilter = '';
+            this.assignableFilterName = 'All assignment states';
+            this.usersMin = '';
+            this.usersMax = '';
+            this.permissionsMin = '';
+            this.permissionsMax = '';
+            this.clearDateFilter(false);
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        activeFilterChips() {
+            const chips = [];
+
+            if (this.statusFilter !== '') chips.push({ key: 'status', label: `Status: ${this.statusFilterName}` });
+            if (this.typeFilter) chips.push({ key: 'type', label: `Definition: ${this.typeFilterName}` });
+            if (this.assignableFilter !== '') chips.push({ key: 'assignable', label: `Assignment: ${this.assignableFilterName}` });
+            if (this.createdFrom || this.createdTo) chips.push({ key: 'created', label: `Created: ${this.createdFrom || '...'} - ${this.createdTo || '...'}` });
+            if (this.usersMin || this.usersMax) chips.push({ key: 'users', label: `Users: ${this.usersMin || '0'} - ${this.usersMax || 'any'}` });
+            if (this.permissionsMin || this.permissionsMax) chips.push({ key: 'permissions', label: `Permissions: ${this.permissionsMin || '0'} - ${this.permissionsMax || 'any'}` });
+
+            return chips;
+        },
+
+        clearFilter(key) {
+            if (key === 'status') {
+                this.statusFilter = '';
+                this.statusFilterName = 'All statuses';
+            } else if (key === 'type') {
+                this.typeFilter = '';
+                this.typeFilterName = 'All definitions';
+            } else if (key === 'assignable') {
+                this.assignableFilter = '';
+                this.assignableFilterName = 'All assignment states';
+            } else if (key === 'created') {
+                this.clearDateFilter(false);
+            } else if (key === 'users') {
+                this.usersMin = '';
+                this.usersMax = '';
+            } else if (key === 'permissions') {
+                this.permissionsMin = '';
+                this.permissionsMax = '';
+            }
+
             this.meta.current_page = 1;
             this.loadData();
         },
@@ -119,6 +182,11 @@ function buildRolesTable(config) {
                 if (this.search) params.append('search', this.search);
                 if (this.statusFilter !== '' && this.statusFilter !== null) params.append('status', this.statusFilter);
                 if (this.typeFilter) params.append('type', this.typeFilter);
+                if (this.assignableFilter !== '' && this.assignableFilter !== null) params.append('assignable', this.assignableFilter);
+                if (this.usersMin !== '' && this.usersMin !== null) params.append('users_min', this.usersMin);
+                if (this.usersMax !== '' && this.usersMax !== null) params.append('users_max', this.usersMax);
+                if (this.permissionsMin !== '' && this.permissionsMin !== null) params.append('permissions_min', this.permissionsMin);
+                if (this.permissionsMax !== '' && this.permissionsMax !== null) params.append('permissions_max', this.permissionsMax);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
 
@@ -199,8 +267,6 @@ function buildRolesTable(config) {
                     this.createdFrom = picker.startDate.format('YYYY-MM-DD');
                     this.createdTo = picker.endDate.format('YYYY-MM-DD');
                     $input.val(`${this.createdFrom} - ${this.createdTo}`);
-                    this.meta.current_page = 1;
-                    this.loadData();
                 });
 
                 $input.on('cancel.daterangepicker', () => {
@@ -226,7 +292,7 @@ function buildRolesTable(config) {
                 });
         },
 
-        clearDateFilter() {
+        clearDateFilter(load = true) {
             this.createdFrom = '';
             this.createdTo = '';
             if (this.dateRangePicker) {
@@ -236,8 +302,10 @@ function buildRolesTable(config) {
             if (this.$refs.createdRange) {
                 this.$refs.createdRange.value = '';
             }
-            this.meta.current_page = 1;
-            this.loadData();
+            if (load) {
+                this.meta.current_page = 1;
+                this.loadData();
+            }
         },
 
         nextPage() {
@@ -314,6 +382,11 @@ function buildRolesTable(config) {
                 if (this.search) params.append('search', this.search);
                 if (this.statusFilter !== '' && this.statusFilter !== null) params.append('status', this.statusFilter);
                 if (this.typeFilter) params.append('type', this.typeFilter);
+                if (this.assignableFilter !== '' && this.assignableFilter !== null) params.append('assignable', this.assignableFilter);
+                if (this.usersMin !== '' && this.usersMin !== null) params.append('users_min', this.usersMin);
+                if (this.usersMax !== '' && this.usersMax !== null) params.append('users_max', this.usersMax);
+                if (this.permissionsMin !== '' && this.permissionsMin !== null) params.append('permissions_min', this.permissionsMin);
+                if (this.permissionsMax !== '' && this.permissionsMax !== null) params.append('permissions_max', this.permissionsMax);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
 

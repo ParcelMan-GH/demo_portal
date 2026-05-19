@@ -32,8 +32,8 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
                 return false;
             }
 
-            // Allow authenticated admins (super_admin role)
-            if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
+            // Allow HQ back-office administrators.
+            if (method_exists($user, 'isHqUser') && $user->isHqUser()) {
                 return true;
             }
 

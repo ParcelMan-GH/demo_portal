@@ -98,13 +98,7 @@ class AuthController extends Controller
             statusCode: 200
         );
 
-        if (!$admin->isSuperAdmin()
-            && !empty($admin->warehouse_id)
-            && $admin->roles()->where('is_warehouse_role', true)->exists()) {
-            return redirect()->route('warehouse.dashboard');
-        }
-
-        return redirect()->route('admin.dashboard');
+        return redirect()->route('warehouse.dashboard');
     }
 
     /**

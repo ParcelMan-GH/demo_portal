@@ -95,7 +95,7 @@ function registerWarehouseReceiptShowPage() {
         cancelInvoiceId: null,
         cancelInvoiceReason: '',
         cancelInvoiceLoading: false,
-        isSuperAdmin: Boolean(config.is_super_admin),
+        isSuperAdmin: Boolean(config.is_hq_user || config.is_super_admin),
         canCreateInvoice: Boolean(config.can_create_invoice),
         canEditInvoice: Boolean(config.can_edit_invoice),
         canViewInvoice: Boolean(config.can_view_invoice),

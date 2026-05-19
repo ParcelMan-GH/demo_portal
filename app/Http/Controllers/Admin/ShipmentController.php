@@ -1527,7 +1527,7 @@ class ShipmentController extends Controller
         ]);
     }
 
-    // ─── RECEIVING (Super Admin) ───────────────────────────────────────────────
+    // ─── RECEIVING (Back Office) ───────────────────────────────────────────────
 
     public function createRunFromClaims(Request $request): JsonResponse
     {
@@ -1885,7 +1885,6 @@ class ShipmentController extends Controller
             'items.images',
             'items.deliveryRegion',
             'items.deliveryDistrict',
-            'items.tracking',
             'items.charges',
             'charges',
             'currentInvoice',
@@ -1897,6 +1896,10 @@ class ShipmentController extends Controller
             'pickupAssignment.photos',
             'pickupAssignment.warehouseReceipt.items.photos',
         ];
+
+        if (Schema::hasTable('shipment_item_tracking')) {
+            $relations[] = 'items.tracking';
+        }
 
         if ($this->receivingCustodyTablesAvailable()) {
             $relations[] = 'pickupAssignment.warehouseReceipt.items.labels.latestCustody.driver:id,name,phone';
@@ -2388,7 +2391,6 @@ class ShipmentController extends Controller
             'items.images',
             'items.deliveryRegion',
             'items.deliveryDistrict',
-            'items.tracking',
             'items.charges',
             'pickupAssignment.driver',
             'pickupAssignment.targetWarehouse',
@@ -2397,7 +2399,15 @@ class ShipmentController extends Controller
             'pickupAssignment.warehouseReceipt.items.photos',
         ]);
 
-        $itemRelations = ['images', 'deliveryRegion', 'deliveryDistrict', 'tracking', 'charges'];
+        if (Schema::hasTable('shipment_item_tracking')) {
+            $shipment->loadMissing(['items.tracking']);
+        }
+
+        $itemRelations = ['images', 'deliveryRegion', 'deliveryDistrict', 'charges'];
+
+        if (Schema::hasTable('shipment_item_tracking')) {
+            $itemRelations[] = 'tracking';
+        }
 
         if ($this->receivingMovementTablesAvailable()) {
             $itemRelations[] = 'sortBatchItems.sortBatch.originWarehouse';
@@ -3318,15 +3328,17 @@ class ShipmentController extends Controller
             ]);
         }
 
-        $item->tracking?->each(function (ShipmentItemTracking $tracking) use ($events) {
-            $events->push([
-                'label' => str_replace('_', ' ', ucfirst((string) $tracking->status)),
-                'status' => $tracking->status,
-                'location' => $tracking->location,
-                'notes' => $tracking->notes,
-                'created_at' => $tracking->created_at?->toIso8601String(),
-            ]);
-        });
+        if (Schema::hasTable('shipment_item_tracking')) {
+            $item->tracking?->each(function (ShipmentItemTracking $tracking) use ($events) {
+                $events->push([
+                    'label' => str_replace('_', ' ', ucfirst((string) $tracking->status)),
+                    'status' => $tracking->status,
+                    'location' => $tracking->location,
+                    'notes' => $tracking->notes,
+                    'created_at' => $tracking->created_at?->toIso8601String(),
+                ]);
+            });
+        }
 
         return $events
             ->filter(fn ($event) => ! empty($event['created_at']))

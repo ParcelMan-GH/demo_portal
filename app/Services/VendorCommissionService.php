@@ -112,12 +112,20 @@ class VendorCommissionService
         $pendingPayout = VendorPayout::where('vendor_id', $vendor->id)
             ->where('status', VendorPayout::STATUS_PENDING)
             ->sum('amount');
+        $lastPayout = VendorPayout::where('vendor_id', $vendor->id)
+            ->whereIn('status', [VendorPayout::STATUS_SENT, VendorPayout::STATUS_CONFIRMED])
+            ->latest('confirmed_at')
+            ->latest('sent_at')
+            ->latest()
+            ->first();
 
         return [
             'total_earned' => (float) $totalEarned,
             'available_balance' => (float) $approvedBalance,
             'total_paid' => (float) $totalPaid,
             'pending_payout' => (float) $pendingPayout,
+            'last_payout_amount' => $lastPayout ? (float) $lastPayout->amount : 0,
+            'last_payout_at' => $lastPayout?->confirmed_at?->toIso8601String() ?? $lastPayout?->sent_at?->toIso8601String() ?? $lastPayout?->created_at?->toIso8601String(),
             'min_payout' => $this->getMinPayout(),
             'can_request_payout' => $approvedBalance >= $this->getMinPayout(),
             'currency' => 'GHS',
@@ -137,14 +145,20 @@ class VendorCommissionService
         }
 
         return DB::transaction(function () use ($vendor, $amount, $adminId, $data) {
+            $confirmImmediately = (bool) ($data['confirm_immediately'] ?? false);
+            $now = now();
+
             $payout = VendorPayout::create([
                 'vendor_id' => $vendor->id,
                 'amount' => $amount,
-                'status' => VendorPayout::STATUS_PENDING,
+                'status' => $confirmImmediately ? VendorPayout::STATUS_CONFIRMED : VendorPayout::STATUS_PENDING,
                 'payment_method' => $data['payment_method'] ?? 'momo',
+                'payment_reference' => $data['payment_reference'] ?? null,
                 'payment_phone' => $data['payment_phone'] ?? $vendor->phone,
                 'notes' => $data['notes'] ?? null,
                 'processed_by_admin_id' => $adminId,
+                'sent_at' => $confirmImmediately ? $now : null,
+                'confirmed_at' => $confirmImmediately ? $now : null,
             ]);
 
             $remaining = $amount;
@@ -160,7 +174,9 @@ class VendorCommissionService
                 $remaining -= $earning->amount;
             }
 
-            return ['success' => true, 'message' => 'Payout of GHS ' . number_format($amount, 2) . ' created.', 'data' => ['payout' => $payout]];
+            $message = $confirmImmediately ? 'Vendor paid successfully.' : 'Payout of GHS ' . number_format($amount, 2) . ' created.';
+
+            return ['success' => true, 'message' => $message, 'data' => ['payout' => $payout]];
         });
     }
 

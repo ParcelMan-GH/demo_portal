@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
+use App\Models\EmailTemplate;
 use App\Models\NotificationLog;
 use App\Models\OtpCode;
 use App\Models\PlatformSetting;
+use App\Services\EmailTemplateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -23,7 +25,6 @@ class SettingsController extends Controller
      */
     protected array $tabs = [
         'platform' => ['label' => 'Platform Info', 'icon' => 'building'],
-        'invoice' => ['label' => 'Invoice Settings', 'icon' => 'document'],
         'sms' => ['label' => 'SMS Config', 'icon' => 'chat'],
         'mail' => ['label' => 'Mail Config', 'icon' => 'envelope'],
         'email-templates' => ['label' => 'Email Templates', 'icon' => 'template'],
@@ -33,7 +34,7 @@ class SettingsController extends Controller
         'admin-audit-logs' => ['label' => 'Admin Audit Logs', 'icon' => 'shield'],
         'notification-logs' => ['label' => 'Notification Logs', 'icon' => 'bell'],
         'delivery' => ['label' => 'Delivery Settings', 'icon' => 'truck'],
-        'pricing' => ['label' => 'Revenue & Pricing', 'icon' => 'cash'],
+        'pricing' => ['label' => 'Vendor Commissions', 'icon' => 'cash'],
         'push' => ['label' => 'Push Notifications', 'icon' => 'bell'],
         'health' => ['label' => 'System Health', 'icon' => 'heart'],
         'logs' => ['label' => 'System Logs', 'icon' => 'terminal'],
@@ -73,16 +74,8 @@ class SettingsController extends Controller
                 'platform_currency' => ['label' => 'Default Currency', 'type' => 'select', 'options' => $this->getCurrencies(), 'default' => 'GHS'],
                 'platform_date_format' => ['label' => 'Date Format', 'type' => 'select', 'options' => ['Y-m-d' => 'YYYY-MM-DD', 'd/m/Y' => 'DD/MM/YYYY', 'm/d/Y' => 'MM/DD/YYYY'], 'default' => 'd/m/Y'],
             ],
-            'invoice' => [
-                'invoice_prefix' => ['label' => 'Invoice Prefix', 'type' => 'text', 'default' => 'INV-'],
-                'invoice_start_number' => ['label' => 'Starting Number', 'type' => 'number', 'default' => '1000'],
-                'invoice_tax_rate' => ['label' => 'Tax Rate (%)', 'type' => 'number', 'default' => '0'],
-                'invoice_tax_label' => ['label' => 'Tax Label', 'type' => 'text', 'default' => 'VAT'],
-                'invoice_notes' => ['label' => 'Default Invoice Notes', 'type' => 'textarea', 'default' => 'Thank you for your business!'],
-                'invoice_terms' => ['label' => 'Terms & Conditions', 'type' => 'textarea', 'default' => ''],
-            ],
             'sms' => [
-                'sms_provider' => ['label' => 'SMS Provider', 'type' => 'select', 'options' => ['arkesel' => 'Arkesel', 'twilio' => 'Twilio', 'nexmo' => 'Vonage/Nexmo'], 'default' => 'arkesel'],
+                'sms_provider' => ['label' => 'SMS Provider', 'type' => 'select', 'options' => ['arkesel' => 'Arkesel', 'twilio' => 'Twilio'], 'default' => 'arkesel'],
                 'sms_sender_id' => ['label' => 'Sender ID', 'type' => 'text', 'default' => ''],
                 'arkesel_api_key' => ['label' => 'Arkesel API Key', 'type' => 'password', 'encrypted' => true, 'default' => ''],
                 'twilio_sid' => ['label' => 'Twilio SID', 'type' => 'password', 'encrypted' => true, 'default' => ''],
@@ -91,7 +84,7 @@ class SettingsController extends Controller
                 'sms_enabled' => ['label' => 'Enable SMS', 'type' => 'toggle', 'default' => '1'],
             ],
             'mail' => [
-                'mail_mailer' => ['label' => 'Mail Driver', 'type' => 'select', 'options' => ['smtp' => 'SMTP', 'mailgun' => 'Mailgun', 'ses' => 'Amazon SES', 'postmark' => 'Postmark'], 'default' => 'smtp'],
+                'mail_mailer' => ['label' => 'Mail Driver', 'type' => 'select', 'options' => ['smtp' => 'SMTP', 'mailgun' => 'Mailgun'], 'default' => 'smtp'],
                 'mail_host' => ['label' => 'SMTP Host', 'type' => 'text', 'default' => ''],
                 'mail_port' => ['label' => 'SMTP Port', 'type' => 'number', 'default' => '587'],
                 'mail_username' => ['label' => 'SMTP Username', 'type' => 'text', 'default' => ''],
@@ -107,10 +100,6 @@ class SettingsController extends Controller
                 'transport.scan_issue_auto_accept' => ['label' => 'Auto-Accept Transport Scan Issues', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, driver scan issue reports with proof photos immediately mark the selected load group or package as loaded. When disabled, admins must review them first.'],
             ],
             'pricing' => [
-                // Pickup fee — charged to vendor when we go collect items
-                'charges.pickup_fee_default' => ['label' => 'Default Pickup Fee (GHS)', 'type' => 'number', 'default' => '0.00', 'help' => 'Flat fee charged to the vendor for going to pick up a shipment. Overridable per shipment. Set to 0 to disable the default.'],
-
-                // Vendor commission — what Parcelman pays vendors per delivered package
                 'vendor_commission.enabled' => ['label' => 'Enable Vendor Commission', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, vendors earn a commission for each package delivered to their recipients. Can be overridden per vendor on their profile.'],
                 'vendor_commission.rate_per_package' => ['label' => 'Commission Rate Per Package (GHS)', 'type' => 'number', 'default' => '2.00', 'help' => 'Amount in Ghana Cedis earned by the vendor per delivered package.'],
                 'vendor_commission.min_payout' => ['label' => 'Minimum Vendor Payout (GHS)', 'type' => 'number', 'default' => '20.00', 'help' => 'Vendors must accumulate at least this amount before a payout can be processed.'],
@@ -277,21 +266,116 @@ class SettingsController extends Controller
 
     protected function getEmailTemplates(): array
     {
-        $templates = [];
-        $viewPath = resource_path('views/emails');
+        $templates = EmailTemplate::query()
+            ->orderBy('category')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (EmailTemplate $template) => $this->serializeEmailTemplate($template))
+            ->values();
 
-        if (File::isDirectory($viewPath)) {
-            $files = File::allFiles($viewPath);
-            foreach ($files as $file) {
-                $templates[] = [
-                    'name' => $file->getFilenameWithoutExtension(),
-                    'path' => str_replace(resource_path('views/'), '', $file->getPathname()),
-                    'modified' => date('Y-m-d H:i:s', $file->getMTime()),
-                ];
-            }
+        return [
+            'templates' => $templates,
+            'categories' => $templates->pluck('category')->unique()->values(),
+            'recipientTypes' => $templates->pluck('recipient_type')->unique()->values(),
+        ];
+    }
+
+    public function updateEmailTemplate(Request $request, EmailTemplate $emailTemplate): JsonResponse
+    {
+        $validated = $request->validate([
+            'subject' => ['required', 'string', 'max:255'],
+            'body_html' => ['nullable', 'string'],
+            'body_text' => ['nullable', 'string'],
+            'is_enabled' => ['required', 'boolean'],
+        ]);
+
+        if (blank($validated['body_html'] ?? null) && blank($validated['body_text'] ?? null)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Add either HTML content or a plain text fallback.',
+            ], 422);
         }
 
-        return ['templates' => $templates];
+        $emailTemplate->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email template saved.',
+            'template' => $this->serializeEmailTemplate($emailTemplate->fresh()),
+        ]);
+    }
+
+    public function storeEmailTemplate(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'key' => ['required', 'string', 'max:120', 'regex:/^[a-z0-9_]+$/', 'unique:email_templates,key'],
+            'name' => ['required', 'string', 'max:160'],
+            'category' => ['required', 'string', 'max:80'],
+            'recipient_type' => ['required', 'string', 'max:80'],
+            'subject' => ['required', 'string', 'max:255'],
+            'body_html' => ['nullable', 'string'],
+            'body_text' => ['nullable', 'string'],
+            'variables' => ['nullable', 'array'],
+            'variables.*' => ['string', 'max:80', 'regex:/^[a-zA-Z0-9_]+$/'],
+            'is_enabled' => ['required', 'boolean'],
+        ]);
+
+        if (blank($validated['body_html'] ?? null) && blank($validated['body_text'] ?? null)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Add either HTML content or a plain text fallback.',
+            ], 422);
+        }
+
+        $template = EmailTemplate::create([
+            ...$validated,
+            'variables' => array_values(array_unique($validated['variables'] ?? [])),
+            'is_system' => false,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email template created.',
+            'template' => $this->serializeEmailTemplate($template),
+        ], 201);
+    }
+
+    public function toggleEmailTemplate(EmailTemplate $emailTemplate): JsonResponse
+    {
+        $emailTemplate->update(['is_enabled' => !$emailTemplate->is_enabled]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $emailTemplate->is_enabled ? 'Template enabled.' : 'Template disabled.',
+            'template' => $this->serializeEmailTemplate($emailTemplate->fresh()),
+        ]);
+    }
+
+    public function previewEmailTemplate(EmailTemplate $emailTemplate, EmailTemplateService $service): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'preview' => $service->preview($emailTemplate),
+        ]);
+    }
+
+    private function serializeEmailTemplate(EmailTemplate $template): array
+    {
+        return [
+            'id' => $template->id,
+            'key' => $template->key,
+            'name' => $template->name,
+            'category' => $template->category,
+            'recipient_type' => $template->recipient_type,
+            'recipient_label' => str($template->recipient_type)->replace('_', ' / ')->title()->toString(),
+            'subject' => $template->subject,
+            'body_html' => $template->body_html,
+            'body_text' => $template->body_text,
+            'variables' => $template->variables ?: [],
+            'is_enabled' => $template->is_enabled,
+            'is_system' => $template->is_system,
+            'updated_at' => $template->updated_at?->format('d M Y, h:i A'),
+        ];
     }
 
     /**

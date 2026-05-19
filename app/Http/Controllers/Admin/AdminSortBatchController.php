@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ShipmentItem;
 use App\Models\SortBatch;
 use App\Models\Warehouse;
+use App\Services\BackOfficeAccess;
 use App\Services\Warehouse\RecipientPaymentService;
 use App\Services\Warehouse\WarehouseDeliveryService;
 use App\Services\Warehouse\WarehouseSortingService;
@@ -27,12 +28,13 @@ class AdminSortBatchController extends Controller
         private WarehouseDeliveryService $deliveryService,
         private WarehouseTransportService $transportService,
         private RecipientPaymentService $recipientPaymentService,
+        private readonly BackOfficeAccess $access,
     ) {
     }
 
     public function index(): View
     {
-        $warehouses = Warehouse::orderBy('name')->get(['id', 'name', 'code']);
+        $warehouses = $this->access->warehousesFor(Auth::guard('admin')->user(), 'warehouse');
 
         $dispatchModes = [
             ['value' => SortBatch::DISPATCH_TRANSFER,       'label' => 'Transfer'],
@@ -49,7 +51,7 @@ class AdminSortBatchController extends Controller
 
     public function create(): View
     {
-        $warehouses = Warehouse::orderBy('name')->get(['id', 'name', 'code']);
+        $warehouses = $this->access->warehousesFor(Auth::guard('admin')->user(), 'warehouse');
 
         return view('admin.sort-batches.create', compact('warehouses'));
     }
@@ -63,6 +65,8 @@ class AdminSortBatchController extends Controller
             'transportManifest',
             'deliveryRun',
         ])->withCount('activeItems');
+
+        $this->access->applyWarehouseScope($query, Auth::guard('admin')->user(), 'warehouse', 'origin_warehouse_id');
 
         if ($search = $request->get('search')) {
             $query->where('batch_number', 'like', "%{$search}%");
@@ -137,6 +141,8 @@ class AdminSortBatchController extends Controller
         $query = SortBatch::with(['originWarehouse', 'destinationWarehouse', 'createdBy'])
             ->withCount('activeItems');
 
+        $this->access->applyWarehouseScope($query, Auth::guard('admin')->user(), 'warehouse', 'origin_warehouse_id');
+
         if ($search = $request->get('search')) {
             $query->where('batch_number', 'like', "%{$search}%");
         }
@@ -182,6 +188,8 @@ class AdminSortBatchController extends Controller
 
     public function show(Request $request, SortBatch $batch): View
     {
+        $this->access->assertCanUseWarehouse(Auth::guard('admin')->user(), (int) $batch->origin_warehouse_id, 'warehouse');
+
         $batch->load([
             'originWarehouse',
             'destinationWarehouse',
@@ -313,6 +321,8 @@ class AdminSortBatchController extends Controller
         ]);
 
         $originWarehouse      = Warehouse::findOrFail((int) $validated['origin_warehouse_id']);
+        $this->access->assertCanUseWarehouse(Auth::guard('admin')->user(), (int) $originWarehouse->id, 'warehouse');
+
         $destinationWarehouse = !empty($validated['destination_warehouse_id'])
             ? Warehouse::findOrFail((int) $validated['destination_warehouse_id'])
             : null;
@@ -331,6 +341,8 @@ class AdminSortBatchController extends Controller
 
     public function eligibleItemsData(Request $request, SortBatch $batch): JsonResponse
     {
+        $this->access->assertCanUseWarehouse(Auth::guard('admin')->user(), (int) $batch->origin_warehouse_id, 'warehouse');
+
         $warehouse = Warehouse::findOrFail((int) $batch->origin_warehouse_id);
         $query     = $this->sortingService->eligibleItemsQuery($warehouse);
 

@@ -25,6 +25,11 @@ class DriverController extends Controller
         return view('admin.drivers.index');
     }
 
+    public function redirectLegacyIndex()
+    {
+        return redirect()->route('admin.drivers.index');
+    }
+
     /**
      * Get drivers data for DataTable.
      */
@@ -43,9 +48,31 @@ class DriverController extends Controller
             });
         }
 
-        // Status filter
-        if ($request->has('status') && $request->get('status') !== '') {
-            $query->where('is_active', $request->get('status') === 'active');
+        // Account status filter
+        if ($request->has('account_status') && $request->get('account_status') !== '') {
+            $accountStatus = $request->get('account_status');
+
+            if (in_array($accountStatus, ['active', 'inactive'], true)) {
+                $query->where('is_active', $accountStatus === 'active');
+            }
+        }
+
+        // Availability filter
+        if ($request->has('availability') && $request->get('availability') !== '') {
+            $availability = $request->get('availability');
+
+            if (in_array($availability, ['available', 'busy', 'offline'], true)) {
+                $query->where('status', $availability);
+            }
+        }
+
+        // Capability filter
+        if ($request->has('capability') && $request->get('capability') !== '') {
+            $capability = $request->get('capability');
+
+            if (in_array($capability, Driver::CAPABILITIES, true)) {
+                $query->whereJsonContains('task_capabilities', $capability);
+            }
         }
 
         // Date range filter
@@ -139,6 +166,11 @@ class DriverController extends Controller
         ]);
     }
 
+    public function redirectLegacyShow(Driver $driver)
+    {
+        return redirect()->route('admin.drivers.show', $driver);
+    }
+
     /**
      * Store a new driver.
      */
@@ -180,7 +212,7 @@ class DriverController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Driver created successfully.',
+            'message' => 'Rider/driver created successfully.',
             'driver' => $driver,
         ]);
     }
@@ -230,7 +262,7 @@ class DriverController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Driver updated successfully.',
+            'message' => 'Rider/driver updated successfully.',
             'driver' => $driver,
         ]);
     }
@@ -247,7 +279,7 @@ class DriverController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => $driver->is_active ? 'Driver activated.' : 'Driver deactivated.',
+            'message' => $driver->is_active ? 'Rider/driver activated.' : 'Rider/driver deactivated.',
             'is_active' => $driver->is_active,
         ]);
     }
@@ -263,7 +295,7 @@ class DriverController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Driver deleted successfully.',
+            'message' => 'Rider/driver deleted successfully.',
         ]);
     }
 
@@ -284,8 +316,28 @@ class DriverController extends Controller
             });
         }
 
-        if ($request->has('status') && $request->get('status') !== '') {
-            $query->where('is_active', $request->get('status') === 'active');
+        if ($request->has('account_status') && $request->get('account_status') !== '') {
+            $accountStatus = $request->get('account_status');
+
+            if (in_array($accountStatus, ['active', 'inactive'], true)) {
+                $query->where('is_active', $accountStatus === 'active');
+            }
+        }
+
+        if ($request->has('availability') && $request->get('availability') !== '') {
+            $availability = $request->get('availability');
+
+            if (in_array($availability, ['available', 'busy', 'offline'], true)) {
+                $query->where('status', $availability);
+            }
+        }
+
+        if ($request->has('capability') && $request->get('capability') !== '') {
+            $capability = $request->get('capability');
+
+            if (in_array($capability, Driver::CAPABILITIES, true)) {
+                $query->whereJsonContains('task_capabilities', $capability);
+            }
         }
 
         if ($dateFrom = $request->get('date_from')) {
@@ -352,6 +404,21 @@ class DriverController extends Controller
         // Status filter
         if ($status = $request->get('status')) {
             $query->where('status', $status);
+        }
+
+        if ($vendor = $request->get('vendor')) {
+            $query->whereHas('shipment.vendor', function ($vendorQuery) use ($vendor) {
+                $vendorQuery->where('name', 'like', "%{$vendor}%")
+                    ->orWhere('phone', 'like', "%{$vendor}%")
+                    ->orWhere('business_name', 'like', "%{$vendor}%");
+            });
+        }
+
+        if ($recipientPhone = $request->get('recipient_phone')) {
+            $query->whereHas('shipment', function ($shipmentQuery) use ($recipientPhone) {
+                $shipmentQuery->where('delivery_recipient_phone', 'like', "%{$recipientPhone}%")
+                    ->orWhereHas('items', fn ($itemQuery) => $itemQuery->where('delivery_recipient_phone', 'like', "%{$recipientPhone}%"));
+            });
         }
 
         // Date range filter
@@ -426,12 +493,28 @@ class DriverController extends Controller
             $query->where('status', $status);
         }
 
+        if ($origin = $request->get('origin')) {
+            $query->whereHas('originWarehouse', fn ($warehouseQuery) => $warehouseQuery->where('name', 'like', "%{$origin}%"));
+        }
+
+        if ($destination = $request->get('destination')) {
+            $query->whereHas('destinationWarehouse', fn ($warehouseQuery) => $warehouseQuery->where('name', 'like', "%{$destination}%"));
+        }
+
         // Date range filter
         if ($dateFrom = $request->get('date_from')) {
             $query->whereDate('created_at', '>=', $dateFrom);
         }
         if ($dateTo = $request->get('date_to')) {
             $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        if ($receivedFrom = $request->get('received_from')) {
+            $query->whereDate('received_at', '>=', $receivedFrom);
+        }
+
+        if ($receivedTo = $request->get('received_to')) {
+            $query->whereDate('received_at', '<=', $receivedTo);
         }
 
         // Sorting
@@ -495,12 +578,32 @@ class DriverController extends Controller
             $query->where('status', $status);
         }
 
+        if ($warehouse = $request->get('warehouse')) {
+            $query->whereHas('warehouse', fn ($warehouseQuery) => $warehouseQuery->where('name', 'like', "%{$warehouse}%"));
+        }
+
         // Date range filter
         if ($dateFrom = $request->get('date_from')) {
             $query->whereDate('created_at', '>=', $dateFrom);
         }
         if ($dateTo = $request->get('date_to')) {
             $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        if ($completedFrom = $request->get('completed_from')) {
+            $query->whereDate('completed_at', '>=', $completedFrom);
+        }
+
+        if ($completedTo = $request->get('completed_to')) {
+            $query->whereDate('completed_at', '<=', $completedTo);
+        }
+
+        if ($stopsMin = $request->get('stops_min')) {
+            $query->having('stops_count', '>=', (int) $stopsMin);
+        }
+
+        if ($stopsMax = $request->get('stops_max')) {
+            $query->having('stops_count', '<=', (int) $stopsMax);
         }
 
         // Sorting
@@ -563,6 +666,14 @@ class DriverController extends Controller
             $query->where('action', $action);
         }
 
+        if ($deviceType = $request->get('device_type')) {
+            $query->where('device_type', $deviceType);
+        }
+
+        if ($ipAddress = $request->get('ip_address')) {
+            $query->where('ip_address', 'like', "%{$ipAddress}%");
+        }
+
         // Date range filter
         if ($dateFrom = $request->get('date_from')) {
             $query->whereDate('created_at', '>=', $dateFrom);
@@ -623,7 +734,7 @@ class DriverController extends Controller
     private function exportPDF(array $rows)
     {
         $filename = 'drivers_' . date('Y-m-d_His') . '.pdf';
-        return GenericPdfExporter::download($rows, $filename, 'Drivers List');
+        return GenericPdfExporter::download($rows, $filename, 'Riders & Drivers List');
     }
 
     /**
@@ -674,6 +785,51 @@ class DriverController extends Controller
                 });
         }
 
+        if ($search = trim((string) $request->input('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('event_type', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%")
+                    ->orWhereHas('label', fn ($labelQuery) => $labelQuery->where('barcode_value', 'like', "%{$search}%"))
+                    ->orWhereHas('label.receiptItem.shipmentItem', function ($itemQuery) use ($search) {
+                        $itemQuery->where('description', 'like', "%{$search}%")
+                            ->orWhere('tracking_code', 'like', "%{$search}%")
+                            ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                            ->orWhere('delivery_town', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('label.receiptItem.shipmentItem.shipment', function ($shipmentQuery) use ($search) {
+                        $shipmentQuery->where('shipment_number', 'like', "%{$search}%")
+                            ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                            ->orWhere('delivery_town', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($eventType = $request->input('event_type')) {
+            $query->where('event_type', $eventType);
+        }
+
+        if ($recipient = $request->input('recipient')) {
+            $query->where(function ($q) use ($recipient) {
+                $q->whereHas('label.receiptItem.shipmentItem', fn ($itemQuery) => $itemQuery->where('delivery_recipient_name', 'like', "%{$recipient}%"))
+                    ->orWhereHas('label.receiptItem.shipmentItem.shipment', fn ($shipmentQuery) => $shipmentQuery->where('delivery_recipient_name', 'like', "%{$recipient}%"));
+            });
+        }
+
+        if ($location = $request->input('location')) {
+            $query->where(function ($q) use ($location) {
+                $q->whereHas('label.receiptItem.shipmentItem', fn ($itemQuery) => $itemQuery->where('delivery_town', 'like', "%{$location}%"))
+                    ->orWhereHas('label.receiptItem.shipmentItem.shipment', fn ($shipmentQuery) => $shipmentQuery->where('delivery_town', 'like', "%{$location}%"));
+            });
+        }
+
+        if ($dateFrom = $request->input('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo = $request->input('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
         $total = $query->count();
         $perPage = min(max((int) $request->input('per_page', 25), 1), 100);
         $page = max((int) $request->input('page', 1), 1);
@@ -704,6 +860,8 @@ class DriverController extends Controller
                 'per_page' => $perPage,
                 'current_page' => $page,
                 'last_page' => max(1, (int) ceil($total / $perPage)),
+                'from' => $total === 0 ? 0 : (($page - 1) * $perPage) + 1,
+                'to' => min($page * $perPage, $total),
             ],
         ]);
     }

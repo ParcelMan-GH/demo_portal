@@ -23,10 +23,12 @@ use App\Http\Controllers\Admin\AdminMarketingController;
 use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\AdminContactQueueController;
 use App\Http\Controllers\Admin\AdminShipmentChargesController;
+use App\Http\Controllers\Admin\BackOfficeContextController;
 use App\Http\Controllers\Admin\RecipientPaymentController;
 use App\Http\Controllers\Warehouse\WarehouseShipmentChargesController;
 use App\Http\Controllers\Admin\VendorPayoutController;
 use App\Http\Controllers\Admin\WarehouseController;
+use App\Http\Controllers\Admin\WarehouseCapabilityController;
 use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
 use App\Http\Controllers\Warehouse\DeliveryRunController as WarehouseDeliveryRunController;
 use App\Http\Controllers\Warehouse\InvoiceController as WarehouseInvoiceController;
@@ -141,7 +143,7 @@ Route::get('/api-tester', function () {
 | Admin Routes
 |--------------------------------------------------------------------------
 */
-Route::prefix('admin')->name('admin.')->group(function () {
+Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(function () {
     // Guest routes (login)
     Route::middleware('guest:admin')->group(function () {
         Route::get('login', [AuthController::class, 'showLoginForm'])->name('login');
@@ -153,9 +155,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     });
 
-    // Authenticated system-admin routes
-    Route::middleware(['auth:admin', 'admin.audit', 'system.user'])->group(function () {
+    // Authenticated back-office routes
+    Route::middleware(['auth:admin', 'admin.audit', 'backoffice.user'])->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::post('context/warehouse', [BackOfficeContextController::class, 'updateWarehouse'])
+            ->name('context.warehouse.update');
 
         // Admin Self-Profile
         Route::get('profile', [AdminProfileController::class, 'edit'])->name('profile.edit');
@@ -197,6 +201,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->name('vendors.restore')->withTrashed();
         Route::get('vendors-export', [VendorController::class, 'export'])->name('vendors.export');
         Route::get('vendors/{vendor}/shipments', [VendorController::class, 'shipments'])->name('vendors.shipments')->withTrashed();
+        Route::get('vendors/{vendor}/packages', [VendorController::class, 'packages'])->name('vendors.packages')->withTrashed();
         Route::get('vendors/{vendor}/activity-logs', [VendorController::class, 'activityLogs'])->name('vendors.activity-logs')->withTrashed();
         Route::get('vendors/{vendor}/otp-logs', [VendorController::class, 'otpLogs'])->name('vendors.otp-logs')->withTrashed();
 
@@ -281,21 +286,36 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('assignments/{pickupAssignment}/cancel', [PickupAssignmentController::class, 'cancel'])->name('assignments.cancel');
         Route::post('assignments/{pickupAssignment}/receive', [PickupAssignmentController::class, 'receive'])->name('assignments.receive');
 
-        // Driver Management
-        Route::get('drivers', [DriverController::class, 'index'])->name('drivers.index');
-        Route::get('drivers-data', [DriverController::class, 'data'])->name('drivers.data');
-        Route::post('drivers', [DriverController::class, 'store'])->name('drivers.store');
-        Route::get('drivers/{driver}', [DriverController::class, 'showPage'])->name('drivers.show');
-        Route::get('drivers/{driver}/json', [DriverController::class, 'show'])->name('drivers.show.json');
-        Route::get('drivers/{driver}/packages-data', [DriverController::class, 'packagesData'])->name('drivers.packages-data');
-        Route::put('drivers/{driver}', [DriverController::class, 'update'])->name('drivers.update');
-        Route::delete('drivers/{driver}', [DriverController::class, 'destroy'])->name('drivers.destroy');
-        Route::patch('drivers/{driver}/toggle-active', [DriverController::class, 'toggleActive'])->name('drivers.toggle-active');
-        Route::get('drivers-export', [DriverController::class, 'export'])->name('drivers.export');
-        Route::get('drivers/{driver}/assignments', [DriverController::class, 'assignments'])->name('drivers.assignments');
-        Route::get('drivers/{driver}/activity-logs', [DriverController::class, 'activityLogs'])->name('drivers.activity-logs');
-        Route::get('drivers/{driver}/transport-manifests', [DriverController::class, 'transportManifests'])->name('drivers.transport-manifests');
-        Route::get('drivers/{driver}/delivery-runs', [DriverController::class, 'deliveryRuns'])->name('drivers.delivery-runs');
+        // Rider & Driver Management
+        Route::get('riders-drivers', [DriverController::class, 'index'])->name('drivers.index');
+        Route::get('riders-drivers-data', [DriverController::class, 'data'])->name('drivers.data');
+        Route::post('riders-drivers', [DriverController::class, 'store'])->name('drivers.store');
+        Route::get('riders-drivers/{driver}', [DriverController::class, 'showPage'])->name('drivers.show');
+        Route::get('riders-drivers/{driver}/json', [DriverController::class, 'show'])->name('drivers.show.json');
+        Route::get('riders-drivers/{driver}/packages-data', [DriverController::class, 'packagesData'])->name('drivers.packages-data');
+        Route::put('riders-drivers/{driver}', [DriverController::class, 'update'])->name('drivers.update');
+        Route::delete('riders-drivers/{driver}', [DriverController::class, 'destroy'])->name('drivers.destroy');
+        Route::patch('riders-drivers/{driver}/toggle-active', [DriverController::class, 'toggleActive'])->name('drivers.toggle-active');
+        Route::get('riders-drivers-export', [DriverController::class, 'export'])->name('drivers.export');
+        Route::get('riders-drivers/{driver}/assignments', [DriverController::class, 'assignments'])->name('drivers.assignments');
+        Route::get('riders-drivers/{driver}/activity-logs', [DriverController::class, 'activityLogs'])->name('drivers.activity-logs');
+        Route::get('riders-drivers/{driver}/transport-manifests', [DriverController::class, 'transportManifests'])->name('drivers.transport-manifests');
+        Route::get('riders-drivers/{driver}/delivery-runs', [DriverController::class, 'deliveryRuns'])->name('drivers.delivery-runs');
+
+        Route::get('drivers', [DriverController::class, 'redirectLegacyIndex']);
+        Route::get('drivers-data', [DriverController::class, 'data']);
+        Route::post('drivers', [DriverController::class, 'store']);
+        Route::get('drivers-export', [DriverController::class, 'export']);
+        Route::get('drivers/{driver}', [DriverController::class, 'redirectLegacyShow']);
+        Route::get('drivers/{driver}/json', [DriverController::class, 'show']);
+        Route::get('drivers/{driver}/packages-data', [DriverController::class, 'packagesData']);
+        Route::put('drivers/{driver}', [DriverController::class, 'update']);
+        Route::delete('drivers/{driver}', [DriverController::class, 'destroy']);
+        Route::patch('drivers/{driver}/toggle-active', [DriverController::class, 'toggleActive']);
+        Route::get('drivers/{driver}/assignments', [DriverController::class, 'assignments']);
+        Route::get('drivers/{driver}/activity-logs', [DriverController::class, 'activityLogs']);
+        Route::get('drivers/{driver}/transport-manifests', [DriverController::class, 'transportManifests']);
+        Route::get('drivers/{driver}/delivery-runs', [DriverController::class, 'deliveryRuns']);
 
         // Warehouse Management
         Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
@@ -307,6 +327,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('warehouses/{warehouse}/json', [WarehouseController::class, 'show'])->name('warehouses.show.json');
         Route::get('warehouses/{warehouse}/users-data', [WarehouseController::class, 'usersData'])->name('warehouses.users.data');
         Route::get('warehouses/{warehouse}/users-export', [WarehouseController::class, 'usersExport'])->name('warehouses.users.export');
+        Route::get('warehouses/{warehouse}/capabilities', [WarehouseCapabilityController::class, 'index'])->name('warehouses.capabilities.index');
+        Route::put('warehouses/{warehouse}/capabilities', [WarehouseCapabilityController::class, 'update'])->name('warehouses.capabilities.update');
         Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update'])->name('warehouses.update');
         Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->name('warehouses.destroy');
         Route::patch('warehouses/{warehouse}/toggle-active', [WarehouseController::class, 'toggleActive'])->name('warehouses.toggle-active');
@@ -465,6 +487,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::post('settings/save', [SettingsController::class, 'save'])->name('settings.save');
         Route::post('settings/upload', [SettingsController::class, 'uploadFile'])->name('settings.upload');
+        Route::post('settings/email-templates', [SettingsController::class, 'storeEmailTemplate'])->name('settings.email-templates.store');
+        Route::put('settings/email-templates/{emailTemplate}', [SettingsController::class, 'updateEmailTemplate'])->name('settings.email-templates.update');
+        Route::patch('settings/email-templates/{emailTemplate}/toggle', [SettingsController::class, 'toggleEmailTemplate'])->name('settings.email-templates.toggle');
+        Route::get('settings/email-templates/{emailTemplate}/preview', [SettingsController::class, 'previewEmailTemplate'])->name('settings.email-templates.preview');
         Route::get('settings/logs-data', [SettingsController::class, 'logsData'])->name('settings.logs.data');
         Route::get('settings/logs/{index}', [SettingsController::class, 'logDetail'])->name('settings.logs.detail');
         Route::delete('settings/logs', [SettingsController::class, 'clearLogs'])->name('settings.logs.clear');
@@ -494,9 +520,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
 | Warehouse Web Portal Routes
 |--------------------------------------------------------------------------
 */
-Route::prefix('warehouse')
+Route::prefix(config('backoffice.prefix', 'admin') . '/operations')
     ->name('warehouse.')
-    ->middleware(['auth:admin', 'admin.audit', 'warehouse.user'])
+    ->middleware(['auth:admin', 'admin.audit', 'backoffice.user'])
     ->group(function () {
         Route::get('/', [WarehouseDashboardController::class, 'index'])->name('dashboard');
 
@@ -693,6 +719,13 @@ Route::prefix('warehouse')
         Route::get('payments/{payment}/download', [WarehouseShipmentPaymentController::class, 'download'])->name('payments.download');
         Route::get('payments/{payment}/print', [WarehouseShipmentPaymentController::class, 'print'])->name('payments.print');
     });
+
+Route::any('warehouse/{path?}', function (?string $path = null) {
+    $target = trim(config('backoffice.prefix', 'admin') . '/operations/' . ltrim((string) $path, '/'), '/');
+    $query = request()->getQueryString();
+
+    return redirect('/' . $target . ($query ? '?' . $query : ''), 308);
+})->where('path', '.*')->name('warehouse.compat.redirect');
 
 /*
 |--------------------------------------------------------------------------

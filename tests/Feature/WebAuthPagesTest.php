@@ -81,7 +81,7 @@ test('staff can log in with phone number and password', function () {
     $this->post('/admin/login', [
         'email' => '0241234567',
         'password' => 'secret-password',
-    ])->assertRedirect(route('admin.dashboard'));
+    ])->assertRedirect(route('warehouse.dashboard'));
 
     $this->assertAuthenticatedAs($user, 'admin');
 });

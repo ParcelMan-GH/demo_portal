@@ -98,8 +98,8 @@ class DashboardController extends Controller
                                     ->limit(5)
                                     ->get(['id', 'manifest_number', 'status', 'origin_warehouse_id', 'destination_warehouse_id', 'dispatched_at']);
 
-        // ── User stats (superadmin only) ──────────────────────────────────
-        if ($admin->isSuperAdmin()) {
+        // ── User stats (HQ only) ──────────────────────────────────────────
+        if ($admin->isHqUser()) {
             $adminStats = [
                 'total'    => User::whereNull('warehouse_id')->count(),
                 'active'   => User::whereNull('warehouse_id')->where('is_active', true)->count(),

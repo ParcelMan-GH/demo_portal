@@ -31,6 +31,7 @@ class UpdateRoleRequest extends FormRequest
             ],
             'description' => ['nullable', 'string'],
             'is_active' => ['boolean'],
+            'is_assignable_by_warehouse_manager' => ['boolean'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['exists:permissions,id'],
         ];

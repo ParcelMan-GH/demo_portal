@@ -25,6 +25,7 @@ class StoreRoleRequest extends FormRequest
             'name' => ['required', 'string', 'max:255', 'unique:roles,name'],
             'description' => ['nullable', 'string'],
             'is_active' => ['boolean'],
+            'is_assignable_by_warehouse_manager' => ['boolean'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['exists:permissions,id'],
         ];

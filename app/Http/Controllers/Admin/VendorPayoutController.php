@@ -50,6 +50,7 @@ class VendorPayoutController extends Controller
         $search = $request->get('search');
         $sort = $request->get('sort', 'available_balance');
         $sortDir = $request->get('sort_dir', 'desc');
+        $minPayout = $this->commissionService->getMinPayout();
 
         // Build the query with aggregated earnings and payouts
         $query = Vendor::query()
@@ -100,12 +101,17 @@ class VendorPayoutController extends Controller
             });
         }
 
+        // This is the commission payouts worklist, so only vendors with accrued
+        // unpaid commission belong here.
+        $query->having('available_balance', '>', 0);
+
         // Status filter
         $status = $request->get('status');
-        if ($status === 'has_balance') {
-            $query->having('available_balance', '>', 0);
-        } elseif ($status === 'no_balance') {
-            $query->having('available_balance', '=', 0);
+        if ($status === 'ready') {
+            $query->having('available_balance', '>=', $minPayout);
+        } elseif ($status === 'below_minimum') {
+            $query->having('available_balance', '>', 0)
+                ->having('available_balance', '<', $minPayout);
         }
 
         // Sorting
@@ -116,11 +122,18 @@ class VendorPayoutController extends Controller
             $query->orderBy('available_balance', 'desc');
         }
 
-        $total = $query->get()->count(); // Count after having clauses
+        $summaryRows = (clone $query)->get();
+        $total = $summaryRows->count(); // Count after having clauses
+        $readyCount = $summaryRows->filter(fn ($row) => (float) $row->available_balance >= $minPayout)->count();
+        $summary = [
+            'vendors_with_balance' => $total,
+            'ready_to_pay' => $readyCount,
+            'below_minimum' => max($total - $readyCount, 0),
+            'available_balance' => (float) $summaryRows->sum('available_balance'),
+            'minimum_payout' => (float) $minPayout,
+        ];
         $skip = ($page - 1) * $perPage;
         $items = $query->skip($skip)->take($perPage)->get();
-
-        $minPayout = $this->commissionService->getMinPayout();
 
         $data = $items->map(function ($row) use ($minPayout) {
             return [
@@ -133,11 +146,13 @@ class VendorPayoutController extends Controller
                 'total_paid' => (float) $row->total_paid,
                 'pending_payouts' => (float) $row->pending_payouts,
                 'can_payout' => (float) $row->available_balance >= $minPayout,
+                'payout_state' => (float) $row->available_balance >= $minPayout ? 'ready' : 'below_minimum',
             ];
         });
 
         return response()->json([
             'data' => $data,
+            'summary' => $summary,
             'meta' => [
                 'total' => $total,
                 'per_page' => $perPage,
@@ -163,6 +178,22 @@ class VendorPayoutController extends Controller
         $query = VendorPayout::where('vendor_id', $vendor->id)
             ->with('processedBy:id,name')
             ->orderBy('created_at', 'desc');
+
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('payment_reference', 'like', "%{$search}%")
+                    ->orWhere('payment_phone', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%");
+            });
+        }
+
+        if ($status = $request->get('status')) {
+            $query->where('status', $status);
+        }
+
+        if ($method = $request->get('method')) {
+            $query->where('payment_method', $method);
+        }
 
         $total = $query->count();
         $payouts = $query->skip($skip)->take($perPage)->get();
@@ -210,6 +241,8 @@ class VendorPayoutController extends Controller
             'amount' => 'required|numeric|min:1',
             'payment_method' => 'required|in:momo,bank,cash',
             'payment_phone' => 'required_if:payment_method,momo|nullable|string|max:20',
+            'payment_reference' => [$request->boolean('confirm_immediately') ? 'required' : 'nullable', 'string', 'max:255'],
+            'confirm_immediately' => 'sometimes|boolean',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -222,6 +255,8 @@ class VendorPayoutController extends Controller
             [
                 'payment_method' => $request->payment_method,
                 'payment_phone' => $request->payment_phone,
+                'payment_reference' => $request->payment_reference,
+                'confirm_immediately' => $request->boolean('confirm_immediately'),
                 'notes' => $request->notes,
             ]
         );

@@ -23,7 +23,7 @@
                 </div>
                 <div class="min-w-0">
                     <h3 class="text-lg font-extrabold text-slate-900" x-text="modalMode === 'create' ? 'Add User' : 'Edit User'"></h3>
-                    <p class="mt-1 text-sm leading-6 text-slate-500" x-text="modalMode === 'create' ? 'Create a warehouse user and assign their role.' : 'Update user profile, role, status, or password.'"></p>
+                    <p class="mt-1 text-sm leading-6 text-slate-500" x-text="modalMode === 'create' ? 'Create a user and assign their role.' : 'Update user profile, role, status, or password.'"></p>
                 </div>
             </div>
             <button type="button" @@click="closeModal()" class="shrink-0 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
@@ -82,7 +82,7 @@
                     <div class="grid gap-2 sm:grid-cols-2">
                         @foreach($roles as $role)
                         @php
-                            $isAssignable = (bool) $role->is_assignable_by_warehouse_manager;
+                            $isAssignable = (bool) $role->is_assignable_by_warehouse_manager || (bool) ($canAssignRestrictedRoles ?? false);
                         @endphp
                         <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3 transition hover:border-orange-200 hover:bg-orange-50/60"
                                :class="[

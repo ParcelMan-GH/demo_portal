@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\BackOfficeAccess;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -9,6 +10,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CheckPermission
 {
+    public function __construct(private BackOfficeAccess $access)
+    {
+    }
+
     /**
      * Handle an incoming request.
      *
@@ -29,7 +34,7 @@ class CheckPermission
         }
 
         // Check if user has the required permission
-        if (!$user->hasPermission($permission)) {
+        if (!$this->access->canUsePermission($user, $permission)) {
             if ($request->expectsJson()) {
                 return response()->json([
                     'message' => 'You do not have permission to perform this action.',

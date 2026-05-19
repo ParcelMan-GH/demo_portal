@@ -1,187 +1,73 @@
 <div x-data="notificationLogsTab" x-init="init()">
 
-    {{-- Header row with count + controls --}}
-    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-5">
-        <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-
-            {{-- Search --}}
-            <div class="relative flex-1 max-w-xs">
-                <input
-                    type="text"
-                    x-model="search"
-                    @@input.debounce.500ms="applyFilters()"
-                    placeholder="Search notifications..."
-                    class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400 transition-colors"
-                >
-                <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-            </div>
-
-            {{-- Type Filter --}}
-            <div x-data="{ open: false }" class="relative w-full sm:w-52">
-                <button
-                    type="button"
-                    @@click="open = !open"
-                    class="w-full inline-flex items-center justify-between px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors"
-                >
-                    <span x-text="typeFilterName || 'All types'"></span>
-                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div
-                    x-show="open"
-                    @@click.away="open = false"
-                    x-transition
-                    class="absolute left-0 mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/85 shadow-2xl p-2 z-50 backdrop-blur-xl max-h-60 overflow-y-auto"
-                    style="display: none;"
-                >
-                    <button
-                        type="button"
-                        @@click="typeFilter = ''; typeFilterName = ''; applyFilters(); open = false"
-                        class="w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                        :class="typeFilter === '' ? 'bg-white/70 shadow-sm' : ''"
-                    >
-                        <svg x-show="typeFilter === ''" class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        <span>All types</span>
-                    </button>
-                    @foreach($tabData['types'] ?? [] as $type)
-                    <button
-                        type="button"
-                        @@click="typeFilter = '{{ $type }}'; typeFilterName = '{{ ucfirst(str_replace('_', ' ', $type)) }}'; applyFilters(); open = false"
-                        class="mt-1 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                        :class="typeFilter === '{{ $type }}' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''"
-                    >
-                        <svg x-show="typeFilter === '{{ $type }}'" class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        <span>{{ ucfirst(str_replace('_', ' ', $type)) }}</span>
-                    </button>
-                    @endforeach
+    <div class="mb-5 space-y-4">
+        <div class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+            <div class="w-full xl:max-w-md">
+                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
+                <div class="relative">
+                    <input type="text" x-model="search" @@input.debounce.500ms="applyFilters()" placeholder="Search notifications..." class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 </div>
             </div>
-
-            {{-- Channel Filter --}}
-            <div x-data="{ open: false }" class="relative w-full sm:w-44">
-                <button
-                    type="button"
-                    @@click="open = !open"
-                    class="w-full inline-flex items-center justify-between px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors"
-                >
-                    <span x-text="channelFilterName || 'All channels'"></span>
-                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
+            <div class="flex flex-wrap items-center gap-3 xl:justify-end">
+                <button type="button" @@click="showFilters = !showFilters" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50" :class="showFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+                    <span x-text="showFilters ? 'Hide Filters' : 'Filters'"></span>
                 </button>
-                <div
-                    x-show="open"
-                    @@click.away="open = false"
-                    x-transition
-                    class="absolute left-0 mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/85 shadow-2xl p-2 z-50 backdrop-blur-xl"
-                    style="display: none;"
-                >
-                    <button
-                        type="button"
-                        @@click="channelFilter = ''; channelFilterName = ''; applyFilters(); open = false"
-                        class="w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                        :class="channelFilter === '' ? 'bg-white/70 shadow-sm' : ''"
-                    >
-                        <svg x-show="channelFilter === ''" class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        <span>All channels</span>
-                    </button>
-                    @foreach($tabData['channels'] ?? [] as $channel)
-                    <button
-                        type="button"
-                        @@click="channelFilter = '{{ $channel }}'; channelFilterName = '{{ ucfirst($channel) }}'; applyFilters(); open = false"
-                        class="mt-1 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                        :class="channelFilter === '{{ $channel }}' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''"
-                    >
-                        <svg x-show="channelFilter === '{{ $channel }}'" class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        <span>{{ ucfirst($channel) }}</span>
-                    </button>
-                    @endforeach
-                </div>
-            </div>
-
-            {{-- Status Filter --}}
-            <div x-data="{ open: false }" class="relative w-full sm:w-44">
-                <button
-                    type="button"
-                    @@click="open = !open"
-                    class="w-full inline-flex items-center justify-between px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors"
-                >
-                    <span x-text="statusFilterName || 'All statuses'"></span>
-                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div
-                    x-show="open"
-                    @@click.away="open = false"
-                    x-transition
-                    class="absolute left-0 mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/85 shadow-2xl p-2 z-50 backdrop-blur-xl"
-                    style="display: none;"
-                >
-                    <button
-                        type="button"
-                        @@click="statusFilter = ''; statusFilterName = ''; applyFilters(); open = false"
-                        class="w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                        :class="statusFilter === '' ? 'bg-white/70 shadow-sm' : ''"
-                    >
-                        <svg x-show="statusFilter === ''" class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        <span>All statuses</span>
-                    </button>
-                    @foreach($tabData['statuses'] ?? [] as $status)
-                    <button
-                        type="button"
-                        @@click="statusFilter = '{{ $status }}'; statusFilterName = '{{ ucfirst($status) }}'; applyFilters(); open = false"
-                        class="mt-1 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                        :class="statusFilter === '{{ $status }}' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''"
-                    >
-                        <svg x-show="statusFilter === '{{ $status }}'" class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        <span>{{ ucfirst($status) }}</span>
-                    </button>
-                    @endforeach
-                </div>
-            </div>
-
-            {{-- Date Range --}}
-            <div class="relative w-full sm:w-56">
-                <input
-                    type="text"
-                    x-ref="dateRange"
-                    placeholder="Date range"
-                    class="w-full pl-10 pr-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 cursor-pointer"
-                    readonly
-                >
-                <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M4 11h16M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
             </div>
         </div>
 
+        <div x-show="showFilters" x-transition class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4" style="display:none">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <div>
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Type</label>
+                    <select x-model="typeFilter" @@change="typeFilterName = $event.target.selectedOptions[0].text; applyFilters()" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                        <option value="">All types</option>
+                        @foreach($tabData['types'] ?? [] as $type)
+                            <option value="{{ $type }}">{{ ucfirst(str_replace('_', ' ', $type)) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Channel</label>
+                    <select x-model="channelFilter" @@change="channelFilterName = $event.target.selectedOptions[0].text; applyFilters()" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                        <option value="">All channels</option>
+                        @foreach($tabData['channels'] ?? [] as $channel)
+                            <option value="{{ $channel }}">{{ ucfirst($channel) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Status</label>
+                    <select x-model="statusFilter" @@change="statusFilterName = $event.target.selectedOptions[0].text; applyFilters()" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                        <option value="">All statuses</option>
+                        @foreach($tabData['statuses'] ?? [] as $status)
+                            <option value="{{ $status }}">{{ ucfirst($status) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Date Range</label>
+                    <input type="text" x-ref="dateRange" placeholder="Select date range" readonly class="w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                </div>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                <button type="button" @@click="showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
+                <button type="button" @@click="clearFilters()" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
+                <button type="button" @@click="applyFilters()" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">Apply Filters</button>
+            </div>
+        </div>
     </div>
 
     {{-- Table --}}
-    <div class="rounded-xl border border-slate-200/50 relative">
+    <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div x-show="loading" x-cloak x-transition.opacity.duration.150ms class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10"></div>
 
         <div class="overflow-x-auto">
             <table class="w-full min-w-[1000px] md:min-w-full divide-y divide-slate-200/50 text-xs">
-                <thead class="bg-slate-50/50">
+                <thead class="bg-slate-50/70">
                     <tr>
-                        <th x-show="visibleColumns.created_at" @@click="sort('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                        <th x-show="visibleColumns.created_at" @@click="sort('created_at')" class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                             <div class="flex items-center">
                                 CREATED AT
                                 <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'created_at' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -190,11 +76,11 @@
                                 </svg>
                             </div>
                         </th>
-                        <th x-show="visibleColumns.type" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">TYPE</th>
-                        <th x-show="visibleColumns.channel" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">CHANNEL</th>
-                        <th x-show="visibleColumns.status" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">STATUS</th>
-                        <th x-show="visibleColumns.recipient" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">RECIPIENT</th>
-                        <th x-show="visibleColumns.title" @@click="sort('title')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                        <th x-show="visibleColumns.type" class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">TYPE</th>
+                        <th x-show="visibleColumns.channel" class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">CHANNEL</th>
+                        <th x-show="visibleColumns.status" class="px-4 py-3 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">STATUS</th>
+                        <th x-show="visibleColumns.recipient" class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">RECIPIENT</th>
+                        <th x-show="visibleColumns.title" @@click="sort('title')" class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                             <div class="flex items-center">
                                 TITLE
                                 <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'title' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -203,8 +89,8 @@
                                 </svg>
                             </div>
                         </th>
-                        <th x-show="visibleColumns.body" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">BODY</th>
-                        <th x-show="visibleColumns.actions" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ACTIONS</th>
+                        <th x-show="visibleColumns.body" class="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">BODY</th>
+                        <th x-show="visibleColumns.actions" class="px-4 py-3 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ACTIONS</th>
                     </tr>
                 </thead>
                 <tbody class="bg-transparent divide-y divide-slate-100/50">
@@ -223,11 +109,11 @@
 
                     <template x-for="log in logs" :key="log.id">
                         <tr class="hover:bg-slate-50/70">
-                            <td x-show="visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(log.created_at)"></td>
-                            <td x-show="visibleColumns.type" class="px-4 py-2.5 whitespace-nowrap">
+                            <td x-show="visibleColumns.created_at" class="px-4 py-3 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(log.created_at)"></td>
+                            <td x-show="visibleColumns.type" class="px-4 py-3 whitespace-nowrap">
                                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-700" x-text="log.type ? log.type.replace(/_/g, ' ') : '—'"></span>
                             </td>
-                            <td x-show="visibleColumns.channel" class="px-4 py-2.5 whitespace-nowrap">
+                            <td x-show="visibleColumns.channel" class="px-4 py-3 whitespace-nowrap">
                                 <span
                                     class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
                                     :class="{
@@ -238,7 +124,7 @@
                                     x-text="log.channel || '—'"
                                 ></span>
                             </td>
-                            <td x-show="visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap text-center">
+                            <td x-show="visibleColumns.status" class="px-4 py-3 whitespace-nowrap text-center">
                                 <span
                                     class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
                                     :class="{
@@ -249,15 +135,15 @@
                                     x-text="log.status || '—'"
                                 ></span>
                             </td>
-                            <td x-show="visibleColumns.recipient" class="px-4 py-2.5 whitespace-nowrap">
+                            <td x-show="visibleColumns.recipient" class="px-4 py-3 whitespace-nowrap">
                                 <div class="text-xs font-semibold text-slate-900" x-text="log.notifiable_type || '—'"></div>
                                 <div class="text-[10px] text-slate-500" x-text="log.notifiable_id ? '#' + log.notifiable_id : ''"></div>
                             </td>
-                            <td x-show="visibleColumns.title" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-700 font-medium" x-text="log.title || '—'"></td>
-                            <td x-show="visibleColumns.body" class="px-4 py-2.5 text-xs text-slate-500 max-w-[350px]">
+                            <td x-show="visibleColumns.title" class="px-4 py-3 whitespace-nowrap text-xs text-slate-700 font-medium" x-text="log.title || '—'"></td>
+                            <td x-show="visibleColumns.body" class="px-4 py-3 text-xs text-slate-500 max-w-[350px]">
                                 <span class="block truncate" x-text="log.body || '—'"></span>
                             </td>
-                            <td x-show="visibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center">
+                            <td x-show="visibleColumns.actions" class="px-4 py-3 whitespace-nowrap text-center">
                                 <button
                                     type="button"
                                     @@click="openDetail(log)"
@@ -277,87 +163,26 @@
         </div>
 
         {{-- Pagination --}}
-        <div class="px-4 py-2.5 border-t border-slate-200/50 bg-slate-50/30">
+        <div class="border-t border-slate-200/70 bg-slate-50/40 px-4 py-3">
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div class="text-xs text-slate-600">
-                    Showing <span x-text="meta.from || 0"></span> to <span x-text="meta.to || 0"></span> of <span x-text="meta.total || 0"></span> results
+                <div class="text-sm font-semibold text-slate-600">
+                    Showing <span x-text="meta.from || 0"></span> to <span x-text="meta.to || 0"></span> of <span x-text="meta.total || 0"></span>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-3">
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs font-medium text-slate-600">Rows per page</span>
-                        <div x-data="{ open: false }" class="relative">
-                            <button
-                                type="button"
-                                @@click="open = !open"
-                                class="inline-flex items-center justify-between gap-1.5 px-2.5 py-1 min-w-[60px] border border-slate-200/70 rounded-lg bg-white/70 backdrop-blur-sm text-xs font-medium text-slate-700 hover:bg-white/90 transition-colors"
-                            >
-                                <span x-text="perPage"></span>
-                                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                </svg>
-                            </button>
-                            <div
-                                x-show="open"
-                                @@click.away="open = false"
-                                x-transition
-                                class="absolute bottom-full mb-1 right-0 w-16 rounded-lg border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-lg p-1 z-[9999]"
-                                style="display: none;"
-                            >
-                                <button type="button" @@click="setPerPage(10); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 10 ? 'bg-slate-100/70' : ''">10</button>
-                                <button type="button" @@click="setPerPage(25); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 25 ? 'bg-slate-100/70' : ''">25</button>
-                                <button type="button" @@click="setPerPage(50); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 50 ? 'bg-slate-100/70' : ''">50</button>
-                                <button type="button" @@click="setPerPage(100); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 100 ? 'bg-slate-100/70' : ''">100</button>
-                            </div>
-                        </div>
-                    </div>
+                    <select x-model="perPage" @@change="setPerPage(perPage)" class="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700">
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
 
-                    <div class="text-xs font-medium text-slate-600">
+                    <div class="text-sm font-bold text-slate-600">
                         Page <span x-text="meta.current_page || 1"></span> of <span x-text="meta.last_page || 1"></span>
                     </div>
 
-                    <div class="flex space-x-1">
-                        <button
-                            @@click="firstPage()"
-                            :disabled="meta.current_page === 1"
-                            :class="meta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                            class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
-                        >
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/>
-                            </svg>
-                        </button>
-                        <button
-                            @@click="previousPage()"
-                            :disabled="meta.current_page === 1"
-                            :class="meta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                            class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
-                        >
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                            </svg>
-                        </button>
-                        <button
-                            @@click="nextPage()"
-                            :disabled="meta.current_page >= meta.last_page"
-                            :class="meta.current_page >= meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                            class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
-                        >
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                            </svg>
-                        </button>
-                        <button
-                            @@click="lastPage()"
-                            :disabled="meta.current_page >= meta.last_page"
-                            :class="meta.current_page >= meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                            class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
-                        >
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/>
-                            </svg>
-                        </button>
-                    </div>
+                    <button @@click="previousPage()" :disabled="meta.current_page === 1" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Prev</button>
+                    <button @@click="nextPage()" :disabled="meta.current_page >= meta.last_page" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
                 </div>
             </div>
         </div>
@@ -478,7 +303,7 @@
                 </div>
 
                 {{-- Modal Footer --}}
-                <div class="px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+                <div class="px-6 py-3 border-t border-slate-100 bg-slate-50/70 flex justify-end">
                     <button @@click="detailOpen = false" class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
                         Close
                     </button>
@@ -509,6 +334,7 @@ document.addEventListener('alpine:init', () => {
         createdFrom: '',
         createdTo: '',
         dateRangePicker: null,
+        showFilters: false,
         detailOpen: false,
         detailLog: null,
         meta: {
@@ -626,6 +452,19 @@ document.addEventListener('alpine:init', () => {
         applyFilters() {
             this.meta.current_page = 1;
             this.loadData();
+        },
+
+        clearFilters() {
+            this.typeFilter = '';
+            this.typeFilterName = '';
+            this.channelFilter = '';
+            this.channelFilterName = '';
+            this.statusFilter = '';
+            this.statusFilterName = '';
+            this.createdFrom = '';
+            this.createdTo = '';
+            if (this.$refs.dateRange) this.$refs.dateRange.value = '';
+            this.applyFilters();
         },
 
         setPerPage(value) {

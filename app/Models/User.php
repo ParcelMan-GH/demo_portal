@@ -121,11 +121,6 @@ class User extends Authenticatable
      */
     public function hasPermission(string $permission): bool
     {
-        // Super admin bypasses all checks
-        if ($this->hasRole('super_admin')) {
-            return true;
-        }
-
         $permissionNames = Cache::remember(
             "user.{$this->id}.permission_names",
             now()->addHours(24),
@@ -201,6 +196,11 @@ class User extends Authenticatable
         return $this->roles()->where('slug', $roleSlug)->exists();
     }
 
+    public function hasAnyRole(array $roleSlugs): bool
+    {
+        return $this->roles()->whereIn('slug', $roleSlugs)->exists();
+    }
+
     /**
      * Assign a role to the user.
      */
@@ -263,12 +263,26 @@ class User extends Authenticatable
     // HELPER METHODS
     // =====================
 
+    public function isAdministrator(): bool
+    {
+        return $this->hasAnyRole(['administrator', 'super_admin']);
+    }
+
+    public function isHqUser(): bool
+    {
+        $warehouse = $this->relationLoaded('warehouse')
+            ? $this->warehouse
+            : $this->warehouse()->first();
+
+        return (bool) ($warehouse?->is_hq && $warehouse?->can_administer_system);
+    }
+
     /**
-     * Check if user is super admin.
+     * @deprecated Use isHqUser() when checking elevated back-office scope.
      */
     public function isSuperAdmin(): bool
     {
-        return $this->hasRole('super_admin');
+        return $this->isHqUser();
     }
 
     /**
@@ -284,8 +298,7 @@ class User extends Authenticatable
      */
     public function canManage(User $user): bool
     {
-        // Super admin can manage anyone
-        if ($this->isSuperAdmin()) {
+        if ($this->isHqUser()) {
             return true;
         }
 

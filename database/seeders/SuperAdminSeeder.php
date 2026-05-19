@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Warehouse;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -14,28 +15,43 @@ class SuperAdminSeeder extends Seeder
      */
     public function run(): void
     {
-        // Check if super admin already exists
-        if (User::where('email', 'admin@parcelman.com')->exists()) {
-            $this->command->info('Super Admin already exists. Skipping...');
+        $hqWarehouse = Warehouse::query()
+            ->where('is_hq', true)
+            ->first()
+            ?? Warehouse::query()->where('code', 'WH-001')->first()
+            ?? Warehouse::query()->orderBy('id')->first();
+
+        $existing = User::where('email', 'admin@parcelman.com')->first();
+        if ($existing) {
+            if (!$existing->warehouse_id && $hqWarehouse) {
+                $existing->update(['warehouse_id' => $hqWarehouse->id]);
+            }
+
+            $administratorRole = Role::where('slug', 'administrator')->first();
+            if ($administratorRole && !$existing->hasRole('administrator')) {
+                $existing->syncRoles([$administratorRole->id]);
+            }
+
+            $this->command->info('Administrator already exists. Skipping...');
             return;
         }
 
         $user = User::create([
-            'name' => 'Super Admin',
+            'name' => 'Administrator',
             'email' => 'admin@parcelman.com',
             'password' => Hash::make('password'),
             'is_active' => true,
+            'warehouse_id' => $hqWarehouse?->id,
         ]);
 
-        // Assign Super Admin role
-        $superAdminRole = Role::where('slug', 'super_admin')->first();
-        if ($superAdminRole) {
-            $user->roles()->attach($superAdminRole->id, [
+        $administratorRole = Role::where('slug', 'administrator')->first();
+        if ($administratorRole) {
+            $user->roles()->attach($administratorRole->id, [
                 'assigned_at' => now(),
             ]);
         }
 
-        $this->command->info('Super Admin created successfully!');
+        $this->command->info('Administrator created successfully!');
         $this->command->info('Email: admin@parcelman.com');
         $this->command->info('Password: password');
         $this->command->warn('Please change the password after first login.');

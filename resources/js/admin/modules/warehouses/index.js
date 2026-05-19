@@ -23,8 +23,15 @@ function buildWarehousesTable(config) {
         },
         loading: false,
         search: '',
+        showFilters: false,
         statusFilter: '',
-        statusFilterName: 'All statuses',
+        regionFilter: '',
+        districtFilter: '',
+        filterDistricts: [],
+        capacityMin: '',
+        capacityMax: '',
+        usersMin: '',
+        usersMax: '',
         createdFrom: '',
         createdTo: '',
         dateRangePicker: null,
@@ -152,6 +159,12 @@ function buildWarehousesTable(config) {
 
                 if (this.search) params.append('search', this.search);
                 if (this.statusFilter) params.append('status', this.statusFilter);
+                if (this.regionFilter) params.append('region_id', this.regionFilter);
+                if (this.districtFilter) params.append('district_id', this.districtFilter);
+                if (this.capacityMin) params.append('capacity_min', this.capacityMin);
+                if (this.capacityMax) params.append('capacity_max', this.capacityMax);
+                if (this.usersMin) params.append('users_min', this.usersMin);
+                if (this.usersMax) params.append('users_max', this.usersMax);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
 
@@ -188,6 +201,112 @@ function buildWarehousesTable(config) {
                 this.sortDirection = 'asc';
             }
             this.loadData();
+        },
+
+        setStatusFilter(value) {
+            this.statusFilter = value;
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        clearStatusFilter() {
+            this.setStatusFilter('');
+        },
+
+        statusFilterLabel() {
+            if (this.statusFilter === 'active') return 'Active';
+            if (this.statusFilter === 'inactive') return 'Inactive';
+            return 'All statuses';
+        },
+
+        activeCount() {
+            return this.meta.active_count ?? this.warehouses.filter((warehouse) => warehouse.is_active).length;
+        },
+
+        inactiveCount() {
+            return this.meta.inactive_count ?? this.warehouses.filter((warehouse) => !warehouse.is_active).length;
+        },
+
+        staffCount() {
+            return this.meta.users_count ?? this.warehouses.reduce((sum, warehouse) => sum + Number(warehouse.users_count || 0), 0);
+        },
+
+        async onFilterRegionChange() {
+            this.districtFilter = '';
+            this.filterDistricts = [];
+
+            if (!this.regionFilter) return;
+
+            try {
+                const endpoint = this.districtsEndpointTemplate
+                    ? this.districtsEndpointTemplate.replace('__REGION__', this.regionFilter)
+                    : '';
+
+                if (!endpoint) return;
+
+                const response = await fetch(endpoint, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch districts');
+
+                const result = await response.json();
+                this.filterDistricts = Array.isArray(result.data) ? result.data : (Array.isArray(result) ? result : []);
+            } catch (error) {
+                console.error('Error loading filter districts:', error);
+            }
+        },
+
+        applyFilters() {
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        clearFilters() {
+            this.statusFilter = '';
+            this.regionFilter = '';
+            this.districtFilter = '';
+            this.filterDistricts = [];
+            this.capacityMin = '';
+            this.capacityMax = '';
+            this.usersMin = '';
+            this.usersMax = '';
+            this.clearDateFilter(false);
+            this.applyFilters();
+        },
+
+        clearFilter(key) {
+            if (key === 'status') this.statusFilter = '';
+            if (key === 'region') {
+                this.regionFilter = '';
+                this.districtFilter = '';
+                this.filterDistricts = [];
+            }
+            if (key === 'district') this.districtFilter = '';
+            if (key === 'capacity') {
+                this.capacityMin = '';
+                this.capacityMax = '';
+            }
+            if (key === 'users') {
+                this.usersMin = '';
+                this.usersMax = '';
+            }
+            if (key === 'created') this.clearDateFilter(false);
+            this.applyFilters();
+        },
+
+        activeFilterChips() {
+            const chips = [];
+            if (this.statusFilter) chips.push({ key: 'status', label: this.statusFilterLabel() });
+            if (this.regionFilter) chips.push({ key: 'region', label: (this.regions.find((region) => String(region.id) === String(this.regionFilter)) || { name: 'Region' }).name });
+            if (this.districtFilter) chips.push({ key: 'district', label: (this.filterDistricts.find((district) => String(district.id) === String(this.districtFilter)) || { name: 'District' }).name });
+            if (this.capacityMin || this.capacityMax) chips.push({ key: 'capacity', label: `Capacity ${this.capacityMin || 0}-${this.capacityMax || 'any'} m³` });
+            if (this.usersMin || this.usersMax) chips.push({ key: 'users', label: `Users ${this.usersMin || 0}-${this.usersMax || 'any'}` });
+            if (this.createdFrom || this.createdTo) chips.push({ key: 'created', label: `${this.createdFrom || 'Start'} to ${this.createdTo || 'Today'}` });
+            return chips;
         },
 
         toggleColumn(key) {
@@ -272,7 +391,7 @@ function buildWarehousesTable(config) {
                 .then(setupPicker);
         },
 
-        clearDateFilter() {
+        clearDateFilter(reload = true) {
             this.createdFrom = '';
             this.createdTo = '';
             if (this.dateRangePicker) {
@@ -282,7 +401,7 @@ function buildWarehousesTable(config) {
             if (this.$refs.createdRange) {
                 this.$refs.createdRange.value = '';
             }
-            this.loadData();
+            if (reload) this.loadData();
         },
 
         nextPage() {
@@ -539,6 +658,12 @@ function buildWarehousesTable(config) {
                 const params = new URLSearchParams();
                 if (this.search) params.append('search', this.search);
                 if (this.statusFilter) params.append('status', this.statusFilter);
+                if (this.regionFilter) params.append('region_id', this.regionFilter);
+                if (this.districtFilter) params.append('district_id', this.districtFilter);
+                if (this.capacityMin) params.append('capacity_min', this.capacityMin);
+                if (this.capacityMax) params.append('capacity_max', this.capacityMax);
+                if (this.usersMin) params.append('users_min', this.usersMin);
+                if (this.usersMax) params.append('users_max', this.usersMax);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
                 params.append('format', format);
@@ -573,6 +698,12 @@ function buildWarehousesTable(config) {
                 const params = new URLSearchParams();
                 if (this.search) params.append('search', this.search);
                 if (this.statusFilter) params.append('status', this.statusFilter);
+                if (this.regionFilter) params.append('region_id', this.regionFilter);
+                if (this.districtFilter) params.append('district_id', this.districtFilter);
+                if (this.capacityMin) params.append('capacity_min', this.capacityMin);
+                if (this.capacityMax) params.append('capacity_max', this.capacityMax);
+                if (this.usersMin) params.append('users_min', this.usersMin);
+                if (this.usersMax) params.append('users_max', this.usersMax);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
 
@@ -764,4 +895,3 @@ if (window.Alpine) {
 } else {
     document.addEventListener('alpine:init', registerWarehousesTable);
 }
-

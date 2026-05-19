@@ -17,459 +17,273 @@
     ];
 @endphp
 
-<div class="space-y-6" x-data="warehousesTable" data-warehouses-config='@json($warehousesConfig)'>
-    <!-- Warehouses Datatable -->
-    <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">
-        <!-- Card Header -->
-        <div class="px-6 py-5 border-b border-slate-200/50">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100">
-                        <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
-                        </svg>
+<div class="space-y-5" x-data="warehousesTable" data-warehouses-config='@json($warehousesConfig)'>
+    <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <button type="button" @@click="clearStatusFilter()" class="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-left shadow-sm transition hover:border-orange-200 hover:bg-orange-50/30 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-orange-100">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 ring-1 ring-slate-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M3 21h18M4 10h16v11H4V10Zm-.5-3L12 3l8.5 4"/></svg>
+            </div>
+            <div class="min-w-0">
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Total</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="meta.total || 0"></p>
+            </div>
+        </button>
+        <button type="button" @@click="setStatusFilter('active')" class="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-left shadow-sm transition hover:border-orange-200 hover:bg-orange-50/30 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-orange-100">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+            </div>
+            <div class="min-w-0">
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Active</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="activeCount()"></p>
+            </div>
+        </button>
+        <button type="button" @@click="setStatusFilter('inactive')" class="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-left shadow-sm transition hover:border-orange-200 hover:bg-orange-50/30 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-orange-100">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 9v3.75m0 3.75h.008M3.75 19.5h16.5L12 4.5 3.75 19.5Z"/></svg>
+            </div>
+            <div class="min-w-0">
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Inactive</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="inactiveCount()"></p>
+            </div>
+        </button>
+        <div class="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-left shadow-sm">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-700 ring-1 ring-orange-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a8.25 8.25 0 0 1 15 0"/></svg>
+            </div>
+            <div class="min-w-0">
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Staff</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="staffCount()"></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-300/30">
+        <div class="border-b border-slate-200/60 px-5 py-4">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex min-w-0 items-center gap-3">
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M3 21h18M4 10h16v11H4V10Zm-.5-3L12 3l8.5 4M8 14v3m4-3v3m4-3v3"/></svg>
                     </div>
-                    <div>
-                        <h2 class="text-lg font-semibold text-slate-900">Warehouses</h2>
-                        <p class="mt-0.5 text-sm text-slate-500">Manage warehouse locations and capacity (m&sup3;)</p>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-extrabold text-slate-900">Warehouses</h2>
+                        <p class="truncate text-sm text-slate-500">Manage HQ warehouse locations, capacity, contacts, and staff access.</p>
                     </div>
                 </div>
-                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="meta.total + ' Total Warehouses'">
-                </span>
+                <div class="flex flex-wrap items-center gap-3 lg:justify-end">
+                    <a href="{{ route('admin.roles.index') }}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Zm10-10V7a4 4 0 0 0-8 0v4"/></svg>
+                        Roles
+                    </a>
+                    @if(Auth::guard('admin')->user()->hasPermission('warehouses.create'))
+                    <button type="button" @@click="openAddModal()" class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Add Warehouse
+                    </button>
+                    @endif
+                </div>
             </div>
         </div>
 
-        <!-- Table Controls -->
-        <div class="p-6 pb-0">
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <!-- Search + Status + Date Range -->
-                <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-                    <div class="relative flex-1 max-w-xs">
-                        <input
-                            type="text"
-                            x-model="search"
-                            @@input.debounce.500ms="loadData()"
-                            placeholder="Search warehouses..."
-                            class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400 transition-colors"
-                        >
-                        <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                    </div>
-
-                    <!-- Status Filter -->
-                    <div x-data="{ open: false }" class="relative w-full sm:w-56">
-                        <button
-                            type="button"
-                            @@click="open = !open"
-                            class="w-full inline-flex items-center justify-between px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors"
-                        >
-                            <span x-text="statusFilterName || 'All statuses'"></span>
-                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                            </svg>
-                        </button>
-
-                        <div
-                            x-show="open"
-                            @@click.away="open = false"
-                            x-transition
-                            class="absolute right-0 mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/85 shadow-2xl p-2 z-50 backdrop-blur-xl"
-                            style="display: none;"
-                        >
-                            <button
-                                type="button"
-                                @@click="statusFilter = ''; statusFilterName = 'All statuses'; loadData(); open = false"
-                                class="w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                                :class="statusFilter === '' ? 'bg-white/70 shadow-sm' : ''"
-                            >
-                                <svg x-show="statusFilter === ''" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>All statuses</span>
-                            </button>
-                            <button
-                                type="button"
-                                @@click="statusFilter = 'active'; statusFilterName = 'Active'; loadData(); open = false"
-                                class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                                :class="statusFilter === 'active' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''"
-                            >
-                                <svg x-show="statusFilter === 'active'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>Active</span>
-                            </button>
-                            <button
-                                type="button"
-                                @@click="statusFilter = 'inactive'; statusFilterName = 'Inactive'; loadData(); open = false"
-                                class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                                :class="statusFilter === 'inactive' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''"
-                            >
-                                <svg x-show="statusFilter === 'inactive'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>Inactive</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                        <div class="relative w-full sm:w-56">
-                            <input
-                                type="text"
-                                x-ref="createdRange"
-                                placeholder="Created date range"
-                                class="w-full pl-10 pr-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 cursor-pointer"
-                                readonly
-                            >
-                            <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M4 11h16M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                            </svg>
-                        </div>
+        <div class="border-b border-slate-100 px-5 py-4">
+            <div class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+                <div class="w-full xl:max-w-md">
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"/></svg>
+                        <input type="text" x-model="search" @@input.debounce.500ms="meta.current_page = 1; loadData()" placeholder="Search name, code, phone..." class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                     </div>
                 </div>
-
-                <!-- Right Controls -->
-                <div class="flex flex-wrap items-center justify-end gap-3">
-                    <!-- Customize Columns -->
+                <div class="flex flex-wrap items-center gap-3 xl:justify-end">
+                    <button type="button" @@click="showFilters = !showFilters" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50" :class="showFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+                        <span x-text="showFilters ? 'Hide Filters' : 'Filters'"></span>
+                    </button>
                     <div x-data="{ open: false }" class="relative">
-                        <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
-                            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/>
-                            </svg>
+                        <button type="button" @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/></svg>
                             View
-                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                            </svg>
                         </button>
-
-                        <div x-show="open" @@click.away="open = false" x-transition
-                             class="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50"
-                             style="display: none;">
+                        <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 z-50 mt-2 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl" style="display:none">
                             <template x-for="col in columns" :key="col.key">
-                                <button type="button" @@click="toggleColumn(col.key)"
-                                        class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70">
+                                <button type="button" @@click="toggleColumn(col.key)" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                                     <span x-text="col.label"></span>
-                                    <svg x-show="visibleColumns[col.key]" class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                    </svg>
+                                    <svg x-show="visibleColumns[col.key]" class="h-4 w-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 </button>
                             </template>
                         </div>
                     </div>
-
-                    <!-- Export -->
                     <div x-data="{ open: false }" class="relative">
-                        <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
-                            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
+                        <button type="button" @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0-3-3m3 3 3-3m2 8H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414A1 1 0 0 1 19 9.414V19a2 2 0 0 1-2 2Z"/></svg>
                             Export
-                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                            </svg>
                         </button>
-
-                        <div x-show="open" @@click.away="open = false" x-transition
-                             class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50"
-                             style="display: none;">
-                            <button type="button" @@click="exportData('excel'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
-                                Excel
-                            </button>
-                            <button type="button" @@click="exportData('pdf'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                                </svg>
-                                PDF
-                            </button>
-                            <button type="button" @@click="exportData('csv'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
-                                CSV
-                            </button>
-                            <div class="border-t border-slate-200/50 my-1"></div>
-                            <button type="button" @@click="printData(); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                                </svg>
-                                Print
-                            </button>
+                        <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 z-50 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl" style="display:none">
+                            <button type="button" @@click="exportData('excel'); open = false" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Excel</button>
+                            <button type="button" @@click="exportData('pdf'); open = false" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">PDF</button>
+                            <button type="button" @@click="exportData('csv'); open = false" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">CSV</button>
+                            <div class="my-1 border-t border-slate-100"></div>
+                            <button type="button" @@click="printData(); open = false" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Print</button>
                         </div>
                     </div>
-
-                    @if(Auth::guard('admin')->user()->hasPermission('warehouses.create'))
-                    <button
-                        type="button"
-                        @@click="openAddModal()"
-                        class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 transition-all shadow-sm"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                        </svg>
-                        Add Warehouse
-                    </button>
-                    @endif
-                    <a href="{{ route('admin.roles.warehouse.index') }}"
-                       class="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-semibold rounded-xl hover:bg-violet-700 transition-all shadow-sm">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                        </svg>
-                        Warehouse Roles
-                    </a>
                 </div>
+            </div>
+
+            <div x-show="showFilters" x-transition class="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4" style="display:none">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Status</label>
+                        <select x-model="statusFilter" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All statuses</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Region</label>
+                        <select x-model="regionFilter" @@change="onFilterRegionChange()" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All regions</option>
+                            <template x-for="region in regions" :key="region.id"><option :value="region.id" x-text="region.name"></option></template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">District</label>
+                        <select x-model="districtFilter" :disabled="!regionFilter" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100 disabled:bg-slate-100 disabled:text-slate-400">
+                            <option value="">All districts</option>
+                            <template x-for="district in filterDistricts" :key="district.id"><option :value="district.id" x-text="district.name"></option></template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Created Date</label>
+                        <input type="text" x-ref="createdRange" placeholder="Select date range" readonly class="w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Capacity (m³)</label>
+                        <div class="grid grid-cols-2 overflow-hidden rounded-xl border-2 border-slate-200 bg-white focus-within:border-orange-400 focus-within:ring-4 focus-within:ring-orange-100">
+                            <input type="number" min="0" x-model="capacityMin" placeholder="Min" class="min-w-0 border-0 px-3 py-3 text-sm font-semibold text-slate-900 outline-none">
+                            <input type="number" min="0" x-model="capacityMax" placeholder="Max" class="min-w-0 border-0 border-l border-slate-200 px-3 py-3 text-sm font-semibold text-slate-900 outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Assigned Users</label>
+                        <div class="grid grid-cols-2 overflow-hidden rounded-xl border-2 border-slate-200 bg-white focus-within:border-orange-400 focus-within:ring-4 focus-within:ring-orange-100">
+                            <input type="number" min="0" x-model="usersMin" placeholder="Min" class="min-w-0 border-0 px-3 py-3 text-sm font-semibold text-slate-900 outline-none">
+                            <input type="number" min="0" x-model="usersMax" placeholder="Max" class="min-w-0 border-0 border-l border-slate-200 px-3 py-3 text-sm font-semibold text-slate-900 outline-none">
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                    <button type="button" @@click="showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
+                    <button type="button" @@click="clearFilters()" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
+                    <button type="button" @@click="applyFilters()" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">Apply Filters</button>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2" x-show="activeFilterChips().length">
+                <template x-for="chip in activeFilterChips()" :key="chip.key">
+                    <span class="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-700 ring-1 ring-orange-200">
+                        <span x-text="chip.label"></span>
+                        <button type="button" @@click="clearFilter(chip.key)" class="text-orange-500 hover:text-orange-800">&times;</button>
+                    </span>
+                </template>
             </div>
         </div>
 
-        <!-- Table -->
-        <div class="px-6 py-4">
-            <div class="rounded-xl border border-slate-200/50 relative">
-            <!-- Loading overlay -->
-            <div x-show="loading" x-transition.opacity.duration.150ms class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10" style="display: none;"></div>
+        <div class="relative overflow-hidden">
+            <div x-show="loading" x-transition.opacity.duration.150ms class="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px]" style="display:none"></div>
 
-            <div class="overflow-x-auto">
-            <table class="w-full min-w-[900px] md:min-w-full divide-y divide-slate-200/50 text-xs">
-                <thead class="bg-slate-50/50">
-                    <tr>
-                        <th x-show="visibleColumns.name" @@click="sort('name')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                            <div class="flex items-center">
-                                NAME
-                                <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'name' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
-                                </svg>
-                            </div>
-                        </th>
-                        <th x-show="visibleColumns.code" @@click="sort('code')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                            <div class="flex items-center">
-                                CODE
-                                <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'code' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
-                                </svg>
-                            </div>
-                        </th>
-                        <th x-show="visibleColumns.region" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            REGION
-                        </th>
-                        <th x-show="visibleColumns.district" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            DISTRICT
-                        </th>
-                        <th x-show="visibleColumns.contact_phone" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            CONTACT PHONE
-                        </th>
-                        <th x-show="visibleColumns.capacity" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            CAPACITY (M&sup3;)
-                        </th>
-                        <th x-show="visibleColumns.users_count" @@click="sort('users_count')" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                            <div class="flex items-center justify-center">
-                                USERS
-                                <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'users_count' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
-                                </svg>
-                            </div>
-                        </th>
-                        <th x-show="visibleColumns.status" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            STATUS
-                        </th>
-                        <th x-show="visibleColumns.created_at" @@click="sort('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                            <div class="flex items-center">
-                                CREATED AT
-                                <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'created_at' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
-                                </svg>
-                            </div>
-                        </th>
-                        <th x-show="visibleColumns.actions" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            ACTIONS
-                        </th>
-                    </tr>
-                </thead>
-                <tbody class="bg-transparent divide-y divide-slate-100/50">
-                    <template x-if="warehouses.length === 0 && !loading">
+            <div class="hidden overflow-x-auto lg:block">
+                <table class="min-w-[1180px] w-full table-fixed divide-y divide-slate-200/50 text-xs">
+                    <thead class="bg-slate-50/50">
                         <tr>
-                            <td :colspan="visibleColumnCount()" class="px-4 py-8 text-center text-gray-500 text-xs">
-                                No warehouses found
-                            </td>
+                            <th x-show="visibleColumns.name" @@click="sort('name')" class="w-[20%] cursor-pointer px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Warehouse</th>
+                            <th x-show="visibleColumns.code" @@click="sort('code')" class="w-[10%] cursor-pointer px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Code</th>
+                            <th x-show="visibleColumns.region" class="w-[14%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Region</th>
+                            <th x-show="visibleColumns.district" class="w-[14%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">District</th>
+                            <th x-show="visibleColumns.contact_phone" class="w-[14%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Contact</th>
+                            <th x-show="visibleColumns.capacity" class="w-[10%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Capacity</th>
+                            <th x-show="visibleColumns.users_count" @@click="sort('users_count')" class="w-[8%] cursor-pointer px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Users</th>
+                            <th x-show="visibleColumns.is_active" class="w-[9%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                            <th x-show="visibleColumns.actions" class="w-[11%] px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Actions</th>
                         </tr>
-                    </template>
-
-                    <template x-for="warehouse in warehouses" :key="warehouse.id">
-                        <tr class="hover:bg-slate-50/70">
-                            <td x-show="visibleColumns.name" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="warehouse.name"></td>
-                            <td x-show="visibleColumns.code" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 font-mono" x-text="warehouse.code || '-'"></td>
-                            <td x-show="visibleColumns.region" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="warehouse.region || '-'"></td>
-                            <td x-show="visibleColumns.district" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="warehouse.district || '-'"></td>
-                            <td x-show="visibleColumns.contact_phone" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="warehouse.contact_phone || '-'"></td>
-                            <td x-show="visibleColumns.capacity" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 text-center" x-text="warehouse.capacity ? warehouse.capacity + ' m\u00B3' : '-'"></td>
-                            <td x-show="visibleColumns.users_count" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-700 text-center font-semibold" x-text="warehouse.users_count ?? 0"></td>
-                            <td x-show="visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap text-xs">
-                                <span
-                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                    :class="warehouse.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
-                                    x-text="warehouse.is_active ? 'Active' : 'Inactive'"
-                                ></span>
-                            </td>
-                            <td x-show="visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(warehouse.created_at)"></td>
-                            <td x-show="visibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center text-xs font-medium">
-                                <div class="inline-flex items-center gap-1">
-                                    <!-- View Button -->
-                                    <a
-                                        :href="'{{ route('admin.warehouses.index') }}/' + warehouse.id"
-                                        class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                        title="View warehouse">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                        </svg>
-                                    </a>
-
-                                    <!-- Edit Button -->
-                                    <template x-if="warehouse.can_manage">
-                                        <button
-                                            @@click="openEditModal(warehouse)"
-                                            class="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                                            title="Edit warehouse">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-                                            </svg>
-                                        </button>
-                                    </template>
-
-                                    <!-- Toggle Status Button -->
-                                    <template x-if="warehouse.can_manage">
-                                        <button
-                                            @@click="toggleWarehouseStatus(warehouse)"
-                                            class="p-1.5 rounded-lg transition-colors"
-                                            :class="warehouse.is_active ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-teal-600 hover:bg-teal-50'"
-                                            :title="warehouse.is_active ? 'Deactivate warehouse' : 'Activate warehouse'">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                                            </svg>
-                                        </button>
-                                    </template>
-
-                                    <!-- Delete Button -->
-                                    <template x-if="warehouse.can_manage">
-                                        <button
-                                            @@click="openDeleteModal(warehouse)"
-                                            class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                            title="Delete warehouse">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                            </svg>
-                                        </button>
-                                    </template>
-                                </div>
-                            </td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 bg-white">
+                        <template x-if="warehouses.length === 0 && !loading">
+                            <tr><td :colspan="visibleColumnCount()" class="px-4 py-12 text-center text-sm font-semibold text-slate-400">No warehouses found</td></tr>
+                        </template>
+                        <template x-for="warehouse in warehouses" :key="warehouse.id">
+                            <tr class="transition hover:bg-orange-50/20">
+                                <td x-show="visibleColumns.name" class="px-4 py-3 align-top">
+                                    <a :href="'{{ route('admin.warehouses.index') }}/' + warehouse.id" class="font-extrabold text-slate-900 hover:text-orange-700" x-text="warehouse.name"></a>
+                                    <p class="mt-1 line-clamp-1 text-[11px] font-medium text-slate-500" x-text="warehouse.address || 'No address set'"></p>
+                                </td>
+                                <td x-show="visibleColumns.code" class="px-4 py-3 align-top font-mono text-xs font-bold text-slate-600" x-text="warehouse.code || '-'"></td>
+                                <td x-show="visibleColumns.region" class="px-4 py-3 align-top text-xs font-semibold text-slate-700" x-text="warehouse.region || '-'"></td>
+                                <td x-show="visibleColumns.district" class="px-4 py-3 align-top text-xs font-semibold text-slate-700" x-text="warehouse.district || '-'"></td>
+                                <td x-show="visibleColumns.contact_phone" class="px-4 py-3 align-top">
+                                    <p class="text-xs font-semibold text-slate-700" x-text="warehouse.contact_phone || '-'"></p>
+                                    <p class="mt-1 truncate text-[11px] text-slate-400" x-text="warehouse.contact_email || ''"></p>
+                                </td>
+                                <td x-show="visibleColumns.capacity" class="px-4 py-3 align-top text-xs font-semibold text-slate-700" x-text="warehouse.capacity ? warehouse.capacity + ' m³' : '-'"></td>
+                                <td x-show="visibleColumns.users_count" class="px-4 py-3 text-center align-top text-xs font-extrabold text-slate-900" x-text="warehouse.users_count ?? 0"></td>
+                                <td x-show="visibleColumns.is_active" class="px-4 py-3 align-top">
+                                    <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold" :class="warehouse.is_active ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'" x-text="warehouse.is_active ? 'Active' : 'Inactive'"></span>
+                                </td>
+                                <td x-show="visibleColumns.actions" class="px-4 py-3 text-right align-top">
+                                    <div class="inline-flex items-center gap-1">
+                                        <a :href="'{{ route('admin.warehouses.index') }}/' + warehouse.id" class="rounded-lg p-2 text-slate-400 transition hover:bg-blue-50 hover:text-blue-600" title="View"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7Z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg></a>
+                                        <template x-if="warehouse.can_manage"><button type="button" @@click="openEditModal(warehouse)" class="rounded-lg p-2 text-slate-400 transition hover:bg-emerald-50 hover:text-emerald-600" title="Edit"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/></svg></button></template>
+                                        <template x-if="warehouse.can_manage"><button type="button" @@click="toggleWarehouseStatus(warehouse)" class="rounded-lg p-2 text-slate-400 transition" :class="warehouse.is_active ? 'hover:bg-amber-50 hover:text-amber-600' : 'hover:bg-emerald-50 hover:text-emerald-600'" :title="warehouse.is_active ? 'Deactivate' : 'Activate'"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636"/></svg></button></template>
+                                        <template x-if="warehouse.can_manage"><button type="button" @@click="openDeleteModal(warehouse)" class="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600" title="Delete"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166M19.228 5.79 18.16 19.673A2.25 2.25 0 0 1 15.916 21.75H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79"/></svg></button></template>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
             </div>
 
-            <!-- Pagination -->
-            <div class="px-4 py-2.5 border-t border-slate-200/50 bg-slate-50/30">
-                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div class="text-xs text-slate-600">
-                        Showing
-                        <span x-text="meta.from"></span>
-                        to
-                        <span x-text="meta.to"></span>
-                        of
-                        <span x-text="meta.total"></span>
-                        results
-                    </div>
-
-                    <div class="flex flex-wrap items-center gap-3">
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs font-medium text-slate-600">Rows per page</span>
-                            <div x-data="{ open: false }" class="relative">
-                                <button
-                                    type="button"
-                                    @@click="open = !open"
-                                    class="inline-flex items-center justify-between gap-1.5 px-2.5 py-1 min-w-[60px] border border-slate-200/70 rounded-lg bg-white/70 backdrop-blur-sm text-xs font-medium text-slate-700 hover:bg-white/90 transition-colors"
-                                >
-                                    <span x-text="perPage"></span>
-                                    <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                    </svg>
-                                </button>
-                                <div
-                                    x-show="open"
-                                    @@click.away="open = false"
-                                    x-transition
-                                    class="absolute bottom-full mb-1 right-0 w-16 rounded-lg border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-lg p-1 z-[9999]"
-                                    style="display: none;"
-                                >
-                                    <button type="button" @@click="perPage = 10; loadData(); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 10 ? 'bg-slate-100/70' : ''">10</button>
-                                    <button type="button" @@click="perPage = 25; loadData(); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 25 ? 'bg-slate-100/70' : ''">25</button>
-                                    <button type="button" @@click="perPage = 50; loadData(); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 50 ? 'bg-slate-100/70' : ''">50</button>
-                                    <button type="button" @@click="perPage = 100; loadData(); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 100 ? 'bg-slate-100/70' : ''">100</button>
-                                </div>
+            <div class="divide-y divide-slate-100 lg:hidden">
+                <template x-if="warehouses.length === 0 && !loading">
+                    <div class="px-5 py-12 text-center text-sm font-semibold text-slate-400">No warehouses found</div>
+                </template>
+                <template x-for="warehouse in warehouses" :key="warehouse.id">
+                    <article class="px-5 py-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <a :href="'{{ route('admin.warehouses.index') }}/' + warehouse.id" class="text-base font-extrabold text-slate-900" x-text="warehouse.name"></a>
+                                <p class="mt-1 font-mono text-xs font-bold text-slate-500" x-text="warehouse.code || '-'"></p>
                             </div>
+                            <span class="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold" :class="warehouse.is_active ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'" x-text="warehouse.is_active ? 'Active' : 'Inactive'"></span>
                         </div>
-
-                        <div class="text-xs font-medium text-slate-600">
-                            Page
-                            <span x-text="meta.current_page"></span>
-                            of
-                            <span x-text="meta.last_page"></span>
+                        <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                            <div><p class="font-black uppercase tracking-wide text-slate-400">Region</p><p class="mt-1 font-bold text-slate-700" x-text="warehouse.region || '-'"></p></div>
+                            <div><p class="font-black uppercase tracking-wide text-slate-400">District</p><p class="mt-1 font-bold text-slate-700" x-text="warehouse.district || '-'"></p></div>
+                            <div><p class="font-black uppercase tracking-wide text-slate-400">Users</p><p class="mt-1 font-bold text-slate-700" x-text="warehouse.users_count ?? 0"></p></div>
+                            <div><p class="font-black uppercase tracking-wide text-slate-400">Capacity</p><p class="mt-1 font-bold text-slate-700" x-text="warehouse.capacity ? warehouse.capacity + ' m³' : '-'"></p></div>
                         </div>
-
-                        <div class="flex space-x-1">
-                            <button
-                                @@click="firstPage()"
-                                :disabled="meta.current_page === 1"
-                                :class="meta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
-                            >
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/>
-                                </svg>
-                            </button>
-
-                            <button
-                                @@click="previousPage()"
-                                :disabled="meta.current_page === 1"
-                                :class="meta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
-                            >
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                                </svg>
-                            </button>
-
-                            <button
-                                @@click="nextPage()"
-                                :disabled="meta.current_page === meta.last_page"
-                                :class="meta.current_page === meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
-                            >
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </button>
-
-                            <button
-                                @@click="lastPage()"
-                                :disabled="meta.current_page === meta.last_page"
-                                :class="meta.current_page === meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
-                            >
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/>
-                                </svg>
-                            </button>
+                        <div class="mt-4 flex items-center justify-end gap-2">
+                            <a :href="'{{ route('admin.warehouses.index') }}/' + warehouse.id" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">View</a>
+                            <template x-if="warehouse.can_manage"><button type="button" @@click="openEditModal(warehouse)" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">Edit</button></template>
                         </div>
+                    </article>
+                </template>
+            </div>
+
+            <div class="border-t border-slate-100 bg-slate-50/50 px-5 py-4">
+                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <p class="text-sm font-semibold text-slate-600">Showing <span x-text="meta.from"></span> to <span x-text="meta.to"></span> of <span x-text="meta.total"></span></p>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <select x-model="perPage" @@change="meta.current_page = 1; loadData()" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                        <span class="text-sm font-bold text-slate-600">Page <span x-text="meta.current_page"></span> of <span x-text="meta.last_page"></span></span>
+                        <button type="button" @@click="previousPage()" :disabled="meta.current_page === 1" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-40">Prev</button>
+                        <button type="button" @@click="nextPage()" :disabled="meta.current_page === meta.last_page" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-40">Next</button>
                     </div>
                 </div>
-            </div>
             </div>
         </div>
     </div>
@@ -503,14 +317,14 @@
                 x-transition:leave-start="opacity-100 scale-100"
                 x-transition:leave-end="opacity-0 scale-95"
                 @click.stop
-                class="relative w-full max-w-lg bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50"
+                class="relative w-full max-w-3xl bg-white backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50"
             >
                 <!-- Header with Gradient -->
-                <div class="relative bg-gradient-to-r from-slate-50 to-slate-100/50 px-6 py-5 border-b border-slate-200/50 rounded-t-2xl">
+                <div class="relative bg-white px-6 py-5 border-b border-slate-200/70">
                     <div class="flex items-start justify-between">
                         <div class="flex items-start gap-4">
                             <!-- Icon Badge -->
-                            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-lg shadow-teal-900/20">
+                            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-orange-600 flex items-center justify-center shadow-lg shadow-orange-600/20">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
                                 </svg>
@@ -548,7 +362,7 @@
                                         type="text"
                                         x-model="form.name"
                                         :disabled="modalMode === 'view'"
-                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-100 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         placeholder="Main Warehouse"
                                         required
                                     >
@@ -580,7 +394,7 @@
                                             type="text"
                                             x-model="form.code"
                                             :disabled="modalMode === 'view'"
-                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-100 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                             placeholder="WH-001"
                                         >
                                     </div>
@@ -612,7 +426,7 @@
                                         x-model="form.address"
                                         :disabled="modalMode === 'view'"
                                         rows="2"
-                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500 resize-none"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-100 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500 resize-none"
                                         placeholder="Full address of warehouse location"
                                     ></textarea>
                                 </div>
@@ -643,7 +457,7 @@
                                             x-model="form.region_id"
                                             :disabled="modalMode === 'view'"
                                             @@change="onRegionChange()"
-                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 transition-all disabled:bg-slate-50 disabled:text-slate-500 appearance-none cursor-pointer"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-100 text-sm text-slate-900 transition-all disabled:bg-slate-50 disabled:text-slate-500 appearance-none cursor-pointer"
                                         >
                                             <option value="">Select region</option>
                                             <template x-for="region in regions" :key="region.id">
@@ -676,7 +490,7 @@
                                         <select
                                             x-model="form.district_id"
                                             :disabled="modalMode === 'view' || !form.region_id || loadingDistricts"
-                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 transition-all disabled:bg-slate-50 disabled:text-slate-500 appearance-none cursor-pointer"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-100 text-sm text-slate-900 transition-all disabled:bg-slate-50 disabled:text-slate-500 appearance-none cursor-pointer"
                                         >
                                             <option value="">Select district</option>
                                             <template x-for="district in districts" :key="district.id">
@@ -713,7 +527,7 @@
                                             type="text"
                                             x-model="form.contact_phone"
                                             :disabled="modalMode === 'view'"
-                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-100 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                             placeholder="+233 24 123 4567"
                                         >
                                     </div>
@@ -742,7 +556,7 @@
                                             type="email"
                                             x-model="form.contact_email"
                                             :disabled="modalMode === 'view'"
-                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-100 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                             placeholder="warehouse@example.com"
                                         >
                                     </div>
@@ -773,7 +587,7 @@
                                         x-model="form.capacity"
                                         :disabled="modalMode === 'view'"
                                         min="0"
-                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-100 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         placeholder="500"
                                     >
                                 </div>
@@ -854,7 +668,7 @@
                                     x-show="modalMode !== 'view'"
                                     type="submit"
                                     :disabled="saving"
-                                    class="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-slate-700 to-slate-900 hover:from-slate-800 hover:to-slate-950 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-slate-900/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                                    class="inline-flex items-center gap-2 px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-orange-600/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                                 >
                                     <svg x-show="saving" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

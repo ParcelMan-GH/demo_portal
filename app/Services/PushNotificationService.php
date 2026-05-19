@@ -63,14 +63,13 @@ class PushNotificationService
     }
 
     /**
-     * Send to warehouse-role users PLUS super admins.
+     * Send to users assigned to warehouse roles.
      */
     public function sendToWarehouseAdmins(string $title, string $body, array $data = [], string $type = 'general'): int
     {
         $users = User::whereNotNull('fcm_token')
             ->whereHas('roles', function ($q) {
-                $q->where('is_warehouse_role', true)
-                  ->orWhere('slug', 'super_admin');
+                $q->where('is_warehouse_role', true);
             })
             ->get()
             ->unique('id');
@@ -87,12 +86,14 @@ class PushNotificationService
     }
 
     /**
-     * Send to super admins only.
+     * Send to HQ warehouse users only.
      */
     public function sendToSuperAdmins(string $title, string $body, array $data = [], string $type = 'general'): int
     {
         $users = User::whereNotNull('fcm_token')
-            ->whereHas('roles', fn($q) => $q->where('slug', 'super_admin'))
+            ->whereHas('warehouse', fn ($q) => $q
+                ->where('is_hq', true)
+                ->where('can_administer_system', true))
             ->get();
 
         $count = 0;

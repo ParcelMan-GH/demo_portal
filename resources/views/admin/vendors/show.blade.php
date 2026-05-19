@@ -8,8 +8,13 @@
 $vendorConfig = [
     'vendor' => $vendor,
     'shipmentsEndpoint' => route('admin.vendors.shipments', $vendor),
+    'packagesEndpoint' => route('admin.vendors.packages', $vendor),
     'activityLogsEndpoint' => route('admin.vendors.activity-logs', $vendor),
     'otpLogsEndpoint' => route('admin.vendors.otp-logs', $vendor),
+    'payoutsEndpoint' => route('admin.vendors.payouts-data', $vendor),
+    'createPayoutEndpoint' => route('admin.vendors.payouts.store', $vendor),
+    'markPayoutSentEndpoint' => route('admin.vendor-payouts.mark-sent', ['payout' => '__PAYOUT__']),
+    'confirmPayoutEndpoint' => route('admin.vendor-payouts.confirm', ['payout' => '__PAYOUT__']),
     'updateEndpoint' => route('admin.vendors.update', $vendor),
     'toggleActiveEndpoint' => route('admin.vendors.toggle-active', $vendor),
     'restoreEndpoint' => route('admin.vendors.restore', $vendor),
@@ -18,6 +23,7 @@ $vendorConfig = [
     'canManage' => $canManage,
     'statuses' => $statuses,
     'globalCommissionRate' => number_format($globalCommissionRate, 2),
+    'payoutSummary' => $payoutSummary,
 ];
 @endphp
 
@@ -54,285 +60,347 @@ $vendorConfig = [
     @endif
 
     <!-- Hero Section -->
-    <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30">
-        <div class="relative">
-            <!-- Background Pattern -->
-            <div class="absolute inset-0 opacity-10">
-                <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <defs>
-                        <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" stroke-width="0.5"/>
-                        </pattern>
-                    </defs>
-                    <rect width="100" height="100" fill="url(#grid)"/>
-                </svg>
-            </div>
+    <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 shadow-xl shadow-slate-300/20">
+        <div class="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
+            <div class="absolute inset-y-0 right-0 w-2/3 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.25),transparent_58%)]"></div>
+            <div class="absolute inset-y-0 left-0 w-1/2 bg-[radial-gradient(circle_at_bottom_left,rgba(15,23,42,0.95),transparent_70%)]"></div>
+        </div>
 
-            <div class="relative px-6 lg:px-8 py-6">
-                <!-- Top Row: Back Button + Action Buttons -->
-                <div class="flex items-center justify-between mb-6">
-                    <a href="{{ route('admin.vendors.index') }}" class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium transition-all backdrop-blur-sm hover:shadow-md">
-                        <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                        </svg>
-                        <span class="text-xs">Back to Vendors</span>
-                    </a>
+        <div class="relative p-5 sm:p-6">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <a href="{{ route('admin.vendors.index') }}" class="inline-flex h-11 w-auto shrink-0 items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 text-sm font-black text-slate-100 transition hover:bg-white/15">
+                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    <span>Back</span>
+                </a>
+
+                <div class="ml-auto flex w-auto max-w-[calc(100%-5.75rem)] flex-wrap items-center justify-end gap-2 sm:max-w-none">
+                    <span class="inline-flex h-9 items-center whitespace-nowrap rounded-full px-3 text-xs font-black {{ $vendor->is_active ? 'bg-emerald-500/15 text-emerald-100 ring-1 ring-emerald-400/30' : 'bg-slate-500/15 text-slate-200 ring-1 ring-slate-400/30' }}">
+                        <span class="mr-2 h-2 w-2 rounded-full {{ $vendor->is_active ? 'bg-emerald-300' : 'bg-slate-300' }}"></span>
+                        {{ $vendor->is_active ? 'Active' : 'Inactive' }}
+                    </span>
                     @if($canManage)
-                    <div class="flex items-center gap-2">
                         <button
+                            type="button"
                             @@click="openEditModal()"
-                            class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl border border-white/20 transition-all backdrop-blur-sm shadow-sm hover:shadow-md"
+                            class="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-orange-400/45 bg-orange-500/15 px-3 text-xs font-black text-orange-100 transition hover:bg-orange-500/25"
                         >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 1 1 3.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                             </svg>
-                            Edit Profile
+                            Edit
                         </button>
                         <button
+                            type="button"
                             @@click="showToggleModal = true"
-                            class="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl border transition-all backdrop-blur-sm shadow-sm hover:shadow-md"
+                            class="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-xs font-black transition"
                             :class="vendor.is_active
-                                ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/30'
-                                : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/30'"
+                                ? 'border-amber-400/45 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25'
+                                : 'border-emerald-400/45 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25'"
                         >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                            </svg>
                             <span x-text="vendor.is_active ? 'Deactivate' : 'Activate'"></span>
                         </button>
                         <button
+                            type="button"
                             @@click="showDeleteModal = true"
-                            class="inline-flex items-center gap-2 px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl border border-rose-500/30 transition-all backdrop-blur-sm shadow-sm hover:shadow-md"
+                            class="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-rose-400/45 bg-rose-500/15 px-3 text-xs font-black text-rose-100 transition hover:bg-rose-500/25"
                         >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
                             Delete
                         </button>
-                    </div>
                     @endif
                 </div>
+            </div>
 
-                <!-- Main Row: Profile LEFT, Summary + Actions RIGHT -->
-                <div class="flex flex-col lg:flex-row lg:items-stretch gap-6">
-                    <!-- LEFT: Vendor Profile Info -->
-                    <div class="flex items-start gap-5 lg:flex-shrink-0">
-                        <!-- Avatar -->
-                        <div class="relative flex-shrink-0">
-                            <div class="w-20 h-20 lg:w-24 lg:h-24 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white text-2xl lg:text-3xl font-bold shadow-xl shadow-blue-500/30 ring-4 ring-white/10">
-                                {{ strtoupper(substr($vendor->name, 0, 1)) }}
-                            </div>
-                            <div class="absolute -bottom-1.5 -right-1.5 w-7 h-7 lg:w-8 lg:h-8 rounded-full {{ $vendor->is_active ? 'bg-gradient-to-br from-emerald-400 to-emerald-600' : 'bg-gradient-to-br from-slate-400 to-slate-500' }} border-4 border-slate-900 flex items-center justify-center shadow-lg">
-                                @if($vendor->is_active)
-                                    <svg class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-                                    </svg>
-                                @else
-                                    <svg class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                                    </svg>
-                                @endif
-                            </div>
+            <div class="relative mt-5 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div class="min-w-0 lg:max-w-[620px] lg:shrink">
+                    <div class="flex min-w-0 items-start gap-4">
+                        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-500 text-2xl font-black text-white shadow-lg shadow-orange-950/25">
+                            {{ strtoupper(substr($vendor->name, 0, 1)) }}
                         </div>
 
-                        <!-- Details -->
-                        <div class="space-y-2 min-w-0">
-                            <div>
-                                <h1 class="text-xl lg:text-2xl font-bold text-white truncate">{{ $vendor->name }}</h1>
+                        <div class="min-w-0">
+                            <p class="text-xs font-black uppercase tracking-[0.16em] text-orange-200">Vendor Workspace</p>
+                            <h1 class="mt-1 max-w-4xl break-words text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl xl:text-2xl 2xl:text-3xl">{{ $vendor->name }}</h1>
+                            <div class="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-300">
                                 @if($vendor->business_name)
-                                    <p class="text-slate-400 text-sm mt-0.5 truncate">{{ $vendor->business_name }}</p>
+                                    <span>{{ $vendor->business_name }}</span>
+                                    <span class="text-slate-600">/</span>
                                 @endif
+                                <span>{{ $vendor->phone }}</span>
+                                @if($vendor->email)
+                                    <span class="text-slate-600">/</span>
+                                    <span>{{ $vendor->email }}</span>
+                                @endif
+                                <span class="text-slate-600">/</span>
+                                <span>Created {{ $vendor->created_at->format('d M Y, h:i A') }}</span>
                             </div>
+                        </div>
+                    </div>
+                </div>
 
-                            <div class="flex flex-wrap items-center gap-2 text-xs">
-                                <div class="flex items-center gap-1.5 text-slate-300">
-                                    <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                    </svg>
-                                    <span class="truncate">{{ $vendor->email }}</span>
-                                </div>
-                                <div class="flex items-center gap-1.5 text-slate-300">
-                                    <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                                    </svg>
-                                    {{ $vendor->phone }}
-                                </div>
-                            </div>
-
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $vendor->is_active ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-500/20 text-slate-300' }}">
-                                    <span class="w-1.5 h-1.5 rounded-full {{ $vendor->is_active ? 'bg-emerald-400' : 'bg-slate-400' }}"></span>
-                                    {{ $vendor->is_active ? 'Active' : 'Inactive' }}
-                                </span>
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-500/20 text-slate-300">
-                                    {{ $vendor->created_at->format('M d, Y') }}
-                                </span>
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3 lg:ml-auto lg:w-[620px] lg:shrink-0 2xl:w-[680px]">
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-3 sm:p-4">
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-500/20 text-orange-300 sm:h-9 sm:w-9">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20 7 12 3 4 7m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                            </svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg">{{ number_format($shipmentStats['total']) }} Shipments</p>
+                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs">{{ number_format($packagesCount) }} Packages</p>
                             </div>
                         </div>
                     </div>
 
-                    <!-- RIGHT: Summary Stats -->
-                    <div class="flex flex-col lg:ml-auto lg:justify-center">
-                        <!-- Summary Stats - 4 compact cards in one row -->
-                        <div class="flex items-stretch gap-2 flex-wrap lg:flex-nowrap h-full">
-                            <!-- Total Shipments -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2 flex items-center gap-2.5 transition-colors flex-1">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/30 to-blue-600/20 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-white leading-none">{{ number_format($shipmentStats['total']) }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Shipments</p>
-                                </div>
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-3 sm:p-4">
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-500/20 text-orange-300 sm:h-9 sm:w-9">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 10v2m8-6a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/>
+                                </svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg" x-text="'GHS ' + formatMoney(payouts.summary.available_balance)"></p>
+                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs">Unpaid payout</p>
                             </div>
+                        </div>
+                    </div>
 
-                            <!-- Delivered -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2 flex items-center gap-2.5 transition-colors flex-1">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-emerald-400 leading-none">{{ number_format($shipmentStats['delivered']) }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Delivered</p>
-                                </div>
-                            </div>
-
-                            <!-- Activities -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2 flex items-center gap-2.5 transition-colors flex-1">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500/30 to-violet-600/20 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-white leading-none">{{ number_format($activityLogsCount) }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Activities</p>
-                                </div>
-                            </div>
-
-                            <!-- Last Login -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 py-2 flex items-center gap-2.5 transition-colors flex-1">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500/30 to-amber-600/20 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-white leading-none">
-                                        @if($lastLogin)
-                                            {{ $lastLogin->created_at->format('M d') }}
-                                        @else
-                                            —
-                                        @endif
-                                    </p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Last Login</p>
-                                </div>
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-3 sm:p-4">
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300 sm:h-9 sm:w-9">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                                </svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg" x-text="'GHS ' + formatMoney(payouts.summary.total_paid)"></p>
+                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs">Payout paid</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+
+    </section>
 
     <!-- Tabs Section -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex min-h-[680px]">
-
-        <!-- Sidebar Nav -->
-        <aside class="w-60 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col py-5 px-3">
-
-            <!-- Section: Shipments -->
-            <p class="px-2 mb-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Shipments</p>
-
-            <!-- Shipments -->
-            <button @@click="activeTab = 'shipments'; loadShipments()"
-                class="group flex items-center gap-3 w-full px-2.5 py-2 rounded-xl mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'shipments'
-                    ? 'bg-blue-50 ring-1 ring-blue-100 shadow-sm'
-                    : 'hover:bg-slate-50'">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'shipments' ? 'bg-blue-500 shadow-md shadow-blue-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3.5 h-3.5 transition-colors" :class="activeTab === 'shipments' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                    </svg>
-                </div>
-                <span class="flex-1 text-sm transition-colors" :class="activeTab === 'shipments' ? 'font-bold text-blue-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Shipments</span>
-                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-[10px] font-bold rounded-full transition-all"
-                    :class="activeTab === 'shipments' ? 'bg-blue-500 text-white shadow-sm' : 'bg-slate-100 text-slate-500'">{{ $shipmentsCount }}</span>
+    <section class="rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="button" @@click="setActiveTab('shipments')"
+                class="inline-flex w-auto items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition"
+                :class="activeTab === 'shipments' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-600 hover:bg-slate-50'">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7 12 3 4 7m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                Shipments
             </button>
+            <button type="button" @@click="setActiveTab('packages')"
+                class="inline-flex w-auto items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition"
+                :class="activeTab === 'packages' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-600 hover:bg-slate-50'">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 8-9-5-9 5 9 5 9-5ZM3 8v8l9 5 9-5V8"/>
+                </svg>
+                Packages
+            </button>
+            <button type="button" @@click="setActiveTab('activity')"
+                class="inline-flex w-auto items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition"
+                :class="activeTab === 'activity' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-600 hover:bg-slate-50'">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                </svg>
+                Activity
+            </button>
+            <button type="button" @@click="setActiveTab('otp')"
+                class="inline-flex w-auto items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition"
+                :class="activeTab === 'otp' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-600 hover:bg-slate-50'">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Zm10-10V7a4 4 0 0 0-8 0v4h8Z"/>
+                </svg>
+                OTP Logs
+            </button>
+            <button type="button" @@click="setActiveTab('payouts')"
+                class="inline-flex w-auto items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition"
+                :class="activeTab === 'payouts' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-600 hover:bg-slate-50'">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 10v2m8-6a8 8 0 11-16 0 8 8 0 0116 0z"/>
+                </svg>
+                Payouts
+            </button>
+        </div>
+    </section>
 
-            <!-- Divider: Activity -->
-            <div class="flex items-center gap-2 mt-4 mb-2 px-1">
-                <div class="flex-1 h-px bg-slate-100"></div>
-                <p class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Activity</p>
-                <div class="flex-1 h-px bg-slate-100"></div>
+    <section class="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            {{-- ═══════════════════════════════════════════════════════ --}}
+            {{-- PAYOUTS TAB                                            --}}
+            {{-- ═══════════════════════════════════════════════════════ --}}
+            <div x-show="activeTab === 'payouts'" x-cloak>
+                <div class="border-b border-slate-100 px-5 py-4">
+                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div>
+                            <h2 class="text-lg font-black text-slate-900">Payouts</h2>
+                            <p class="mt-1 text-sm font-semibold text-slate-500">Review earnings, pay vendors, and track payout history.</p>
+                        </div>
+                        <button type="button" @@click="openPayoutModal()" :disabled="!payouts.summary.can_request_payout"
+                            class="inline-flex items-center justify-center rounded-xl bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-45">
+                            Pay Vendor
+                        </button>
+                    </div>
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 px-5 py-4">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:gap-4">
+                                <span class="text-xs font-black uppercase tracking-wide text-orange-600">Available To Pay</span>
+                                <span class="text-3xl font-black text-slate-950" x-text="'GHS ' + formatMoney(payouts.summary.available_balance)"></span>
+                                <span class="inline-flex w-fit rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wide"
+                                    :class="payouts.summary.can_request_payout ? 'border-orange-200 bg-white text-orange-700' : 'border-slate-200 bg-white text-slate-500'"
+                                    x-text="payouts.summary.can_request_payout ? 'Ready to pay' : 'Below minimum'"></span>
+                            </div>
+                            <div class="flex flex-wrap gap-x-8 gap-y-3 text-sm">
+                                <div>
+                                    <span class="block text-[10px] font-black uppercase tracking-wide text-slate-400">Total Earned</span>
+                                    <span class="mt-1 block font-black text-slate-900" x-text="'GHS ' + formatMoney(payouts.summary.total_earned)"></span>
+                                </div>
+                                <div>
+                                    <span class="block text-[10px] font-black uppercase tracking-wide text-slate-400">Total Paid</span>
+                                    <span class="mt-1 block font-black text-slate-900" x-text="'GHS ' + formatMoney(payouts.summary.total_paid)"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 xl:flex-row xl:items-end xl:justify-between">
+                    <div class="relative w-full xl:max-w-md">
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
+                        <input type="text" x-model="payouts.search" @@input.debounce.500ms="payouts.page = 1; loadPayouts()" placeholder="Search reference, phone, or notes..."
+                            class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                        <svg class="absolute left-3 bottom-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-end gap-3">
+                        <button type="button" @@click="payouts.showFilters = !payouts.showFilters"
+                            class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            :class="payouts.showFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+                            <span x-text="payouts.showFilters ? 'Hide Filters' : 'Filters'"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div x-show="payouts.showFilters" x-transition class="border-b border-slate-100 px-5 pb-4" style="display:none">
+                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Status</label>
+                                <select x-model="payouts.status" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <option value="">All statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="sent">Sent</option>
+                                    <option value="confirmed">Confirmed</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Method</label>
+                                <select x-model="payouts.method" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <option value="">All methods</option>
+                                    <option value="momo">MoMo</option>
+                                    <option value="bank">Bank</option>
+                                    <option value="cash">Cash</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                            <button type="button" @@click="payouts.showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
+                            <button type="button" @@click="clearTabFilters('payouts')" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
+                            <button type="button" @@click="applyTabFilters('payouts')" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">Apply Filters</button>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2" x-show="activeFilterChips('payouts').length">
+                        <template x-for="chip in activeFilterChips('payouts')" :key="chip.key">
+                            <span class="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-700 ring-1 ring-orange-200">
+                                <span x-text="chip.label"></span>
+                                <button type="button" @@click="clearFilter('payouts', chip.key)" class="text-orange-500 hover:text-orange-800">&times;</button>
+                            </span>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="relative overflow-hidden bg-white">
+                    <div x-show="payouts.loading" class="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px]" style="display:none"></div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[980px] divide-y divide-slate-200/60 text-xs">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Date</th>
+                                    <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Amount</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Method</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Reference</th>
+                                    <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Status</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Processed By</th>
+                                    <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                <template x-if="payouts.data.length === 0 && !payouts.loading">
+                                    <tr><td colspan="7" class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No payout history found</td></tr>
+                                </template>
+                                <template x-for="payout in payouts.data" :key="payout.id">
+                                    <tr class="hover:bg-slate-50/70">
+                                        <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-600" x-text="formatDateTime(payout.created_at)"></td>
+                                        <td class="whitespace-nowrap px-4 py-3 text-right font-black text-slate-900" x-text="'GHS ' + formatMoney(payout.amount)"></td>
+                                        <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-700" x-text="payoutMethodLabel(payout.payment_method) || '-'"></td>
+                                        <td class="px-4 py-3 font-semibold text-slate-700" x-text="payout.payment_reference || '-'"></td>
+                                        <td class="whitespace-nowrap px-4 py-3 text-center">
+                                            <span class="inline-flex rounded-full px-2.5 py-1 text-[10px] font-black" :class="payoutStatusClass(payout.status)" x-text="payoutStatusLabel(payout.status)"></span>
+                                        </td>
+                                        <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-600" x-text="payout.processed_by?.name || '-'"></td>
+                                        <td class="whitespace-nowrap px-4 py-3 text-right">
+                                            <button x-show="payout.status === 'pending'" @@click="openMarkSentModal(payout)" class="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700 hover:bg-orange-100">Mark Sent</button>
+                                            <button x-show="payout.status === 'sent'" @@click="openConfirmPayoutModal(payout)" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100">Confirm</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="text-xs font-semibold text-slate-600">Showing <span x-text="payouts.meta.from || 0"></span> to <span x-text="payouts.meta.to || 0"></span> of <span x-text="payouts.meta.total || 0"></span></div>
+                            <div class="flex items-center gap-1">
+                                <button @@click="payoutsPrevPage()" :disabled="payouts.page <= 1" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
+                                <div class="px-2 text-xs font-black text-slate-700">Page <span x-text="payouts.meta.current_page || 1"></span> / <span x-text="payouts.meta.last_page || 1"></span></div>
+                                <button @@click="payoutsNextPage()" :disabled="payouts.page >= payouts.meta.last_page" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Activity Logs -->
-            <button @@click="activeTab = 'activity'; loadActivityLogs()"
-                class="group flex items-center gap-3 w-full px-2.5 py-2 rounded-xl mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'activity'
-                    ? 'bg-violet-50 ring-1 ring-violet-100 shadow-sm'
-                    : 'hover:bg-slate-50'">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'activity' ? 'bg-violet-500 shadow-md shadow-violet-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3.5 h-3.5 transition-colors" :class="activeTab === 'activity' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                </div>
-                <span class="flex-1 text-sm transition-colors" :class="activeTab === 'activity' ? 'font-bold text-violet-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">Activity Logs</span>
-                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-[10px] font-bold rounded-full transition-all"
-                    :class="activeTab === 'activity' ? 'bg-violet-500 text-white shadow-sm' : 'bg-slate-100 text-slate-500'">{{ $activityLogsCount }}</span>
-            </button>
-
-            <!-- OTP Logs -->
-            <button @@click="activeTab = 'otp'; loadOtpLogs()"
-                class="group flex items-center gap-3 w-full px-2.5 py-2 rounded-xl mb-0.5 transition-all duration-150 text-left"
-                :class="activeTab === 'otp'
-                    ? 'bg-amber-50 ring-1 ring-amber-100 shadow-sm'
-                    : 'hover:bg-slate-50'">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-150"
-                    :class="activeTab === 'otp' ? 'bg-amber-500 shadow-md shadow-amber-200' : 'bg-slate-100 group-hover:bg-slate-200'">
-                    <svg class="w-3.5 h-3.5 transition-colors" :class="activeTab === 'otp' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                    </svg>
-                </div>
-                <span class="flex-1 text-sm transition-colors" :class="activeTab === 'otp' ? 'font-bold text-amber-700' : 'font-medium text-slate-500 group-hover:text-slate-700'">OTP Logs</span>
-                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-[10px] font-bold rounded-full transition-all"
-                    :class="activeTab === 'otp' ? 'bg-amber-500 text-white shadow-sm' : 'bg-slate-100 text-slate-500'">{{ $otpLogsCount }}</span>
-            </button>
-
-        </aside>
-
-        <!-- Tab Content Area -->
-        <div class="flex-1 min-w-0 px-8 py-6 overflow-auto bg-slate-50/60">
             {{-- ═══════════════════════════════════════════════════════ --}}
             {{-- SHIPMENTS TAB                                          --}}
             {{-- ═══════════════════════════════════════════════════════ --}}
             <div x-show="activeTab === 'shipments'" x-cloak>
                 <!-- Controls -->
-                <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
+                <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 xl:flex-row xl:items-end xl:justify-between">
                     <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-                        <div class="relative flex-1 max-w-xs">
+                        <div class="relative w-full xl:max-w-md">
+                            <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
                             <input type="text" x-model="shipments.search" @@input.debounce.500ms="shipments.page = 1; loadShipments()" placeholder="Search shipments..."
-                                class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400 transition-colors">
-                            <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                            <svg class="absolute left-3 bottom-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         </div>
-                        <select x-model="shipments.status" @@change="shipments.page = 1; loadShipments()" class="px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors cursor-pointer">
-                            <option value="">All Statuses</option>
-                            @foreach($statuses as $status)
-                                <option value="{{ $status['value'] }}">{{ $status['label'] }}</option>
-                            @endforeach
-                        </select>
                     </div>
                     <div class="flex flex-wrap items-center justify-end gap-3">
+                        <button type="button" @@click="shipments.showFilters = !shipments.showFilters"
+                            class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            :class="shipments.showFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+                            <span x-text="shipments.showFilters ? 'Hide Filters' : 'Filters'"></span>
+                        </button>
                         <!-- View Columns -->
                         <div x-data="{ open: false }" class="relative">
-                            <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                            <button @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-orange-200 hover:bg-orange-50/40">
                                 <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/></svg>
                                 View
                                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -348,7 +416,7 @@ $vendorConfig = [
                         </div>
                         <!-- Export -->
                         <div x-data="{ open: false }" class="relative">
-                            <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                            <button @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-orange-200 hover:bg-orange-50/40">
                                 <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 Export
                                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -368,45 +436,98 @@ $vendorConfig = [
                     </div>
                 </div>
 
+                <div x-show="shipments.showFilters" x-transition class="border-b border-slate-100 px-5 pb-4" style="display:none">
+                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Created Date</label>
+                                <div class="relative">
+                                    <input type="text" x-ref="shipmentsCreatedRange" placeholder="Select date range" readonly class="w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <svg class="absolute left-3 top-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M4 11h16M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Shipment Status</label>
+                                <select x-model="shipments.status" @@change="shipments.statusName = $event.target.selectedOptions[0].text" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <option value="">All Statuses</option>
+                                    @foreach($statuses as $status)
+                                        <option value="{{ $status['value'] }}">{{ $status['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Package Count</label>
+                                <select x-model="shipments.packageCount" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <option value="">Any count</option>
+                                    <option value="one">One package</option>
+                                    <option value="multiple">Multiple packages</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Recipient Phone</label>
+                                <input type="text" x-model="shipments.recipientPhone" placeholder="Phone number" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Location</label>
+                                <input type="text" x-model="shipments.location" placeholder="Town, district, or region" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            </div>
+                        </div>
+                        <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                            <button type="button" @@click="shipments.showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
+                            <button type="button" @@click="clearTabFilters('shipments')" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
+                            <button type="button" @@click="applyTabFilters('shipments')" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">Apply Filters</button>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2" x-show="activeFilterChips('shipments').length">
+                        <template x-for="chip in activeFilterChips('shipments')" :key="chip.key">
+                            <span class="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-700 ring-1 ring-orange-200">
+                                <span x-text="chip.label"></span>
+                                <button type="button" @@click="clearFilter('shipments', chip.key)" class="text-orange-500 hover:text-orange-800">&times;</button>
+                            </span>
+                        </template>
+                    </div>
+                </div>
+
                 <!-- Table -->
-                <div class="rounded-xl border border-slate-200/50 relative">
+                <div class="relative overflow-hidden bg-white">
                     <div x-show="shipments.loading" x-transition.opacity.duration.150ms class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10" style="display: none;"></div>
                     <div class="overflow-x-auto">
-                        <table class="w-full min-w-[700px] md:min-w-full divide-y divide-slate-200/50 text-xs">
-                            <thead class="bg-slate-50/50">
+                        <table class="w-full min-w-[700px] table-auto divide-y divide-slate-200/60 text-xs">
+                            <thead class="bg-slate-50">
                                 <tr>
-                                    <th x-show="shipments.visibleColumns.shipment_number" @@click="sortShipments('shipment_number')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <th x-show="shipments.visibleColumns.shipment_number" @@click="sortShipments('shipment_number')" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 cursor-pointer">
                                         <div class="flex items-center">SHIPMENT #<svg class="w-2.5 h-2.5 ml-1" :class="shipments.sortBy === 'shipment_number' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/></svg></div>
                                     </th>
-                                    <th x-show="shipments.visibleColumns.recipient" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">RECIPIENT</th>
-                                    <th x-show="shipments.visibleColumns.location" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">LOCATION</th>
-                                    <th x-show="shipments.visibleColumns.items" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ITEMS</th>
-                                    <th x-show="shipments.visibleColumns.status" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">STATUS</th>
-                                    <th x-show="shipments.visibleColumns.created_at" @@click="sortShipments('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <th x-show="shipments.visibleColumns.recipient" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">RECIPIENT</th>
+                                    <th x-show="shipments.visibleColumns.location" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">LOCATION</th>
+                                    <th x-show="shipments.visibleColumns.items" class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">ITEMS</th>
+                                    <th x-show="shipments.visibleColumns.status" class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">STATUS</th>
+                                    <th x-show="shipments.visibleColumns.created_at" @@click="sortShipments('created_at')" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 cursor-pointer">
                                         <div class="flex items-center">CREATED<svg class="w-2.5 h-2.5 ml-1" :class="shipments.sortBy === 'created_at' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/></svg></div>
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-transparent divide-y divide-slate-100/50">
+                            <tbody class="divide-y divide-slate-100 bg-white">
                                 <template x-if="shipments.data.length === 0 && !shipments.loading">
-                                    <tr><td :colspan="visibleColumnCount('shipments')" class="px-4 py-8 text-center text-gray-500 text-xs">No shipments found</td></tr>
+                                    <tr><td :colspan="visibleColumnCount('shipments')" class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No shipments found</td></tr>
                                 </template>
                                 <template x-for="shipment in shipments.data" :key="shipment.id">
                                     <tr class="hover:bg-slate-50/70">
-                                        <td x-show="shipments.visibleColumns.shipment_number" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="shipment.shipment_number"></td>
-                                        <td x-show="shipments.visibleColumns.recipient" class="px-4 py-2.5 whitespace-nowrap">
-                                            <p class="text-xs font-medium text-slate-900" x-text="shipment.recipient_name"></p>
-                                            <p class="text-xs text-slate-500" x-text="shipment.recipient_phone"></p>
+                                        <td x-show="shipments.visibleColumns.shipment_number" class="px-4 py-3 whitespace-nowrap text-xs font-black text-orange-700" x-text="shipment.shipment_number"></td>
+                                        <td x-show="shipments.visibleColumns.recipient" class="px-4 py-3 whitespace-nowrap">
+                                            <p class="text-xs font-bold text-slate-900" x-text="shipment.recipient_name"></p>
+                                            <p class="mt-1 text-[11px] font-semibold text-slate-500" x-text="shipment.recipient_phone"></p>
                                         </td>
-                                        <td x-show="shipments.visibleColumns.location" class="px-4 py-2.5 whitespace-nowrap">
-                                            <p class="text-xs text-slate-600" x-text="shipment.region || '-'"></p>
-                                            <p class="text-xs text-slate-400" x-text="shipment.district || ''"></p>
+                                        <td x-show="shipments.visibleColumns.location" class="px-4 py-3 whitespace-nowrap">
+                                            <p class="text-xs font-semibold text-slate-600" x-text="shipment.region || '-'"></p>
+                                            <p class="mt-1 text-[11px] font-semibold text-slate-400" x-text="shipment.district || ''"></p>
                                         </td>
-                                        <td x-show="shipments.visibleColumns.items" class="px-4 py-2.5 whitespace-nowrap text-center">
-                                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold" x-text="shipment.items_count"></span>
+                                        <td x-show="shipments.visibleColumns.items" class="px-4 py-3 whitespace-nowrap text-center font-black text-slate-900" x-text="shipment.items_count">
                                         </td>
-                                        <td x-show="shipments.visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap text-center">
-                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                        <td x-show="shipments.visibleColumns.status" class="px-4 py-3 whitespace-nowrap text-center">
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black"
                                                 :class="{
                                                     'bg-slate-100 text-slate-700': shipment.status === 'draft',
                                                     'bg-blue-100 text-blue-700': ['submitted', 'invoice_sent', 'invoice_accepted'].includes(shipment.status),
@@ -416,38 +537,201 @@ $vendorConfig = [
                                                     'bg-rose-100 text-rose-700': shipment.status === 'cancelled'
                                                 }" x-text="shipment.status_label"></span>
                                         </td>
-                                        <td x-show="shipments.visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(shipment.created_at)"></td>
+                                        <td x-show="shipments.visibleColumns.created_at" class="px-4 py-3 whitespace-nowrap text-xs font-semibold text-slate-600" x-text="formatDateTime(shipment.created_at)"></td>
                                     </tr>
                                 </template>
                             </tbody>
                         </table>
                     </div>
                     <!-- Pagination -->
-                    <div class="px-4 py-2.5 border-t border-slate-200/50 bg-slate-50/30">
-                        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <div class="text-xs text-slate-600">Showing <span x-text="shipments.meta.from"></span> to <span x-text="shipments.meta.to"></span> of <span x-text="shipments.meta.total"></span> results</div>
-                            <div class="flex flex-wrap items-center gap-3">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs font-medium text-slate-600">Rows per page</span>
-                                    <div x-data="{ open: false }" class="relative">
-                                        <button type="button" @@click="open = !open" class="inline-flex items-center justify-between gap-1.5 px-2.5 py-1 min-w-[60px] border border-slate-200/70 rounded-lg bg-white/70 backdrop-blur-sm text-xs font-medium text-slate-700 hover:bg-white/90 transition-colors">
-                                            <span x-text="shipments.perPage"></span>
-                                            <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                        </button>
-                                        <div x-show="open" @@click.away="open = false" x-transition class="absolute bottom-full mb-1 right-0 w-16 rounded-lg border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-lg p-1 z-[9999]" style="display: none;">
-                                            <button type="button" @@click="setShipmentsPerPage(10); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="shipments.perPage == 10 ? 'bg-slate-100/70' : ''">10</button>
-                                            <button type="button" @@click="setShipmentsPerPage(25); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="shipments.perPage == 25 ? 'bg-slate-100/70' : ''">25</button>
-                                            <button type="button" @@click="setShipmentsPerPage(50); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="shipments.perPage == 50 ? 'bg-slate-100/70' : ''">50</button>
-                                        </div>
+                    <div class="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="text-xs font-semibold text-slate-600">Showing <span x-text="shipments.meta.from || 0"></span> to <span x-text="shipments.meta.to || 0"></span> of <span x-text="shipments.meta.total || 0"></span></div>
+                            <div class="flex items-center gap-1">
+                                <button @@click="shipmentsPrevPage()" :disabled="shipments.page <= 1" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
+                                <div class="px-2 text-xs font-black text-slate-700">Page <span x-text="shipments.meta.current_page || 1"></span> / <span x-text="shipments.meta.last_page || 1"></span></div>
+                                <button @@click="shipmentsNextPage()" :disabled="shipments.page >= shipments.meta.last_page" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- ═══════════════════════════════════════════════════════ --}}
+            {{-- PACKAGES TAB                                           --}}
+            {{-- ═══════════════════════════════════════════════════════ --}}
+            <div x-show="activeTab === 'packages'" x-cloak>
+                <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 xl:flex-row xl:items-end xl:justify-between">
+                    <div class="w-full xl:max-w-md">
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
+                        <div class="relative">
+                            <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                            <input type="text" x-model="packages.search" @@input.debounce.500ms="packages.page = 1; loadPackages()" placeholder="Search shipment, package, recipient, phone..."
+                                   class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3 xl:justify-end">
+                        <button type="button" @@click="packages.showFilters = !packages.showFilters"
+                            class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            :class="packages.showFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+                            <span x-text="packages.showFilters ? 'Hide Filters' : 'Filters'"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div x-show="packages.showFilters" x-transition class="border-b border-slate-100 px-5 pb-4" style="display:none">
+                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Created Date</label>
+                                <div class="relative">
+                                    <input type="text" x-ref="packagesCreatedRange" placeholder="Select date range" readonly class="w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <svg class="absolute left-3 top-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M4 11h16M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Package Status</label>
+                                <select x-model="packages.status" @@change="packages.statusName = $event.target.selectedOptions[0].text" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <option value="">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="picked_up">Picked Up</option>
+                                    <option value="at_warehouse">At Warehouse</option>
+                                    <option value="sorted">Sorted</option>
+                                    <option value="in_transit">In Transit</option>
+                                    <option value="out_for_delivery">Out for Delivery</option>
+                                    <option value="delivered">Delivered</option>
+                                    <option value="returned">Returned</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Delivery Method</label>
+                                <select x-model="packages.deliveryMethod" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <option value="">All methods</option>
+                                    <option value="direct">Recipient delivery</option>
+                                    <option value="bus_handoff">Bus handoff</option>
+                                    <option value="pickup">Self pickup</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Recipient Phone</label>
+                                <input type="text" x-model="packages.recipientPhone" placeholder="Phone number" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Location</label>
+                                <input type="text" x-model="packages.location" placeholder="Town, district, or region" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Quantity Range</label>
+                                <div class="flex overflow-hidden rounded-xl border-2 border-slate-200 bg-white transition focus-within:border-orange-400 focus-within:ring-4 focus-within:ring-orange-100">
+                                    <input type="number" min="1" x-model="packages.quantityMin" placeholder="Min" class="min-w-0 flex-1 border-0 bg-transparent px-3 py-3 text-sm font-semibold text-slate-900 outline-none">
+                                    <div class="w-px bg-slate-200"></div>
+                                    <input type="number" min="1" x-model="packages.quantityMax" placeholder="Max" class="min-w-0 flex-1 border-0 bg-transparent px-3 py-3 text-sm font-semibold text-slate-900 outline-none">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                            <button type="button" @@click="packages.showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
+                            <button type="button" @@click="clearTabFilters('packages')" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
+                            <button type="button" @@click="applyTabFilters('packages')" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">Apply Filters</button>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2" x-show="activeFilterChips('packages').length">
+                        <template x-for="chip in activeFilterChips('packages')" :key="chip.key">
+                            <span class="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-700 ring-1 ring-orange-200">
+                                <span x-text="chip.label"></span>
+                                <button type="button" @@click="clearFilter('packages', chip.key)" class="text-orange-500 hover:text-orange-800">&times;</button>
+                            </span>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="relative overflow-hidden bg-white">
+                    <div x-show="packages.loading" x-transition.opacity.duration.150ms class="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px]" style="display:none"></div>
+                    <div class="hidden overflow-x-auto lg:block">
+                        <table class="w-full table-auto divide-y divide-slate-200/60 text-xs">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Package</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Shipment</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Recipient</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Location</th>
+                                    <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Qty</th>
+                                    <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Method</th>
+                                    <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Status</th>
+                                    <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                <template x-if="packages.data.length === 0 && !packages.loading">
+                                    <tr><td colspan="8" class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No packages found for this vendor.</td></tr>
+                                </template>
+                                <template x-for="pkg in packages.data" :key="pkg.id">
+                                    <tr class="hover:bg-slate-50/70">
+                                        <td class="max-w-[320px] px-4 py-3">
+                                            <p class="text-sm font-black text-slate-900" x-text="pkg.description || 'Package'"></p>
+                                            <p class="mt-1 font-mono text-[11px] font-semibold text-slate-500" x-text="pkg.tracking_code || 'No tracking code'"></p>
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            <a :href="'/admin/shipments/' + pkg.shipment_id" class="text-xs font-black text-orange-700 hover:underline" x-text="pkg.shipment_number || '-'"></a>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <p class="font-bold text-slate-800" x-text="pkg.recipient_name || '-'"></p>
+                                            <p class="mt-1 text-[11px] font-semibold text-slate-500" x-text="pkg.recipient_phone || '-'"></p>
+                                        </td>
+                                        <td class="max-w-[280px] px-4 py-3 text-xs font-semibold text-slate-600" x-text="pkg.location || '-'"></td>
+                                        <td class="px-4 py-3 text-center font-black text-slate-900" x-text="pkg.quantity || 1"></td>
+                                        <td class="px-4 py-3 text-center">
+                                            <span class="inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-black"
+                                                :class="pkg.delivery_method === 'bus_handoff' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-200 bg-slate-50 text-slate-600'"
+                                                x-text="pkg.delivery_method_label"></span>
+                                        </td>
+                                        <td class="px-4 py-3 text-center">
+                                            <span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black"
+                                                :class="statusBadgeClass(pkg.status)"
+                                                x-text="pkg.status_label"></span>
+                                        </td>
+                                        <td class="px-4 py-3 text-right">
+                                            <a :href="'/admin/shipments/' + pkg.shipment_id" class="inline-flex rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700 hover:bg-orange-100">Open</a>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="divide-y divide-slate-100 lg:hidden">
+                        <template x-if="packages.data.length === 0 && !packages.loading">
+                            <div class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No packages found for this vendor.</div>
+                        </template>
+                        <template x-for="pkg in packages.data" :key="pkg.id">
+                            <div class="p-4">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-black text-slate-900" x-text="pkg.description || 'Package'"></p>
+                                        <p class="mt-1 font-mono text-[11px] font-semibold text-slate-500" x-text="pkg.tracking_code || 'No tracking code'"></p>
                                     </div>
+                                    <span class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black" :class="statusBadgeClass(pkg.status)" x-text="pkg.status_label"></span>
                                 </div>
-                                <div class="text-xs font-medium text-slate-600">Page <span x-text="shipments.meta.current_page"></span> of <span x-text="shipments.meta.last_page"></span></div>
-                                <div class="flex space-x-1">
-                                    <button @@click="shipmentsFirstPage()" :disabled="shipments.page === 1" :class="shipments.page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/></svg></button>
-                                    <button @@click="shipmentsPrevPage()" :disabled="shipments.page === 1" :class="shipments.page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
-                                    <button @@click="shipmentsNextPage()" :disabled="shipments.page === shipments.meta.last_page" :class="shipments.page === shipments.meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
-                                    <button @@click="shipmentsLastPage()" :disabled="shipments.page === shipments.meta.last_page" :class="shipments.page === shipments.meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg></button>
+                                <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                                    <div><p class="font-black uppercase tracking-wide text-slate-400">Shipment</p><a :href="'/admin/shipments/' + pkg.shipment_id" class="font-black text-orange-700" x-text="pkg.shipment_number || '-'"></a></div>
+                                    <div><p class="font-black uppercase tracking-wide text-slate-400">Qty</p><p class="font-black text-slate-900" x-text="pkg.quantity || 1"></p></div>
+                                    <div><p class="font-black uppercase tracking-wide text-slate-400">Recipient</p><p class="font-bold text-slate-800" x-text="pkg.recipient_name || '-'"></p><p class="font-semibold text-slate-500" x-text="pkg.recipient_phone || '-'"></p></div>
+                                    <div><p class="font-black uppercase tracking-wide text-slate-400">Method</p><p class="font-bold text-slate-800" x-text="pkg.delivery_method_label"></p></div>
+                                    <div class="col-span-2"><p class="font-black uppercase tracking-wide text-slate-400">Location</p><p class="font-bold text-slate-800" x-text="pkg.location || '-'"></p></div>
                                 </div>
+                                <a :href="'/admin/shipments/' + pkg.shipment_id" class="mt-4 inline-flex rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700">Open</a>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="text-xs font-semibold text-slate-600">Showing <span x-text="packages.meta.from || 0"></span> to <span x-text="packages.meta.to || 0"></span> of <span x-text="packages.meta.total || 0"></span></div>
+                            <div class="flex items-center gap-1">
+                                <button @@click="packagesPrevPage()" :disabled="packages.page <= 1" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
+                                <div class="px-2 text-xs font-black text-slate-700">Page <span x-text="packages.meta.current_page || 1"></span> / <span x-text="packages.meta.last_page || 1"></span></div>
+                                <button @@click="packagesNextPage()" :disabled="packages.page >= packages.meta.last_page" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
                             </div>
                         </div>
                     </div>
@@ -459,27 +743,25 @@ $vendorConfig = [
             {{-- ═══════════════════════════════════════════════════════ --}}
             <div x-show="activeTab === 'activity'" x-cloak>
                 <!-- Controls -->
-                <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
+                <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 xl:flex-row xl:items-end xl:justify-between">
                     <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-                        <div class="relative flex-1 max-w-xs">
+                        <div class="relative w-full xl:max-w-md">
+                            <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
                             <input type="text" x-model="activity.search" @@input.debounce.500ms="activity.page = 1; loadActivityLogs()" placeholder="Search activity..."
-                                class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400 transition-colors">
-                            <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                            <svg class="absolute left-3 bottom-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         </div>
-                        <select x-model="activity.action" @@change="activity.page = 1; loadActivityLogs()" class="px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors cursor-pointer">
-                            <option value="">All Actions</option>
-                            <option value="login">Login</option>
-                            <option value="logout">Logout</option>
-                            <option value="register">Register</option>
-                            <option value="login_otp_requested">Login OTP Requested</option>
-                            <option value="verify_phone">Verify Phone</option>
-                            <option value="profile_updated">Profile Updated</option>
-                        </select>
                     </div>
                     <div class="flex flex-wrap items-center justify-end gap-3">
+                        <button type="button" @@click="activity.showFilters = !activity.showFilters"
+                            class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            :class="activity.showFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+                            <span x-text="activity.showFilters ? 'Hide Filters' : 'Filters'"></span>
+                        </button>
                         <!-- View Columns -->
                         <div x-data="{ open: false }" class="relative">
-                            <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                            <button @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-orange-200 hover:bg-orange-50/40">
                                 <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/></svg>
                                 View
                                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -495,7 +777,7 @@ $vendorConfig = [
                         </div>
                         <!-- Export -->
                         <div x-data="{ open: false }" class="relative">
-                            <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                            <button @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-orange-200 hover:bg-orange-50/40">
                                 <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 Export
                                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -515,74 +797,110 @@ $vendorConfig = [
                     </div>
                 </div>
 
+                <div x-show="activity.showFilters" x-transition class="border-b border-slate-100 px-5 pb-4" style="display:none">
+                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Activity Date</label>
+                                <div class="relative">
+                                    <input type="text" x-ref="activityCreatedRange" placeholder="Select date range" readonly class="w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <svg class="absolute left-3 top-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M4 11h16M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Action</label>
+                                <select x-model="activity.action" @@change="activity.actionName = $event.target.selectedOptions[0].text" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <option value="">All Actions</option>
+                                    <option value="login">Login</option>
+                                    <option value="logout">Logout</option>
+                                    <option value="register">Register</option>
+                                    <option value="login_otp_requested">Login OTP Requested</option>
+                                    <option value="verify_phone">Verify Phone</option>
+                                    <option value="profile_updated">Profile Updated</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Device Type</label>
+                                <select x-model="activity.deviceType" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <option value="">All devices</option>
+                                    <option value="web">Web</option>
+                                    <option value="mobile">Mobile</option>
+                                    <option value="desktop">Desktop</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">IP Address</label>
+                                <input type="text" x-model="activity.ipAddress" placeholder="IP address" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            </div>
+                        </div>
+                        <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                            <button type="button" @@click="activity.showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
+                            <button type="button" @@click="clearTabFilters('activity')" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
+                            <button type="button" @@click="applyTabFilters('activity')" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">Apply Filters</button>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2" x-show="activeFilterChips('activity').length">
+                        <template x-for="chip in activeFilterChips('activity')" :key="chip.key">
+                            <span class="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-700 ring-1 ring-orange-200">
+                                <span x-text="chip.label"></span>
+                                <button type="button" @@click="clearFilter('activity', chip.key)" class="text-orange-500 hover:text-orange-800">&times;</button>
+                            </span>
+                        </template>
+                    </div>
+                </div>
+
                 <!-- Table -->
-                <div class="rounded-xl border border-slate-200/50 relative">
+                <div class="relative overflow-hidden bg-white">
                     <div x-show="activity.loading" x-transition.opacity.duration.150ms class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10" style="display: none;"></div>
                     <div class="overflow-x-auto">
-                        <table class="w-full min-w-[800px] md:min-w-full divide-y divide-slate-200/50 text-xs">
-                            <thead class="bg-slate-50/50">
+                        <table class="w-full min-w-[800px] table-auto divide-y divide-slate-200/60 text-xs">
+                            <thead class="bg-slate-50">
                                 <tr>
-                                    <th x-show="activity.visibleColumns.action" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ACTION</th>
-                                    <th x-show="activity.visibleColumns.description" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">DESCRIPTION</th>
-                                    <th x-show="activity.visibleColumns.device" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">DEVICE</th>
-                                    <th x-show="activity.visibleColumns.ip_address" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">IP ADDRESS</th>
-                                    <th x-show="activity.visibleColumns.created_at" @@click="sortActivity('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <th x-show="activity.visibleColumns.action" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">ACTION</th>
+                                    <th x-show="activity.visibleColumns.description" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">DESCRIPTION</th>
+                                    <th x-show="activity.visibleColumns.device" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">DEVICE</th>
+                                    <th x-show="activity.visibleColumns.ip_address" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">IP ADDRESS</th>
+                                    <th x-show="activity.visibleColumns.created_at" @@click="sortActivity('created_at')" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 cursor-pointer">
                                         <div class="flex items-center">DATE<svg class="w-2.5 h-2.5 ml-1" :class="activity.sortBy === 'created_at' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/></svg></div>
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-transparent divide-y divide-slate-100/50">
+                            <tbody class="divide-y divide-slate-100 bg-white">
                                 <template x-if="activity.data.length === 0 && !activity.loading">
-                                    <tr><td :colspan="visibleColumnCount('activity')" class="px-4 py-8 text-center text-gray-500 text-xs">No activity logs found</td></tr>
+                                    <tr><td :colspan="visibleColumnCount('activity')" class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No activity logs found</td></tr>
                                 </template>
                                 <template x-for="log in activity.data" :key="log.id">
                                     <tr class="hover:bg-slate-50/70">
-                                        <td x-show="activity.visibleColumns.action" class="px-4 py-2.5 whitespace-nowrap">
-                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                        <td x-show="activity.visibleColumns.action" class="px-4 py-3 whitespace-nowrap">
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black"
                                                 :class="{
                                                     'bg-emerald-100 text-emerald-700': ['login', 'register', 'verify_phone'].includes(log.action),
                                                     'bg-blue-100 text-blue-700': ['profile_updated', 'login_otp_requested'].includes(log.action),
                                                     'bg-slate-100 text-slate-700': log.action === 'logout'
                                                 }" x-text="log.action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())"></span>
                                         </td>
-                                        <td x-show="activity.visibleColumns.description" class="px-4 py-2.5 text-xs text-slate-600 max-w-xs truncate" x-text="log.description || '-'"></td>
-                                        <td x-show="activity.visibleColumns.device" class="px-4 py-2.5 whitespace-nowrap">
-                                            <p class="text-xs font-medium text-slate-900" x-text="log.device_name || 'Unknown'"></p>
-                                            <p class="text-xs text-slate-400" x-text="(log.device_type || '') + ' ' + (log.os_version || '')"></p>
+                                        <td x-show="activity.visibleColumns.description" class="max-w-xs px-4 py-3 text-xs font-semibold text-slate-600" x-text="log.description || '-'"></td>
+                                        <td x-show="activity.visibleColumns.device" class="px-4 py-3 whitespace-nowrap">
+                                            <p class="text-xs font-bold text-slate-900" x-text="log.device_name || 'Unknown'"></p>
+                                            <p class="mt-1 text-[11px] font-semibold text-slate-400" x-text="(log.device_type || '') + ' ' + (log.os_version || '')"></p>
                                         </td>
-                                        <td x-show="activity.visibleColumns.ip_address" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 font-mono" x-text="log.ip_address || '-'"></td>
-                                        <td x-show="activity.visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(log.created_at)"></td>
+                                        <td x-show="activity.visibleColumns.ip_address" class="px-4 py-3 whitespace-nowrap font-mono text-xs font-semibold text-slate-600" x-text="log.ip_address || '-'"></td>
+                                        <td x-show="activity.visibleColumns.created_at" class="px-4 py-3 whitespace-nowrap text-xs font-semibold text-slate-600" x-text="formatDateTime(log.created_at)"></td>
                                     </tr>
                                 </template>
                             </tbody>
                         </table>
                     </div>
                     <!-- Pagination -->
-                    <div class="px-4 py-2.5 border-t border-slate-200/50 bg-slate-50/30">
-                        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <div class="text-xs text-slate-600">Showing <span x-text="activity.meta.from"></span> to <span x-text="activity.meta.to"></span> of <span x-text="activity.meta.total"></span> results</div>
-                            <div class="flex flex-wrap items-center gap-3">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs font-medium text-slate-600">Rows per page</span>
-                                    <div x-data="{ open: false }" class="relative">
-                                        <button type="button" @@click="open = !open" class="inline-flex items-center justify-between gap-1.5 px-2.5 py-1 min-w-[60px] border border-slate-200/70 rounded-lg bg-white/70 backdrop-blur-sm text-xs font-medium text-slate-700 hover:bg-white/90 transition-colors">
-                                            <span x-text="activity.perPage"></span>
-                                            <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                        </button>
-                                        <div x-show="open" @@click.away="open = false" x-transition class="absolute bottom-full mb-1 right-0 w-16 rounded-lg border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-lg p-1 z-[9999]" style="display: none;">
-                                            <button type="button" @@click="setActivityPerPage(10); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="activity.perPage == 10 ? 'bg-slate-100/70' : ''">10</button>
-                                            <button type="button" @@click="setActivityPerPage(25); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="activity.perPage == 25 ? 'bg-slate-100/70' : ''">25</button>
-                                            <button type="button" @@click="setActivityPerPage(50); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="activity.perPage == 50 ? 'bg-slate-100/70' : ''">50</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="text-xs font-medium text-slate-600">Page <span x-text="activity.meta.current_page"></span> of <span x-text="activity.meta.last_page"></span></div>
-                                <div class="flex space-x-1">
-                                    <button @@click="activityFirstPage()" :disabled="activity.page === 1" :class="activity.page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/></svg></button>
-                                    <button @@click="activityPrevPage()" :disabled="activity.page === 1" :class="activity.page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
-                                    <button @@click="activityNextPage()" :disabled="activity.page === activity.meta.last_page" :class="activity.page === activity.meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
-                                    <button @@click="activityLastPage()" :disabled="activity.page === activity.meta.last_page" :class="activity.page === activity.meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg></button>
-                                </div>
+                    <div class="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="text-xs font-semibold text-slate-600">Showing <span x-text="activity.meta.from || 0"></span> to <span x-text="activity.meta.to || 0"></span> of <span x-text="activity.meta.total || 0"></span></div>
+                            <div class="flex items-center gap-1">
+                                <button @@click="activityPrevPage()" :disabled="activity.page <= 1" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
+                                <div class="px-2 text-xs font-black text-slate-700">Page <span x-text="activity.meta.current_page || 1"></span> / <span x-text="activity.meta.last_page || 1"></span></div>
+                                <button @@click="activityNextPage()" :disabled="activity.page >= activity.meta.last_page" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
                             </div>
                         </div>
                     </div>
@@ -594,18 +912,17 @@ $vendorConfig = [
             {{-- ═══════════════════════════════════════════════════════ --}}
             <div x-show="activeTab === 'otp'" x-cloak>
                 <!-- Controls -->
-                <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
-                    <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-                        <select x-model="otp.purpose" @@change="otp.page = 1; loadOtpLogs()" class="px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors cursor-pointer">
-                            <option value="">All Purposes</option>
-                            <option value="registration">Registration</option>
-                            <option value="login">Login</option>
-                        </select>
-                    </div>
+                <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 xl:flex-row xl:items-center xl:justify-end">
                     <div class="flex flex-wrap items-center justify-end gap-3">
+                        <button type="button" @@click="otp.showFilters = !otp.showFilters"
+                            class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            :class="otp.showFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+                            <span x-text="otp.showFilters ? 'Hide Filters' : 'Filters'"></span>
+                        </button>
                         <!-- View Columns -->
                         <div x-data="{ open: false }" class="relative">
-                            <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                            <button @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-orange-200 hover:bg-orange-50/40">
                                 <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/></svg>
                                 View
                                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -621,7 +938,7 @@ $vendorConfig = [
                         </div>
                         <!-- Export -->
                         <div x-data="{ open: false }" class="relative">
-                            <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
+                            <button @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-orange-200 hover:bg-orange-50/40">
                                 <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 Export
                                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -641,94 +958,254 @@ $vendorConfig = [
                     </div>
                 </div>
 
+                <div x-show="otp.showFilters" x-transition class="border-b border-slate-100 px-5 pb-4" style="display:none">
+                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Created Date</label>
+                                <div class="relative">
+                                    <input type="text" x-ref="otpCreatedRange" placeholder="Select date range" readonly class="w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <svg class="absolute left-3 top-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M4 11h16M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Purpose</label>
+                                <select x-model="otp.purpose" @@change="otp.purposeName = $event.target.selectedOptions[0].text" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <option value="">All Purposes</option>
+                                    <option value="registration">Registration</option>
+                                    <option value="login">Login</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">OTP Status</label>
+                                <select x-model="otp.status" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <option value="">All statuses</option>
+                                    <option value="verified">Verified</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="expired">Expired</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Expires Date</label>
+                                <div class="relative">
+                                    <input type="text" x-ref="otpExpiresRange" placeholder="Select date range" readonly class="w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    <svg class="absolute left-3 top-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M4 11h16M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                            <button type="button" @@click="otp.showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
+                            <button type="button" @@click="clearTabFilters('otp')" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
+                            <button type="button" @@click="applyTabFilters('otp')" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">Apply Filters</button>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2" x-show="activeFilterChips('otp').length">
+                        <template x-for="chip in activeFilterChips('otp')" :key="chip.key">
+                            <span class="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-700 ring-1 ring-orange-200">
+                                <span x-text="chip.label"></span>
+                                <button type="button" @@click="clearFilter('otp', chip.key)" class="text-orange-500 hover:text-orange-800">&times;</button>
+                            </span>
+                        </template>
+                    </div>
+                </div>
+
                 <!-- Table -->
-                <div class="rounded-xl border border-slate-200/50 relative">
+                <div class="relative overflow-hidden bg-white">
                     <div x-show="otp.loading" x-transition.opacity.duration.150ms class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10" style="display: none;"></div>
                     <div class="overflow-x-auto">
-                        <table class="w-full min-w-[600px] md:min-w-full divide-y divide-slate-200/50 text-xs">
-                            <thead class="bg-slate-50/50">
+                        <table class="w-full min-w-[600px] table-auto divide-y divide-slate-200/60 text-xs">
+                            <thead class="bg-slate-50">
                                 <tr>
-                                    <th x-show="otp.visibleColumns.code" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">CODE</th>
-                                    <th x-show="otp.visibleColumns.purpose" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">PURPOSE</th>
-                                    <th x-show="otp.visibleColumns.status" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">STATUS</th>
-                                    <th x-show="otp.visibleColumns.expires_at" @@click="sortOtp('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
+                                    <th x-show="otp.visibleColumns.code" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">CODE</th>
+                                    <th x-show="otp.visibleColumns.purpose" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">PURPOSE</th>
+                                    <th x-show="otp.visibleColumns.status" class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">STATUS</th>
+                                    <th x-show="otp.visibleColumns.expires_at" @@click="sortOtp('created_at')" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 cursor-pointer">
                                         <div class="flex items-center">EXPIRES AT<svg class="w-2.5 h-2.5 ml-1" :class="otp.sortBy === 'created_at' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/></svg></div>
                                     </th>
-                                    <th x-show="otp.visibleColumns.verified_at" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">VERIFIED AT</th>
-                                    <th x-show="otp.visibleColumns.created_at" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">CREATED</th>
+                                    <th x-show="otp.visibleColumns.verified_at" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">VERIFIED AT</th>
+                                    <th x-show="otp.visibleColumns.created_at" class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">CREATED</th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-transparent divide-y divide-slate-100/50">
+                            <tbody class="divide-y divide-slate-100 bg-white">
                                 <template x-if="otp.data.length === 0 && !otp.loading">
-                                    <tr><td :colspan="visibleColumnCount('otp')" class="px-4 py-8 text-center text-gray-500 text-xs">No OTP logs found</td></tr>
+                                    <tr><td :colspan="visibleColumnCount('otp')" class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No OTP logs found</td></tr>
                                 </template>
                                 <template x-for="log in otp.data" :key="log.id">
                                     <tr class="hover:bg-slate-50/70">
-                                        <td x-show="otp.visibleColumns.code" class="px-4 py-2.5 whitespace-nowrap">
+                                        <td x-show="otp.visibleColumns.code" class="px-4 py-3 whitespace-nowrap">
                                             <span class="text-sm font-mono font-bold text-slate-900 tracking-wider" x-text="log.code"></span>
                                         </td>
-                                        <td x-show="otp.visibleColumns.purpose" class="px-4 py-2.5 whitespace-nowrap">
-                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                        <td x-show="otp.visibleColumns.purpose" class="px-4 py-3 whitespace-nowrap">
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black"
                                                 :class="{ 'bg-blue-100 text-blue-700': log.purpose === 'registration', 'bg-emerald-100 text-emerald-700': log.purpose === 'login' }"
                                                 x-text="log.purpose.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())"></span>
                                         </td>
-                                        <td x-show="otp.visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap text-center">
+                                        <td x-show="otp.visibleColumns.status" class="px-4 py-3 whitespace-nowrap text-center">
                                             <template x-if="log.is_verified">
-                                                <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+                                                <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black bg-emerald-100 text-emerald-700">
                                                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                                                     Verified
                                                 </span>
                                             </template>
                                             <template x-if="!log.is_verified && log.is_expired">
-                                                <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-rose-100 text-rose-700">
+                                                <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black bg-rose-100 text-rose-700">
                                                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
                                                     Expired
                                                 </span>
                                             </template>
                                             <template x-if="!log.is_verified && !log.is_expired">
-                                                <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-700">
+                                                <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black bg-amber-100 text-amber-700">
                                                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
                                                     Pending
                                                 </span>
                                             </template>
                                         </td>
-                                        <td x-show="otp.visibleColumns.expires_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(log.expires_at)"></td>
-                                        <td x-show="otp.visibleColumns.verified_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="log.verified_at ? formatDateTime(log.verified_at) : '-'"></td>
-                                        <td x-show="otp.visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(log.created_at)"></td>
+                                        <td x-show="otp.visibleColumns.expires_at" class="px-4 py-3 whitespace-nowrap text-xs font-semibold text-slate-600" x-text="formatDateTime(log.expires_at)"></td>
+                                        <td x-show="otp.visibleColumns.verified_at" class="px-4 py-3 whitespace-nowrap text-xs font-semibold text-slate-600" x-text="log.verified_at ? formatDateTime(log.verified_at) : '-'"></td>
+                                        <td x-show="otp.visibleColumns.created_at" class="px-4 py-3 whitespace-nowrap text-xs font-semibold text-slate-600" x-text="formatDateTime(log.created_at)"></td>
                                     </tr>
                                 </template>
                             </tbody>
                         </table>
                     </div>
                     <!-- Pagination -->
-                    <div class="px-4 py-2.5 border-t border-slate-200/50 bg-slate-50/30">
-                        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <div class="text-xs text-slate-600">Showing <span x-text="otp.meta.from"></span> to <span x-text="otp.meta.to"></span> of <span x-text="otp.meta.total"></span> results</div>
-                            <div class="flex flex-wrap items-center gap-3">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs font-medium text-slate-600">Rows per page</span>
-                                    <div x-data="{ open: false }" class="relative">
-                                        <button type="button" @@click="open = !open" class="inline-flex items-center justify-between gap-1.5 px-2.5 py-1 min-w-[60px] border border-slate-200/70 rounded-lg bg-white/70 backdrop-blur-sm text-xs font-medium text-slate-700 hover:bg-white/90 transition-colors">
-                                            <span x-text="otp.perPage"></span>
-                                            <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                        </button>
-                                        <div x-show="open" @@click.away="open = false" x-transition class="absolute bottom-full mb-1 right-0 w-16 rounded-lg border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-lg p-1 z-[9999]" style="display: none;">
-                                            <button type="button" @@click="setOtpPerPage(10); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="otp.perPage == 10 ? 'bg-slate-100/70' : ''">10</button>
-                                            <button type="button" @@click="setOtpPerPage(25); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="otp.perPage == 25 ? 'bg-slate-100/70' : ''">25</button>
-                                            <button type="button" @@click="setOtpPerPage(50); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="otp.perPage == 50 ? 'bg-slate-100/70' : ''">50</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="text-xs font-medium text-slate-600">Page <span x-text="otp.meta.current_page"></span> of <span x-text="otp.meta.last_page"></span></div>
-                                <div class="flex space-x-1">
-                                    <button @@click="otpFirstPage()" :disabled="otp.page === 1" :class="otp.page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/></svg></button>
-                                    <button @@click="otpPrevPage()" :disabled="otp.page === 1" :class="otp.page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
-                                    <button @@click="otpNextPage()" :disabled="otp.page === otp.meta.last_page" :class="otp.page === otp.meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
-                                    <button @@click="otpLastPage()" :disabled="otp.page === otp.meta.last_page" :class="otp.page === otp.meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg></button>
-                                </div>
+                    <div class="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="text-xs font-semibold text-slate-600">Showing <span x-text="otp.meta.from || 0"></span> to <span x-text="otp.meta.to || 0"></span> of <span x-text="otp.meta.total || 0"></span></div>
+                            <div class="flex items-center gap-1">
+                                <button @@click="otpPrevPage()" :disabled="otp.page <= 1" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
+                                <div class="px-2 text-xs font-black text-slate-700">Page <span x-text="otp.meta.current_page || 1"></span> / <span x-text="otp.meta.last_page || 1"></span></div>
+                                <button @@click="otpNextPage()" :disabled="otp.page >= otp.meta.last_page" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+    </section>
+
+    <!-- Pay Vendor Modal -->
+    <div x-show="showPayoutModal" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="closePayoutModal()">
+        <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" @@click="closePayoutModal()"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <form @@submit.prevent="submitPayout()" class="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl" @@click.stop>
+                <div class="border-b border-slate-200 px-6 py-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 10v2m8-6a8 8 0 11-16 0 8 8 0 0116 0z"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-black text-slate-900">Pay Vendor</h3>
+                                <p class="mt-1 text-sm font-semibold text-slate-500">Available balance: <span x-text="'GHS ' + formatMoney(payouts.summary.available_balance)"></span></p>
+                            </div>
+                        </div>
+                        <button type="button" @@click="closePayoutModal()" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:bg-slate-50">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="space-y-4 px-6 py-5">
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Amount</label>
+                        <input type="number" step="0.01" min="1" x-model="payoutForm.amount" required class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payment Method</label>
+                        <select x-model="payoutForm.payment_method" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="momo">MOMO</option>
+                            <option value="bank">Bank Transfer</option>
+                            <option value="cash">Cash</option>
+                        </select>
+                    </div>
+                    <div x-show="payoutForm.payment_method === 'momo'">
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payment Phone</label>
+                        <input type="text" x-model="payoutForm.payment_phone" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payment Reference <span class="text-rose-500">*</span></label>
+                        <input type="text" x-model="payoutForm.payment_reference" required class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Notes</label>
+                        <textarea rows="3" x-model="payoutForm.notes" class="w-full resize-none rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"></textarea>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-5">
+                    <button type="button" @@click="closePayoutModal()" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" :disabled="payoutSaving" class="rounded-xl bg-orange-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/20 hover:bg-orange-700 disabled:opacity-50">
+                        <span x-text="payoutSaving ? 'Paying...' : 'Pay Vendor'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Mark Payout Sent Modal -->
+    <div x-show="showMarkSentModal" x-cloak class="fixed inset-0 z-[110] overflow-y-auto" @@keydown.escape.window="showMarkSentModal = false">
+        <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" @@click="showMarkSentModal = false"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <form @@submit.prevent="submitMarkSent()" class="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl" @@click.stop>
+                <div class="border-b border-slate-200 px-6 py-5">
+                    <h3 class="text-xl font-black text-slate-900">Mark Payout Sent</h3>
+                    <p class="mt-1 text-sm font-semibold text-slate-500">Record the payment transaction reference.</p>
+                </div>
+                <div class="px-6 py-5">
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payment Reference</label>
+                    <input type="text" x-model="markSentForm.payment_reference" required class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-5">
+                    <button type="button" @@click="showMarkSentModal = false" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" :disabled="markSentSaving" class="rounded-xl bg-orange-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/20 hover:bg-orange-700 disabled:opacity-50">
+                        <span x-text="markSentSaving ? 'Saving...' : 'Mark Sent'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Confirm Payout Modal -->
+    <div x-show="showConfirmPayoutModal" x-cloak class="fixed inset-0 z-[120] overflow-y-auto" @@keydown.escape.window="closeConfirmPayoutModal()">
+        <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" @@click="closeConfirmPayoutModal()"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl" @@click.stop>
+                <div class="border-b border-slate-200 px-6 py-5">
+                    <div class="flex items-start gap-4">
+                        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/20">
+                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-black text-slate-900">Confirm Payout?</h3>
+                            <p class="mt-1 text-sm font-semibold text-slate-500">This marks the payout as fully confirmed.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 px-6 py-5">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p class="text-xs font-black uppercase tracking-wide text-slate-500">Amount</p>
+                        <p class="mt-1 text-lg font-black text-slate-900" x-text="confirmPayoutTarget ? 'GHS ' + formatMoney(confirmPayoutTarget.amount) : '-'"></p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                            <p class="text-xs font-black uppercase tracking-wide text-slate-500">Method</p>
+                            <p class="mt-1 text-sm font-bold text-slate-800" x-text="confirmPayoutTarget ? payoutMethodLabel(confirmPayoutTarget.payment_method) : '-'"></p>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                            <p class="text-xs font-black uppercase tracking-wide text-slate-500">Reference</p>
+                            <p class="mt-1 break-words text-sm font-bold text-slate-800" x-text="confirmPayoutTarget?.payment_reference || '-'"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-5">
+                    <button type="button" @@click="closeConfirmPayoutModal()" :disabled="confirmPayoutSaving" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+                    <button type="button" @@click="submitConfirmPayout()" :disabled="confirmPayoutSaving" class="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50">
+                        <span x-text="confirmPayoutSaving ? 'Confirming...' : 'Confirm Payout'"></span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -763,13 +1240,13 @@ $vendorConfig = [
                 x-transition:leave-start="opacity-100 scale-100"
                 x-transition:leave-end="opacity-0 scale-95"
                 @@click.stop
-                class="relative w-full max-w-lg bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50"
+                class="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl"
             >
-                <!-- Header with Gradient -->
-                <div class="relative bg-gradient-to-r from-slate-50 to-slate-100/50 px-6 py-5 border-b border-slate-200/50 rounded-t-2xl">
+                <!-- Header -->
+                <div class="relative border-b border-slate-200 px-6 py-5">
                     <div class="flex items-start justify-between">
                         <div class="flex items-start gap-4">
-                            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center shadow-lg shadow-slate-900/20">
+                            <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                 </svg>
@@ -779,7 +1256,7 @@ $vendorConfig = [
                                 <p class="text-sm text-slate-500 mt-1">Update vendor information and settings</p>
                             </div>
                         </div>
-                        <button @@click="showEditModal = false" class="flex-shrink-0 rounded-xl p-2 text-slate-400 hover:bg-white hover:text-slate-700 transition-all shadow-sm">
+                        <button @@click="showEditModal = false" class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
@@ -804,7 +1281,7 @@ $vendorConfig = [
                                 <input
                                     type="text"
                                     x-model="form.name"
-                                    class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all"
+                                    class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
                                     placeholder="John Doe"
                                     required
                                 >
@@ -828,7 +1305,7 @@ $vendorConfig = [
                                 <input
                                     type="text"
                                     x-model="form.business_name"
-                                    class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all"
+                                    class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
                                     placeholder="Acme Corporation"
                                 >
                             </div>
@@ -850,7 +1327,7 @@ $vendorConfig = [
                                     <input
                                         type="email"
                                         x-model="form.email"
-                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
                                         placeholder="vendor@example.com"
                                     >
                                 </div>
@@ -859,10 +1336,10 @@ $vendorConfig = [
                                 </template>
                             </div>
 
-                            <!-- Phone (read-only) -->
+                            <!-- Phone -->
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                    Phone
+                                    Phone <span class="text-rose-500">*</span>
                                 </label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -873,11 +1350,14 @@ $vendorConfig = [
                                     <input
                                         type="text"
                                         x-model="form.phone"
-                                        disabled
-                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-500 transition-all cursor-not-allowed"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
+                                        placeholder="+233 24 123 4567"
+                                        required
                                     >
                                 </div>
-                                <p class="mt-1 text-xs text-slate-400">Phone number cannot be changed after creation</p>
+                                <template x-if="errors.phone">
+                                    <p class="mt-1.5 text-xs text-rose-600" x-text="errors.phone[0]"></p>
+                                </template>
                             </div>
                         </div>
 
@@ -885,8 +1365,8 @@ $vendorConfig = [
                         <div class="bg-slate-50/50 rounded-2xl p-5 border border-slate-200">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-                                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100 flex items-center justify-center shadow-sm">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                         </svg>
                                     </div>
@@ -898,8 +1378,8 @@ $vendorConfig = [
                                 <button
                                     type="button"
                                     @@click="form.is_active = !form.is_active"
-                                    :class="form.is_active ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-slate-300'"
-                                    class="relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 shadow-sm"
+                                    :class="form.is_active ? 'bg-orange-600' : 'bg-slate-300'"
+                                    class="relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-orange-100 focus:ring-offset-2 shadow-sm"
                                 >
                                     <span
                                         :class="form.is_active ? 'translate-x-7' : 'translate-x-0'"
@@ -934,7 +1414,7 @@ $vendorConfig = [
                                     min="0"
                                     x-model="form.commission_rate_override"
                                     :placeholder="'Default: GHS ' + (config.globalCommissionRate ?? '0.00')"
-                                    class="w-full pl-14 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-sm text-slate-900 placeholder-slate-400 transition-all"
+                                    class="w-full pl-14 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
                                 >
                             </div>
                             <p class="mt-2 text-[11px] text-slate-500 leading-relaxed">
@@ -949,18 +1429,18 @@ $vendorConfig = [
                     </div>
 
                     <!-- Footer -->
-                    <div class="flex items-center justify-end gap-3 border-t border-slate-200/50 bg-gradient-to-r from-slate-50/50 to-slate-100/30 px-6 py-5 rounded-b-2xl">
+                    <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-5">
                         <button
                             type="button"
                             @@click="showEditModal = false"
-                            class="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-white border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all shadow-sm"
+                            class="px-5 py-2.5 text-sm font-bold text-slate-700 bg-white border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all shadow-sm"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             :disabled="saving"
-                            class="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-slate-700 to-slate-900 hover:from-slate-800 hover:to-slate-950 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-slate-900/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                            class="inline-flex items-center gap-2 px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-orange-600/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                         >
                             <svg x-show="saving" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -1126,6 +1606,3 @@ $vendorConfig = [
 </div>
 
 @endsection
-
-
-

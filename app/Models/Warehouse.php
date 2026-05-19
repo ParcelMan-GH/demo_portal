@@ -24,10 +24,14 @@ class Warehouse extends Model
         'contact_email',
         'capacity',
         'is_active',
+        'is_hq',
+        'can_administer_system',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_hq' => 'boolean',
+        'can_administer_system' => 'boolean',
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
         'capacity' => 'integer',
@@ -74,6 +78,11 @@ class Warehouse extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function capabilities(): HasMany
+    {
+        return $this->hasMany(WarehouseCapability::class);
     }
 
     public function auditLogs(): HasMany

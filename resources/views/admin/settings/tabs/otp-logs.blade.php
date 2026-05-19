@@ -1,70 +1,101 @@
-<div x-data="otpLogsTable()" x-init="loadData()">
-    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-            <div class="relative flex-1 sm:max-w-xs">
-                <input type="text"
-                       x-model="search"
-                       @@input.debounce.500ms="refreshData()"
-                       placeholder="Search phone, purpose, OTP..."
-                       class="w-full rounded-xl border border-slate-200/70 bg-white/70 px-3.5 py-2 pr-10 text-sm text-slate-900 placeholder-slate-400 backdrop-blur-sm transition-colors focus:border-slate-300 focus:ring-2 focus:ring-slate-400/50">
-                <svg class="absolute right-3 top-2.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
+<div x-data="otpLogsTable()" x-init="loadData(); initDateRange()" class="space-y-4">
+    <div class="border-b border-slate-100 pb-4">
+        <div class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+            <div class="w-full xl:max-w-md">
+                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
+                <div class="relative">
+                    <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text"
+                           x-model="search"
+                           @@input.debounce.500ms="refreshData()"
+                           placeholder="Search phone, purpose, or OTP..."
+                           class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                </div>
             </div>
+            <div class="flex flex-wrap items-center gap-3 xl:justify-end">
+                <button type="button"
+                        @@click="showFilters = !showFilters"
+                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                        :class="showFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                    </svg>
+                    <span x-text="showFilters ? 'Hide Filters' : 'Filters'"></span>
+                </button>
+                <button type="button"
+                        @@click="loadData()"
+                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    <svg class="h-4 w-4" :class="loading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
 
-            <select x-model="purpose"
-                    @@change="refreshData()"
-                    class="rounded-xl border border-slate-200/70 bg-white/70 px-3.5 py-2 text-sm text-slate-900 backdrop-blur-sm transition-colors focus:border-slate-300 focus:ring-2 focus:ring-slate-400/50">
-                <option value="">All purposes</option>
-                <option value="login">Login</option>
-                <option value="registration">Registration</option>
-                <option value="delivery_verification">Delivery Verification</option>
-            </select>
+        <div x-show="showFilters" x-transition class="mb-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4" style="display:none">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div>
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Purpose</label>
+                    <select x-model="purpose" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                        <option value="">All purposes</option>
+                        <option value="login">Login</option>
+                        <option value="registration">Registration</option>
+                        <option value="delivery_verification">Delivery Verification</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Date Range</label>
+                    <input type="text" x-ref="dateRange" placeholder="Select date range" readonly class="w-full max-w-sm cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                </div>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                <button type="button" @@click="showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
+                <button type="button" @@click="clearFilters()" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
+                <button type="button" @@click="applyFilters()" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">Apply Filters</button>
+            </div>
         </div>
     </div>
 
-    <div class="overflow-hidden rounded-xl border border-slate-200/50">
-        <div x-show="loading" class="flex items-center justify-center py-12">
-            <svg class="h-6 w-6 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-        </div>
-
-        <template x-if="!loading && logs.length === 0">
-            <div class="py-12 text-center">
-                <svg class="mx-auto h-12 w-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-                </svg>
-                <h3 class="mt-4 text-sm font-medium text-slate-900">No OTP logs</h3>
-                <p class="mt-1 text-sm text-slate-500">OTP records will appear here once OTPs are requested.</p>
-            </div>
-        </template>
-
-        <div x-show="!loading && logs.length > 0" class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-200/50">
-                <thead class="bg-slate-50/50">
+    <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div x-show="loading" x-transition.opacity class="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px]" style="display:none"></div>
+        <div class="overflow-x-auto">
+            <table class="min-w-[980px] w-full divide-y divide-slate-200/50 text-xs">
+                <thead class="bg-slate-50/70">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Phone</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Code</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Purpose</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Status</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Verified At</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Expires At</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Created At</th>
+                        <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Phone</th>
+                        <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Code</th>
+                        <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Purpose</th>
+                        <th class="px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                        <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Verified At</th>
+                        <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Expires At</th>
+                        <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Created At</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100/50">
+                    <template x-if="!loading && logs.length === 0">
+                        <tr>
+                            <td colspan="7" class="px-4 py-10 text-center">
+                                <div class="flex flex-col items-center gap-2">
+                                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+                                        <svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                                        </svg>
+                                    </div>
+                                    <p class="text-sm font-medium text-slate-500">No OTP logs match the current filters</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
                     <template x-for="log in logs" :key="log.id">
-                        <tr class="hover:bg-slate-50/50">
-                            <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-900" x-text="log.phone"></td>
-                            <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-700" x-text="log.code"></td>
+                        <tr class="hover:bg-slate-50/70">
+                            <td class="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-900" x-text="log.phone || '-'"></td>
+                            <td class="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-700" x-text="log.code || '-'"></td>
                             <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-600" x-text="formatPurpose(log.purpose)"></td>
-                            <td class="whitespace-nowrap px-4 py-3">
-                                <span class="inline-flex rounded-full px-2 py-1 text-xs font-medium"
-                                      :class="statusClass(log)">
-                                    <span x-text="statusLabel(log)"></span>
-                                </span>
+                            <td class="whitespace-nowrap px-4 py-3 text-center">
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold" :class="statusClass(log)" x-text="statusLabel(log)"></span>
                             </td>
                             <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-500" x-text="log.verified_at || '-'"></td>
                             <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-500" x-text="log.expires_at || '-'"></td>
@@ -74,28 +105,21 @@
                 </tbody>
             </table>
         </div>
-    </div>
-
-    <div class="mt-4 flex items-center justify-between" x-show="!loading && meta.total > 0">
-        <p class="text-sm text-slate-600">
-            Showing <span x-text="meta.from"></span> to <span x-text="meta.to"></span> of <span x-text="meta.total"></span>
-        </p>
-        <div class="flex items-center gap-2">
-            <button type="button"
-                    @@click="prevPage()"
-                    :disabled="meta.current_page <= 1"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
-                Previous
-            </button>
-            <span class="text-xs text-slate-600">
-                Page <span x-text="meta.current_page"></span> of <span x-text="meta.last_page"></span>
-            </span>
-            <button type="button"
-                    @@click="nextPage()"
-                    :disabled="meta.current_page >= meta.last_page"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
-                Next
-            </button>
+        <div class="border-t border-slate-200/70 bg-slate-50/40 px-4 py-3" x-show="meta.total >= 0">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-sm font-semibold text-slate-600">Showing <span x-text="meta.from || 0"></span> to <span x-text="meta.to || 0"></span> of <span x-text="meta.total || 0"></span></p>
+                <div class="flex items-center gap-3">
+                    <select x-model="perPage" @@change="setPerPage(perPage)" class="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700">
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                    <button type="button" @@click="prevPage()" :disabled="meta.current_page <= 1" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Prev</button>
+                    <span class="text-sm font-bold text-slate-600">Page <span x-text="meta.current_page || 1"></span> of <span x-text="meta.last_page || 1"></span></span>
+                    <button type="button" @@click="nextPage()" :disabled="meta.current_page >= meta.last_page" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -108,80 +132,55 @@ document.addEventListener('alpine:init', () => {
         loading: true,
         search: '',
         purpose: '',
-        meta: {
-            total: 0,
-            per_page: 25,
-            current_page: 1,
-            last_page: 1,
-            from: 0,
-            to: 0,
+        dateFrom: '',
+        dateTo: '',
+        showFilters: false,
+        dateRangePicker: null,
+        perPage: 25,
+        meta: { total: 0, current_page: 1, last_page: 1, from: 0, to: 0 },
+        refreshData() { this.meta.current_page = 1; this.loadData(); },
+        initDateRange() {
+            this.$nextTick(() => window.setupSettingsDateRangePicker?.(this, this.$refs.dateRange, 'dateFrom', 'dateTo', () => this.refreshData()));
         },
-
-        async refreshData() {
-            this.meta.current_page = 1;
-            await this.loadData();
+        clearDateRange() {
+            this.dateFrom = '';
+            this.dateTo = '';
+            if (this.$refs.dateRange) this.$refs.dateRange.value = '';
         },
-
-        async prevPage() {
-            if (this.meta.current_page <= 1) {
-                return;
-            }
-            this.meta.current_page -= 1;
-            await this.loadData();
-        },
-
-        async nextPage() {
-            if (this.meta.current_page >= this.meta.last_page) {
-                return;
-            }
-            this.meta.current_page += 1;
-            await this.loadData();
-        },
-
+        applyFilters() { this.refreshData(); },
+        clearFilters() { this.purpose = ''; this.dateFrom = ''; this.dateTo = ''; this.search = ''; this.clearDateRange(); this.refreshData(); },
+        setPerPage(value) { this.perPage = value; this.meta.current_page = 1; this.loadData(); },
+        prevPage() { if (this.meta.current_page > 1) { this.meta.current_page--; this.loadData(); } },
+        nextPage() { if (this.meta.current_page < this.meta.last_page) { this.meta.current_page++; this.loadData(); } },
         formatPurpose(value) {
             if (!value) return '-';
-            return String(value).split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            return String(value).split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
         },
-
         statusLabel(log) {
             if (log.is_verified) return 'Verified';
             if (log.is_expired) return 'Expired';
             return 'Pending';
         },
-
         statusClass(log) {
             if (log.is_verified) return 'bg-emerald-50 text-emerald-700';
             if (log.is_expired) return 'bg-rose-50 text-rose-700';
             return 'bg-amber-50 text-amber-700';
         },
-
         async loadData() {
             this.loading = true;
             try {
-                const params = new URLSearchParams({
-                    page: this.meta.current_page,
-                    per_page: this.meta.per_page,
-                });
-
-                if (this.search.trim()) {
-                    params.append('search', this.search.trim());
-                }
-                if (this.purpose) {
-                    params.append('purpose', this.purpose);
-                }
-
-                const response = await fetch(window.settingsConfig.otpLogsDataEndpoint + '?' + params.toString(), {
-                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                });
+                const params = new URLSearchParams({ page: this.meta.current_page, per_page: this.perPage });
+                if (this.search.trim()) params.append('search', this.search.trim());
+                if (this.purpose) params.append('purpose', this.purpose);
+                if (this.dateFrom) params.append('date_from', this.dateFrom);
+                if (this.dateTo) params.append('date_to', this.dateTo);
+                const response = await fetch(window.settingsConfig.otpLogsDataEndpoint + '?' + params.toString(), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
                 const result = await response.json();
                 this.logs = Array.isArray(result.data) ? result.data : [];
-                this.meta = {
-                    ...this.meta,
-                    ...(result.meta || {}),
-                };
+                this.meta = { ...this.meta, ...(result.meta || {}) };
             } catch (error) {
-                console.error('Failed to load OTP logs:', error);
                 this.logs = [];
+                console.error('Failed to load OTP logs:', error);
             } finally {
                 this.loading = false;
             }

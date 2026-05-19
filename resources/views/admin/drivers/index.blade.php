@@ -1,356 +1,326 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Driver Management')
+@section('title', 'Riders & Drivers')
 @section('breadcrumb-parent', 'Management')
-@section('breadcrumb-current', 'Drivers')
+@section('breadcrumb-current', 'Riders & Drivers')
 
 @section('content')
 
-<div class="space-y-6" x-data="driversTable" data-drivers-config='@json(["endpoint" => route("admin.drivers.data"), "exportEndpoint" => route("admin.drivers.export"), "storeEndpoint" => route("admin.drivers.store")])'>
-    <!-- Drivers Datatable -->
-    <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">
-        <!-- Card Header -->
-        <div class="px-6 py-5 border-b border-slate-200/50">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100">
-                        <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-lg font-semibold text-slate-900">Drivers</h2>
-                        <p class="mt-0.5 text-sm text-slate-500">Manage driver accounts and assignments</p>
+@php
+    $driversConfig = [
+        'endpoint' => route('admin.drivers.data'),
+        'exportEndpoint' => route('admin.drivers.export'),
+        'storeEndpoint' => route('admin.drivers.store'),
+        'baseEndpoint' => route('admin.drivers.index'),
+        'csrfToken' => csrf_token(),
+    ];
+@endphp
+
+<div class="space-y-5" x-data="driversTable" data-drivers-config='@json($driversConfig)'>
+    <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <button type="button" @@click="clearAccountStatusFilter()" class="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-left shadow-sm transition hover:border-orange-200 hover:bg-orange-50/30 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-orange-100">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 ring-1 ring-slate-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h7.5m-7.5 0H3.375A1.125 1.125 0 0 1 2.25 17.625V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V14.25m-19.5 0V6.375c0-.621.504-1.125 1.125-1.125h11.25c.621 0 1.125.504 1.125 1.125v7.875m-12.375 0h18"/></svg>
+            </div>
+            <div class="min-w-0">
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Total</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="meta.total || 0"></p>
+            </div>
+        </button>
+        <button type="button" @@click="setAccountStatusFilter('active', 'Active')" class="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-left shadow-sm transition hover:border-orange-200 hover:bg-orange-50/30 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-orange-100">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-700 ring-1 ring-orange-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+            </div>
+            <div class="min-w-0">
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Active</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="activeCount()"></p>
+            </div>
+        </button>
+        <button type="button" @@click="setAccountStatusFilter('inactive', 'Inactive')" class="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-left shadow-sm transition hover:border-orange-200 hover:bg-orange-50/30 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-orange-100">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 9v3.75m0 3.75h.008v.008H12V16.5Zm-8.25 3h16.5a1.5 1.5 0 0 0 1.296-2.256L13.296 3.006a1.5 1.5 0 0 0-2.592 0L2.454 17.244A1.5 1.5 0 0 0 3.75 19.5Z"/></svg>
+            </div>
+            <div class="min-w-0">
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Inactive</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="inactiveCount()"></p>
+            </div>
+        </button>
+        <button type="button" @@click="setAvailabilityFilter('available', 'Available')" class="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-left shadow-sm transition hover:border-orange-200 hover:bg-orange-50/30 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-orange-100">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h7.5m-7.5 0H3.375A1.125 1.125 0 0 1 2.25 17.625V7.5h13.5v11.25m0 0h1.5m-1.5 0a1.5 1.5 0 0 1 3 0m-3 0a1.5 1.5 0 0 0 3 0m0 0h1.125c.621 0 1.125-.504 1.125-1.125V13.5h-4.5V9h2.25l3.375 4.5"/></svg>
+            </div>
+            <div class="min-w-0">
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Available</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="availableCount()"></p>
+            </div>
+        </button>
+    </div>
+
+    <div class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-300/30">
+        <div class="border-b border-slate-200/60 px-5 py-4">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h7.5m-7.5 0H3.375A1.125 1.125 0 0 1 2.25 17.625V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V14.25m-19.5 0V6.375c0-.621.504-1.125 1.125-1.125h11.25c.621 0 1.125.504 1.125 1.125v7.875m-12.375 0h18"/></svg>
+                        </div>
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-extrabold text-slate-900">Riders & Drivers</h2>
+                            <p class="truncate text-sm text-slate-500">Manage rider accounts, vehicle details, capabilities, and assignment access.</p>
+                        </div>
                     </div>
                 </div>
-                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="meta.total + ' Total Drivers'">
-                </span>
+                @if(Auth::guard('admin')->user()->hasPermission('drivers.create'))
+                <div class="flex lg:justify-end">
+                    <button type="button" @@click="openAddModal()" class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Add Rider/Driver
+                    </button>
+                </div>
+                @endif
             </div>
         </div>
 
-        <!-- Table Controls -->
-        <div class="p-6 pb-0">
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <!-- Search + Status + Date Range -->
-                <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-                    <div class="relative flex-1 max-w-xs">
-                        <input
-                            type="text"
-                            x-model="search"
-                            @@input.debounce.500ms="loadData()"
-                            placeholder="Search drivers..."
-                            class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400 transition-colors"
-                        >
-                        <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                    </div>
-
-                    <div x-data="{ open: false }" class="relative w-full sm:w-56">
-                        <button
-                            type="button"
-                            @@click="open = !open"
-                            class="w-full inline-flex items-center justify-between px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors"
-                        >
-                            <span x-text="statusFilterName || 'All statuses'"></span>
-                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                            </svg>
-                        </button>
-
-                        <div
-                            x-show="open"
-                            @@click.away="open = false"
-                            x-transition
-                            class="absolute right-0 mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/85 shadow-2xl p-2 z-50 backdrop-blur-xl"
-                            style="display: none;"
-                        >
-                            <button
-                                type="button"
-                                @@click="statusFilter = ''; statusFilterName = 'All statuses'; loadData(); open = false"
-                                class="w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                                :class="statusFilter === '' ? 'bg-white/70 shadow-sm' : ''"
-                            >
-                                <svg x-show="statusFilter === ''" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>All statuses</span>
-                            </button>
-                            <button
-                                type="button"
-                                @@click="statusFilter = 'active'; statusFilterName = 'Active'; loadData(); open = false"
-                                class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                                :class="statusFilter === 'active' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''"
-                            >
-                                <svg x-show="statusFilter === 'active'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>Active</span>
-                            </button>
-                            <button
-                                type="button"
-                                @@click="statusFilter = 'inactive'; statusFilterName = 'Inactive'; loadData(); open = false"
-                                class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70"
-                                :class="statusFilter === 'inactive' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''"
-                            >
-                                <svg x-show="statusFilter === 'inactive'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>Inactive</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                        <div class="relative w-full sm:w-56">
-                            <input
-                                type="text"
-                                x-ref="createdRange"
-                                placeholder="Created date range"
-                                class="w-full pl-10 pr-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 cursor-pointer"
-                                readonly
-                            >
-                            <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M4 11h16M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                            </svg>
-                        </div>
+        <div class="border-b border-slate-100 px-5 py-4">
+            <div class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+                <div class="w-full xl:max-w-md">
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"/></svg>
+                        <input type="text" x-model="search" @@input.debounce.500ms="meta.current_page = 1; loadData()" placeholder="Search name, email, or phone..."
+                               class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                     </div>
                 </div>
-
-                <!-- Right Controls -->
-                <div class="flex flex-wrap items-center justify-end gap-3">
-                    <!-- Customize Columns -->
+                <div class="flex flex-wrap items-center gap-3 xl:justify-end">
+                    <button type="button" @@click="showFilters = !showFilters"
+                            class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            :class="showFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+                        <span x-text="showFilters ? 'Hide Filters' : 'Filters'"></span>
+                    </button>
                     <div x-data="{ open: false }" class="relative">
-                        <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
-                            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/>
-                            </svg>
+                        <button type="button" @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/></svg>
                             View
-                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                            </svg>
                         </button>
-
-                        <div x-show="open" @@click.away="open = false" x-transition
-                             class="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50"
-                             style="display: none;">
+                        <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 z-50 mt-2 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl" style="display:none">
                             <template x-for="col in columns" :key="col.key">
-                                <button type="button" @@click="toggleColumn(col.key)"
-                                        class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70">
+                                <button type="button" @@click="toggleColumn(col.key)" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                                     <span x-text="col.label"></span>
-                                    <svg x-show="visibleColumns[col.key]" class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                    </svg>
+                                    <svg x-show="visibleColumns[col.key]" class="h-4 w-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 </button>
                             </template>
                         </div>
                     </div>
-
-                    <!-- Export -->
                     <div x-data="{ open: false }" class="relative">
-                        <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
-                            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
+                        <button type="button" @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414A1 1 0 0 1 19 9.414V19a2 2 0 0 1-2 2z"/></svg>
                             Export
-                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                            </svg>
                         </button>
-
-                        <div x-show="open" @@click.away="open = false" x-transition
-                             class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50"
-                             style="display: none;">
-                            <button type="button" @@click="exportData('excel'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
-                                Excel
-                            </button>
-                            <button type="button" @@click="exportData('pdf'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                                </svg>
-                                PDF
-                            </button>
-                            <button type="button" @@click="exportData('csv'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
-                                CSV
-                            </button>
-                            <div class="border-t border-slate-200/50 my-1"></div>
-                            <button type="button" @@click="printData(); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                                </svg>
-                                Print
-                            </button>
+                        <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 z-50 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl" style="display:none">
+                            <button type="button" @@click="exportData('excel'); open = false" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Excel</button>
+                            <button type="button" @@click="exportData('pdf'); open = false" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">PDF</button>
+                            <button type="button" @@click="exportData('csv'); open = false" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">CSV</button>
+                            <div class="my-1 border-t border-slate-100"></div>
+                            <button type="button" @@click="printData(); open = false" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Print</button>
                         </div>
                     </div>
-
-                    @if(Auth::guard('admin')->user()->hasPermission('drivers.create'))
-                    <button
-                        type="button"
-                        @@click="openAddModal()"
-                        class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 transition-all shadow-sm"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                        </svg>
-                        Add Driver
-                    </button>
-                    @endif
                 </div>
+            </div>
+
+            <div x-show="showFilters" x-transition class="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4" style="display:none">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Account Status</label>
+                        <select x-model="accountStatusFilter" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All account statuses</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Availability</label>
+                        <select x-model="availabilityFilter" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All availability</option>
+                            <option value="available">Available</option>
+                            <option value="busy">Busy</option>
+                            <option value="offline">Offline</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Capability</label>
+                        <select x-model="capabilityFilter" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All capabilities</option>
+                            <option value="pickup">Pickup</option>
+                            <option value="transport">Transport</option>
+                            <option value="delivery">Delivery</option>
+                            <option value="bus_handoff">Bus Handoff</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Date Range</label>
+                        <input type="text" x-ref="createdRange" placeholder="Select date range" readonly class="w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    </div>
+                </div>
+                <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                    <button type="button" @@click="showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
+                    <button type="button" @@click="clearFilters()" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
+                    <button type="button" @@click="applyFilters()" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">Apply Filters</button>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2" x-show="activeFilterChips().length">
+                <template x-for="chip in activeFilterChips()" :key="chip.key">
+                    <span class="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-700 ring-1 ring-orange-200">
+                        <span x-text="chip.label"></span>
+                        <button type="button" @@click="clearFilter(chip.key)" class="text-orange-500 hover:text-orange-800">&times;</button>
+                    </span>
+                </template>
             </div>
         </div>
 
-        <!-- Table -->
-        <div class="px-6 py-4">
-            <div class="rounded-xl border border-slate-200/50 relative">
-            <!-- Loading overlay -->
-            <div x-show="loading" x-transition.opacity.duration.150ms class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10" style="display: none;"></div>
+        <div class="relative overflow-hidden">
+            <div x-show="loading" x-transition.opacity.duration.150ms class="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px]" style="display: none;"></div>
 
-            <div class="overflow-x-auto">
-            <table class="w-full min-w-[900px] md:min-w-full divide-y divide-slate-200/50 text-xs">
+            <div class="hidden overflow-x-auto lg:block">
+            <table class="min-w-[1180px] w-full table-fixed divide-y divide-slate-200/50 text-xs">
                 <thead class="bg-slate-50/50">
                     <tr>
-                        <th x-show="visibleColumns.name" @@click="sort('name')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                            <div class="flex items-center">
-                                NAME
+                        <th x-show="visibleColumns.name" @@click="sort('name')" class="w-[17%] cursor-pointer px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            <div class="flex items-center gap-1">
+                                Name
                                 <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'name' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
                                 </svg>
                             </div>
                         </th>
-                        <th x-show="visibleColumns.email" @@click="sort('email')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                            <div class="flex items-center">
-                                EMAIL
+                        <th x-show="visibleColumns.email" @@click="sort('email')" class="w-[21%] cursor-pointer px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            <div class="flex items-center gap-1">
+                                Email
                                 <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'email' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
                                 </svg>
                             </div>
                         </th>
-                        <th x-show="visibleColumns.phone" @@click="sort('phone')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                            <div class="flex items-center">
-                                PHONE
+                        <th x-show="visibleColumns.phone" @@click="sort('phone')" class="w-[13%] cursor-pointer px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            <div class="flex items-center gap-1">
+                                Phone
                                 <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'phone' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
                                 </svg>
                             </div>
                         </th>
-                        <th x-show="visibleColumns.vehicle_type" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            VEHICLE TYPE
+                        <th x-show="visibleColumns.capabilities" class="w-[16%] px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            Capabilities
                         </th>
-                        <th x-show="visibleColumns.status" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            STATUS
+                        <th x-show="visibleColumns.vehicle_type" class="w-[12%] px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            Vehicle
                         </th>
-                        <th x-show="visibleColumns.is_active" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            ACTIVE
+                        <th x-show="visibleColumns.status" class="w-[8%] px-4 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            Status
                         </th>
-                        <th x-show="visibleColumns.assignments" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            ASSIGNMENTS
+                        <th x-show="visibleColumns.is_active" class="w-[8%] px-4 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            Active
                         </th>
-                        <th x-show="visibleColumns.created_at" @@click="sort('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                            <div class="flex items-center">
-                                CREATED AT
+                        <th x-show="visibleColumns.assignments" class="w-[7%] px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            Pickups
+                        </th>
+                        <th x-show="visibleColumns.created_at" @@click="sort('created_at')" class="w-[13%] cursor-pointer px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            <div class="flex items-center gap-1">
+                                Created At
                                 <svg class="w-2.5 h-2.5 ml-1" :class="sortBy === 'created_at' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
                                 </svg>
                             </div>
                         </th>
-                        <th x-show="visibleColumns.actions" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            ACTIONS
+                        <th x-show="visibleColumns.actions" class="px-4 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            Actions
                         </th>
                     </tr>
                 </thead>
                 <tbody class="bg-transparent divide-y divide-slate-100/50">
                     <template x-if="drivers.length === 0 && !loading">
                         <tr>
-                            <td :colspan="visibleColumnCount()" class="px-4 py-8 text-center text-gray-500 text-xs">
-                                No drivers found
+                            <td :colspan="visibleColumnCount()" class="px-4 py-10 text-center">
+                                <div class="flex flex-col items-center gap-2">
+                                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+                                        <svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h7.5"/></svg>
+                                    </div>
+                                    <p class="text-sm font-medium text-slate-500">No riders or drivers match the current filters</p>
+                                    <button type="button" @@click="clearFilter('all')" class="text-xs font-semibold text-orange-600 hover:underline">Clear filters</button>
+                                </div>
                             </td>
                         </tr>
                     </template>
 
                     <template x-for="driver in drivers" :key="driver.id">
                         <tr class="hover:bg-slate-50/70">
-                            <td x-show="visibleColumns.name" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="driver.name"></td>
-                            <td x-show="visibleColumns.email" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="driver.email"></td>
-                            <td x-show="visibleColumns.phone" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="driver.phone"></td>
-                            <td x-show="visibleColumns.vehicle_type" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="driver.vehicle_type || '-'"></td>
-                            <td x-show="visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap text-xs">
+                            <td x-show="visibleColumns.name" class="px-4 py-3 align-top">
+                                <a :href="'{{ route('admin.drivers.index') }}/' + driver.id" class="block break-words font-bold leading-5 text-slate-900 hover:text-orange-700 hover:underline" x-text="driver.name"></a>
+                            </td>
+                            <td x-show="visibleColumns.email" class="break-all px-4 py-3 align-top text-slate-600" x-text="driver.email"></td>
+                            <td x-show="visibleColumns.phone" class="whitespace-nowrap px-4 py-3 align-top text-slate-600" x-text="driver.phone"></td>
+                            <td x-show="visibleColumns.capabilities" class="px-4 py-3 align-top">
+                                <div class="flex flex-wrap gap-1.5">
+                                    <template x-for="capability in capabilityList(driver)" :key="capability.value">
+                                        <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-600" x-text="capability.label"></span>
+                                    </template>
+                                </div>
+                            </td>
+                            <td x-show="visibleColumns.vehicle_type" class="px-4 py-3 align-top">
+                                <p class="font-semibold capitalize text-slate-700" x-text="driver.vehicle_type || '-'"></p>
+                                <p class="mt-0.5 text-[10px] text-slate-400" x-text="driver.vehicle_number || 'No plate'"></p>
+                            </td>
+                            <td x-show="visibleColumns.status" class="whitespace-nowrap px-4 py-3 align-top text-center">
                                 <span
-                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                    :class="{
-                                        'bg-emerald-100 text-emerald-700': driver.status === 'available',
-                                        'bg-amber-100 text-amber-700': driver.status === 'busy',
-                                        'bg-slate-100 text-slate-600': driver.status === 'offline'
-                                    }"
-                                    x-text="driver.status ? driver.status.charAt(0).toUpperCase() + driver.status.slice(1) : 'Offline'"
+                                    class="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                                    :class="driverStatusBadgeClass(driver)"
+                                    x-text="driverStatusLabel(driver)"
                                 ></span>
                             </td>
-                            <td x-show="visibleColumns.is_active" class="px-4 py-2.5 whitespace-nowrap text-xs">
+                            <td x-show="visibleColumns.is_active" class="whitespace-nowrap px-4 py-3 align-top text-center">
                                 <span
-                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                    :class="driver.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+                                    class="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                                    :class="activeBadgeClass(driver)"
                                     x-text="driver.is_active ? 'Active' : 'Inactive'"
                                 ></span>
                             </td>
-                            <td x-show="visibleColumns.assignments" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600 text-center" x-text="driver.assignments_count"></td>
-                            <td x-show="visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(driver.created_at)"></td>
-                            <td x-show="visibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center text-xs font-medium">
+                            <td x-show="visibleColumns.assignments" class="whitespace-nowrap px-3 py-3 align-top text-center">
+                                <span class="font-bold text-slate-900" x-text="driver.assignments_count || 0"></span>
+                            </td>
+                            <td x-show="visibleColumns.created_at" class="px-4 py-3 align-top text-slate-600" x-text="formatDateTime(driver.created_at)"></td>
+                            <td x-show="visibleColumns.actions" class="whitespace-nowrap px-4 py-3 align-top text-right">
                                 <div class="inline-flex items-center gap-1">
-                                    <!-- View Button -->
                                     <a
                                         :href="'{{ route('admin.drivers.index') }}/' + driver.id"
-                                        class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                        title="View driver">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                        </svg>
+                                        class="inline-flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-[11px] font-semibold text-orange-700 transition-colors hover:bg-orange-100">
+                                        <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>
+                                        View
                                     </a>
-
-                                    <!-- Edit Button -->
                                     <template x-if="driver.can_manage">
                                         <button
                                             @@click="openEditModal(driver)"
-                                            class="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                                            title="Edit driver">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-                                            </svg>
+                                            class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">
+                                            Edit
                                         </button>
                                     </template>
-
-                                    <!-- Toggle Status Button -->
                                     <template x-if="driver.can_manage">
                                         <button
                                             @@click="toggleDriverStatus(driver)"
-                                            class="p-1.5 rounded-lg transition-colors"
-                                            :class="driver.is_active ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-teal-600 hover:bg-teal-50'"
-                                            :title="driver.is_active ? 'Deactivate driver' : 'Activate driver'">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                                            </svg>
+                                            class="rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold"
+                                            :class="driver.is_active ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'"
+                                            x-text="driver.is_active ? 'Disable' : 'Enable'">
                                         </button>
                                     </template>
-
-                                    <!-- Delete Button -->
                                     <template x-if="driver.can_manage">
                                         <button
                                             @@click="openDeleteModal(driver)"
-                                            class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                            title="Delete driver">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                            </svg>
+                                            class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-100">
+                                            Delete
                                         </button>
                                     </template>
                                 </div>
@@ -360,107 +330,85 @@
                 </tbody>
             </table>
             </div>
+            </div>
 
-            <!-- Pagination -->
-            <div class="px-4 py-2.5 border-t border-slate-200/50 bg-slate-50/30">
-                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div class="text-xs text-slate-600">
-                        Showing
-                        <span x-text="meta.from"></span>
-                        to
-                        <span x-text="meta.to"></span>
-                        of
-                        <span x-text="meta.total"></span>
-                        results
+            <div class="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="text-xs font-semibold text-slate-600">
+                        Showing <span x-text="meta.from || 0"></span> to <span x-text="meta.to || 0"></span> of <span x-text="meta.total || 0"></span>
                     </div>
-
-                    <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
                         <div class="flex items-center gap-2">
-                            <span class="text-xs font-medium text-slate-600">Rows per page</span>
+                            <span class="text-xs font-bold text-slate-600">Rows</span>
                             <div x-data="{ open: false }" class="relative">
-                                <button
-                                    type="button"
-                                    @@click="open = !open"
-                                    class="inline-flex items-center justify-between gap-1.5 px-2.5 py-1 min-w-[60px] border border-slate-200/70 rounded-lg bg-white/70 backdrop-blur-sm text-xs font-medium text-slate-700 hover:bg-white/90 transition-colors"
-                                >
+                                <button type="button" @@click="open = !open" class="inline-flex min-w-16 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-black text-slate-700">
                                     <span x-text="perPage"></span>
-                                    <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                    </svg>
+                                    <svg class="h-3 w-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </button>
-                                <div
-                                    x-show="open"
-                                    @@click.away="open = false"
-                                    x-transition
-                                    class="absolute bottom-full mb-1 right-0 w-16 rounded-lg border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-lg p-1 z-[9999]"
-                                    style="display: none;"
-                                >
-                                    <button type="button" @@click="perPage = 10; loadData(); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 10 ? 'bg-slate-100/70' : ''">10</button>
-                                    <button type="button" @@click="perPage = 25; loadData(); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 25 ? 'bg-slate-100/70' : ''">25</button>
-                                    <button type="button" @@click="perPage = 50; loadData(); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 50 ? 'bg-slate-100/70' : ''">50</button>
-                                    <button type="button" @@click="perPage = 100; loadData(); open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="perPage == 100 ? 'bg-slate-100/70' : ''">100</button>
+                                <div x-show="open" @@click.away="open = false" x-transition class="absolute bottom-full right-0 z-50 mb-1 w-20 rounded-xl border border-slate-200 bg-white p-1 shadow-lg" style="display:none">
+                                    <button type="button" @@click="setPerPage(10); open = false" class="w-full rounded-lg px-2 py-1.5 text-center text-xs font-bold text-slate-700 hover:bg-slate-100" :class="perPage == 10 ? 'bg-slate-100' : ''">10</button>
+                                    <button type="button" @@click="setPerPage(25); open = false" class="w-full rounded-lg px-2 py-1.5 text-center text-xs font-bold text-slate-700 hover:bg-slate-100" :class="perPage == 25 ? 'bg-slate-100' : ''">25</button>
+                                    <button type="button" @@click="setPerPage(50); open = false" class="w-full rounded-lg px-2 py-1.5 text-center text-xs font-bold text-slate-700 hover:bg-slate-100" :class="perPage == 50 ? 'bg-slate-100' : ''">50</button>
+                                    <button type="button" @@click="setPerPage(100); open = false" class="w-full rounded-lg px-2 py-1.5 text-center text-xs font-bold text-slate-700 hover:bg-slate-100" :class="perPage == 100 ? 'bg-slate-100' : ''">100</button>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="text-xs font-medium text-slate-600">
-                            Page
-                            <span x-text="meta.current_page"></span>
-                            of
-                            <span x-text="meta.last_page"></span>
-                        </div>
-
-                        <div class="flex space-x-1">
-                            <button
-                                @@click="firstPage()"
-                                :disabled="meta.current_page === 1"
-                                :class="meta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
-                            >
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/>
-                                </svg>
+                        <div class="flex items-center gap-1">
+                            <button @@click="previousPage()" :disabled="meta.current_page <= 1" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                             </button>
-
-                            <button
-                                @@click="previousPage()"
-                                :disabled="meta.current_page === 1"
-                                :class="meta.current_page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
-                            >
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                                </svg>
-                            </button>
-
-                            <button
-                                @@click="nextPage()"
-                                :disabled="meta.current_page === meta.last_page"
-                                :class="meta.current_page === meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
-                            >
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </button>
-
-                            <button
-                                @@click="lastPage()"
-                                :disabled="meta.current_page === meta.last_page"
-                                :class="meta.current_page === meta.last_page ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors"
-                            >
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/>
-                                </svg>
+                            <div class="px-2 text-xs font-black text-slate-700">Page <span x-text="meta.current_page || 1"></span> / <span x-text="meta.last_page || 1"></span></div>
+                            <button @@click="nextPage()" :disabled="meta.current_page >= meta.last_page" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <div class="divide-y divide-slate-100 lg:hidden">
+                <template x-if="drivers.length === 0 && !loading">
+                    <div class="px-4 py-12 text-center text-sm text-slate-400">No riders or drivers match the current filters.</div>
+                </template>
+                <template x-for="driver in drivers" :key="driver.id">
+                    <div class="p-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <a :href="'{{ route('admin.drivers.index') }}/' + driver.id" class="break-words text-sm font-extrabold text-slate-900 hover:text-orange-700" x-text="driver.name"></a>
+                            </div>
+                            <span class="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold" :class="activeBadgeClass(driver)" x-text="driver.is_active ? 'Active' : 'Inactive'"></span>
+                        </div>
+                        <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                            <div><p class="font-black uppercase tracking-wide text-slate-400">Phone</p><p class="font-bold text-slate-800" x-text="driver.phone || '-'"></p></div>
+                            <div><p class="font-black uppercase tracking-wide text-slate-400">Pickups</p><p class="font-bold text-slate-800" x-text="driver.assignments_count || 0"></p></div>
+                            <div><p class="font-black uppercase tracking-wide text-slate-400">Vehicle</p><p class="font-bold capitalize text-slate-800" x-text="driver.vehicle_type || '-'"></p></div>
+                            <div><p class="font-black uppercase tracking-wide text-slate-400">Status</p><p class="font-bold text-slate-800" x-text="driverStatusLabel(driver)"></p></div>
+                            <div class="col-span-2"><p class="font-black uppercase tracking-wide text-slate-400">Email</p><p class="break-words font-bold text-slate-800" x-text="driver.email || '-'"></p></div>
+                            <div class="col-span-2">
+                                <p class="font-black uppercase tracking-wide text-slate-400">Capabilities</p>
+                                <div class="mt-1 flex flex-wrap gap-1.5">
+                                    <template x-for="capability in capabilityList(driver)" :key="capability.value">
+                                        <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-600" x-text="capability.label"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <a :href="'{{ route('admin.drivers.index') }}/' + driver.id" class="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700">View</a>
+                            <template x-if="driver.can_manage">
+                                <button @@click="openEditModal(driver)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">Edit</button>
+                            </template>
+                            <template x-if="driver.can_manage">
+                                <button @@click="toggleDriverStatus(driver)" class="rounded-lg border px-3 py-2 text-xs font-bold" :class="driver.is_active ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-orange-200 bg-orange-50 text-orange-700'" x-text="driver.is_active ? 'Disable' : 'Enable'"></button>
+                            </template>
+                            <template x-if="driver.can_manage">
+                                <button @@click="openDeleteModal(driver)" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">Delete</button>
+                            </template>
+                        </div>
+                    </div>
+                </template>
             </div>
         </div>
-    </div>
 
     <!-- Add/Edit Modal -->
     <div
@@ -491,14 +439,14 @@
                 x-transition:leave-start="opacity-100 scale-100"
                 x-transition:leave-end="opacity-0 scale-95"
                 @click.stop
-                class="relative w-full max-w-lg bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50"
+                class="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl"
             >
-                <!-- Header with Gradient -->
-                <div class="relative bg-gradient-to-r from-slate-50 to-slate-100/50 px-6 py-5 border-b border-slate-200/50 rounded-t-2xl">
+                <!-- Header -->
+                <div class="relative border-b border-slate-200 px-6 py-5">
                     <div class="flex items-start justify-between">
                         <div class="flex items-start gap-4">
                             <!-- Icon Badge -->
-                            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center shadow-lg shadow-slate-900/20">
+                            <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -506,12 +454,12 @@
                             </div>
                             <!-- Title & Description -->
                             <div>
-                                <h3 class="text-xl font-bold text-slate-900" x-text="modalMode === 'add' ? 'Add New Driver' : (modalMode === 'edit' ? 'Edit Driver' : 'View Driver')"></h3>
-                                <p class="text-sm text-slate-500 mt-1" x-text="modalMode === 'add' ? 'Create a new driver account with contact details' : (modalMode === 'edit' ? 'Update driver information and settings' : 'View driver account details')"></p>
+                                <h3 class="text-xl font-bold text-slate-900" x-text="modalMode === 'add' ? 'Add Rider/Driver' : (modalMode === 'edit' ? 'Edit Rider/Driver' : 'View Rider/Driver')"></h3>
+                                <p class="text-sm text-slate-500 mt-1" x-text="modalMode === 'add' ? 'Create a rider or driver account with contact details' : (modalMode === 'edit' ? 'Update rider/driver information and settings' : 'View rider/driver account details')"></p>
                             </div>
                         </div>
                         <!-- Close Button -->
-                        <button @click="closeModal()" class="flex-shrink-0 rounded-xl p-2 text-slate-400 hover:bg-white hover:text-slate-700 transition-all shadow-sm">
+                        <button @click="closeModal()" class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
@@ -525,7 +473,7 @@
                             <!-- Name -->
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                    Driver Name <span class="text-rose-500">*</span>
+                                    Name <span class="text-rose-500">*</span>
                                 </label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -537,7 +485,7 @@
                                         type="text"
                                         x-model="form.name"
                                         :disabled="modalMode === 'view'"
-                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         placeholder="John Doe"
                                         required
                                     >
@@ -569,7 +517,7 @@
                                             type="email"
                                             x-model="form.email"
                                             :disabled="modalMode === 'view'"
-                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                             placeholder="driver@example.com"
                                             required
                                         >
@@ -599,7 +547,7 @@
                                             type="text"
                                             x-model="form.phone"
                                             :disabled="modalMode === 'view'"
-                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                             placeholder="+233 24 123 4567"
                                             required
                                         >
@@ -631,7 +579,7 @@
                                         type="password"
                                         x-model="form.password"
                                         :disabled="modalMode === 'view'"
-                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         :placeholder="modalMode === 'edit' ? 'Leave blank to keep current' : 'Enter password'"
                                         :required="modalMode === 'add'"
                                     >
@@ -663,7 +611,7 @@
                                             type="text"
                                             x-model="form.vehicle_type"
                                             :disabled="modalMode === 'view'"
-                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                             placeholder="Motorcycle"
                                         >
                                     </div>
@@ -686,7 +634,7 @@
                                         type="text"
                                         x-model="form.vehicle_number"
                                         :disabled="modalMode === 'view'"
-                                        class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                        class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         placeholder="GR-1234-21"
                                     >
                                     <template x-if="errors.vehicle_number">
@@ -708,7 +656,7 @@
                                         type="text"
                                         x-model="form.license_number"
                                         :disabled="modalMode === 'view'"
-                                        class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                        class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         placeholder="DL-123456"
                                     >
                                     <template x-if="errors.license_number">
@@ -726,8 +674,8 @@
                             <div class="bg-slate-50/50 rounded-2xl p-5 border border-slate-200">
                                 <div class="flex items-center justify-between gap-3 mb-3">
                                     <div>
-                                        <h4 class="text-sm font-bold text-slate-800">Driver Capabilities</h4>
-                                        <p class="text-xs text-slate-500">Select what this driver is allowed to handle.</p>
+                                        <h4 class="text-sm font-bold text-slate-800">Assignment Capabilities</h4>
+                                        <p class="text-xs text-slate-500">Select what this person is allowed to handle.</p>
                                     </div>
                                     <span class="text-xs font-semibold text-slate-600" x-text="(form.task_capabilities || []).length + ' selected'"></span>
                                 </div>
@@ -738,7 +686,7 @@
                                                value="pickup"
                                                x-model="form.task_capabilities"
                                                :disabled="modalMode === 'view'"
-                                               class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500">
+                                               class="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
                                         <span class="text-sm font-medium text-slate-700">Pickup</span>
                                     </label>
                                     <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
@@ -746,7 +694,7 @@
                                                value="transport"
                                                x-model="form.task_capabilities"
                                                :disabled="modalMode === 'view'"
-                                               class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500">
+                                               class="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
                                         <span class="text-sm font-medium text-slate-700">Transport</span>
                                     </label>
                                     <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
@@ -754,7 +702,7 @@
                                                value="delivery"
                                                x-model="form.task_capabilities"
                                                :disabled="modalMode === 'view'"
-                                               class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500">
+                                               class="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
                                         <span class="text-sm font-medium text-slate-700">Delivery</span>
                                     </label>
                                     <label class="flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50/40 px-3 py-2">
@@ -781,21 +729,21 @@
                             <div x-show="modalMode !== 'view'" class="bg-slate-50/50 rounded-2xl p-5 border border-slate-200">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-                                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100 flex items-center justify-center shadow-sm">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </svg>
                                         </div>
                                         <div>
                                             <h4 class="text-sm font-bold text-slate-800">Account Status</h4>
-                                            <p class="text-xs text-slate-500" x-text="form.is_active ? 'Driver can accept assignments' : 'Driver access disabled'"></p>
+                                            <p class="text-xs text-slate-500" x-text="form.is_active ? 'Can accept assignments' : 'Account access disabled'"></p>
                                         </div>
                                     </div>
                                     <button
                                         type="button"
                                         @@click="form.is_active = !form.is_active"
-                                        :class="form.is_active ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-slate-300'"
-                                        class="relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 shadow-sm"
+                                        :class="form.is_active ? 'bg-orange-600' : 'bg-slate-300'"
+                                        class="relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-orange-100 focus:ring-offset-2 shadow-sm"
                                     >
                                         <span
                                             :class="form.is_active ? 'translate-x-7' : 'translate-x-0'"
@@ -809,9 +757,9 @@
                             <template x-if="modalMode === 'view'">
                                 <div class="grid grid-cols-2 gap-4">
                                     <!-- Status Card -->
-                                    <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-100">
+                                    <div class="rounded-xl border border-orange-100 bg-orange-50 p-4">
                                         <div class="flex items-center gap-2 mb-2">
-                                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </svg>
                                             <span class="text-xs font-bold text-slate-700">Account Status</span>
@@ -828,7 +776,7 @@
                         </div>
 
                         <!-- Footer -->
-                        <div class="flex items-center justify-between gap-3 border-t border-slate-200/50 bg-gradient-to-r from-slate-50/50 to-slate-100/30 px-6 py-5 rounded-b-2xl">
+                        <div class="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-6 py-5">
                             <p class="text-xs text-slate-500">
                                 <span class="text-rose-500">*</span> Required fields
                             </p>
@@ -844,7 +792,7 @@
                                     x-show="modalMode !== 'view'"
                                     type="submit"
                                     :disabled="saving"
-                                    class="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-slate-700 to-slate-900 hover:from-slate-800 hover:to-slate-950 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-slate-900/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                                    class="inline-flex items-center gap-2 px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-orange-600/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                                 >
                                     <svg x-show="saving" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -853,7 +801,7 @@
                                     <svg x-show="!saving" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                     </svg>
-                                    <span x-text="saving ? 'Saving...' : (modalMode === 'add' ? 'Create Driver' : 'Save Changes')"></span>
+                                    <span x-text="saving ? 'Saving...' : (modalMode === 'add' ? 'Create Rider/Driver' : 'Save Changes')"></span>
                                 </button>
                             </div>
                         </div>
@@ -861,7 +809,6 @@
                 </div>
             </div>
         </div>
-    </div>
 
     <!-- Delete Confirmation Modal -->
     <div
@@ -878,7 +825,7 @@
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
-             class="fixed inset-0 bg-slate-600/60 backdrop-blur-[2px]"
+             class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
              @click="$store.driversDelete.show = false"></div>
 
         <!-- Modal Content -->
@@ -892,17 +839,17 @@
                 x-transition:leave-start="opacity-100 scale-100"
                 x-transition:leave-end="opacity-0 scale-95"
                 @click.stop
-                class="relative w-full max-w-lg bg-white rounded-2xl shadow-[0_18px_45px_rgba(15,23,42,0.28)] border border-slate-200/80 overflow-hidden"
+                class="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl"
             >
                 <div class="px-6 py-5">
                     <div class="flex items-start gap-4">
-                        <div class="flex-shrink-0 w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center">
+                        <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 ring-1 ring-rose-100">
                             <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-slate-900">Delete Driver</h3>
+                            <h3 class="text-lg font-semibold text-slate-900">Delete Rider/Driver</h3>
                             <p class="mt-1.5 text-sm text-slate-500 leading-relaxed">
                                 Are you sure you want to delete
                                 <span class="font-semibold text-slate-800" x-text="$store.driversDelete.driver?.name"></span>?
@@ -912,11 +859,11 @@
                     </div>
                 </div>
 
-                <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-5">
+                <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-5">
                     <button
                         type="button"
                         @click="$store.driversDelete.show = false"
-                        class="text-sm font-medium text-slate-600 hover:text-slate-800"
+                        class="rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                     >
                         Cancel
                     </button>
@@ -924,7 +871,7 @@
                         type="button"
                         @click="$store.driversDelete.onConfirm && $store.driversDelete.onConfirm()"
                         :disabled="$store.driversDelete.deleting"
-                        class="inline-flex items-center justify-center px-6 py-2.5 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-full shadow-lg shadow-rose-600/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="inline-flex items-center justify-center rounded-xl bg-rose-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-rose-600/20 transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <span x-show="$store.driversDelete.deleting">Deleting...</span>
                         <span x-show="!$store.driversDelete.deleting">Delete</span>

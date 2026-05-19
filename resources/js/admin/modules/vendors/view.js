@@ -22,8 +22,15 @@ function vendorShow() {
             data: [],
             meta: { current_page: 1, from: 0, to: 0, total: 0, last_page: 1 },
             loading: false,
+            showFilters: false,
             search: '',
             status: '',
+            statusName: 'All Statuses',
+            dateFrom: '',
+            dateTo: '',
+            recipientPhone: '',
+            location: '',
+            packageCount: '',
             page: 1,
             perPage: 10,
             sortBy: 'created_at',
@@ -46,13 +53,41 @@ function vendorShow() {
             },
         },
 
+        // Packages state
+        packages: {
+            data: [],
+            meta: { current_page: 1, from: 0, to: 0, total: 0, last_page: 1 },
+            loading: false,
+            showFilters: false,
+            search: '',
+            status: '',
+            statusName: 'All Statuses',
+            dateFrom: '',
+            dateTo: '',
+            deliveryMethod: '',
+            recipientPhone: '',
+            location: '',
+            quantityMin: '',
+            quantityMax: '',
+            page: 1,
+            perPage: 10,
+            sortBy: 'created_at',
+            sortDirection: 'desc',
+        },
+
         // Activity logs state
         activity: {
             data: [],
             meta: { current_page: 1, from: 0, to: 0, total: 0, last_page: 1 },
             loading: false,
+            showFilters: false,
             search: '',
             action: '',
+            actionName: 'All Actions',
+            dateFrom: '',
+            dateTo: '',
+            deviceType: '',
+            ipAddress: '',
             page: 1,
             perPage: 10,
             sortBy: 'created_at',
@@ -78,7 +113,14 @@ function vendorShow() {
             data: [],
             meta: { current_page: 1, from: 0, to: 0, total: 0, last_page: 1 },
             loading: false,
+            showFilters: false,
             purpose: '',
+            purposeName: 'All Purposes',
+            status: '',
+            dateFrom: '',
+            dateTo: '',
+            expiresFrom: '',
+            expiresTo: '',
             page: 1,
             perPage: 10,
             sortBy: 'created_at',
@@ -101,6 +143,48 @@ function vendorShow() {
             },
         },
 
+        payouts: {
+            data: [],
+            meta: { current_page: 1, from: 0, to: 0, total: 0, last_page: 1 },
+            loading: false,
+            showFilters: false,
+            search: '',
+            status: '',
+            method: '',
+            page: 1,
+            perPage: 10,
+            summary: {
+                total_earned: 0,
+                available_balance: 0,
+                total_paid: 0,
+                pending_payout: 0,
+                last_payout_amount: 0,
+                last_payout_at: null,
+                min_payout: 0,
+                can_request_payout: false,
+            },
+        },
+
+        showPayoutModal: false,
+        payoutSaving: false,
+        payoutForm: {
+            amount: '',
+            payment_method: 'momo',
+            payment_phone: '',
+            payment_reference: '',
+            notes: '',
+            confirm_immediately: true,
+        },
+        showMarkSentModal: false,
+        markSentSaving: false,
+        markSentPayout: null,
+        markSentForm: {
+            payment_reference: '',
+        },
+        showConfirmPayoutModal: false,
+        confirmPayoutSaving: false,
+        confirmPayoutTarget: null,
+
         // Edit modal state
         showEditModal: false,
         saving: false,
@@ -120,7 +204,31 @@ function vendorShow() {
             this.vendor = this.config.vendor;
             this.canManage = this.config.canManage;
             this.statuses = this.config.statuses;
-            this.loadShipments();
+            this.payouts.summary = this.config.payoutSummary || this.payouts.summary;
+            this.activeTab = this.validTabFromUrl();
+            this.loadTab(this.activeTab);
+            this.$nextTick(() => this.initDateRanges());
+        },
+
+        validTabFromUrl() {
+            const validTabs = ['shipments', 'packages', 'activity', 'otp', 'payouts'];
+            const tab = new URLSearchParams(window.location.search).get('tab');
+            return validTabs.includes(tab) ? tab : 'shipments';
+        },
+
+        setActiveTab(tab) {
+            const validTabs = ['shipments', 'packages', 'activity', 'otp', 'payouts'];
+            if (!validTabs.includes(tab)) return;
+
+            this.activeTab = tab;
+            const url = new URL(window.location.href);
+            if (tab === 'shipments') {
+                url.searchParams.delete('tab');
+            } else {
+                url.searchParams.set('tab', tab);
+            }
+            window.history.pushState({}, '', url.toString());
+            this.loadTab(tab);
         },
 
         // ── Sort helpers ──────────────────────────────────────────
@@ -166,12 +274,286 @@ function vendorShow() {
             return Object.values(this[tab].visibleColumns).filter(Boolean).length;
         },
 
+        setShipmentStatus(value, label) {
+            this.shipments.status = value;
+            this.shipments.statusName = label;
+            this.shipments.page = 1;
+            this.loadShipments();
+        },
+
+        setPackageStatus(value, label) {
+            this.packages.status = value;
+            this.packages.statusName = label;
+            this.packages.page = 1;
+            this.loadPackages();
+        },
+
+        setActivityAction(value, label) {
+            this.activity.action = value;
+            this.activity.actionName = label;
+            this.activity.page = 1;
+            this.loadActivityLogs();
+        },
+
+        setOtpPurpose(value, label) {
+            this.otp.purpose = value;
+            this.otp.purposeName = label;
+            this.otp.page = 1;
+            this.loadOtpLogs();
+        },
+
+        applyTabFilters(tab) {
+            this[tab].page = 1;
+            this.loadTab(tab);
+        },
+
+        clearTabFilters(tab) {
+            const resetters = {
+                shipments: () => {
+                    this.shipments.status = '';
+                    this.shipments.statusName = 'All Statuses';
+                    this.clearDateRange('shipments');
+                    this.shipments.recipientPhone = '';
+                    this.shipments.location = '';
+                    this.shipments.packageCount = '';
+                },
+                packages: () => {
+                    this.packages.status = '';
+                    this.packages.statusName = 'All Statuses';
+                    this.clearDateRange('packages');
+                    this.packages.deliveryMethod = '';
+                    this.packages.recipientPhone = '';
+                    this.packages.location = '';
+                    this.packages.quantityMin = '';
+                    this.packages.quantityMax = '';
+                },
+                activity: () => {
+                    this.activity.action = '';
+                    this.activity.actionName = 'All Actions';
+                    this.clearDateRange('activity');
+                    this.activity.deviceType = '';
+                    this.activity.ipAddress = '';
+                },
+                otp: () => {
+                    this.otp.purpose = '';
+                    this.otp.purposeName = 'All Purposes';
+                    this.otp.status = '';
+                    this.clearDateRange('otp');
+                    this.clearDateRange('otpExpires', 'otp', 'expiresFrom', 'expiresTo');
+                },
+                payouts: () => {
+                    this.payouts.status = '';
+                    this.payouts.method = '';
+                },
+            };
+
+            resetters[tab]?.();
+            this[tab].page = 1;
+            this.loadTab(tab);
+        },
+
+        loadTab(tab) {
+            const loaders = {
+                shipments: () => this.loadShipments(),
+                packages: () => this.loadPackages(),
+                activity: () => this.loadActivityLogs(),
+                otp: () => this.loadOtpLogs(),
+                payouts: () => this.loadPayouts(),
+            };
+
+            loaders[tab]?.();
+        },
+
+        activeFilterChips(tab) {
+            const tabState = this[tab];
+            const chips = [];
+            const add = (key, label, value) => {
+                if (value !== undefined && value !== null && value !== '') chips.push({ key, label });
+            };
+
+            if (tab === 'shipments') {
+                add('status', `Status: ${tabState.statusName}`, tabState.status);
+                add('dateRange', `Created: ${this.dateRangeLabel(tabState.dateFrom, tabState.dateTo)}`, tabState.dateFrom || tabState.dateTo);
+                add('recipientPhone', `Phone: ${tabState.recipientPhone}`, tabState.recipientPhone);
+                add('location', `Location: ${tabState.location}`, tabState.location);
+                add('packageCount', `Packages: ${this.packageCountLabel(tabState.packageCount)}`, tabState.packageCount);
+            } else if (tab === 'packages') {
+                add('status', `Status: ${tabState.statusName}`, tabState.status);
+                add('dateRange', `Created: ${this.dateRangeLabel(tabState.dateFrom, tabState.dateTo)}`, tabState.dateFrom || tabState.dateTo);
+                add('deliveryMethod', `Method: ${this.deliveryMethodLabel(tabState.deliveryMethod)}`, tabState.deliveryMethod);
+                add('recipientPhone', `Phone: ${tabState.recipientPhone}`, tabState.recipientPhone);
+                add('location', `Location: ${tabState.location}`, tabState.location);
+                add('quantityMin', `Min qty: ${tabState.quantityMin}`, tabState.quantityMin);
+                add('quantityMax', `Max qty: ${tabState.quantityMax}`, tabState.quantityMax);
+            } else if (tab === 'activity') {
+                add('action', `Action: ${tabState.actionName}`, tabState.action);
+                add('dateRange', `Activity: ${this.dateRangeLabel(tabState.dateFrom, tabState.dateTo)}`, tabState.dateFrom || tabState.dateTo);
+                add('deviceType', `Device: ${this.deviceTypeLabel(tabState.deviceType)}`, tabState.deviceType);
+                add('ipAddress', `IP: ${tabState.ipAddress}`, tabState.ipAddress);
+            } else if (tab === 'otp') {
+                add('purpose', `Purpose: ${tabState.purposeName}`, tabState.purpose);
+                add('status', `Status: ${this.otpStatusLabel(tabState.status)}`, tabState.status);
+                add('dateRange', `Created: ${this.dateRangeLabel(tabState.dateFrom, tabState.dateTo)}`, tabState.dateFrom || tabState.dateTo);
+                add('expiresRange', `Expires: ${this.dateRangeLabel(tabState.expiresFrom, tabState.expiresTo)}`, tabState.expiresFrom || tabState.expiresTo);
+            } else if (tab === 'payouts') {
+                add('status', `Status: ${this.payoutStatusLabel(tabState.status)}`, tabState.status);
+                add('method', `Method: ${this.payoutMethodLabel(tabState.method)}`, tabState.method);
+            }
+
+            return chips;
+        },
+
+        clearFilter(tab, key) {
+            const tabState = this[tab];
+            const labelResetters = {
+                shipments: { status: () => { tabState.statusName = 'All Statuses'; } },
+                packages: { status: () => { tabState.statusName = 'All Statuses'; } },
+                activity: { action: () => { tabState.actionName = 'All Actions'; } },
+                otp: { purpose: () => { tabState.purposeName = 'All Purposes'; } },
+            };
+
+            if (key === 'dateRange') {
+                this.clearDateRange(tab);
+            } else if (key === 'expiresRange' && tab === 'otp') {
+                this.clearDateRange('otpExpires', 'otp', 'expiresFrom', 'expiresTo');
+            } else {
+                tabState[key] = '';
+            }
+            labelResetters[tab]?.[key]?.();
+            tabState.page = 1;
+            this.loadTab(tab);
+        },
+
+        dateRangeLabel(from, to) {
+            return `${from || '...'} - ${to || '...'}`;
+        },
+
+        initDateRanges() {
+            const setupPicker = () => {
+                this.setupDateRangePicker(this.$refs.shipmentsCreatedRange, 'shipments');
+                this.setupDateRangePicker(this.$refs.packagesCreatedRange, 'packages');
+                this.setupDateRangePicker(this.$refs.activityCreatedRange, 'activity');
+                this.setupDateRangePicker(this.$refs.otpCreatedRange, 'otp');
+                this.setupDateRangePicker(this.$refs.otpExpiresRange, 'otpExpires', 'otp', 'expiresFrom', 'expiresTo');
+            };
+
+            if (window.$ && window.moment && window.$.fn.daterangepicker) {
+                setupPicker();
+                return;
+            }
+
+            const cssId = 'daterangepicker-css';
+            if (!document.getElementById(cssId)) {
+                const link = document.createElement('link');
+                link.id = cssId;
+                link.rel = 'stylesheet';
+                link.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
+                document.head.appendChild(link);
+            }
+
+            const loadScript = (id, src) => new Promise((resolve) => {
+                if (document.getElementById(id)) return resolve();
+                const script = document.createElement('script');
+                script.id = id;
+                script.src = src;
+                script.onload = () => resolve();
+                document.body.appendChild(script);
+            });
+
+            loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
+                .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
+                .then(() => {
+                    window.$ = window.jQuery = window.jQuery || window.$;
+                    window.moment = window.moment || moment;
+                    return loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js');
+                })
+                .then(setupPicker);
+        },
+
+        setupDateRangePicker(input, refKey, stateKey = refKey, fromField = 'dateFrom', toField = 'dateTo') {
+            if (!input || !window.$ || !window.moment || !window.$.fn.daterangepicker) return;
+            if (this[`${refKey}RangePicker`]) return;
+
+            const $input = window.$(input);
+            $input.daterangepicker({
+                autoUpdateInput: false,
+                alwaysShowCalendars: true,
+                opens: 'left',
+                locale: { format: 'YYYY-MM-DD', cancelLabel: 'Clear' },
+                ranges: {
+                    'Today': [window.moment(), window.moment()],
+                    'Yesterday': [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
+                    'Last 7 Days': [window.moment().subtract(6, 'days'), window.moment()],
+                    'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
+                    'This Month': [window.moment().startOf('month'), window.moment().endOf('month')],
+                    'Last Month': [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
+                },
+            });
+
+            $input.on('apply.daterangepicker', (ev, picker) => {
+                this[stateKey][fromField] = picker.startDate.format('YYYY-MM-DD');
+                this[stateKey][toField] = picker.endDate.format('YYYY-MM-DD');
+                $input.val(`${this[stateKey][fromField]} - ${this[stateKey][toField]}`);
+                this[stateKey].page = 1;
+                this.loadTab(stateKey);
+            });
+
+            $input.on('cancel.daterangepicker', () => {
+                this.clearDateRange(refKey, stateKey, fromField, toField);
+                this[stateKey].page = 1;
+                this.loadTab(stateKey);
+            });
+
+            this[`${refKey}RangePicker`] = $input.data('daterangepicker');
+        },
+
+        clearDateRange(refKey, stateKey = refKey, fromField = 'dateFrom', toField = 'dateTo') {
+            if (!this[stateKey]) return;
+            this[stateKey][fromField] = '';
+            this[stateKey][toField] = '';
+
+            const input = {
+                shipments: this.$refs.shipmentsCreatedRange,
+                packages: this.$refs.packagesCreatedRange,
+                activity: this.$refs.activityCreatedRange,
+                otp: this.$refs.otpCreatedRange,
+                otpExpires: this.$refs.otpExpiresRange,
+            }[refKey];
+
+            if (input && window.$) {
+                window.$(input).val('');
+            }
+        },
+
+        packageCountLabel(value) {
+            return ({ one: 'One package', multiple: 'Multiple packages' })[value] || value;
+        },
+
+        deliveryMethodLabel(value) {
+            return ({ direct: 'Recipient delivery', bus_handoff: 'Bus handoff', pickup: 'Self pickup' })[value] || value;
+        },
+
+        deviceTypeLabel(value) {
+            return ({ mobile: 'Mobile', web: 'Web', desktop: 'Desktop' })[value] || value;
+        },
+
+        otpStatusLabel(value) {
+            return ({ verified: 'Verified', expired: 'Expired', pending: 'Pending' })[value] || value;
+        },
+
+        payoutMethodLabel(value) {
+            return ({ momo: 'MOMO', bank: 'Bank', cash: 'Cash' })[value] || value;
+        },
+
         // ── Pagination helpers ──────────────────────────────────────
         shipmentsFirstPage()    { this.shipments.page = 1; this.loadShipments(); },
         shipmentsPrevPage()     { if (this.shipments.page > 1) { this.shipments.page--; this.loadShipments(); } },
         shipmentsNextPage()     { if (this.shipments.page < this.shipments.meta.last_page) { this.shipments.page++; this.loadShipments(); } },
         shipmentsLastPage()     { this.shipments.page = this.shipments.meta.last_page; this.loadShipments(); },
         setShipmentsPerPage(n)  { this.shipments.perPage = n; this.shipments.page = 1; this.loadShipments(); },
+
+        packagesPrevPage()      { if (this.packages.page > 1) { this.packages.page--; this.loadPackages(); } },
+        packagesNextPage()      { if (this.packages.page < this.packages.meta.last_page) { this.packages.page++; this.loadPackages(); } },
 
         activityFirstPage()     { this.activity.page = 1; this.loadActivityLogs(); },
         activityPrevPage()      { if (this.activity.page > 1) { this.activity.page--; this.loadActivityLogs(); } },
@@ -185,6 +567,9 @@ function vendorShow() {
         otpLastPage()           { this.otp.page = this.otp.meta.last_page; this.loadOtpLogs(); },
         setOtpPerPage(n)        { this.otp.perPage = n; this.otp.page = 1; this.loadOtpLogs(); },
 
+        payoutsPrevPage()       { if (this.payouts.page > 1) { this.payouts.page--; this.loadPayouts(); } },
+        payoutsNextPage()       { if (this.payouts.page < this.payouts.meta.last_page) { this.payouts.page++; this.loadPayouts(); } },
+
         // ── Data loaders ──────────────────────────────────────────
         async loadShipments() {
             this.shipments.loading = true;
@@ -194,6 +579,11 @@ function vendorShow() {
                     per_page: this.shipments.perPage,
                     search: this.shipments.search,
                     status: this.shipments.status,
+                    date_from: this.shipments.dateFrom,
+                    date_to: this.shipments.dateTo,
+                    recipient_phone: this.shipments.recipientPhone,
+                    location: this.shipments.location,
+                    package_count: this.shipments.packageCount,
                     sort: this.shipments.sortBy,
                     direction: this.shipments.sortDirection,
                 });
@@ -210,6 +600,42 @@ function vendorShow() {
             }
         },
 
+        async loadPackages() {
+            this.packages.loading = true;
+            try {
+                const params = new URLSearchParams({
+                    page: this.packages.page,
+                    per_page: this.packages.perPage,
+                    search: this.packages.search,
+                    status: this.packages.status,
+                    date_from: this.packages.dateFrom,
+                    date_to: this.packages.dateTo,
+                    delivery_method: this.packages.deliveryMethod,
+                    recipient_phone: this.packages.recipientPhone,
+                    location: this.packages.location,
+                    quantity_min: this.packages.quantityMin,
+                    quantity_max: this.packages.quantityMax,
+                    sort: this.packages.sortBy,
+                    direction: this.packages.sortDirection,
+                });
+
+                const response = await fetch(`${this.config.packagesEndpoint}?${params}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                const data = await response.json();
+
+                this.packages.data = data.data || [];
+                this.packages.meta = data.meta || this.packages.meta;
+            } catch (error) {
+                console.error('Failed to load packages:', error);
+            } finally {
+                this.packages.loading = false;
+            }
+        },
+
         async loadActivityLogs() {
             this.activity.loading = true;
             try {
@@ -218,6 +644,10 @@ function vendorShow() {
                     per_page: this.activity.perPage,
                     search: this.activity.search,
                     action: this.activity.action,
+                    date_from: this.activity.dateFrom,
+                    date_to: this.activity.dateTo,
+                    device_type: this.activity.deviceType,
+                    ip_address: this.activity.ipAddress,
                     sort: this.activity.sortBy,
                     direction: this.activity.sortDirection,
                 });
@@ -241,6 +671,11 @@ function vendorShow() {
                     page: this.otp.page,
                     per_page: this.otp.perPage,
                     purpose: this.otp.purpose,
+                    status: this.otp.status,
+                    date_from: this.otp.dateFrom,
+                    date_to: this.otp.dateTo,
+                    expires_from: this.otp.expiresFrom,
+                    expires_to: this.otp.expiresTo,
                     sort: this.otp.sortBy,
                     direction: this.otp.sortDirection,
                 });
@@ -255,6 +690,162 @@ function vendorShow() {
             } finally {
                 this.otp.loading = false;
             }
+        },
+
+        async loadPayouts() {
+            this.payouts.loading = true;
+            try {
+                const params = new URLSearchParams({
+                    page: this.payouts.page,
+                    per_page: this.payouts.perPage,
+                    search: this.payouts.search,
+                    status: this.payouts.status,
+                    method: this.payouts.method,
+                });
+
+                const response = await fetch(`${this.config.payoutsEndpoint}?${params}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                const data = await response.json();
+
+                this.payouts.data = data.data || [];
+                this.payouts.meta = data.meta || this.payouts.meta;
+            } catch (error) {
+                console.error('Failed to load payouts:', error);
+            } finally {
+                this.payouts.loading = false;
+            }
+        },
+
+        openPayoutModal() {
+            if (!this.payouts.summary.can_request_payout) return;
+            this.payoutForm = {
+                amount: this.payouts.summary.available_balance || '',
+                payment_method: 'momo',
+                payment_phone: this.vendor.phone || '',
+                payment_reference: '',
+                notes: '',
+                confirm_immediately: true,
+            };
+            this.showPayoutModal = true;
+        },
+
+        closePayoutModal() {
+            this.showPayoutModal = false;
+            this.payoutSaving = false;
+        },
+
+        async submitPayout() {
+            this.payoutSaving = true;
+            try {
+                const response = await fetch(this.config.createPayoutEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify(this.payoutForm),
+                });
+                const data = await response.json();
+                if (!response.ok || data.success === false) throw new Error(data.message || 'Failed to create payout');
+                if (window.showToast) window.showToast(data.message || 'Vendor paid successfully.', 'success');
+                this.closePayoutModal();
+                await this.refreshPayoutSummary();
+                this.loadPayouts();
+            } catch (error) {
+                if (window.showToast) window.showToast(error.message || 'Failed to create payout.', 'error');
+            } finally {
+                this.payoutSaving = false;
+            }
+        },
+
+        async refreshPayoutSummary() {
+            window.location.reload();
+        },
+
+        openMarkSentModal(payout) {
+            this.markSentPayout = payout;
+            this.markSentForm.payment_reference = payout.payment_reference || '';
+            this.showMarkSentModal = true;
+        },
+
+        async submitMarkSent() {
+            if (!this.markSentPayout) return;
+            this.markSentSaving = true;
+            try {
+                const response = await fetch(this.config.markPayoutSentEndpoint.replace('__PAYOUT__', this.markSentPayout.id), {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify(this.markSentForm),
+                });
+                const data = await response.json();
+                if (!response.ok || data.success === false) throw new Error(data.message || 'Failed to mark payout as sent');
+                if (window.showToast) window.showToast(data.message || 'Payout marked as sent.', 'success');
+                this.showMarkSentModal = false;
+                this.loadPayouts();
+            } catch (error) {
+                if (window.showToast) window.showToast(error.message || 'Failed to mark payout as sent.', 'error');
+            } finally {
+                this.markSentSaving = false;
+            }
+        },
+
+        openConfirmPayoutModal(payout) {
+            this.confirmPayoutTarget = payout;
+            this.showConfirmPayoutModal = true;
+        },
+
+        closeConfirmPayoutModal() {
+            if (this.confirmPayoutSaving) return;
+            this.showConfirmPayoutModal = false;
+            this.confirmPayoutTarget = null;
+        },
+
+        async submitConfirmPayout() {
+            if (!this.confirmPayoutTarget) return;
+            this.confirmPayoutSaving = true;
+
+            try {
+                const response = await fetch(this.config.confirmPayoutEndpoint.replace('__PAYOUT__', this.confirmPayoutTarget.id), {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                const data = await response.json();
+                if (!response.ok || data.success === false) throw new Error(data.message || 'Failed to confirm payout');
+                if (window.showToast) window.showToast(data.message || 'Payout confirmed.', 'success');
+                this.closeConfirmPayoutModal();
+                this.loadPayouts();
+            } catch (error) {
+                if (window.showToast) window.showToast(error.message || 'Failed to confirm payout.', 'error');
+            } finally {
+                this.confirmPayoutSaving = false;
+            }
+        },
+
+        payoutStatusLabel(status) {
+            return ({ pending: 'Pending', sent: 'Sent', confirmed: 'Confirmed' })[status] || status;
+        },
+
+        payoutStatusClass(status) {
+            return {
+                pending: 'bg-amber-100 text-amber-700',
+                sent: 'bg-blue-100 text-blue-700',
+                confirmed: 'bg-emerald-100 text-emerald-700',
+            }[status] || 'bg-slate-100 text-slate-600';
         },
 
         // ── Print helpers ──────────────────────────────────────────
@@ -385,6 +976,7 @@ function vendorShow() {
                 this.vendor.name = this.form.name;
                 this.vendor.business_name = this.form.business_name;
                 this.vendor.email = this.form.email;
+                this.vendor.phone = data.vendor?.phone || this.form.phone;
                 this.vendor.is_active = this.form.is_active;
                 this.vendor.commission_rate_override = this.form.commission_rate_override === '' ? null : this.form.commission_rate_override;
 
@@ -520,6 +1112,22 @@ function vendorShow() {
                 hour: '2-digit',
                 minute: '2-digit'
             });
+        },
+
+        formatMoney(value) {
+            const amount = Number(value || 0);
+            return amount.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        },
+
+        statusBadgeClass(status) {
+            if (status === 'delivered') return 'bg-emerald-100 text-emerald-700';
+            if (['in_transit', 'out_for_delivery', 'at_destination'].includes(status)) return 'bg-amber-100 text-amber-700';
+            if (['picked_up', 'at_warehouse', 'sorted', 'handed_to_courier'].includes(status)) return 'bg-violet-100 text-violet-700';
+            if (status === 'returned') return 'bg-rose-100 text-rose-700';
+            return 'bg-slate-100 text-slate-600';
         }
     };
 }

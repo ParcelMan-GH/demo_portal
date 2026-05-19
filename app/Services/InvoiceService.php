@@ -25,10 +25,10 @@ class InvoiceService
                 ];
             }
 
-            // Super admins can create invoices regardless of shipment status
-            $isSuperAdmin = $admin && method_exists($admin, 'isSuperAdmin') && $admin->isSuperAdmin();
+            // HQ operators can create invoices regardless of shipment status.
+            $isHqUser = $admin && method_exists($admin, 'isHqUser') && $admin->isHqUser();
 
-            if (!$isSuperAdmin) {
+            if (!$isHqUser) {
                 // Phase 3: Invoice can be created at SUBMITTED (old flow) or AT_WAREHOUSE (new flow)
                 $invoiceableStatuses = [ShipmentStatus::SUBMITTED, ShipmentStatus::AT_WAREHOUSE];
                 if (!in_array($lockedShipment->status, $invoiceableStatuses)) {

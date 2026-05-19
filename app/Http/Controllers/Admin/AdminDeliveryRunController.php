@@ -9,6 +9,7 @@ use App\Models\DeliveryRunStop;
 use App\Models\Driver;
 use App\Models\SortBatch;
 use App\Models\Warehouse;
+use App\Services\BackOfficeAccess;
 use App\Services\Warehouse\WarehouseDeliveryService;
 use App\Services\Warehouse\WarehouseSortingService;
 use App\Support\GenericPdfExporter;
@@ -20,12 +21,16 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class AdminDeliveryRunController extends Controller
 {
+    public function __construct(private readonly BackOfficeAccess $access)
+    {
+    }
+
     /**
      * Display the delivery runs index page.
      */
     public function index(): View
     {
-        $warehouses = Warehouse::orderBy('name')->get(['id', 'name', 'code']);
+        $warehouses = $this->access->warehousesFor(Auth::guard('admin')->user(), 'warehouse');
         $drivers = Driver::where('is_active', true)->orderBy('name')->get(['id', 'name', 'phone']);
 
         $statuses = [
@@ -47,6 +52,8 @@ class AdminDeliveryRunController extends Controller
     {
         $query = DeliveryRun::with(['warehouse', 'assignedDriver'])
             ->withCount(['stops', 'items']);
+
+        $this->access->applyWarehouseScope($query, Auth::guard('admin')->user(), 'warehouse');
 
         // Search
         if ($search = $request->get('search')) {
@@ -151,6 +158,8 @@ class AdminDeliveryRunController extends Controller
             'stops.verificationAttempts',
         ]);
 
+        $this->access->assertCanUseWarehouse(Auth::guard('admin')->user(), (int) $run->warehouse_id, 'warehouse');
+
         $statusLabel = $this->formatStatusLabel($run->status);
 
         return view('admin.delivery-runs.show', compact('run', 'statusLabel'));
@@ -163,6 +172,8 @@ class AdminDeliveryRunController extends Controller
     {
         $query = DeliveryRun::with(['warehouse', 'assignedDriver'])
             ->withCount(['stops', 'items']);
+
+        $this->access->applyWarehouseScope($query, Auth::guard('admin')->user(), 'warehouse');
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
@@ -245,6 +256,8 @@ class AdminDeliveryRunController extends Controller
 
         $batch = SortBatch::findOrFail((int) $validated['sort_batch_id']);
         $warehouse = Warehouse::findOrFail((int) $validated['warehouse_id']);
+        $this->access->assertCanUseWarehouse(Auth::guard('admin')->user(), (int) $warehouse->id, 'warehouse');
+
         $deliveryService = app(WarehouseDeliveryService::class);
         $result = $deliveryService->createRun($batch, $warehouse, Auth::guard('admin')->user());
 
@@ -262,6 +275,8 @@ class AdminDeliveryRunController extends Controller
         ]);
 
         $warehouse = Warehouse::findOrFail((int) $validated['warehouse_id']);
+        $this->access->assertCanUseWarehouse(Auth::guard('admin')->user(), (int) $warehouse->id, 'warehouse');
+
         $deliveryService = app(WarehouseDeliveryService::class);
         $sortingService = app(WarehouseSortingService::class);
         $result = $deliveryService->createRunFromItems($warehouse, Auth::guard('admin')->user(), $validated['warehouse_receipt_item_ids'], $sortingService);

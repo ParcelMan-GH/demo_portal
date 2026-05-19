@@ -7,9 +7,15 @@ use App\Exports\VendorsExport;
 use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\OtpCode;
+use App\Models\Shipment;
+use App\Models\ShipmentItem;
 use App\Models\Vendor;
 use App\Models\VendorActivityLog;
+use App\Models\VendorEarning;
+use App\Models\VendorPayout;
+use App\Services\VendorCommissionService;
 use App\Support\GenericPdfExporter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -30,12 +36,13 @@ class VendorController extends Controller
     /**
      * Display vendor detail page.
      */
-    public function showPage(Vendor $vendor, \App\Services\VendorCommissionService $commissionService)
+    public function showPage(Vendor $vendor, VendorCommissionService $commissionService)
     {
         $this->authorizePermission('vendors.view');
 
         // Load counts
         $shipmentsCount = $vendor->shipments()->count();
+        $packagesCount = ShipmentItem::whereHas('shipment', fn ($query) => $query->where('vendor_id', $vendor->id))->count();
         $activityLogsCount = $vendor->activityLogs()->count();
         $otpLogsCount = OtpCode::where('phone', $vendor->phone)->count();
 
@@ -61,6 +68,7 @@ class VendorController extends Controller
         return view('admin.vendors.show', [
             'vendor' => $vendor,
             'shipmentsCount' => $shipmentsCount,
+            'packagesCount' => $packagesCount,
             'activityLogsCount' => $activityLogsCount,
             'otpLogsCount' => $otpLogsCount,
             'shipmentStats' => $shipmentStats,
@@ -69,6 +77,117 @@ class VendorController extends Controller
             'canManage' => $canManage,
             'statuses' => ShipmentStatus::toArray(),
             'globalCommissionRate' => $commissionService->getRatePerPackage(),
+            'payoutSummary' => $commissionService->getVendorSummary($vendor),
+        ]);
+    }
+
+    /**
+     * Get package data for vendor.
+     */
+    public function packages(Request $request, Vendor $vendor)
+    {
+        $this->authorizePermission('vendors.view');
+
+        $query = ShipmentItem::query()
+            ->with(['shipment:id,shipment_number,vendor_id,status', 'deliveryRegion:id,name', 'deliveryDistrict:id,name'])
+            ->whereHas('shipment', fn ($shipmentQuery) => $shipmentQuery->where('vendor_id', $vendor->id));
+
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'like', "%{$search}%")
+                    ->orWhere('tracking_code', 'like', "%{$search}%")
+                    ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                    ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
+                    ->orWhere('delivery_town', 'like', "%{$search}%")
+                    ->orWhereHas('shipment', fn ($shipmentQuery) => $shipmentQuery->where('shipment_number', 'like', "%{$search}%"));
+            });
+        }
+
+        if ($status = $request->get('status')) {
+            $query->where('status', $status);
+        }
+
+        if ($dateFrom = $request->get('date_from')) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo = $request->get('date_to')) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        if ($deliveryMethod = $request->get('delivery_method')) {
+            $query->where(function ($q) use ($deliveryMethod) {
+                if ($deliveryMethod === ShipmentItem::DELIVERY_METHOD_DIRECT) {
+                    $q->where('delivery_method', ShipmentItem::DELIVERY_METHOD_DIRECT)
+                        ->orWhereNull('delivery_method');
+                } else {
+                    $q->where('delivery_method', $deliveryMethod);
+                }
+            });
+        }
+
+        if ($recipientPhone = $request->get('recipient_phone')) {
+            $query->where('delivery_recipient_phone', 'like', "%{$recipientPhone}%");
+        }
+
+        if ($location = $request->get('location')) {
+            $query->where(function ($q) use ($location) {
+                $q->where('delivery_town', 'like', "%{$location}%")
+                    ->orWhereHas('deliveryRegion', fn ($regionQuery) => $regionQuery->where('name', 'like', "%{$location}%"))
+                    ->orWhereHas('deliveryDistrict', fn ($districtQuery) => $districtQuery->where('name', 'like', "%{$location}%"));
+            });
+        }
+
+        if ($quantityMin = $request->get('quantity_min')) {
+            $query->where('quantity', '>=', (int) $quantityMin);
+        }
+
+        if ($quantityMax = $request->get('quantity_max')) {
+            $query->where('quantity', '<=', (int) $quantityMax);
+        }
+
+        $sortBy = $request->get('sort', 'created_at');
+        $sortDirection = $request->get('direction', 'desc') === 'asc' ? 'asc' : 'desc';
+        $allowedSorts = ['description', 'quantity', 'status', 'created_at'];
+
+        if (in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortDirection);
+        } else {
+            $query->latest('created_at');
+        }
+
+        $perPage = min($request->get('per_page', 10), 50);
+        $packages = $query->paginate($perPage);
+
+        return response()->json([
+            'data' => $packages->map(function (ShipmentItem $item) {
+                $status = $item->status;
+                $statusValue = $status?->value ?? (string) $item->getRawOriginal('status');
+
+                return [
+                    'id' => $item->id,
+                    'shipment_id' => $item->shipment_id,
+                    'shipment_number' => $item->shipment?->shipment_number,
+                    'description' => $item->description,
+                    'quantity' => $item->quantity,
+                    'tracking_code' => $item->tracking_code,
+                    'recipient_name' => $item->delivery_recipient_name,
+                    'recipient_phone' => $item->delivery_recipient_phone,
+                    'location' => collect([$item->delivery_town, $item->deliveryDistrict?->name, $item->deliveryRegion?->name])->filter()->implode(', '),
+                    'delivery_method' => $item->delivery_method ?: ShipmentItem::DELIVERY_METHOD_DIRECT,
+                    'delivery_method_label' => ($item->delivery_method ?: ShipmentItem::DELIVERY_METHOD_DIRECT) === ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF ? 'Bus handoff' : 'Recipient',
+                    'status' => $statusValue,
+                    'status_label' => method_exists($status, 'label') ? $status->label() : ucwords(str_replace('_', ' ', $statusValue)),
+                    'created_at' => $item->created_at?->format('Y-m-d H:i:s'),
+                ];
+            }),
+            'meta' => [
+                'current_page' => $packages->currentPage(),
+                'from' => $packages->firstItem() ?? 0,
+                'to' => $packages->lastItem() ?? 0,
+                'total' => $packages->total(),
+                'last_page' => $packages->lastPage(),
+            ],
         ]);
     }
 
@@ -79,7 +198,7 @@ class VendorController extends Controller
     {
         $this->authorizePermission('vendors.view');
 
-        $query = $vendor->shipments()->with(['region', 'district']);
+        $query = $vendor->shipments()->with(['region', 'district'])->withCount('items');
 
         // Search
         if ($search = $request->get('search')) {
@@ -105,6 +224,33 @@ class VendorController extends Controller
         }
         if ($dateTo = $request->get('date_to')) {
             $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        if ($recipientPhone = $request->get('recipient_phone')) {
+            $query->where(function ($q) use ($recipientPhone) {
+                $q->where('delivery_recipient_phone', 'like', "%{$recipientPhone}%")
+                    ->orWhereHas('items', fn ($itemQuery) => $itemQuery->where('delivery_recipient_phone', 'like', "%{$recipientPhone}%"));
+            });
+        }
+
+        if ($location = $request->get('location')) {
+            $query->where(function ($q) use ($location) {
+                $q->whereHas('region', fn ($regionQuery) => $regionQuery->where('name', 'like', "%{$location}%"))
+                    ->orWhereHas('district', fn ($districtQuery) => $districtQuery->where('name', 'like', "%{$location}%"))
+                    ->orWhereHas('items', function ($itemQuery) use ($location) {
+                        $itemQuery->where('delivery_town', 'like', "%{$location}%")
+                            ->orWhereHas('deliveryRegion', fn ($regionQuery) => $regionQuery->where('name', 'like', "%{$location}%"))
+                            ->orWhereHas('deliveryDistrict', fn ($districtQuery) => $districtQuery->where('name', 'like', "%{$location}%"));
+                    });
+            });
+        }
+
+        if ($packageCount = $request->get('package_count')) {
+            if ($packageCount === 'one') {
+                $query->has('items', '=', 1);
+            } elseif ($packageCount === 'multiple') {
+                $query->has('items', '>', 1);
+            }
         }
 
         // Sorting
@@ -135,7 +281,7 @@ class VendorController extends Controller
                     'status_label' => $shipment->status->label(),
                     'region' => $shipment->region?->name,
                     'district' => $shipment->district?->name,
-                    'items_count' => $shipment->items()->count(),
+                    'items_count' => $shipment->items_count,
                     'created_at' => $shipment->created_at->format('Y-m-d H:i:s'),
                 ];
             }),
@@ -170,6 +316,14 @@ class VendorController extends Controller
         // Action filter
         if ($action = $request->get('action')) {
             $query->where('action', $action);
+        }
+
+        if ($deviceType = $request->get('device_type')) {
+            $query->where('device_type', $deviceType);
+        }
+
+        if ($ipAddress = $request->get('ip_address')) {
+            $query->where('ip_address', 'like', "%{$ipAddress}%");
         }
 
         // Date range filter
@@ -231,12 +385,30 @@ class VendorController extends Controller
             $query->where('purpose', $purpose);
         }
 
+        if ($status = $request->get('status')) {
+            if ($status === 'verified') {
+                $query->whereNotNull('verified_at');
+            } elseif ($status === 'expired') {
+                $query->whereNull('verified_at')->where('expires_at', '<', now());
+            } elseif ($status === 'pending') {
+                $query->whereNull('verified_at')->where('expires_at', '>=', now());
+            }
+        }
+
         // Date range filter
         if ($dateFrom = $request->get('date_from')) {
             $query->whereDate('created_at', '>=', $dateFrom);
         }
         if ($dateTo = $request->get('date_to')) {
             $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        if ($expiresFrom = $request->get('expires_from')) {
+            $query->whereDate('expires_at', '>=', $expiresFrom);
+        }
+
+        if ($expiresTo = $request->get('expires_to')) {
+            $query->whereDate('expires_at', '<=', $expiresTo);
         }
 
         // Sorting
@@ -276,42 +448,30 @@ class VendorController extends Controller
     {
         $this->authorizePermission('vendors.view');
 
-        $query = Vendor::query();
-
-        // Search
-        if ($search = $request->get('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('business_name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
-            });
-        }
-
-        // Status filter
-        if ($request->has('status') && $request->get('status') !== '') {
-            $status = $request->get('status');
-            if ($status === 'deleted') {
-                $query->onlyTrashed();
-            } elseif ($status === 'active') {
-                $query->where('is_active', true);
-            } elseif ($status === 'inactive') {
-                $query->where('is_active', false);
-            }
-        }
-
-        // Date range filter
-        if ($dateFrom = $request->get('date_from')) {
-            $query->whereDate('created_at', '>=', $dateFrom);
-        }
-        if ($dateTo = $request->get('date_to')) {
-            $query->whereDate('created_at', '<=', $dateTo);
-        }
+        $query = $this->vendorReportQuery($request);
+        $summary = $this->vendorReportSummary($query);
 
         // Sorting
         $sortBy = $request->get('sort', 'created_at');
         $sortDirection = $request->get('direction', 'desc');
-        $allowedSorts = ['name', 'business_name', 'email', 'phone', 'created_at'];
+        $allowedSorts = [
+            'name',
+            'business_name',
+            'email',
+            'phone',
+            'created_at',
+            'shipments_count',
+            'delivered_shipments_count',
+            'open_shipments_count',
+            'cancelled_shipments_count',
+            'last_shipment_at',
+            'last_activity_at',
+            'total_earnings',
+            'unpaid_earnings',
+            'available_balance',
+            'pending_payouts',
+            'total_paid',
+        ];
 
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortDirection);
@@ -321,10 +481,16 @@ class VendorController extends Controller
         $perPage = min($request->get('per_page', 50), 100);
         $vendors = $query->paginate($perPage);
 
-        $canManage = Auth::guard('admin')->user()->hasPermission('vendors.edit');
+        $user = Auth::guard('admin')->user();
+        $canManage = $user->hasPermission('vendors.edit');
+        $canManagePayouts = $user->hasPermission('vendors.manage');
+        $minPayout = app(VendorCommissionService::class)->getMinPayout();
 
         return response()->json([
-            'data' => $vendors->map(function ($vendor) use ($canManage) {
+            'data' => $vendors->map(function ($vendor) use ($canManage, $canManagePayouts, $minPayout) {
+                $availableBalance = (float) ($vendor->available_balance ?? 0);
+                $pendingPayouts = (float) ($vendor->pending_payouts ?? 0);
+
                 return [
                     'id' => $vendor->id,
                     'name' => $vendor->name,
@@ -334,7 +500,21 @@ class VendorController extends Controller
                     'is_active' => $vendor->is_active,
                     'is_deleted' => $vendor->trashed(),
                     'deleted_at' => $vendor->deleted_at?->format('Y-m-d H:i:s'),
-                    'shipments_count' => $vendor->shipments()->count(),
+                    'shipments_count' => (int) ($vendor->shipments_count ?? 0),
+                    'delivered_shipments_count' => (int) ($vendor->delivered_shipments_count ?? 0),
+                    'open_shipments_count' => (int) ($vendor->open_shipments_count ?? 0),
+                    'cancelled_shipments_count' => (int) ($vendor->cancelled_shipments_count ?? 0),
+                    'last_shipment_at' => $vendor->last_shipment_at ? date('Y-m-d H:i:s', strtotime($vendor->last_shipment_at)) : null,
+                    'last_activity_at' => $vendor->last_activity_at ? date('Y-m-d H:i:s', strtotime($vendor->last_activity_at)) : null,
+                    'has_push_token' => filled($vendor->fcm_token),
+                    'total_earnings' => (float) ($vendor->total_earnings ?? 0),
+                    'unpaid_earnings' => (float) ($vendor->unpaid_earnings ?? 0),
+                    'available_balance' => $availableBalance,
+                    'pending_payouts' => $pendingPayouts,
+                    'total_paid' => (float) ($vendor->total_paid ?? 0),
+                    'min_payout' => $minPayout,
+                    'can_create_payout' => $canManagePayouts && $availableBalance >= $minPayout,
+                    'payout_state' => $this->vendorPayoutState($availableBalance, $pendingPayouts, $minPayout),
                     'commission_rate_override' => $vendor->commission_rate_override !== null
                         ? (float) $vendor->commission_rate_override
                         : null,
@@ -348,6 +528,7 @@ class VendorController extends Controller
                 'to' => $vendors->lastItem() ?? 0,
                 'total' => $vendors->total(),
                 'last_page' => $vendors->lastPage(),
+                'summary' => $summary,
             ],
         ]);
     }
@@ -364,10 +545,17 @@ class VendorController extends Controller
             'business_name' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255', 'unique:vendors,email'],
             'phone' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
-                if (!PhoneHelper::isValid($value)) {
+                $phone = PhoneHelper::format((string) $value);
+
+                if (!$phone) {
                     $fail('Please enter a valid Ghana phone number.');
+                    return;
                 }
-            }, 'unique:vendors,phone'],
+
+                if ($this->vendorPhoneExists($phone)) {
+                    $fail('This phone number is already registered to another vendor.');
+                }
+            }],
             'is_active' => ['boolean'],
         ]);
 
@@ -423,6 +611,18 @@ class VendorController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'business_name' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255', Rule::unique('vendors')->ignore($vendor->id)],
+            'phone' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) use ($vendor) {
+                $phone = PhoneHelper::format((string) $value);
+
+                if (!$phone) {
+                    $fail('Please enter a valid Ghana phone number.');
+                    return;
+                }
+
+                if ($this->vendorPhoneExists($phone, $vendor->id)) {
+                    $fail('This phone number is already registered to another vendor.');
+                }
+            }],
             'is_active' => ['boolean'],
             'commission_rate_override' => ['nullable', 'numeric', 'min:0', 'max:9999.99'],
         ]);
@@ -430,6 +630,7 @@ class VendorController extends Controller
         $vendor->name = $validated['name'];
         $vendor->business_name = $validated['business_name'] ?? null;
         $vendor->email = $validated['email'] ?? null;
+        $vendor->phone = PhoneHelper::format($validated['phone']);
         $vendor->is_active = $validated['is_active'] ?? $vendor->is_active;
 
         if ($request->exists('commission_rate_override')) {
@@ -510,9 +711,7 @@ class VendorController extends Controller
         $originalPhone = preg_replace('/_deleted_\d+$/', '', $vendor->phone);
 
         // Check if the phone is now taken by another active vendor
-        $phoneTaken = Vendor::where('phone', $originalPhone)
-            ->where('id', '!=', $vendor->id)
-            ->exists();
+        $phoneTaken = $this->vendorPhoneExists($originalPhone, $vendor->id);
 
         if ($phoneTaken) {
             return response()->json([
@@ -521,7 +720,7 @@ class VendorController extends Controller
             ], 422);
         }
 
-        $vendor->phone = $originalPhone;
+        $vendor->phone = PhoneHelper::format($originalPhone) ?: $originalPhone;
         $vendor->save();
         $vendor->restore();
 
@@ -531,14 +730,123 @@ class VendorController extends Controller
         ]);
     }
 
-    /**
-     * Export vendors data.
-     */
-    public function export(Request $request)
+    private function vendorPhoneExists(string $phone, ?int $ignoreVendorId = null): bool
     {
-        $this->authorizePermission('vendors.view');
+        $formatted = PhoneHelper::format($phone);
 
-        $query = Vendor::query();
+        if (!$formatted) {
+            return false;
+        }
+
+        $query = Vendor::withTrashed()
+            ->whereIn('phone', $this->phoneLookupVariants($formatted));
+
+        if ($ignoreVendorId !== null) {
+            $query->where('id', '!=', $ignoreVendorId);
+        }
+
+        return $query->exists();
+    }
+
+    private function phoneLookupVariants(string $formattedPhone): array
+    {
+        $local = PhoneHelper::toLocal($formattedPhone);
+        $withoutPlus = ltrim($formattedPhone, '+');
+        $withoutCountry = str_starts_with($formattedPhone, '+233') ? substr($formattedPhone, 4) : null;
+
+        return collect([$formattedPhone, $withoutPlus, $local, $withoutCountry])
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function openShipmentStatuses(): array
+    {
+        return collect(ShipmentStatus::cases())
+            ->reject(fn (ShipmentStatus $status) => in_array($status, [ShipmentStatus::DELIVERED, ShipmentStatus::CANCELLED], true))
+            ->map(fn (ShipmentStatus $status) => $status->value)
+            ->all();
+    }
+
+    private function vendorReportSummary(Builder $query): array
+    {
+        $vendorIds = (clone $query)->select('vendors.id');
+        $minPayout = app(VendorCommissionService::class)->getMinPayout();
+
+        return [
+            'total_vendors' => (clone $query)->count(),
+            'active_vendors' => (clone $query)->where('is_active', true)->count(),
+            'vendors_with_shipments' => (clone $query)->has('shipments')->count(),
+            'eligible_payout_vendors' => (clone $query)->whereRaw(
+                '(select coalesce(sum(amount), 0) from vendor_earnings where vendor_earnings.vendor_id = vendors.id and status = ? and payout_id is null) >= ?',
+                [VendorEarning::STATUS_APPROVED, $minPayout]
+            )->count(),
+            'open_shipments' => Shipment::query()
+                ->whereIn('vendor_id', clone $vendorIds)
+                ->whereIn('status', $this->openShipmentStatuses())
+                ->count(),
+            'delivered_shipments' => Shipment::query()
+                ->whereIn('vendor_id', clone $vendorIds)
+                ->where('status', ShipmentStatus::DELIVERED->value)
+                ->count(),
+            'unpaid_earnings' => (float) VendorEarning::query()
+                ->whereIn('vendor_id', clone $vendorIds)
+                ->where('status', VendorEarning::STATUS_APPROVED)
+                ->sum('amount'),
+            'available_balance' => (float) VendorEarning::query()
+                ->whereIn('vendor_id', clone $vendorIds)
+                ->where('status', VendorEarning::STATUS_APPROVED)
+                ->whereNull('payout_id')
+                ->sum('amount'),
+            'pending_payouts' => (float) VendorPayout::query()
+                ->whereIn('vendor_id', clone $vendorIds)
+                ->where('status', VendorPayout::STATUS_PENDING)
+                ->sum('amount'),
+            'total_paid' => (float) VendorPayout::query()
+                ->whereIn('vendor_id', clone $vendorIds)
+                ->whereIn('status', [VendorPayout::STATUS_SENT, VendorPayout::STATUS_CONFIRMED])
+                ->sum('amount'),
+        ];
+    }
+
+    private function vendorPayoutState(float $availableBalance, float $pendingPayouts, float $minPayout): string
+    {
+        if ($pendingPayouts > 0) {
+            return 'pending';
+        }
+
+        if ($availableBalance >= $minPayout) {
+            return 'eligible';
+        }
+
+        if ($availableBalance > 0) {
+            return 'below_minimum';
+        }
+
+        return 'no_balance';
+    }
+
+    private function vendorReportQuery(Request $request): Builder
+    {
+        $openStatuses = $this->openShipmentStatuses();
+
+        $query = Vendor::query()
+            ->withCount([
+                'shipments',
+                'shipments as delivered_shipments_count' => fn (Builder $q) => $q->where('status', ShipmentStatus::DELIVERED->value),
+                'shipments as cancelled_shipments_count' => fn (Builder $q) => $q->where('status', ShipmentStatus::CANCELLED->value),
+                'shipments as open_shipments_count' => fn (Builder $q) => $q->whereIn('status', $openStatuses),
+            ])
+            ->withMax('shipments as last_shipment_at', 'created_at')
+            ->withMax('activityLogs as last_activity_at', 'created_at')
+            ->withSum('earnings as total_earnings', 'amount')
+            ->withSum(['earnings as unpaid_earnings' => fn (Builder $q) => $q->where('status', VendorEarning::STATUS_APPROVED)], 'amount')
+            ->withSum(['earnings as available_balance' => fn (Builder $q) => $q
+                ->where('status', VendorEarning::STATUS_APPROVED)
+                ->whereNull('payout_id')], 'amount')
+            ->withSum(['payouts as pending_payouts' => fn (Builder $q) => $q->where('status', VendorPayout::STATUS_PENDING)], 'amount')
+            ->withSum(['payouts as total_paid' => fn (Builder $q) => $q->whereIn('status', [VendorPayout::STATUS_SENT, VendorPayout::STATUS_CONFIRMED])], 'amount');
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
@@ -563,9 +871,159 @@ class VendorController extends Controller
         if ($dateFrom = $request->get('date_from')) {
             $query->whereDate('created_at', '>=', $dateFrom);
         }
+
         if ($dateTo = $request->get('date_to')) {
             $query->whereDate('created_at', '<=', $dateTo);
         }
+
+        $this->applyNullablePresenceFilter($query, $request->get('has_email'), 'email');
+        $this->applyNullablePresenceFilter($query, $request->get('has_business_name'), 'business_name');
+        $this->applyNullablePresenceFilter($query, $request->get('has_push_token'), 'fcm_token');
+
+        if ($request->get('has_commission_override') === 'yes') {
+            $query->whereNotNull('commission_rate_override');
+        } elseif ($request->get('has_commission_override') === 'no') {
+            $query->whereNull('commission_rate_override');
+        }
+
+        if ($request->filled('commission_min')) {
+            $commissionMin = $request->get('commission_min');
+            $query->where('commission_rate_override', '>=', (float) $commissionMin);
+        }
+
+        if ($request->filled('commission_max')) {
+            $commissionMax = $request->get('commission_max');
+            $query->where('commission_rate_override', '<=', (float) $commissionMax);
+        }
+
+        if ($request->filled('shipment_count_min')) {
+            $shipmentMin = $request->get('shipment_count_min');
+            $query->has('shipments', '>=', (int) $shipmentMin);
+        }
+
+        if ($request->filled('shipment_count_max')) {
+            $shipmentMax = $request->get('shipment_count_max');
+            $query->has('shipments', '<=', (int) $shipmentMax);
+        }
+
+        if ($shipmentStatus = $request->get('shipment_status')) {
+            $query->whereHas('shipments', fn (Builder $q) => $q->where('status', $shipmentStatus));
+        }
+
+        if ($shipmentSource = $request->get('shipment_source')) {
+            $query->whereHas('shipments', fn (Builder $q) => $q->where('source', $shipmentSource));
+        }
+
+        if ($destinationMode = $request->get('destination_mode')) {
+            $query->whereHas('shipments', fn (Builder $q) => $q->where('destination_mode', $destinationMode));
+        }
+
+        if ($lastShipmentFrom = $request->get('last_shipment_from')) {
+            $query->whereHas('shipments', fn (Builder $q) => $q->whereDate('created_at', '>=', $lastShipmentFrom));
+        }
+
+        if ($lastShipmentTo = $request->get('last_shipment_to')) {
+            $query->whereHas('shipments', fn (Builder $q) => $q->whereDate('created_at', '<=', $lastShipmentTo));
+        }
+
+        if ($request->get('activity_state') === 'never_logged_in') {
+            $query->whereDoesntHave('activityLogs', fn (Builder $q) => $q->where('action', 'login'));
+        } elseif ($request->get('activity_state') === 'has_activity') {
+            $query->whereHas('activityLogs');
+        }
+
+        if ($lastActivityFrom = $request->get('last_activity_from')) {
+            $query->whereHas('activityLogs', fn (Builder $q) => $q->whereDate('created_at', '>=', $lastActivityFrom));
+        }
+
+        if ($lastActivityTo = $request->get('last_activity_to')) {
+            $query->whereHas('activityLogs', fn (Builder $q) => $q->whereDate('created_at', '<=', $lastActivityTo));
+        }
+
+        if ($earningsStatus = $request->get('earnings_status')) {
+            if ($earningsStatus === 'none') {
+                $query->whereDoesntHave('earnings');
+            } else {
+                $query->whereHas('earnings', fn (Builder $q) => $q->where('status', $earningsStatus));
+            }
+        }
+
+        if ($payoutStatus = $request->get('payout_status')) {
+            if ($payoutStatus === 'none') {
+                $query->whereDoesntHave('payouts');
+            } else {
+                $query->whereHas('payouts', fn (Builder $q) => $q->where('status', $payoutStatus));
+            }
+        }
+
+        $minPayout = app(VendorCommissionService::class)->getMinPayout();
+        $availableBalanceSql = '(select coalesce(sum(amount), 0) from vendor_earnings where vendor_earnings.vendor_id = vendors.id and status = ? and payout_id is null)';
+        $pendingPayoutSql = '(select coalesce(sum(amount), 0) from vendor_payouts where vendor_payouts.vendor_id = vendors.id and status = ?)';
+
+        if ($payoutState = $request->get('payout_state')) {
+            if ($payoutState === 'eligible') {
+                $query->whereRaw("{$availableBalanceSql} >= ?", [VendorEarning::STATUS_APPROVED, $minPayout]);
+            } elseif ($payoutState === 'below_minimum') {
+                $query->whereRaw("{$availableBalanceSql} > 0 and {$availableBalanceSql} < ?", [
+                    VendorEarning::STATUS_APPROVED,
+                    VendorEarning::STATUS_APPROVED,
+                    $minPayout,
+                ]);
+            } elseif ($payoutState === 'no_balance') {
+                $query->whereRaw("{$availableBalanceSql} = 0", [VendorEarning::STATUS_APPROVED]);
+            } elseif ($payoutState === 'pending') {
+                $query->whereRaw("{$pendingPayoutSql} > 0", [VendorPayout::STATUS_PENDING]);
+            }
+        }
+
+        if ($request->filled('available_balance_min')) {
+            $query->whereRaw("{$availableBalanceSql} >= ?", [VendorEarning::STATUS_APPROVED, (float) $request->get('available_balance_min')]);
+        }
+
+        if ($request->filled('available_balance_max')) {
+            $query->whereRaw("{$availableBalanceSql} <= ?", [VendorEarning::STATUS_APPROVED, (float) $request->get('available_balance_max')]);
+        }
+
+        if ($request->get('pending_payout_state') === 'has_pending') {
+            $query->whereRaw("{$pendingPayoutSql} > 0", [VendorPayout::STATUS_PENDING]);
+        } elseif ($request->get('pending_payout_state') === 'no_pending') {
+            $query->whereRaw("{$pendingPayoutSql} = 0", [VendorPayout::STATUS_PENDING]);
+        }
+
+        if ($request->filled('unpaid_earnings_min')) {
+            $query->whereRaw(
+                '(select coalesce(sum(amount), 0) from vendor_earnings where vendor_earnings.vendor_id = vendors.id and status = ?) >= ?',
+                [VendorEarning::STATUS_APPROVED, (float) $request->get('unpaid_earnings_min')]
+            );
+        }
+
+        if ($request->filled('unpaid_earnings_max')) {
+            $query->whereRaw(
+                '(select coalesce(sum(amount), 0) from vendor_earnings where vendor_earnings.vendor_id = vendors.id and status = ?) <= ?',
+                [VendorEarning::STATUS_APPROVED, (float) $request->get('unpaid_earnings_max')]
+            );
+        }
+
+        return $query;
+    }
+
+    private function applyNullablePresenceFilter(Builder $query, mixed $value, string $column): void
+    {
+        if ($value === 'yes') {
+            $query->whereNotNull($column)->where($column, '!=', '');
+        } elseif ($value === 'no') {
+            $query->where(fn (Builder $q) => $q->whereNull($column)->orWhere($column, ''));
+        }
+    }
+
+    /**
+     * Export vendors data.
+     */
+    public function export(Request $request)
+    {
+        $this->authorizePermission('vendors.view');
+
+        $query = $this->vendorReportQuery($request);
 
         $vendors = $query->orderBy('created_at', 'desc')->get();
 
@@ -579,6 +1037,21 @@ class VendorController extends Controller
                 'Email' => $vendor->email,
                 'Phone' => $vendor->phone,
                 'Status' => $status,
+                'Has Email' => $vendor->email ? 'Yes' : 'No',
+                'Has Business Name' => $vendor->business_name ? 'Yes' : 'No',
+                'Push Ready' => $vendor->fcm_token ? 'Yes' : 'No',
+                'Shipment Count' => (int) ($vendor->shipments_count ?? 0),
+                'Delivered Shipments' => (int) ($vendor->delivered_shipments_count ?? 0),
+                'Open Shipments' => (int) ($vendor->open_shipments_count ?? 0),
+                'Cancelled Shipments' => (int) ($vendor->cancelled_shipments_count ?? 0),
+                'Last Shipment At' => $vendor->last_shipment_at ? date('Y-m-d H:i:s', strtotime($vendor->last_shipment_at)) : '',
+                'Last Activity At' => $vendor->last_activity_at ? date('Y-m-d H:i:s', strtotime($vendor->last_activity_at)) : '',
+                'Commission Override' => $vendor->commission_rate_override,
+                'Total Earnings' => (float) ($vendor->total_earnings ?? 0),
+                'Unpaid Earnings' => (float) ($vendor->unpaid_earnings ?? 0),
+                'Available Balance' => (float) ($vendor->available_balance ?? 0),
+                'Pending Payouts' => (float) ($vendor->pending_payouts ?? 0),
+                'Total Paid' => (float) ($vendor->total_paid ?? 0),
                 'Created At' => $vendor->created_at->format('Y-m-d H:i:s'),
             ];
         })->values()->toArray();

@@ -1,0 +1,1 @@
+<span class="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold" :class="item.is_active ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'" x-text="item.is_active ? 'Active' : 'Inactive'"></span>

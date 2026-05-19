@@ -38,7 +38,7 @@ class VendorPayout extends Model
 
     public function processedBy(): BelongsTo
     {
-        return $this->belongsTo(Admin::class, 'processed_by_admin_id');
+        return $this->belongsTo(User::class, 'processed_by_admin_id');
     }
 
     public function earnings(): HasMany

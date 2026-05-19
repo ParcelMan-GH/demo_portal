@@ -742,6 +742,11 @@ function warehouseShow() {
         warehouse: {},
         canManage: false,
         activeTab: 'details',
+        capabilitiesLoaded: false,
+        loadingCapabilities: false,
+        savingCapabilities: false,
+        capabilityModules: [],
+        capabilityForm: {},
 
         showToggleModal: false,
 
@@ -764,12 +769,153 @@ function warehouseShow() {
             this.config = window.warehouseShowConfig;
             this.warehouse = this.config.warehouse;
             this.canManage = this.config.canManage;
+            this.prepareCapabilityForm();
         },
 
         tabClass(tab) {
             return this.activeTab === tab
                 ? 'bg-slate-900 text-white shadow-sm'
                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50';
+        },
+
+        prepareCapabilityForm(modules = null, capabilities = {}) {
+            const sourceModules = modules || {};
+            this.capabilityModules = Object.entries(sourceModules).map(([key, label]) => ({ key, label }));
+
+            this.capabilityForm = {};
+            this.capabilityModules.forEach((module) => {
+                const capability = capabilities[module.key] || null;
+                this.capabilityForm[module.key] = capability ? {
+                    enabled: true,
+                    scope: capability.scope || 'own',
+                    allowed_warehouse_ids: (capability.allowed_warehouse_ids || []).map((id) => String(id)),
+                } : {
+                    enabled: false,
+                    scope: 'own',
+                    allowed_warehouse_ids: [],
+                };
+            });
+        },
+
+        async loadCapabilities() {
+            if (!this.config.canManageCapabilities || this.config.isHqWarehouse || this.capabilitiesLoaded || this.loadingCapabilities) {
+                return;
+            }
+
+            this.loadingCapabilities = true;
+
+            try {
+                const response = await fetch(this.config.capabilitiesEndpoint, {
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to load capabilities');
+                }
+
+                this.prepareCapabilityForm(data.modules || {}, data.capabilities || {});
+                this.capabilitiesLoaded = true;
+            } catch (error) {
+                console.error('Capabilities load error:', error);
+                if (window.showToast) {
+                    window.showToast(error.message || 'Failed to load capabilities', 'error');
+                }
+            } finally {
+                this.loadingCapabilities = false;
+            }
+        },
+
+        isCapabilityEnabled(module) {
+            return Boolean(this.capabilityForm[module]?.enabled);
+        },
+
+        toggleCapability(module, enabled) {
+            if (!this.capabilityForm[module]) {
+                this.capabilityForm[module] = { enabled: false, scope: 'own', allowed_warehouse_ids: [] };
+            }
+
+            this.capabilityForm[module].enabled = enabled;
+
+            if (!enabled) {
+                this.capabilityForm[module].scope = 'own';
+                this.capabilityForm[module].allowed_warehouse_ids = [];
+            }
+        },
+
+        enabledCapabilitiesCount() {
+            return Object.values(this.capabilityForm || {}).filter((item) => item.enabled).length;
+        },
+
+        capabilityDescription(module) {
+            const descriptions = {
+                dashboard: 'Dashboard access for this warehouse.',
+                warehouse: 'Local warehouse operations such as receiving, sorting, and manifests.',
+                warehouses: 'Warehouse listing and cross-warehouse management.',
+                vendors: 'Vendor listing, vendor details, and vendor payout workflows.',
+                shipments: 'Shipment management and assignment workflows.',
+                drivers: 'Rider and driver management.',
+                reports: 'Operational and finance reports.',
+                recipient_payments: 'Recipient payment recording and reporting.',
+                invoices: 'Invoice access and controls.',
+                users: 'Local user management for this warehouse.',
+                roles: 'Role visibility. HQ still owns role definitions in this phase.',
+                settings: 'System settings access.',
+                marketing: 'Marketing and communication controls.',
+            };
+
+            return descriptions[module] || 'Back-office module access.';
+        },
+
+        async saveCapabilities() {
+            if (this.config.isHqWarehouse) {
+                return;
+            }
+
+            this.savingCapabilities = true;
+
+            const capabilities = Object.entries(this.capabilityForm)
+                .filter(([, capability]) => capability.enabled)
+                .map(([module, capability]) => ({
+                    module,
+                    scope: capability.scope || 'own',
+                    allowed_warehouse_ids: capability.scope === 'selected'
+                        ? (capability.allowed_warehouse_ids || []).map((id) => Number(id)).filter(Boolean)
+                        : [],
+                }));
+
+            try {
+                const response = await fetch(this.config.capabilitiesUpdateEndpoint, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    body: JSON.stringify({ capabilities }),
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to save capabilities');
+                }
+
+                this.prepareCapabilityForm(data.modules || {}, data.capabilities || {});
+                this.capabilitiesLoaded = true;
+
+                if (window.showToast) {
+                    window.showToast('Warehouse capabilities saved.', 'success');
+                }
+            } catch (error) {
+                console.error('Capabilities save error:', error);
+                if (window.showToast) {
+                    window.showToast(error.message || 'Failed to save capabilities', 'error');
+                }
+            } finally {
+                this.savingCapabilities = false;
+            }
         },
 
         openEditModal() {

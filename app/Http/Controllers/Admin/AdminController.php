@@ -41,7 +41,7 @@ class AdminController extends Controller
         $currentUser = Auth::guard('admin')->user();
 
         // Base query
-        if ($currentUser->isSuperAdmin()) {
+        if ($currentUser->isHqUser()) {
             $query = User::whereNull('warehouse_id')
                 ->with(['creator', 'roles']);
         } else {
@@ -147,7 +147,7 @@ class AdminController extends Controller
     {
         $currentUser = Auth::guard('admin')->user();
 
-        if ($currentUser->isSuperAdmin()) {
+        if ($currentUser->isHqUser()) {
             $query = User::whereNull('warehouse_id')
                 ->with(['creator', 'roles']);
         } else {
@@ -294,7 +294,7 @@ class AdminController extends Controller
         $currentUser = Auth::guard('admin')->user();
 
         // Check if can view this user
-        if (!$currentUser->isSuperAdmin() && $admin->created_by_user_id !== $currentUser->id && $admin->id !== $currentUser->id) {
+        if (!$currentUser->isHqUser() && $admin->created_by_user_id !== $currentUser->id && $admin->id !== $currentUser->id) {
             return redirect()->route('admin.admins.index')
                 ->with('error', 'You do not have permission to view this user.');
         }
@@ -311,7 +311,7 @@ class AdminController extends Controller
     {
         $currentUser = Auth::guard('admin')->user();
 
-        if (!$currentUser->isSuperAdmin() && $admin->created_by_user_id !== $currentUser->id && $admin->id !== $currentUser->id) {
+        if (!$currentUser->isHqUser() && $admin->created_by_user_id !== $currentUser->id && $admin->id !== $currentUser->id) {
             return response()->json(['data' => [], 'meta' => ['total' => 0, 'per_page' => 15, 'current_page' => 1, 'last_page' => 1, 'from' => 0, 'to' => 0]]);
         }
 

@@ -26,6 +26,8 @@ class WarehouseSeeder extends Seeder
                 'contact_email' => 'accra-hub@parcelman.com',
                 'capacity' => 5000,
                 'is_active' => true,
+                'is_hq' => true,
+                'can_administer_system' => true,
             ],
             [
                 'name' => 'Kumasi Distribution Center',
@@ -36,6 +38,8 @@ class WarehouseSeeder extends Seeder
                 'contact_email' => 'kumasi@parcelman.com',
                 'capacity' => 3000,
                 'is_active' => true,
+                'is_hq' => false,
+                'can_administer_system' => false,
             ],
             [
                 'name' => 'Tema Port Warehouse',
@@ -46,6 +50,8 @@ class WarehouseSeeder extends Seeder
                 'contact_email' => 'tema@parcelman.com',
                 'capacity' => 2000,
                 'is_active' => true,
+                'is_hq' => false,
+                'can_administer_system' => false,
             ],
         ];
 

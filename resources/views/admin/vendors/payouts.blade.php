@@ -1,521 +1,693 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Vendor Payouts')
+@section('title', 'Commission Payouts')
 @section('breadcrumb-parent', 'Finance')
-@section('breadcrumb-current', 'Vendor Payouts')
+@section('breadcrumb-current', 'Commission Payouts')
 
 @section('content')
-<div id="vendor-payouts-app" class="space-y-6">
-
-    {{-- Stats Row --}}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Vendors with Balance</p>
-                    <p id="stat-vendors-count" class="mt-2 text-2xl font-bold text-slate-900">&mdash;</p>
-                </div>
-                <div class="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                </div>
+<div x-data="vendorPayoutsPage(@js($payoutConfig))" x-init="init()" class="space-y-6">
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div class="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 shadow-sm">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 ring-1 ring-slate-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+            </div>
+            <div class="min-w-0">
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Vendors</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="summary.vendors_with_balance || 0"></p>
             </div>
         </div>
-        <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Available Balance</p>
-                    <p id="stat-total-balance" class="mt-2 text-2xl font-bold text-emerald-600">&mdash;</p>
-                </div>
-                <div class="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
+        <div class="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 shadow-sm">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-700 ring-1 ring-orange-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+            </div>
+            <div class="min-w-0">
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Ready To Pay</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="summary.ready_to_pay || 0"></p>
             </div>
         </div>
-        <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Pending Payouts</p>
-                    <p id="stat-pending" class="mt-2 text-2xl font-bold text-amber-600">&mdash;</p>
-                </div>
-                <div class="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
+        <div class="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 shadow-sm">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 ring-1 ring-slate-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 6v6l4 2m6-2a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z"/></svg>
+            </div>
+            <div class="min-w-0">
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Below Minimum</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="summary.below_minimum || 0"></p>
             </div>
         </div>
-    </div>
-
-    {{-- Main Table Card --}}
-    <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg">
-        <div class="px-6 py-5 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h2 class="text-lg font-bold text-slate-900">Vendor Payouts</h2>
-            <div class="relative">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                <input type="text" id="search-input" placeholder="Search vendors..." class="pl-10 pr-4 py-2 text-xs border border-slate-200 rounded-xl bg-white/60 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none w-64" />
+        <div class="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 shadow-sm">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 10v2m8-6a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
             </div>
-        </div>
-
-        <div class="overflow-x-auto">
-            <table class="w-full text-xs">
-                <thead>
-                    <tr class="border-b border-slate-100">
-                        <th class="px-6 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Vendor</th>
-                        <th class="px-6 py-3 text-right text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Earned</th>
-                        <th class="px-6 py-3 text-right text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Available Balance</th>
-                        <th class="px-6 py-3 text-right text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Paid</th>
-                        <th class="px-6 py-3 text-right text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Pending</th>
-                        <th class="px-6 py-3 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="vendors-tbody">
-                    <tr id="loading-row">
-                        <td colspan="6" class="px-6 py-12 text-center text-slate-400 text-sm">
-                            <svg class="animate-spin h-5 w-5 mx-auto text-slate-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        </td>
-                    </tr>
-                    <tr id="empty-row" style="display:none;">
-                        <td colspan="6" class="px-6 py-12 text-center text-slate-400 text-sm">No vendors found.</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div id="pagination-row" class="px-6 py-4 border-t border-slate-100 flex items-center justify-between" style="display:none;">
-            <p class="text-xs text-slate-500">Showing <span id="pag-from">0</span> to <span id="pag-to">0</span> of <span id="pag-total">0</span></p>
-            <div class="flex items-center gap-1">
-                <button id="btn-prev" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Prev</button>
-                <button id="btn-next" class="px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
+            <div class="min-w-0">
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Available</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="'GHS ' + formatMoney(summary.available_balance)"></p>
             </div>
         </div>
     </div>
 
-    {{-- Modals are moved to body via JS to avoid overflow/transform clipping --}}
-</div>
-
-<div id="create-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
-    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="VendorPayouts.closeCreate()"></div>
-        <div class="relative bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md p-6">
-            <h3 class="text-lg font-bold text-slate-900 mb-1">Create Payout</h3>
-            <p id="create-modal-vendor" class="text-xs text-slate-500 mb-5"></p>
-            <form id="create-form" onsubmit="VendorPayouts.submitCreate(event)">
-                <div class="mb-4">
-                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Amount (GHS)</label>
-                    <input type="number" id="create-amount" step="0.01" min="0" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" required />
+    <section class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-5 py-4">
+            <div class="flex items-center gap-3">
+                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 10v2m8-6a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
                 </div>
-                <div class="mb-4">
-                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Payment Method</label>
-                    <select id="create-method" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" required onchange="VendorPayouts.togglePhone()">
-                        <option value="momo">MoMo</option>
-                        <option value="bank">Bank Transfer</option>
-                        <option value="cash">Cash</option>
-                    </select>
-                </div>
-                <div id="phone-field" class="mb-4">
-                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Payment Phone</label>
-                    <input type="text" id="create-phone" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" />
-                </div>
-                <div class="mb-5">
-                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Notes (optional)</label>
-                    <textarea id="create-notes" rows="2" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none resize-none"></textarea>
-                </div>
-                <div class="flex items-center justify-end gap-3">
-                    <button type="button" onclick="VendorPayouts.closeCreate()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">Cancel</button>
-                    <button type="submit" id="create-submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">Create Payout</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    {{-- History Modal --}}
-    <div id="history-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="VendorPayouts.closeHistory()"></div>
-        <div class="relative bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-            <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between shrink-0">
                 <div>
-                    <h3 class="text-lg font-bold text-slate-900">Payout History</h3>
-                    <p id="history-vendor-name" class="text-xs text-slate-500 mt-0.5"></p>
+                    <h1 class="text-2xl font-black tracking-tight text-slate-950">Commission Payouts</h1>
+                    <p class="mt-1 text-sm font-semibold text-slate-500">Process vendors with accrued unpaid commission.</p>
                 </div>
-                <button onclick="VendorPayouts.closeHistory()" class="p-1 rounded-lg hover:bg-slate-100 transition-colors">
-                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </div>
+        </div>
+
+        <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 xl:flex-row xl:items-end xl:justify-between">
+            <div class="relative w-full xl:max-w-md">
+                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
+                <input type="text" x-model="search" @@input.debounce.500ms="page = 1; loadVendors()" placeholder="Search vendor, business, or phone..."
+                    class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                <svg class="absolute left-3 bottom-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"/></svg>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-3">
+                <button type="button" @@click="showFilters = !showFilters"
+                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                    :class="showFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4Z"/></svg>
+                    <span x-text="showFilters ? 'Hide Filters' : 'Filters'"></span>
+                </button>
+                <button type="button" @@click="loadVendors()"
+                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.58m15.36 2A8.001 8.001 0 0 0 4.58 9m0 0H9m11 11v-5h-.58m0 0a8.003 8.003 0 0 1-15.36-2m15.36 2H15"/></svg>
+                    Refresh
                 </button>
             </div>
-            <div id="history-content" class="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-                <div class="py-12 text-center text-sm text-slate-400">Loading...</div>
+        </div>
+
+        <div x-show="showFilters" x-transition class="border-b border-slate-100 px-5 pb-4" style="display:none">
+            <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payout State</label>
+                        <select x-model="status" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All accrued vendors</option>
+                            <option value="ready">Ready to pay</option>
+                            <option value="below_minimum">Below minimum</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Sort</label>
+                        <select x-model="sort" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="available_balance">Available balance</option>
+                            <option value="total_earned">Total earned</option>
+                            <option value="total_paid">Total paid</option>
+                            <option value="vendor_name">Vendor name</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Direction</label>
+                        <select x-model="sortDir" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="desc">Highest first</option>
+                            <option value="asc">Lowest first</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                    <button type="button" @@click="showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
+                    <button type="button" @@click="clearFilters()" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
+                    <button type="button" @@click="page = 1; loadVendors()" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">Apply Filters</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    {{-- Mark Sent Modal --}}
-    <div id="mark-sent-modal" class="fixed inset-0 z-[60] flex items-center justify-center p-4" style="display:none;">
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="VendorPayouts.closeMarkSent()"></div>
-        <div class="relative bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-sm p-6">
-            <h3 class="text-base font-bold text-slate-900 mb-4">Mark Payout as Sent</h3>
-            <form onsubmit="VendorPayouts.submitMarkSent(event)">
-                <div class="mb-5">
-                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Payment Reference</label>
-                    <input type="text" id="mark-sent-ref" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none" placeholder="e.g. MoMo transaction ID" required />
+        <div class="relative overflow-hidden">
+            <div x-show="loading" class="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px]" style="display:none"></div>
+
+            <div class="hidden overflow-x-auto lg:block">
+                <table class="w-full min-w-[920px] divide-y divide-slate-200/60 text-xs">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Vendor</th>
+                            <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Available</th>
+                            <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Total Earned</th>
+                            <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Total Paid</th>
+                            <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">State</th>
+                            <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 bg-white">
+                        <template x-if="vendors.length === 0 && !loading">
+                            <tr><td colspan="6" class="px-4 py-12 text-center text-sm font-semibold text-slate-400">No vendors with accrued commission found</td></tr>
+                        </template>
+                        <template x-for="vendor in vendors" :key="vendor.vendor_id">
+                            <tr class="hover:bg-slate-50/70">
+                                <td class="px-4 py-3">
+                                    <div class="max-w-[260px]">
+                                        <p class="font-black text-slate-900" x-text="vendor.vendor_name"></p>
+                                        <p class="mt-0.5 truncate text-xs font-semibold text-slate-500" x-text="vendor.business_name || 'No business name'"></p>
+                                        <p class="mt-0.5 text-xs font-semibold text-slate-400" x-text="vendor.vendor_phone || '-'"></p>
+                                    </div>
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-3 text-right text-sm font-black text-emerald-700" x-text="'GHS ' + formatMoney(vendor.available_balance)"></td>
+                                <td class="whitespace-nowrap px-4 py-3 text-right font-bold text-slate-700" x-text="'GHS ' + formatMoney(vendor.total_earned)"></td>
+                                <td class="whitespace-nowrap px-4 py-3 text-right font-bold text-slate-700" x-text="'GHS ' + formatMoney(vendor.total_paid)"></td>
+                                <td class="whitespace-nowrap px-4 py-3 text-center">
+                                    <span class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide" :class="vendor.can_payout ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-slate-200 bg-slate-50 text-slate-500'" x-text="vendor.can_payout ? 'Ready to pay' : 'Below minimum'"></span>
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-3 text-right">
+                                    <div class="inline-flex items-center justify-end gap-2">
+                                        <button type="button" @@click="openHistory(vendor)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">History</button>
+                                        <button type="button" x-show="vendor.can_payout" @@click="openPayout(vendor)" class="rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-orange-600/20 hover:bg-orange-700">Pay Vendor</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="divide-y divide-slate-100 bg-white lg:hidden">
+                <template x-if="vendors.length === 0 && !loading">
+                    <div class="px-5 py-12 text-center text-sm font-semibold text-slate-400">No vendors with accrued commission found</div>
+                </template>
+                <template x-for="vendor in vendors" :key="vendor.vendor_id">
+                    <article class="px-5 py-4">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <p class="font-black text-slate-900" x-text="vendor.vendor_name"></p>
+                                <p class="mt-0.5 truncate text-sm font-semibold text-slate-500" x-text="vendor.business_name || 'No business name'"></p>
+                                <p class="mt-0.5 text-sm font-semibold text-slate-400" x-text="vendor.vendor_phone || '-'"></p>
+                            </div>
+                            <span class="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide" :class="vendor.can_payout ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-slate-200 bg-slate-50 text-slate-500'" x-text="vendor.can_payout ? 'Ready' : 'Below min'"></span>
+                        </div>
+                        <div class="mt-4 grid grid-cols-2 gap-2 text-sm">
+                            <div class="rounded-2xl bg-slate-50 px-3 py-2">
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Available</p>
+                                <p class="mt-1 font-black text-emerald-700" x-text="'GHS ' + formatMoney(vendor.available_balance)"></p>
+                            </div>
+                            <div class="rounded-2xl bg-slate-50 px-3 py-2">
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Earned</p>
+                                <p class="mt-1 font-black text-slate-800" x-text="'GHS ' + formatMoney(vendor.total_earned)"></p>
+                            </div>
+                            <div class="rounded-2xl bg-slate-50 px-3 py-2">
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Paid</p>
+                                <p class="mt-1 font-black text-slate-800" x-text="'GHS ' + formatMoney(vendor.total_paid)"></p>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center justify-end gap-2">
+                            <button type="button" @@click="openHistory(vendor)" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">History</button>
+                            <button type="button" x-show="vendor.can_payout" @@click="openPayout(vendor)" class="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/20 hover:bg-orange-700">Pay Vendor</button>
+                        </div>
+                    </article>
+                </template>
+            </div>
+
+            <div class="border-t border-slate-100 bg-slate-50/70 px-5 py-3">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="text-xs font-semibold text-slate-600">Showing <span x-text="meta.from || 0"></span> to <span x-text="meta.to || 0"></span> of <span x-text="meta.total || 0"></span></div>
+                    <div class="flex items-center gap-1">
+                        <button type="button" @@click="prevPage()" :disabled="page <= 1" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"/></svg></button>
+                        <div class="px-2 text-xs font-black text-slate-700">Page <span x-text="meta.current_page || 1"></span> / <span x-text="meta.last_page || 1"></span></div>
+                        <button type="button" @@click="nextPage()" :disabled="page >= meta.last_page" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg></button>
+                    </div>
                 </div>
-                <div class="flex items-center justify-end gap-3">
-                    <button type="button" onclick="VendorPayouts.closeMarkSent()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">Cancel</button>
-                    <button type="submit" id="mark-sent-submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">Submit</button>
+            </div>
+        </div>
+    </section>
+
+    <div x-show="showPayoutModal" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="closePayout()">
+        <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" @@click="closePayout()"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <form @@submit.prevent="submitPayout()" class="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl" @@click.stop>
+                <div class="border-b border-slate-200 px-6 py-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 10v2m8-6a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-black text-slate-900">Pay Vendor</h3>
+                                <p class="mt-1 text-sm font-semibold text-slate-500" x-text="selectedVendor ? selectedVendor.vendor_name + ' / GHS ' + formatMoney(selectedVendor.available_balance) + ' available' : ''"></p>
+                            </div>
+                        </div>
+                        <button type="button" @@click="closePayout()" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:bg-slate-50">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="space-y-4 px-6 py-5">
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Amount</label>
+                        <input type="number" step="0.01" min="1" x-model="payoutForm.amount" required class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payment Method</label>
+                        <select x-model="payoutForm.payment_method" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="momo">MOMO</option>
+                            <option value="bank">Bank Transfer</option>
+                            <option value="cash">Cash</option>
+                        </select>
+                    </div>
+                    <div x-show="payoutForm.payment_method === 'momo'">
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payment Phone</label>
+                        <input type="text" x-model="payoutForm.payment_phone" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payment Reference</label>
+                        <input type="text" x-model="payoutForm.payment_reference" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Notes</label>
+                        <textarea rows="3" x-model="payoutForm.notes" class="w-full resize-none rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"></textarea>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-5">
+                    <button type="button" @@click="closePayout()" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" :disabled="savingPayout" class="rounded-xl bg-orange-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/20 hover:bg-orange-700 disabled:opacity-50">
+                        <span x-text="savingPayout ? 'Paying...' : 'Pay Vendor'"></span>
+                    </button>
                 </div>
             </form>
         </div>
     </div>
-</div>
 
+    <div x-show="showHistoryModal" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="closeHistory()">
+        <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" @@click="closeHistory()"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl" @@click.stop>
+                <div class="border-b border-slate-200 px-6 py-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 class="text-xl font-black text-slate-900">Payout History</h3>
+                            <p class="mt-1 text-sm font-semibold text-slate-500" x-text="historyVendor ? historyVendor.vendor_name : ''"></p>
+                        </div>
+                        <button type="button" @@click="closeHistory()" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:bg-slate-50">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 xl:flex-row xl:items-end xl:justify-between">
+                    <div class="relative w-full xl:max-w-md">
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
+                        <input type="text" x-model="history.search" @@input.debounce.500ms="history.page = 1; loadHistory()" placeholder="Search reference, phone, or notes..."
+                            class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                        <svg class="absolute left-3 bottom-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"/></svg>
+                    </div>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <select x-model="history.status" @@change="history.page = 1; loadHistory()" class="rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="sent">Sent</option>
+                            <option value="confirmed">Confirmed</option>
+                        </select>
+                        <select x-model="history.method" @@change="history.page = 1; loadHistory()" class="rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All methods</option>
+                            <option value="momo">MOMO</option>
+                            <option value="bank">Bank</option>
+                            <option value="cash">Cash</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex-1 overflow-y-auto">
+                    <div class="hidden overflow-x-auto lg:block">
+                        <table class="w-full min-w-[820px] divide-y divide-slate-200/60 text-xs">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Date</th>
+                                    <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Amount</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Method</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Reference</th>
+                                    <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Status</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Processed By</th>
+                                    <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                <template x-if="history.data.length === 0 && !history.loading">
+                                    <tr><td colspan="7" class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No payout history found</td></tr>
+                                </template>
+                                <template x-for="payout in history.data" :key="payout.id">
+                                    <tr class="hover:bg-slate-50/70">
+                                        <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-600" x-text="formatDateTime(payout.created_at)"></td>
+                                        <td class="whitespace-nowrap px-4 py-3 text-right font-black text-slate-900" x-text="'GHS ' + formatMoney(payout.amount)"></td>
+                                        <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-700" x-text="methodLabel(payout.payment_method)"></td>
+                                        <td class="px-4 py-3 font-semibold text-slate-700" x-text="payout.payment_reference || '-'"></td>
+                                        <td class="whitespace-nowrap px-4 py-3 text-center"><span class="inline-flex rounded-full px-2.5 py-1 text-[10px] font-black" :class="statusClass(payout.status)" x-text="statusLabel(payout.status)"></span></td>
+                                        <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-600" x-text="payout.processed_by?.name || '-'"></td>
+                                        <td class="whitespace-nowrap px-4 py-3 text-right">
+                                            <button x-show="payout.status === 'pending'" @@click="openMarkSent(payout)" class="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700 hover:bg-orange-100">Mark Sent</button>
+                                            <button x-show="payout.status === 'sent'" @@click="openConfirm(payout)" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100">Confirm</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="divide-y divide-slate-100 lg:hidden">
+                        <template x-if="history.data.length === 0 && !history.loading">
+                            <div class="px-5 py-10 text-center text-sm font-semibold text-slate-400">No payout history found</div>
+                        </template>
+                        <template x-for="payout in history.data" :key="payout.id">
+                            <article class="px-5 py-4">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p class="font-black text-slate-900" x-text="'GHS ' + formatMoney(payout.amount)"></p>
+                                        <p class="mt-1 text-xs font-semibold text-slate-500" x-text="formatDateTime(payout.created_at)"></p>
+                                    </div>
+                                    <span class="rounded-full px-2.5 py-1 text-[10px] font-black" :class="statusClass(payout.status)" x-text="statusLabel(payout.status)"></span>
+                                </div>
+                                <div class="mt-3 space-y-1 text-sm font-semibold text-slate-600">
+                                    <p x-text="methodLabel(payout.payment_method) + (payout.payment_phone ? ' / ' + payout.payment_phone : '')"></p>
+                                    <p x-text="'Reference: ' + (payout.payment_reference || '-')"></p>
+                                    <p x-text="'Processed by: ' + (payout.processed_by?.name || '-')"></p>
+                                </div>
+                                <div class="mt-3 flex justify-end gap-2">
+                                    <button x-show="payout.status === 'pending'" @@click="openMarkSent(payout)" class="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700 hover:bg-orange-100">Mark Sent</button>
+                                    <button x-show="payout.status === 'sent'" @@click="openConfirm(payout)" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100">Confirm</button>
+                                </div>
+                            </article>
+                        </template>
+                    </div>
+                </div>
+                <div class="border-t border-slate-100 bg-slate-50/70 px-5 py-3">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="text-xs font-semibold text-slate-600">Showing <span x-text="history.meta.from || 0"></span> to <span x-text="history.meta.to || 0"></span> of <span x-text="history.meta.total || 0"></span></div>
+                        <div class="flex items-center gap-1">
+                            <button type="button" @@click="historyPrev()" :disabled="history.page <= 1" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"/></svg></button>
+                            <div class="px-2 text-xs font-black text-slate-700">Page <span x-text="history.meta.current_page || 1"></span> / <span x-text="history.meta.last_page || 1"></span></div>
+                            <button type="button" @@click="historyNext()" :disabled="history.page >= history.meta.last_page" class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showMarkSentModal" x-cloak class="fixed inset-0 z-[110] overflow-y-auto" @@keydown.escape.window="closeMarkSent()">
+        <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" @@click="closeMarkSent()"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <form @@submit.prevent="submitMarkSent()" class="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl" @@click.stop>
+                <div class="border-b border-slate-200 px-6 py-5">
+                    <h3 class="text-xl font-black text-slate-900">Mark Payout Sent</h3>
+                    <p class="mt-1 text-sm font-semibold text-slate-500">Record the payment transaction reference.</p>
+                </div>
+                <div class="px-6 py-5">
+                    <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payment Reference</label>
+                    <input type="text" x-model="markSentForm.payment_reference" required class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-5">
+                    <button type="button" @@click="closeMarkSent()" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" :disabled="savingMarkSent" class="rounded-xl bg-orange-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/20 hover:bg-orange-700 disabled:opacity-50">
+                        <span x-text="savingMarkSent ? 'Saving...' : 'Mark Sent'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div x-show="showConfirmModal" x-cloak class="fixed inset-0 z-[120] overflow-y-auto" @@keydown.escape.window="closeConfirm()">
+        <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" @@click="closeConfirm()"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl" @@click.stop>
+                <div class="border-b border-slate-200 px-6 py-5">
+                    <div class="flex items-start gap-4">
+                        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/20">
+                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-black text-slate-900">Confirm Payout?</h3>
+                            <p class="mt-1 text-sm font-semibold text-slate-500">This marks the payout as fully confirmed.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3 px-6 py-5">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p class="text-xs font-black uppercase tracking-wide text-slate-500">Amount</p>
+                        <p class="mt-1 text-lg font-black text-slate-900" x-text="confirmTarget ? 'GHS ' + formatMoney(confirmTarget.amount) : '-'"></p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                            <p class="text-xs font-black uppercase tracking-wide text-slate-500">Method</p>
+                            <p class="mt-1 text-sm font-bold text-slate-800" x-text="confirmTarget ? methodLabel(confirmTarget.payment_method) : '-'"></p>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                            <p class="text-xs font-black uppercase tracking-wide text-slate-500">Reference</p>
+                            <p class="mt-1 break-words text-sm font-bold text-slate-800" x-text="confirmTarget?.payment_reference || '-'"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-5">
+                    <button type="button" @@click="closeConfirm()" :disabled="savingConfirm" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+                    <button type="button" @@click="submitConfirm()" :disabled="savingConfirm" class="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50">
+                        <span x-text="savingConfirm ? 'Confirming...' : 'Confirm Payout'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
-(function() {
-    var CONFIG = @json($payoutConfig);
-    var CSRF = document.querySelector('meta[name="csrf-token"]').content;
-
-    var state = {
+function vendorPayoutsPage(config) {
+    return {
+        config,
+        csrf: document.querySelector('meta[name="csrf-token"]').content,
         vendors: [],
+        summary: {},
         meta: {},
+        loading: false,
         search: '',
+        status: '',
+        sort: 'available_balance',
+        sortDir: 'desc',
         page: 1,
+        showFilters: false,
         selectedVendor: null,
+        showPayoutModal: false,
+        savingPayout: false,
+        payoutForm: { amount: '', payment_method: 'momo', payment_phone: '', payment_reference: '', notes: '' },
         historyVendor: null,
-        markSentPayoutId: null
-    };
+        showHistoryModal: false,
+        history: { data: [], meta: {}, loading: false, search: '', status: '', method: '', page: 1 },
+        showMarkSentModal: false,
+        markSentTarget: null,
+        markSentForm: { payment_reference: '' },
+        savingMarkSent: false,
+        showConfirmModal: false,
+        confirmTarget: null,
+        savingConfirm: false,
 
-    var debounceTimer = null;
+        init() {
+            this.loadVendors();
+        },
+        async request(url, options = {}) {
+            const headers = Object.assign({
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': this.csrf,
+            }, options.headers || {});
 
-    // ─── Helpers ───
-    function $(id) { return document.getElementById(id); }
-    function ghs(n) { return 'GHS ' + parseFloat(n || 0).toFixed(2); }
+            if (options.body && !(options.body instanceof FormData)) {
+                headers['Content-Type'] = 'application/json';
+                options.body = JSON.stringify(options.body);
+            }
 
-    async function api(url, opts) {
-        opts = opts || {};
-        opts.headers = opts.headers || {};
-        opts.headers['Accept'] = 'application/json';
-        opts.headers['X-CSRF-TOKEN'] = CSRF;
-        if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
-            opts.headers['Content-Type'] = 'application/json';
-            opts.body = JSON.stringify(opts.body);
-        }
-        var resp = await fetch(url, opts);
-        var json = await resp.json();
-        return { ok: resp.ok, data: json };
-    }
-
-    function toast(msg, type) {
-        if (window.showToast) window.showToast(msg, type);
-    }
-
-    // ─── Load Data ───
-    async function loadData() {
-        $('loading-row').style.display = '';
-        $('empty-row').style.display = 'none';
-        removeVendorRows();
-
-        var params = new URLSearchParams({ page: state.page, search: state.search });
-        try {
-            var result = await api(CONFIG.dataUrl + '?' + params.toString());
-            state.vendors = result.data.data || [];
-            state.meta = result.data.meta || {};
-        } catch(e) {
-            console.error(e);
-            state.vendors = [];
-            state.meta = {};
-        }
-
-        $('loading-row').style.display = 'none';
-        renderTable();
-        renderStats();
-        renderPagination();
-    }
-
-    function removeVendorRows() {
-        var rows = document.querySelectorAll('.vendor-row');
-        for (var i = 0; i < rows.length; i++) rows[i].remove();
-    }
-
-    // ─── Render Table ───
-    function renderTable() {
-        var tbody = $('vendors-tbody');
-
-        if (state.vendors.length === 0) {
-            $('empty-row').style.display = '';
-            return;
-        }
-
-        $('empty-row').style.display = 'none';
-
-        for (var i = 0; i < state.vendors.length; i++) {
-            var v = state.vendors[i];
-            var tr = document.createElement('tr');
-            tr.className = 'vendor-row border-b border-slate-50 hover:bg-slate-50/50 transition-colors';
-            tr.innerHTML =
-                '<td class="px-6 py-4">' +
-                    '<button class="text-left group" data-action="history" data-idx="' + i + '">' +
-                        '<p class="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">' + esc(v.vendor_name) + '</p>' +
-                        '<p class="text-slate-500 text-[10px]">' + esc(v.business_name || '') + '</p>' +
-                        '<p class="text-slate-400 text-[10px]">' + esc(v.vendor_phone || '') + '</p>' +
-                    '</button>' +
-                '</td>' +
-                '<td class="px-6 py-4 text-right font-medium text-slate-700">' + ghs(v.total_earned) + '</td>' +
-                '<td class="px-6 py-4 text-right">' +
-                    '<span class="font-semibold ' + (v.can_payout ? 'text-emerald-600' : 'text-slate-500') + '">' + ghs(v.available_balance) + '</span>' +
-                    '<div class="mt-1">' +
-                        (v.can_payout
-                            ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700">Ready</span>'
-                            : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">Below minimum</span>') +
-                    '</div>' +
-                '</td>' +
-                '<td class="px-6 py-4 text-right font-medium text-slate-700">' + ghs(v.total_paid) + '</td>' +
-                '<td class="px-6 py-4 text-right font-medium text-amber-600">' + ghs(v.pending_payouts) + '</td>' +
-                '<td class="px-6 py-4 text-center">' +
-                    '<button data-action="create" data-idx="' + i + '" ' + (v.can_payout ? '' : 'disabled') +
-                        ' class="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Create Payout</button>' +
-                '</td>';
-            tbody.appendChild(tr);
-        }
-    }
-
-    function esc(s) {
-        var d = document.createElement('div');
-        d.textContent = s;
-        return d.innerHTML;
-    }
-
-    // ─── Render Stats ───
-    function renderStats() {
-        var totalBalance = 0;
-        var totalPending = 0;
-        var withBalance = 0;
-        for (var i = 0; i < state.vendors.length; i++) {
-            var v = state.vendors[i];
-            totalBalance += parseFloat(v.available_balance || 0);
-            totalPending += parseFloat(v.pending_payouts || 0);
-            if (parseFloat(v.available_balance || 0) > 0) withBalance++;
-        }
-        $('stat-vendors-count').textContent = withBalance;
-        $('stat-total-balance').textContent = ghs(totalBalance);
-        $('stat-pending').textContent = ghs(totalPending);
-    }
-
-    // ─── Pagination ───
-    function renderPagination() {
-        var m = state.meta;
-        if (!m.last_page || m.last_page <= 1) {
-            $('pagination-row').style.display = 'none';
-            return;
-        }
-        $('pagination-row').style.display = '';
-        $('pag-from').textContent = m.from || 0;
-        $('pag-to').textContent = m.to || 0;
-        $('pag-total').textContent = m.total || 0;
-        $('btn-prev').disabled = m.current_page <= 1;
-        $('btn-next').disabled = m.current_page >= m.last_page;
-    }
-
-    // ─── Create Payout ───
-    function openCreate(idx) {
-        var v = state.vendors[idx];
-        state.selectedVendor = v;
-        $('create-modal-vendor').textContent = 'For ' + v.vendor_name;
-        $('create-amount').value = v.available_balance;
-        $('create-method').value = 'momo';
-        $('create-phone').value = v.vendor_phone || '';
-        $('create-notes').value = '';
-        $('phone-field').style.display = '';
-        $('create-modal').style.display = '';
-    }
-
-    function closeCreate() { $('create-modal').style.display = 'none'; }
-
-    function togglePhone() {
-        $('phone-field').style.display = $('create-method').value === 'momo' ? '' : 'none';
-    }
-
-    async function submitCreate(e) {
-        e.preventDefault();
-        var btn = $('create-submit');
-        btn.disabled = true;
-        btn.textContent = 'Creating...';
-        try {
-            var url = CONFIG.createPayoutUrl.replace('__VENDOR__', state.selectedVendor.vendor_id);
-            var result = await api(url, {
-                method: 'POST',
-                body: {
-                    amount: $('create-amount').value,
-                    payment_method: $('create-method').value,
-                    payment_phone: $('create-phone').value,
-                    notes: $('create-notes').value
-                }
+            const response = await fetch(url, Object.assign({}, options, { headers }));
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw data;
+            }
+            return data;
+        },
+        toast(message, type = 'success') {
+            if (window.showToast) {
+                window.showToast(message, type);
+            }
+        },
+        async loadVendors() {
+            this.loading = true;
+            const params = new URLSearchParams({
+                page: this.page,
+                per_page: 15,
+                search: this.search || '',
+                status: this.status || '',
+                sort: this.sort || 'available_balance',
+                sort_dir: this.sortDir || 'desc',
             });
-            if (result.ok && result.data.success !== false) {
-                toast(result.data.message || 'Payout created', 'success');
-                closeCreate();
-                loadData();
-            } else {
-                toast(result.data.message || 'Failed to create payout', 'error');
+
+            try {
+                const data = await this.request(this.config.dataUrl + '?' + params.toString());
+                this.vendors = data.data || [];
+                this.summary = data.summary || {};
+                this.meta = data.meta || {};
+            } catch (error) {
+                this.toast(error.message || 'Failed to load commission payouts', 'error');
+            } finally {
+                this.loading = false;
             }
-        } catch(e) {
-            toast('An error occurred', 'error');
-            console.error(e);
-        }
-        btn.disabled = false;
-        btn.textContent = 'Create Payout';
-    }
-
-    // ─── History ───
-    function openHistory(idx) {
-        var v = state.vendors[idx];
-        state.historyVendor = v;
-        $('history-vendor-name').textContent = v.vendor_name;
-        $('history-content').innerHTML = '<div class="py-12 text-center"><svg class="animate-spin h-5 w-5 mx-auto text-slate-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></div>';
-        $('history-modal').style.display = '';
-        loadHistory(v.vendor_id);
-    }
-
-    function closeHistory() { $('history-modal').style.display = 'none'; }
-
-    async function loadHistory(vendorId) {
-        try {
-            var url = CONFIG.vendorPayoutsUrl.replace('__VENDOR__', vendorId);
-            var result = await api(url);
-            var payouts = result.data.data || [];
-            renderHistory(payouts);
-        } catch(e) {
-            $('history-content').innerHTML = '<div class="py-12 text-center text-sm text-red-400">Failed to load history.</div>';
-            console.error(e);
-        }
-    }
-
-    function renderHistory(payouts) {
-        if (payouts.length === 0) {
-            $('history-content').innerHTML = '<div class="py-12 text-center text-sm text-slate-400">No payouts yet.</div>';
-            return;
-        }
-
-        var html = '';
-        for (var i = 0; i < payouts.length; i++) {
-            var p = payouts[i];
-            var statusClass = p.status === 'pending' ? 'bg-amber-50 text-amber-700' : p.status === 'sent' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700';
-            var statusLabel = p.status.charAt(0).toUpperCase() + p.status.slice(1);
-
-            html += '<div class="bg-white/60 border border-slate-100 rounded-2xl p-4">';
-            html += '<div class="flex items-start justify-between mb-2"><div>';
-            html += '<span class="text-sm font-bold text-slate-900">' + ghs(p.amount) + '</span>';
-            html += '<span class="ml-2 text-xs text-slate-500">' + esc(p.payment_method || '') + '</span>';
-            html += '</div>';
-            html += '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold ' + statusClass + '">' + statusLabel + '</span>';
-            html += '</div>';
-            html += '<div class="text-[10px] text-slate-400 space-y-0.5">';
-            if (p.payment_reference) html += '<p>Ref: <span class="text-slate-600">' + esc(p.payment_reference) + '</span></p>';
-            html += '<p>Created: <span class="text-slate-600">' + esc(p.created_at || '') + '</span></p>';
-            if (p.sent_at) html += '<p>Sent: <span class="text-slate-600">' + esc(p.sent_at) + '</span></p>';
-            if (p.confirmed_at) html += '<p>Confirmed: <span class="text-slate-600">' + esc(p.confirmed_at) + '</span></p>';
-            html += '</div>';
-            html += '<div class="mt-3 flex items-center gap-2">';
-            if (p.status === 'pending') html += '<button onclick="VendorPayouts.openMarkSent(' + p.id + ')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors">Mark as Sent</button>';
-            if (p.status === 'sent') html += '<button onclick="VendorPayouts.confirmPayout(' + p.id + ')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors">Confirm</button>';
-            html += '</div></div>';
-        }
-        $('history-content').innerHTML = html;
-    }
-
-    // ─── Mark Sent ───
-    function openMarkSent(payoutId) {
-        state.markSentPayoutId = payoutId;
-        $('mark-sent-ref').value = '';
-        $('mark-sent-modal').style.display = '';
-    }
-
-    function closeMarkSent() { $('mark-sent-modal').style.display = 'none'; }
-
-    async function submitMarkSent(e) {
-        e.preventDefault();
-        var ref = $('mark-sent-ref').value.trim();
-        if (!ref) { toast('Reference required', 'error'); return; }
-        var btn = $('mark-sent-submit');
-        btn.disabled = true;
-        btn.textContent = 'Saving...';
-        try {
-            var url = CONFIG.markSentUrl.replace('__PAYOUT__', state.markSentPayoutId);
-            var result = await api(url, { method: 'PATCH', body: { payment_reference: ref } });
-            if (result.ok && result.data.success !== false) {
-                toast(result.data.message || 'Marked as sent', 'success');
-                closeMarkSent();
-                if (state.historyVendor) loadHistory(state.historyVendor.vendor_id);
-                loadData();
-            } else {
-                toast(result.data.message || 'Failed', 'error');
+        },
+        clearFilters() {
+            this.status = '';
+            this.sort = 'available_balance';
+            this.sortDir = 'desc';
+            this.page = 1;
+            this.loadVendors();
+        },
+        prevPage() {
+            if (this.page <= 1) return;
+            this.page--;
+            this.loadVendors();
+        },
+        nextPage() {
+            if (this.page >= (this.meta.last_page || 1)) return;
+            this.page++;
+            this.loadVendors();
+        },
+        openPayout(vendor) {
+            this.selectedVendor = vendor;
+            this.payoutForm = {
+                amount: vendor.available_balance,
+                payment_method: 'momo',
+                payment_phone: vendor.vendor_phone || '',
+                payment_reference: '',
+                notes: '',
+            };
+            this.showPayoutModal = true;
+        },
+        closePayout() {
+            this.showPayoutModal = false;
+            this.selectedVendor = null;
+        },
+        async submitPayout() {
+            if (!this.selectedVendor) return;
+            this.savingPayout = true;
+            try {
+                const url = this.config.createPayoutUrl.replace('__VENDOR__', this.selectedVendor.vendor_id);
+                const data = await this.request(url, { method: 'POST', body: this.payoutForm });
+                this.toast(data.message || 'Payout created');
+                this.closePayout();
+                await this.loadVendors();
+                if (this.showHistoryModal) await this.loadHistory();
+            } catch (error) {
+                this.toast(error.message || 'Failed to create payout', 'error');
+            } finally {
+                this.savingPayout = false;
             }
-        } catch(e) {
-            toast('An error occurred', 'error');
-            console.error(e);
-        }
-        btn.disabled = false;
-        btn.textContent = 'Submit';
-    }
+        },
+        openHistory(vendor) {
+            this.historyVendor = vendor;
+            this.history = { data: [], meta: {}, loading: false, search: '', status: '', method: '', page: 1 };
+            this.showHistoryModal = true;
+            this.loadHistory();
+        },
+        closeHistory() {
+            this.showHistoryModal = false;
+            this.historyVendor = null;
+        },
+        async loadHistory() {
+            if (!this.historyVendor) return;
+            this.history.loading = true;
+            const params = new URLSearchParams({
+                page: this.history.page,
+                per_page: 10,
+                search: this.history.search || '',
+                status: this.history.status || '',
+                method: this.history.method || '',
+            });
 
-    // ─── Confirm Payout ───
-    async function confirmPayout(payoutId) {
-        try {
-            var url = CONFIG.confirmUrl.replace('__PAYOUT__', payoutId);
-            var result = await api(url, { method: 'PATCH' });
-            if (result.ok && result.data.success !== false) {
-                toast(result.data.message || 'Confirmed', 'success');
-                if (state.historyVendor) loadHistory(state.historyVendor.vendor_id);
-                loadData();
-            } else {
-                toast(result.data.message || 'Failed', 'error');
+            try {
+                const url = this.config.vendorPayoutsUrl.replace('__VENDOR__', this.historyVendor.vendor_id);
+                const data = await this.request(url + '?' + params.toString());
+                this.history.data = data.data || [];
+                this.history.meta = data.meta || {};
+            } catch (error) {
+                this.toast(error.message || 'Failed to load payout history', 'error');
+            } finally {
+                this.history.loading = false;
             }
-        } catch(e) {
-            toast('An error occurred', 'error');
-            console.error(e);
-        }
-    }
-
-    // ─── Event Delegation ───
-    document.addEventListener('click', function(e) {
-        var btn = e.target.closest('[data-action]');
-        if (!btn) return;
-        var action = btn.getAttribute('data-action');
-        var idx = parseInt(btn.getAttribute('data-idx'));
-        if (action === 'create') openCreate(idx);
-        if (action === 'history') openHistory(idx);
-    });
-
-    $('btn-prev').addEventListener('click', function() {
-        if (state.page > 1) { state.page--; loadData(); }
-    });
-
-    $('btn-next').addEventListener('click', function() {
-        if (state.meta.last_page && state.page < state.meta.last_page) { state.page++; loadData(); }
-    });
-
-    $('search-input').addEventListener('input', function() {
-        clearTimeout(debounceTimer);
-        var val = this.value;
-        debounceTimer = setTimeout(function() {
-            state.search = val;
-            state.page = 1;
-            loadData();
-        }, 300);
-    });
-
-    // ─── Public API (for onclick handlers in dynamic HTML) ───
-    window.VendorPayouts = {
-        openCreate: openCreate,
-        closeCreate: closeCreate,
-        togglePhone: togglePhone,
-        submitCreate: submitCreate,
-        openHistory: openHistory,
-        closeHistory: closeHistory,
-        openMarkSent: openMarkSent,
-        closeMarkSent: closeMarkSent,
-        submitMarkSent: submitMarkSent,
-        confirmPayout: confirmPayout
+        },
+        historyPrev() {
+            if (this.history.page <= 1) return;
+            this.history.page--;
+            this.loadHistory();
+        },
+        historyNext() {
+            if (this.history.page >= (this.history.meta.last_page || 1)) return;
+            this.history.page++;
+            this.loadHistory();
+        },
+        openMarkSent(payout) {
+            this.markSentTarget = payout;
+            this.markSentForm = { payment_reference: payout.payment_reference || '' };
+            this.showMarkSentModal = true;
+        },
+        closeMarkSent() {
+            this.showMarkSentModal = false;
+            this.markSentTarget = null;
+        },
+        async submitMarkSent() {
+            if (!this.markSentTarget) return;
+            this.savingMarkSent = true;
+            try {
+                const url = this.config.markSentUrl.replace('__PAYOUT__', this.markSentTarget.id);
+                const data = await this.request(url, { method: 'PATCH', body: this.markSentForm });
+                this.toast(data.message || 'Payout marked as sent');
+                this.closeMarkSent();
+                await this.loadHistory();
+                await this.loadVendors();
+            } catch (error) {
+                this.toast(error.message || 'Failed to mark payout as sent', 'error');
+            } finally {
+                this.savingMarkSent = false;
+            }
+        },
+        openConfirm(payout) {
+            this.confirmTarget = payout;
+            this.showConfirmModal = true;
+        },
+        closeConfirm() {
+            this.showConfirmModal = false;
+            this.confirmTarget = null;
+        },
+        async submitConfirm() {
+            if (!this.confirmTarget) return;
+            this.savingConfirm = true;
+            try {
+                const url = this.config.confirmUrl.replace('__PAYOUT__', this.confirmTarget.id);
+                const data = await this.request(url, { method: 'PATCH' });
+                this.toast(data.message || 'Payout confirmed');
+                this.closeConfirm();
+                await this.loadHistory();
+                await this.loadVendors();
+            } catch (error) {
+                this.toast(error.message || 'Failed to confirm payout', 'error');
+            } finally {
+                this.savingConfirm = false;
+            }
+        },
+        formatMoney(value) {
+            return Number(value || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        },
+        formatDateTime(value) {
+            if (!value) return '-';
+            return new Date(value).toLocaleString('en-GH', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+            });
+        },
+        methodLabel(method) {
+            return { momo: 'MOMO', bank: 'Bank Transfer', cash: 'Cash' }[method] || '-';
+        },
+        statusLabel(status) {
+            return { pending: 'Pending', sent: 'Sent', confirmed: 'Confirmed' }[status] || status || '-';
+        },
+        statusClass(status) {
+            if (status === 'confirmed') return 'bg-emerald-50 text-emerald-700';
+            if (status === 'sent') return 'bg-blue-50 text-blue-700';
+            return 'bg-amber-50 text-amber-700';
+        },
     };
-
-    // ─── Init ───
-    loadData();
-})();
+}
 </script>
 @endpush

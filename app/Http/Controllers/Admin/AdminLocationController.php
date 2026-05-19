@@ -21,25 +21,48 @@ class AdminLocationController extends Controller
 
     public function regionsData(Request $request): JsonResponse
     {
-        $query = Region::withCount(['districts', 'locations'])
+        $query = Region::withCount([
+            'districts',
+            'locations',
+            'districts as active_districts_count' => fn ($q) => $q->where('is_active', true),
+            'locations as active_locations_count' => fn ($q) => $q->where('is_active', true),
+        ])
             ->orderBy('name');
 
         if ($search = trim($request->get('search', ''))) {
-            $query->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            });
         }
 
         if ($request->get('active') !== null) {
             $query->where('is_active', (bool) $request->get('active'));
         }
 
+        if ($code = trim($request->get('code', ''))) {
+            $query->where('code', 'like', "%{$code}%");
+        }
+
+        match ($request->get('coverage')) {
+            'has_districts' => $query->has('districts'),
+            'no_districts' => $query->doesntHave('districts'),
+            'has_towns' => $query->has('locations'),
+            'no_towns' => $query->doesntHave('locations'),
+            'has_active_towns' => $query->whereHas('locations', fn ($q) => $q->where('is_active', true)),
+            'no_active_towns' => $query->whereDoesntHave('locations', fn ($q) => $q->where('is_active', true)),
+            default => null,
+        };
+
         $regions = $query->get()->map(fn ($r) => [
-            'id'              => $r->id,
-            'name'            => $r->name,
-            'code'            => $r->code,
-            'is_active'       => $r->is_active,
-            'districts_count' => $r->districts_count,
-            'locations_count' => $r->locations_count,
+            'id'                     => $r->id,
+            'name'                   => $r->name,
+            'code'                   => $r->code,
+            'is_active'              => $r->is_active,
+            'districts_count'        => $r->districts_count,
+            'locations_count'        => $r->locations_count,
+            'active_districts_count' => $r->active_districts_count,
+            'active_locations_count' => $r->active_locations_count,
         ]);
 
         return response()->json(['success' => true, 'data' => ['regions' => $regions, 'total' => $regions->count()]]);
@@ -98,8 +121,11 @@ class AdminLocationController extends Controller
 
     public function districtsData(Request $request): JsonResponse
     {
-        $query = District::with('region:id,name,code')
-            ->withCount('locations')
+        $query = District::with('region:id,name,code,is_active')
+            ->withCount([
+                'locations',
+                'locations as active_locations_count' => fn ($q) => $q->where('is_active', true),
+            ])
             ->orderBy('name');
 
         if ($search = trim($request->get('search', ''))) {
@@ -117,14 +143,32 @@ class AdminLocationController extends Controller
             $query->where('is_active', (bool) $request->get('active'));
         }
 
+        if ($code = trim($request->get('code', ''))) {
+            $query->where('districts.code', 'like', "%{$code}%");
+        }
+
+        if ($request->get('region_active') !== null) {
+            $query->whereHas('region', fn ($q) => $q->where('is_active', (bool) $request->get('region_active')));
+        }
+
+        match ($request->get('coverage')) {
+            'has_towns' => $query->has('locations'),
+            'no_towns' => $query->doesntHave('locations'),
+            'has_active_towns' => $query->whereHas('locations', fn ($q) => $q->where('is_active', true)),
+            'no_active_towns' => $query->whereDoesntHave('locations', fn ($q) => $q->where('is_active', true)),
+            default => null,
+        };
+
         $districts = $query->get()->map(fn ($d) => [
-            'id'              => $d->id,
-            'name'            => $d->name,
-            'code'            => $d->code,
-            'is_active'       => $d->is_active,
-            'region_id'       => $d->region_id,
-            'region_name'     => $d->region->name,
-            'locations_count' => $d->locations_count,
+            'id'                     => $d->id,
+            'name'                   => $d->name,
+            'code'                   => $d->code,
+            'is_active'              => $d->is_active,
+            'region_id'              => $d->region_id,
+            'region_name'            => $d->region->name,
+            'region_is_active'       => $d->region->is_active,
+            'locations_count'        => $d->locations_count,
+            'active_locations_count' => $d->active_locations_count,
         ]);
 
         return response()->json(['success' => true, 'data' => ['districts' => $districts, 'total' => $districts->count()]]);
@@ -187,11 +231,15 @@ class AdminLocationController extends Controller
 
     public function townsData(Request $request): JsonResponse
     {
-        $query = Location::with(['district:id,name', 'region:id,name'])
+        $query = Location::with(['district:id,name,is_active', 'region:id,name,is_active'])
             ->orderBy('name');
 
         if ($search = trim($request->get('search', ''))) {
-            $query->where('name', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhereHas('district', fn ($districtQuery) => $districtQuery->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('region', fn ($regionQuery) => $regionQuery->where('name', 'like', "%{$search}%"));
+            });
         }
 
         if ($regionId = $request->get('region_id')) {
@@ -202,9 +250,29 @@ class AdminLocationController extends Controller
             $query->where('district_id', $districtId);
         }
 
+        if ($type = $request->get('type')) {
+            $query->where('type', $type);
+        }
+
         if ($request->get('active') !== null) {
             $query->where('is_active', (bool) $request->get('active'));
         }
+
+        if ($request->get('region_active') !== null) {
+            $query->whereHas('region', fn ($q) => $q->where('is_active', (bool) $request->get('region_active')));
+        }
+
+        if ($request->get('district_active') !== null) {
+            $query->whereHas('district', fn ($q) => $q->where('is_active', (bool) $request->get('district_active')));
+        }
+
+        match ($request->get('parent_state')) {
+            'ready' => $query->whereHas('region', fn ($q) => $q->where('is_active', true))
+                ->whereHas('district', fn ($q) => $q->where('is_active', true)),
+            'inactive_region' => $query->whereHas('region', fn ($q) => $q->where('is_active', false)),
+            'inactive_district' => $query->whereHas('district', fn ($q) => $q->where('is_active', false)),
+            default => null,
+        };
 
         $limit  = min((int) $request->get('limit', 100), 500);
         $offset = (int) $request->get('offset', 0);
@@ -217,8 +285,10 @@ class AdminLocationController extends Controller
             'is_active'    => $t->is_active,
             'district_id'  => $t->district_id,
             'district_name'=> $t->district->name,
+            'district_is_active' => $t->district->is_active,
             'region_id'    => $t->region_id,
             'region_name'  => $t->region->name,
+            'region_is_active' => $t->region->is_active,
         ]);
 
         return response()->json(['success' => true, 'data' => ['towns' => $towns, 'total' => $total, 'limit' => $limit, 'offset' => $offset]]);

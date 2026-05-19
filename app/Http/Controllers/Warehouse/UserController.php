@@ -32,7 +32,7 @@ class UserController extends Controller
 
         $user = Auth::guard('admin')->user();
         $warehouse = $this->portalService->resolveWarehouse($user);
-        $roles = $this->portalService->getAssignableWarehouseRoles();
+        $roles = $this->portalService->getAssignableWarehouseRoles($user);
 
         return view('warehouse.users.index', [
             'warehouse' => $warehouse,
@@ -41,6 +41,7 @@ class UserController extends Controller
             'canEditUsers' => $user->hasPermission('warehouse.users.edit'),
             'canDeactivateUsers' => $user->hasPermission('warehouse.users.deactivate'),
             'canAssignRoles' => $user->hasPermission('warehouse.users.assign_roles'),
+            'canAssignRestrictedRoles' => $user->isHqUser(),
         ]);
     }
 
@@ -53,13 +54,14 @@ class UserController extends Controller
         $this->assertWarehouseScopedUser($user, $warehouse);
 
         $user->load(['roles.permissions', 'creator', 'warehouse']);
-        $roles = $this->portalService->getAssignableWarehouseRoles();
+        $roles = $this->portalService->getAssignableWarehouseRoles($actor);
 
         // Reuse the existing rich admin profile UI with warehouse routes.
         return view('warehouse.users.show', [
             'admin' => $user,
             'canManage' => $this->canManageWarehouseUser($actor, $user),
             'roles' => $roles,
+            'canAssignRestrictedRoles' => $actor->isHqUser(),
         ]);
     }
 
@@ -82,6 +84,18 @@ class UserController extends Controller
             });
         }
 
+        if ($email = trim((string) $request->input('email'))) {
+            $query->where('email', 'like', "%{$email}%");
+        }
+
+        if ($phone = trim((string) $request->input('phone'))) {
+            $query->where('phone', 'like', "%{$phone}%");
+        }
+
+        if ($creator = trim((string) $request->input('created_by'))) {
+            $query->whereHas('creator', fn ($q) => $q->where('name', 'like', "%{$creator}%"));
+        }
+
         if ($roleId = $request->integer('role')) {
             $query->whereHas('roles', fn ($q) => $q->where('roles.id', $roleId));
         }
@@ -90,12 +104,26 @@ class UserController extends Controller
             $query->where('is_active', $request->boolean('status'));
         }
 
+        if ($request->input('login_state') === 'logged_in') {
+            $query->whereNotNull('last_login_at');
+        } elseif ($request->input('login_state') === 'never') {
+            $query->whereNull('last_login_at');
+        }
+
         if ($dateFrom = $request->input('date_from')) {
             $query->whereDate('created_at', '>=', $dateFrom);
         }
 
         if ($dateTo = $request->input('date_to')) {
             $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        if ($lastLoginFrom = $request->input('last_login_from')) {
+            $query->whereDate('last_login_at', '>=', $lastLoginFrom);
+        }
+
+        if ($lastLoginTo = $request->input('last_login_to')) {
+            $query->whereDate('last_login_at', '<=', $lastLoginTo);
         }
 
         $sortBy = $request->input('sort', 'created_at');
@@ -171,7 +199,7 @@ class UserController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $role = $this->resolveAssignableWarehouseRole((int) $validated['role_id']);
+        $role = $this->resolveAssignableWarehouseRole((int) $validated['role_id'], $actor);
 
         $user = User::create([
             'name' => $validated['name'],
@@ -187,7 +215,7 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Warehouse user created successfully.',
+            'message' => 'User created successfully.',
             'data' => ['id' => $user->id],
         ]);
     }
@@ -243,14 +271,14 @@ class UserController extends Controller
             $currentRoleId = (int) ($user->roles()->value('roles.id') ?? 0);
 
             if ($requestedRoleId !== $currentRoleId) {
-                $role = $this->resolveAssignableWarehouseRole($requestedRoleId);
+                $role = $this->resolveAssignableWarehouseRole($requestedRoleId, $actor);
                 $user->syncRoles([$role->id]);
             }
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Warehouse user updated successfully.',
+            'message' => 'User updated successfully.',
         ]);
     }
 
@@ -304,6 +332,18 @@ class UserController extends Controller
             });
         }
 
+        if ($email = trim((string) $request->input('email'))) {
+            $query->where('email', 'like', "%{$email}%");
+        }
+
+        if ($phone = trim((string) $request->input('phone'))) {
+            $query->where('phone', 'like', "%{$phone}%");
+        }
+
+        if ($creator = trim((string) $request->input('created_by'))) {
+            $query->whereHas('creator', fn ($q) => $q->where('name', 'like', "%{$creator}%"));
+        }
+
         if ($roleId = $request->integer('role')) {
             $query->whereHas('roles', fn ($q) => $q->where('roles.id', $roleId));
         }
@@ -312,12 +352,26 @@ class UserController extends Controller
             $query->where('is_active', $request->boolean('status'));
         }
 
+        if ($request->input('login_state') === 'logged_in') {
+            $query->whereNotNull('last_login_at');
+        } elseif ($request->input('login_state') === 'never') {
+            $query->whereNull('last_login_at');
+        }
+
         if ($dateFrom = $request->input('date_from')) {
             $query->whereDate('created_at', '>=', $dateFrom);
         }
 
         if ($dateTo = $request->input('date_to')) {
             $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        if ($lastLoginFrom = $request->input('last_login_from')) {
+            $query->whereDate('last_login_at', '>=', $lastLoginFrom);
+        }
+
+        if ($lastLoginTo = $request->input('last_login_to')) {
+            $query->whereDate('last_login_at', '<=', $lastLoginTo);
         }
 
         $rows = $query->latest()->get()->map(function (User $user) {
@@ -334,13 +388,13 @@ class UserController extends Controller
         $format = $request->input('format', 'json');
 
         if ($format === 'excel') {
-            $filename = 'warehouse_users_' . date('Y-m-d_His') . '.xlsx';
+            $filename = 'users_' . date('Y-m-d_His') . '.xlsx';
             return Excel::download(new UsersExport($rows), $filename);
         }
 
         if ($format === 'pdf') {
-            $filename = 'warehouse_users_' . date('Y-m-d_His') . '.pdf';
-            return GenericPdfExporter::download($rows, $filename, 'Warehouse Users');
+            $filename = 'users_' . date('Y-m-d_His') . '.pdf';
+            return GenericPdfExporter::download($rows, $filename, 'Users');
         }
 
         return response()->json(['data' => $rows]);
@@ -450,14 +504,18 @@ class UserController extends Controller
         ]);
     }
 
-    private function resolveAssignableWarehouseRole(int $roleId): Role
+    private function resolveAssignableWarehouseRole(int $roleId, ?User $actor = null): Role
     {
-        return Role::query()
+        $query = Role::query()
             ->active()
             ->warehouseRoles()
-            ->where('is_assignable_by_warehouse_manager', true)
-            ->whereKey($roleId)
-            ->firstOrFail();
+            ->whereKey($roleId);
+
+        if (!$actor?->isHqUser()) {
+            $query->where('is_assignable_by_warehouse_manager', true);
+        }
+
+        return $query->firstOrFail();
     }
 
     private function assertWarehouseScopedUser(User $target, \App\Models\Warehouse $warehouse): void

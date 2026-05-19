@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <!-- Push Toggle -->
-    <div class="flex items-center justify-between p-4 bg-slate-50/70 rounded-2xl border border-slate-200/50">
+    <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
         <div>
             <h3 class="text-sm font-semibold text-slate-800">Push Notifications</h3>
             <p class="text-sm text-slate-500 mt-0.5">Enable or disable push notifications globally</p>
@@ -10,12 +10,12 @@
                    :checked="settings.push_notifications_enabled.value == '1' || settings.push_notifications_enabled.value === true"
                    @@change="settings.push_notifications_enabled.value = $event.target.checked ? '1' : '0'"
                    class="sr-only peer">
-            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-slate-300/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-900"></div>
+            <div class="h-6 w-11 rounded-full bg-slate-200 transition after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-orange-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-100"></div>
         </label>
     </div>
 
     <!-- Firebase Service Account Credentials -->
-    <div class="p-6 bg-slate-50/70 rounded-2xl border border-slate-200/50"
+    <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5"
          x-data="{
              uploading: false,
              uploadError: '',
@@ -89,7 +89,7 @@
         </div>
 
         <!-- Upload Form -->
-        <div class="flex items-start gap-3">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
             <div class="flex-1">
                 <input type="file" accept=".json" x-ref="fileInput"
                        @@change="selectedFile = $event.target.files[0]; uploadError = ''; uploadSuccess = ''"
@@ -98,7 +98,7 @@
             </div>
             <button type="button" @@click="uploadCredentials()"
                     :disabled="uploading || !selectedFile"
-                    class="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-xl hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2">
+                    class="flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
                 <svg x-show="uploading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -113,44 +113,44 @@
     </div>
 
     <!-- Web Push Configuration -->
-    <div class="p-6 bg-slate-50/70 rounded-2xl border border-slate-200/50">
+    <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
         <h3 class="text-sm font-semibold text-slate-800 mb-1">Web Push Configuration</h3>
         <p class="text-sm text-slate-500 mb-4">Public Firebase Web App credentials from Firebase Console → Project Settings → General → Your apps (Web app). These are not secret and are safe to save here.</p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1.5">Web API Key</label>
+                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Web API Key</label>
                 <input type="text"
                        x-model="settings.firebase_web_api_key.value"
-                       class="w-full px-3.5 py-2.5 border border-slate-200/70 rounded-xl bg-white backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                       class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                        placeholder="AIza...">
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1.5">Auth Domain</label>
+                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Auth Domain</label>
                 <input type="text"
                        x-model="settings.firebase_auth_domain.value"
-                       class="w-full px-3.5 py-2.5 border border-slate-200/70 rounded-xl bg-white backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                       class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                        placeholder="your-project.firebaseapp.com">
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1.5">Messaging Sender ID</label>
+                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Messaging Sender ID</label>
                 <input type="text"
                        x-model="settings.firebase_messaging_sender_id.value"
-                       class="w-full px-3.5 py-2.5 border border-slate-200/70 rounded-xl bg-white backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                       class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                        placeholder="123456789012">
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1.5">Web App ID</label>
+                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Web App ID</label>
                 <input type="text"
                        x-model="settings.firebase_app_id.value"
-                       class="w-full px-3.5 py-2.5 border border-slate-200/70 rounded-xl bg-white backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors"
+                       class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                        placeholder="1:123456789012:web:abc123">
             </div>
             <div class="md:col-span-2">
-                <label class="block text-sm font-medium text-slate-700 mb-1.5">VAPID Key <span class="text-slate-400 font-normal">(Web Push Certificate Public Key)</span></label>
+                <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">VAPID Key <span class="text-slate-400 font-normal">(Web Push Certificate Public Key)</span></label>
                 <input type="text"
                        x-model="settings.firebase_vapid_key.value"
-                       class="w-full px-3.5 py-2.5 border border-slate-200/70 rounded-xl bg-white backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 transition-colors font-mono text-xs"
+                       class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 font-mono text-xs font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                        placeholder="BLc2... (from Firebase Console → Cloud Messaging → Web Push certificates)">
                 <p class="text-xs text-slate-400 mt-1">Find this in Firebase Console → Project Settings → Cloud Messaging → Web configuration → Web Push certificates → Key pair</p>
             </div>
@@ -158,7 +158,7 @@
     </div>
 
     <!-- Test Push Notification -->
-    <div class="p-6 bg-slate-50/70 rounded-2xl border border-slate-200/50"
+    <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5"
          x-data="{
              testing: false,
              testMessage: '',
@@ -246,7 +246,7 @@
             </div>
             <button type="button" @@click="runTest()"
                     :disabled="testing"
-                    class="flex-shrink-0 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2">
+                    class="flex shrink-0 items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
                 <svg x-show="testing" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>

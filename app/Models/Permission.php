@@ -53,4 +53,53 @@ class Permission extends Model
     {
         return ucfirst(str_replace('.', ' - ', $this->name));
     }
+
+    public function displayModule(): string
+    {
+        if ($this->module !== 'warehouse') {
+            return match ($this->module) {
+                'platform_settings' => 'Platform',
+                'recipient_payments' => 'Recipient Payments',
+                default => str($this->module)->replace('_', ' ')->title()->toString(),
+            };
+        }
+
+        $segment = explode('.', $this->name)[1] ?? $this->action;
+
+        return match ($segment) {
+            'dashboard' => 'Dashboard',
+            'users' => 'Team',
+            'receiving' => 'Receiving',
+            'sorting' => 'Sorting',
+            'manifest', 'transport' => 'Manifests & Transport',
+            'delivery' => 'Delivery',
+            'items' => 'Packages',
+            'charges' => 'Finance',
+            'contacts' => 'Contact Queue',
+            'recipient_payments' => 'Recipient Payments',
+            default => str($segment)->replace('_', ' ')->title()->toString(),
+        };
+    }
+
+    public function displayLabel(): string
+    {
+        $parts = explode('.', $this->name);
+
+        if ($this->module === 'warehouse') {
+            array_shift($parts);
+        } else {
+            array_shift($parts);
+        }
+
+        return collect($parts)
+            ->map(fn (string $part) => str($part)->replace('_', ' ')->title()->toString())
+            ->implode(' / ');
+    }
+
+    public function displayDescription(): string
+    {
+        return trim((string) str($this->description ?? '')
+            ->replaceMatches('/\bwarehouse\s+/i', '')
+            ->replaceMatches('/\s+/', ' '));
+    }
 }

@@ -159,8 +159,8 @@ class WarehouseShipmentChargesController extends Controller
             abort(403, 'Unauthorized.');
         }
 
-        // Super admin bypasses warehouse scoping.
-        if (method_exists($admin, 'isSuperAdmin') && $admin->isSuperAdmin()) {
+        // HQ bypasses warehouse scoping.
+        if (method_exists($admin, 'isHqUser') && $admin->isHqUser()) {
             return;
         }
 

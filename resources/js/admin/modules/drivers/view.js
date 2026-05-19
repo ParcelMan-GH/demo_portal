@@ -17,8 +17,14 @@ function driverShow() {
             data: [],
             meta: { current_page: 1, from: 0, to: 0, total: 0, last_page: 1 },
             loading: false,
+            showFilters: false,
             search: '',
             status: '',
+            statusName: 'All Statuses',
+            dateFrom: '',
+            dateTo: '',
+            vendor: '',
+            recipientPhone: '',
             page: 1,
             perPage: 10,
             sortBy: 'created_at',
@@ -44,8 +50,16 @@ function driverShow() {
             data: [],
             meta: { current_page: 1, from: 0, to: 0, total: 0, last_page: 1 },
             loading: false,
+            showFilters: false,
             search: '',
             status: '',
+            statusName: 'All Statuses',
+            dateFrom: '',
+            dateTo: '',
+            origin: '',
+            destination: '',
+            receivedFrom: '',
+            receivedTo: '',
             page: 1,
             perPage: 10,
             sortBy: 'created_at',
@@ -73,8 +87,17 @@ function driverShow() {
             data: [],
             meta: { current_page: 1, from: 0, to: 0, total: 0, last_page: 1 },
             loading: false,
+            showFilters: false,
             search: '',
             status: '',
+            statusName: 'All Statuses',
+            dateFrom: '',
+            dateTo: '',
+            warehouse: '',
+            stopsMin: '',
+            stopsMax: '',
+            completedFrom: '',
+            completedTo: '',
             page: 1,
             perPage: 10,
             sortBy: 'created_at',
@@ -101,8 +124,19 @@ function driverShow() {
         packagesLoaded: false,
         packages: {
             rows: [],
+            meta: { current_page: 1, from: 0, to: 0, total: 0, last_page: 1 },
             loading: false,
             filter: 'current',
+            showFilters: false,
+            search: '',
+            eventType: '',
+            eventTypeName: 'All States',
+            dateFrom: '',
+            dateTo: '',
+            recipient: '',
+            location: '',
+            page: 1,
+            perPage: 10,
         },
 
         // Activity logs state
@@ -110,8 +144,14 @@ function driverShow() {
             data: [],
             meta: { current_page: 1, from: 0, to: 0, total: 0, last_page: 1 },
             loading: false,
+            showFilters: false,
             search: '',
             action: '',
+            actionName: 'All Actions',
+            dateFrom: '',
+            dateTo: '',
+            deviceType: '',
+            ipAddress: '',
             page: 1,
             perPage: 10,
             sortBy: 'created_at',
@@ -153,7 +193,268 @@ function driverShow() {
             this.config = window.driverShowConfig;
             this.driver = this.config.driver;
             this.canManage = this.config.canManage;
-            this.loadPickups();
+            this.setActiveTab(this.validTabFromUrl(), { replace: true });
+            window.addEventListener('popstate', () => {
+                this.setActiveTab(this.validTabFromUrl(), { replace: true });
+            });
+            this.$nextTick(() => this.initDateRanges());
+        },
+
+        validTabFromUrl() {
+            const allowed = ['pickups', 'transports', 'deliveries', 'activity', 'packages'];
+            const tab = new URLSearchParams(window.location.search).get('tab') || 'pickups';
+            return allowed.includes(tab) ? tab : 'pickups';
+        },
+
+        setActiveTab(tab, options = {}) {
+            this.activeTab = tab;
+
+            if (tab === 'pickups' && !this.pickups.data.length) this.loadPickups();
+            if (tab === 'transports' && !this.transports.data.length) this.loadTransports();
+            if (tab === 'deliveries' && !this.deliveries.data.length) this.loadDeliveries();
+            if (tab === 'activity' && !this.activity.data.length) this.loadActivityLogs();
+            if (tab === 'packages' && !this.packagesLoaded) this.loadPackages();
+
+            const url = new URL(window.location.href);
+            if (tab === 'pickups') {
+                url.searchParams.delete('tab');
+            } else {
+                url.searchParams.set('tab', tab);
+            }
+
+            const method = options.replace ? 'replaceState' : 'pushState';
+            window.history[method]({}, '', url);
+        },
+
+        loadTab(tab) {
+            const loaders = {
+                pickups: () => this.loadPickups(),
+                transports: () => this.loadTransports(),
+                deliveries: () => this.loadDeliveries(),
+                activity: () => this.loadActivityLogs(),
+                packages: () => this.loadPackages(),
+            };
+            loaders[tab]?.();
+        },
+
+        applyTabFilters(tab) {
+            this[tab].page = 1;
+            this.loadTab(tab);
+        },
+
+        clearTabFilters(tab) {
+            const resetters = {
+                pickups: () => {
+                    this.pickups.status = '';
+                    this.pickups.statusName = 'All Statuses';
+                    this.clearDateRange('pickups');
+                    this.pickups.vendor = '';
+                    this.pickups.recipientPhone = '';
+                },
+                transports: () => {
+                    this.transports.status = '';
+                    this.transports.statusName = 'All Statuses';
+                    this.clearDateRange('transports');
+                    this.clearDateRange('transportsReceived', 'transports', 'receivedFrom', 'receivedTo');
+                    this.transports.origin = '';
+                    this.transports.destination = '';
+                },
+                deliveries: () => {
+                    this.deliveries.status = '';
+                    this.deliveries.statusName = 'All Statuses';
+                    this.clearDateRange('deliveries');
+                    this.clearDateRange('deliveriesCompleted', 'deliveries', 'completedFrom', 'completedTo');
+                    this.deliveries.warehouse = '';
+                    this.deliveries.stopsMin = '';
+                    this.deliveries.stopsMax = '';
+                },
+                packages: () => {
+                    this.packages.filter = 'current';
+                    this.packages.eventType = '';
+                    this.packages.eventTypeName = 'All States';
+                    this.clearDateRange('packages');
+                    this.packages.recipient = '';
+                    this.packages.location = '';
+                },
+                activity: () => {
+                    this.activity.action = '';
+                    this.activity.actionName = 'All Actions';
+                    this.clearDateRange('activity');
+                    this.activity.deviceType = '';
+                    this.activity.ipAddress = '';
+                },
+            };
+
+            resetters[tab]?.();
+            this[tab].page = 1;
+            this.loadTab(tab);
+        },
+
+        activeFilterChips(tab) {
+            const state = this[tab];
+            const chips = [];
+            const add = (key, label, value) => {
+                if (value !== undefined && value !== null && value !== '') chips.push({ key, label });
+            };
+
+            if (tab === 'pickups') {
+                add('status', `Status: ${state.statusName}`, state.status);
+                add('dateRange', `Assigned: ${this.dateRangeLabel(state.dateFrom, state.dateTo)}`, state.dateFrom || state.dateTo);
+                add('vendor', `Vendor: ${state.vendor}`, state.vendor);
+                add('recipientPhone', `Phone: ${state.recipientPhone}`, state.recipientPhone);
+            } else if (tab === 'transports') {
+                add('status', `Status: ${state.statusName}`, state.status);
+                add('dateRange', `Assigned: ${this.dateRangeLabel(state.dateFrom, state.dateTo)}`, state.dateFrom || state.dateTo);
+                add('receivedRange', `Received: ${this.dateRangeLabel(state.receivedFrom, state.receivedTo)}`, state.receivedFrom || state.receivedTo);
+                add('origin', `Origin: ${state.origin}`, state.origin);
+                add('destination', `Destination: ${state.destination}`, state.destination);
+            } else if (tab === 'deliveries') {
+                add('status', `Status: ${state.statusName}`, state.status);
+                add('dateRange', `Assigned: ${this.dateRangeLabel(state.dateFrom, state.dateTo)}`, state.dateFrom || state.dateTo);
+                add('completedRange', `Completed: ${this.dateRangeLabel(state.completedFrom, state.completedTo)}`, state.completedFrom || state.completedTo);
+                add('warehouse', `Warehouse: ${state.warehouse}`, state.warehouse);
+                add('stopsMin', `Min stops: ${state.stopsMin}`, state.stopsMin);
+                add('stopsMax', `Max stops: ${state.stopsMax}`, state.stopsMax);
+            } else if (tab === 'packages') {
+                add('filter', `Scope: ${state.filter === 'current' ? 'Current' : 'All history'}`, state.filter !== 'current' ? state.filter : '');
+                add('eventType', `State: ${state.eventTypeName}`, state.eventType);
+                add('dateRange', `Date: ${this.dateRangeLabel(state.dateFrom, state.dateTo)}`, state.dateFrom || state.dateTo);
+                add('recipient', `Recipient: ${state.recipient}`, state.recipient);
+                add('location', `Location: ${state.location}`, state.location);
+            } else if (tab === 'activity') {
+                add('action', `Action: ${state.actionName}`, state.action);
+                add('dateRange', `Activity: ${this.dateRangeLabel(state.dateFrom, state.dateTo)}`, state.dateFrom || state.dateTo);
+                add('deviceType', `Device: ${this.deviceTypeLabel(state.deviceType)}`, state.deviceType);
+                add('ipAddress', `IP: ${state.ipAddress}`, state.ipAddress);
+            }
+
+            return chips;
+        },
+
+        clearFilter(tab, key) {
+            if (key === 'dateRange') this.clearDateRange(tab);
+            else if (key === 'receivedRange') this.clearDateRange('transportsReceived', 'transports', 'receivedFrom', 'receivedTo');
+            else if (key === 'completedRange') this.clearDateRange('deliveriesCompleted', 'deliveries', 'completedFrom', 'completedTo');
+            else if (key === 'status') {
+                this[tab].status = '';
+                this[tab].statusName = 'All Statuses';
+            } else if (key === 'action') {
+                this.activity.action = '';
+                this.activity.actionName = 'All Actions';
+            } else if (key === 'eventType') {
+                this.packages.eventType = '';
+                this.packages.eventTypeName = 'All States';
+            } else {
+                this[tab][key] = key === 'filter' ? 'current' : '';
+            }
+            this[tab].page = 1;
+            this.loadTab(tab);
+        },
+
+        dateRangeLabel(from, to) {
+            return `${from || '...'} - ${to || '...'}`;
+        },
+
+        initDateRanges() {
+            const setupPicker = () => {
+                this.setupDateRangePicker(this.$refs.pickupsAssignedRange, 'pickups');
+                this.setupDateRangePicker(this.$refs.transportsAssignedRange, 'transports');
+                this.setupDateRangePicker(this.$refs.transportsReceivedRange, 'transportsReceived', 'transports', 'receivedFrom', 'receivedTo');
+                this.setupDateRangePicker(this.$refs.deliveriesAssignedRange, 'deliveries');
+                this.setupDateRangePicker(this.$refs.deliveriesCompletedRange, 'deliveriesCompleted', 'deliveries', 'completedFrom', 'completedTo');
+                this.setupDateRangePicker(this.$refs.packagesEventRange, 'packages');
+                this.setupDateRangePicker(this.$refs.activityCreatedRange, 'activity');
+            };
+
+            if (window.$ && window.moment && window.$.fn.daterangepicker) {
+                setupPicker();
+                return;
+            }
+
+            if (!document.getElementById('daterangepicker-css')) {
+                const link = document.createElement('link');
+                link.id = 'daterangepicker-css';
+                link.rel = 'stylesheet';
+                link.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
+                document.head.appendChild(link);
+            }
+
+            const loadScript = (id, src) => new Promise((resolve) => {
+                if (document.getElementById(id)) return resolve();
+                const script = document.createElement('script');
+                script.id = id;
+                script.src = src;
+                script.onload = () => resolve();
+                document.body.appendChild(script);
+            });
+
+            loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
+                .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
+                .then(() => {
+                    window.$ = window.jQuery = window.jQuery || window.$;
+                    window.moment = window.moment || moment;
+                    return loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js');
+                })
+                .then(setupPicker);
+        },
+
+        setupDateRangePicker(input, refKey, stateKey = refKey, fromField = 'dateFrom', toField = 'dateTo') {
+            if (!input || !window.$ || !window.moment || !window.$.fn.daterangepicker) return;
+            if (this[`${refKey}RangePicker`]) return;
+
+            const $input = window.$(input);
+            $input.daterangepicker({
+                autoUpdateInput: false,
+                alwaysShowCalendars: true,
+                opens: 'left',
+                locale: { format: 'YYYY-MM-DD', cancelLabel: 'Clear' },
+                ranges: {
+                    'Today': [window.moment(), window.moment()],
+                    'Yesterday': [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
+                    'Last 7 Days': [window.moment().subtract(6, 'days'), window.moment()],
+                    'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
+                    'This Month': [window.moment().startOf('month'), window.moment().endOf('month')],
+                    'Last Month': [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
+                },
+            });
+
+            $input.on('apply.daterangepicker', (ev, picker) => {
+                this[stateKey][fromField] = picker.startDate.format('YYYY-MM-DD');
+                this[stateKey][toField] = picker.endDate.format('YYYY-MM-DD');
+                $input.val(`${this[stateKey][fromField]} - ${this[stateKey][toField]}`);
+                this[stateKey].page = 1;
+                this.loadTab(stateKey);
+            });
+
+            $input.on('cancel.daterangepicker', () => {
+                this.clearDateRange(refKey, stateKey, fromField, toField);
+                this[stateKey].page = 1;
+                this.loadTab(stateKey);
+            });
+
+            this[`${refKey}RangePicker`] = $input.data('daterangepicker');
+        },
+
+        clearDateRange(refKey, stateKey = refKey, fromField = 'dateFrom', toField = 'dateTo') {
+            if (!this[stateKey]) return;
+            this[stateKey][fromField] = '';
+            this[stateKey][toField] = '';
+
+            const input = {
+                pickups: this.$refs.pickupsAssignedRange,
+                transports: this.$refs.transportsAssignedRange,
+                transportsReceived: this.$refs.transportsReceivedRange,
+                deliveries: this.$refs.deliveriesAssignedRange,
+                deliveriesCompleted: this.$refs.deliveriesCompletedRange,
+                packages: this.$refs.packagesEventRange,
+                activity: this.$refs.activityCreatedRange,
+            }[refKey];
+
+            if (input && window.$) window.$(input).val('');
+        },
+
+        deviceTypeLabel(value) {
+            return ({ mobile: 'Mobile', web: 'Web', desktop: 'Desktop' })[value] || value;
         },
 
         // ── Sort helpers ──────────────────────────────────────────
@@ -236,6 +537,10 @@ function driverShow() {
         activityLastPage()      { this.activity.page = this.activity.meta.last_page; this.loadActivityLogs(); },
         setActivityPerPage(n)   { this.activity.perPage = n; this.activity.page = 1; this.loadActivityLogs(); },
 
+        packagesPrevPage()      { if (this.packages.page > 1) { this.packages.page--; this.loadPackages(); } },
+        packagesNextPage()      { if (this.packages.page < this.packages.meta.last_page) { this.packages.page++; this.loadPackages(); } },
+        setPackagesPerPage(n)   { this.packages.perPage = n; this.packages.page = 1; this.loadPackages(); },
+
         // ── Data loaders ──────────────────────────────────────────
         async loadPickups() {
             this.pickups.loading = true;
@@ -245,6 +550,10 @@ function driverShow() {
                     per_page: this.pickups.perPage,
                     search: this.pickups.search,
                     status: this.pickups.status,
+                    date_from: this.pickups.dateFrom,
+                    date_to: this.pickups.dateTo,
+                    vendor: this.pickups.vendor,
+                    recipient_phone: this.pickups.recipientPhone,
                     sort: this.pickups.sortBy,
                     direction: this.pickups.sortDirection,
                 });
@@ -269,6 +578,12 @@ function driverShow() {
                     per_page: this.transports.perPage,
                     search: this.transports.search,
                     status: this.transports.status,
+                    date_from: this.transports.dateFrom,
+                    date_to: this.transports.dateTo,
+                    received_from: this.transports.receivedFrom,
+                    received_to: this.transports.receivedTo,
+                    origin: this.transports.origin,
+                    destination: this.transports.destination,
                     sort: this.transports.sortBy,
                     direction: this.transports.sortDirection,
                 });
@@ -293,6 +608,13 @@ function driverShow() {
                     per_page: this.deliveries.perPage,
                     search: this.deliveries.search,
                     status: this.deliveries.status,
+                    date_from: this.deliveries.dateFrom,
+                    date_to: this.deliveries.dateTo,
+                    completed_from: this.deliveries.completedFrom,
+                    completed_to: this.deliveries.completedTo,
+                    warehouse: this.deliveries.warehouse,
+                    stops_min: this.deliveries.stopsMin,
+                    stops_max: this.deliveries.stopsMax,
                     sort: this.deliveries.sortBy,
                     direction: this.deliveries.sortDirection,
                 });
@@ -314,11 +636,19 @@ function driverShow() {
             this.packagesLoaded = true;
             try {
                 const params = new URLSearchParams();
+                params.set('page', this.packages.page);
                 params.set('filter', this.packages.filter);
-                params.set('per_page', 50);
+                params.set('search', this.packages.search);
+                params.set('event_type', this.packages.eventType);
+                params.set('date_from', this.packages.dateFrom);
+                params.set('date_to', this.packages.dateTo);
+                params.set('recipient', this.packages.recipient);
+                params.set('location', this.packages.location);
+                params.set('per_page', this.packages.perPage);
                 const res = await fetch(this.config.packagesDataUrl + '?' + params, { headers: { 'Accept': 'application/json' } });
                 const json = await res.json();
                 this.packages.rows = json.data || [];
+                this.packages.meta = json.meta || this.packages.meta;
             } catch (e) { console.error('Failed to load packages', e); }
             this.packages.loading = false;
         },
@@ -331,6 +661,10 @@ function driverShow() {
                     per_page: this.activity.perPage,
                     search: this.activity.search,
                     action: this.activity.action,
+                    date_from: this.activity.dateFrom,
+                    date_to: this.activity.dateTo,
+                    device_type: this.activity.deviceType,
+                    ip_address: this.activity.ipAddress,
                     sort: this.activity.sortBy,
                     direction: this.activity.sortDirection,
                 });

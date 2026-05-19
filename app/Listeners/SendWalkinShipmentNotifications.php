@@ -19,7 +19,7 @@ class SendWalkinShipmentNotifications implements ShouldQueue
         $shipmentNumber = $shipment->shipment_number;
         $vendorName = $vendor?->name ?? 'Unknown vendor';
 
-        // Notify super admins
+        // Notify HQ operators.
         $this->pushService->sendToSuperAdmins(
             title: 'Walk-in Shipment Received',
             body: "{$actor} received walk-in shipment {$shipmentNumber} from {$vendorName} at {$warehouse->name}.",
