@@ -562,12 +562,34 @@
                                                    class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-900/10">
                                         </div>
                                     </div>
-                                    <div>
+                                    <div class="relative" @@click.outside="closeReceivingTownSearch(items[receiveModal.itemIndex])">
                                         <label class="mb-1.5 block text-xs font-bold text-slate-700">Town / Area</label>
-                                        <input type="text"
-                                               x-model="items[receiveModal.itemIndex].delivery_town"
-                                               placeholder="Delivery town or area"
-                                               class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-900/10">
+                                        <div class="relative">
+                                            <input type="text"
+                                                   :value="items[receiveModal.itemIndex]._town_query"
+                                                   @@input="updateReceivingTownQuery(items[receiveModal.itemIndex], $event.target.value)"
+                                                   placeholder="Search saved towns or keep free text"
+                                                   class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-12 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-900/10">
+                                            <div x-show="items[receiveModal.itemIndex]._town_loading" class="absolute inset-y-0 right-10 flex items-center text-slate-400" style="display:none">
+                                                <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                            </div>
+                                            <button type="button" x-show="items[receiveModal.itemIndex]._town_query" @@click.prevent="clearReceivingTown(items[receiveModal.itemIndex])"
+                                                    class="absolute inset-y-0 right-3 flex items-center text-slate-400 transition-colors hover:text-slate-600" style="display:none">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
+                                            </button>
+                                            <div x-show="items[receiveModal.itemIndex]._town_open" x-transition
+                                                 class="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl" style="display:none">
+                                                <template x-for="town in items[receiveModal.itemIndex]._town_results" :key="`${town.id}-${town.region_id}`">
+                                                    <button type="button" @@click.prevent="selectReceivingTownOption(items[receiveModal.itemIndex], town)"
+                                                            class="w-full border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50">
+                                                        <p class="text-sm font-bold text-slate-800" x-text="town.name"></p>
+                                                        <p class="text-xs text-slate-500" x-text="town.context"></p>
+                                                    </button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <p x-show="items[receiveModal.itemIndex]._town_linked && items[receiveModal.itemIndex]._town_context" class="mt-1 text-[10px] font-medium text-emerald-600" x-text="'Linked to ' + items[receiveModal.itemIndex]._town_context" style="display:none"></p>
+                                        <p x-show="items[receiveModal.itemIndex].delivery_town && !items[receiveModal.itemIndex]._town_linked" class="mt-1 text-[10px] text-amber-600" style="display:none">Free-text town. Region and district stay empty until you select a saved town.</p>
                                     </div>
                                     <div>
                                         <label class="mb-1.5 block text-xs font-bold text-slate-700">Landmark</label>

@@ -569,7 +569,13 @@ class WarehouseReceivingService
 
     public function serializeReceiptItem(WarehouseReceiptItem $item): array
     {
-        $item->loadMissing(['photos', 'shipmentItem.shipment']);
+        $item->loadMissing([
+            'photos',
+            'shipmentItem.deliveryRegion:id,name',
+            'shipmentItem.deliveryDistrict:id,name',
+            'shipmentItem.shipment.deliveryRegion:id,name',
+            'shipmentItem.shipment.deliveryDistrict:id,name',
+        ]);
 
         $shipmentItem = $item->shipmentItem;
         $shipment = $shipmentItem?->shipment;
@@ -587,6 +593,8 @@ class WarehouseReceivingService
             'delivery_recipient_phone' => $shipmentItem?->delivery_recipient_phone ?: $shipment?->delivery_recipient_phone,
             'delivery_region_id' => $shipmentItem?->delivery_region_id ?: $shipment?->delivery_region_id,
             'delivery_district_id' => $shipmentItem?->delivery_district_id ?: $shipment?->delivery_district_id,
+            'delivery_region_name' => $shipmentItem?->deliveryRegion?->name ?: $shipment?->deliveryRegion?->name,
+            'delivery_district_name' => $shipmentItem?->deliveryDistrict?->name ?: $shipment?->deliveryDistrict?->name,
             'delivery_town' => $shipmentItem?->delivery_town ?: $shipment?->delivery_town,
             'delivery_landmark' => $shipmentItem?->delivery_landmark ?: $shipment?->delivery_landmark,
             'delivery_instructions' => $shipmentItem?->delivery_instructions ?: $shipment?->delivery_instructions,

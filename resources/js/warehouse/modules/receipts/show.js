@@ -128,6 +128,7 @@ function registerWarehouseReceiptShowPage() {
         photoModal: { open: false, title: '', photos: [], index: 0 },
 
         init() {
+            this.items = this.items.map((item) => this.prepareReceivingTownState(item));
             if (!this.receipt && this.items.length > 0) {
                 this.receipt = { status: 'draft' };
             }
@@ -197,6 +198,38 @@ function registerWarehouseReceiptShowPage() {
             ].filter(Boolean).join(', ');
 
             return location || 'No shared destination set';
+        },
+
+        receivingTownContext(districtName, regionName) {
+            return [districtName, regionName].filter(Boolean).join(', ');
+        },
+
+        receivingTownDisplay(town, districtName = '', regionName = '', isLinked = false) {
+            if (!town) return '';
+            const context = this.receivingTownContext(districtName, regionName);
+            return isLinked && context ? `${town} - ${context}` : town;
+        },
+
+        prepareReceivingTownState(item) {
+            const prepared = { ...(item || {}) };
+            const isLinked = Boolean(prepared.delivery_town && prepared.delivery_region_id && prepared.delivery_district_id);
+            prepared._town_query = this.receivingTownDisplay(
+                prepared.delivery_town || '',
+                prepared.delivery_district_name || '',
+                prepared.delivery_region_name || '',
+                isLinked
+            );
+            prepared._town_results = [];
+            prepared._town_open = false;
+            prepared._town_loading = false;
+            prepared._town_debounce = null;
+            prepared._town_request = 0;
+            prepared._town_linked = isLinked;
+            prepared._town_context = isLinked
+                ? this.receivingTownContext(prepared.delivery_district_name || '', prepared.delivery_region_name || '')
+                : '';
+            prepared._town_selected_display = isLinked ? prepared._town_query : null;
+            return prepared;
         },
 
         openSharedDestinationModal() {
@@ -501,7 +534,7 @@ function registerWarehouseReceiptShowPage() {
                 this.shipment = data.shipment;
             }
             if (Array.isArray(data.items)) {
-                this.items = data.items;
+                this.items = data.items.map((item) => this.prepareReceivingTownState(item));
             }
             if (Object.prototype.hasOwnProperty.call(data, 'receipt')) {
                 this.receipt = data.receipt || this.receipt;
@@ -685,6 +718,101 @@ function registerWarehouseReceiptShowPage() {
             this.openFinalizeModal();
         },
 
+        clearReceivingTown(item) {
+            if (!item) return;
+            clearTimeout(item._town_debounce);
+            item._town_query = '';
+            item._town_results = [];
+            item._town_open = false;
+            item._town_loading = false;
+            item._town_linked = false;
+            item._town_context = '';
+            item._town_selected_display = null;
+            item.delivery_town = '';
+            item.delivery_region_id = '';
+            item.delivery_district_id = '';
+        },
+
+        closeReceivingTownSearch(item) {
+            if (!item) return;
+            item._town_open = false;
+        },
+
+        updateReceivingTownQuery(item, value) {
+            if (!item) return;
+            item._town_query = value;
+            item.delivery_town = String(value || '').trim();
+            item.delivery_region_id = '';
+            item.delivery_district_id = '';
+            item._town_linked = false;
+            item._town_context = '';
+            item._town_selected_display = null;
+            this.searchReceivingTownOptions(item);
+        },
+
+        async searchReceivingTownOptions(item) {
+            if (!item) return;
+            const query = (item._town_query || '').trim();
+            clearTimeout(item._town_debounce);
+
+            if (query.length < 2 || !config.townsSearchUrl) {
+                item._town_results = [];
+                item._town_open = false;
+                item._town_loading = false;
+                return;
+            }
+
+            const requestId = ++item._town_request;
+            item._town_debounce = setTimeout(async () => {
+                item._town_loading = true;
+                try {
+                    const url = new URL(config.townsSearchUrl, window.location.origin);
+                    url.searchParams.set('search', query);
+                    url.searchParams.set('active', '1');
+                    url.searchParams.set('limit', '12');
+
+                    const response = await fetch(url.toString(), {
+                        headers: { Accept: 'application/json' },
+                    });
+                    const result = await response.json();
+                    if (requestId !== item._town_request) return;
+
+                    item._town_results = (result.data?.towns || []).map((town) => ({
+                        ...town,
+                        display: this.receivingTownDisplay(town.name, town.district_name, town.region_name, true),
+                        context: this.receivingTownContext(town.district_name, town.region_name),
+                    }));
+                    item._town_open = item._town_results.length > 0;
+                } catch (e) {
+                    if (requestId === item._town_request) {
+                        item._town_results = [];
+                        item._town_open = false;
+                    }
+                } finally {
+                    if (requestId === item._town_request) {
+                        item._town_loading = false;
+                    }
+                }
+            }, 300);
+        },
+
+        selectReceivingTownOption(item, town) {
+            if (!item) return;
+            const display = this.receivingTownDisplay(town.name, town.district_name, town.region_name, true);
+            item.delivery_town = town.name || '';
+            item.delivery_region_id = town.region_id ? String(town.region_id) : '';
+            item.delivery_district_id = town.district_id ? String(town.district_id) : '';
+            item.delivery_region_name = town.region_name || '';
+            item.delivery_district_name = town.district_name || '';
+            item._town_query = display;
+            item._town_results = [];
+            item._town_open = false;
+            item._town_loading = false;
+            item._town_linked = Boolean(town.region_id && town.district_id);
+            item._town_context = this.receivingTownContext(town.district_name, town.region_name);
+            item._town_selected_display = display;
+        },
+
         async saveItem(itemId) {
             if (this.isFinalized()) {
                 window.showToast?.('Receipt is finalized and cannot be edited.', 'warning');
@@ -709,6 +837,8 @@ function registerWarehouseReceiptShowPage() {
                 if (this.isPerItemMode()) {
                     formData.append('delivery_recipient_name', item.delivery_recipient_name || '');
                     formData.append('delivery_recipient_phone', item.delivery_recipient_phone || '');
+                    formData.append('delivery_region_id', item.delivery_region_id || '');
+                    formData.append('delivery_district_id', item.delivery_district_id || '');
                     formData.append('delivery_town', item.delivery_town || '');
                     formData.append('delivery_landmark', item.delivery_landmark || '');
                     formData.append('delivery_instructions', item.delivery_instructions || '');
@@ -738,7 +868,7 @@ function registerWarehouseReceiptShowPage() {
                 }
 
                 if (result.data?.item) {
-                    Object.assign(item, result.data.item);
+                    Object.assign(item, this.prepareReceivingTownState(result.data.item));
                 }
                 if (result.data?.receipt) {
                     this.receipt = result.data.receipt;
