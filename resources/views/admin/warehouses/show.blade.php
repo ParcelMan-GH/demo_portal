@@ -101,7 +101,7 @@ $sortBatchesFlat = $sortBatchesOrigin->map(fn($b) => [
     'sealed_at' => $b->sealed_at?->format('d M Y, h:i A') ?? '-',
     'created_at' => $b->created_at?->format('d M Y, h:i A') ?? '-',
     'view_url' => route('admin.sort-batches.show', $b->id),
-])->merge($sortBatchesDest->map(fn($b) => [
+])->toBase()->merge($sortBatchesDest->map(fn($b) => [
     'id' => $b->id,
     '_primary' => $b->batch_number,
     '_secondary' => 'From ' . ($b->originWarehouse?->name ?? 'Unknown warehouse'),
@@ -116,7 +116,7 @@ $sortBatchesFlat = $sortBatchesOrigin->map(fn($b) => [
     'sealed_at' => $b->sealed_at?->format('d M Y, h:i A') ?? '-',
     'created_at' => $b->created_at?->format('d M Y, h:i A') ?? '-',
     'view_url' => route('admin.sort-batches.show', $b->id),
-]))->sortByDesc('created_at')->values()->all();
+])->toBase())->sortByDesc('created_at')->values()->all();
 
 $manifestsFlat = $manifestsOutgoing->map(fn($m) => [
     'id' => $m->id,
@@ -134,7 +134,7 @@ $manifestsFlat = $manifestsOutgoing->map(fn($m) => [
     'arrived_at' => $m->arrived_at?->format('d M Y, h:i A') ?? '-',
     'created_at' => $m->created_at?->format('d M Y, h:i A') ?? '-',
     'view_url' => route('admin.transport-manifests.show', $m->id),
-])->merge($manifestsIncoming->map(fn($m) => [
+])->toBase()->merge($manifestsIncoming->map(fn($m) => [
     'id' => $m->id,
     '_primary' => $m->manifest_number,
     '_secondary' => 'From ' . ($m->originWarehouse?->name ?? 'Unknown warehouse'),
@@ -150,7 +150,7 @@ $manifestsFlat = $manifestsOutgoing->map(fn($m) => [
     'arrived_at' => $m->arrived_at?->format('d M Y, h:i A') ?? '-',
     'created_at' => $m->created_at?->format('d M Y, h:i A') ?? '-',
     'view_url' => route('admin.transport-manifests.show', $m->id),
-]))->sortByDesc('created_at')->values()->all();
+])->toBase())->sortByDesc('created_at')->values()->all();
 
 $deliveryRunsFlat = $deliveryRuns->map(fn($r) => [
     'id' => $r->id,
