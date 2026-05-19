@@ -9,6 +9,7 @@ use App\Models\NotificationLog;
 use App\Models\OtpCode;
 use App\Models\PlatformSetting;
 use App\Services\EmailTemplateService;
+use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -947,16 +948,28 @@ class SettingsController extends Controller
      */
     public function testSms(Request $request): JsonResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'phone' => 'required|string',
         ]);
 
-        // This would integrate with your SMS service
-        // For now, return success
-        return response()->json([
-            'success' => true,
-            'message' => 'Test SMS sent successfully.',
-        ]);
+        try {
+            $sent = app(SmsService::class)->send(
+                $validated['phone'],
+                'Parcelman test SMS. Your SMS settings are working.'
+            );
+
+            return response()->json([
+                'success' => $sent,
+                'message' => $sent
+                    ? 'Test SMS sent successfully.'
+                    : 'Test SMS failed. Check SMS settings and the application log for the provider response.',
+            ], $sent ? 200 : 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send test SMS: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

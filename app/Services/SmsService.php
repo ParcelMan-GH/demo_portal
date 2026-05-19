@@ -15,6 +15,22 @@ class SmsService
      */
     public function send(string $phone, string $message): bool
     {
+        if (!$this->isEnabled()) {
+            Log::warning('SMS skipped because SMS notifications are disabled', [
+                'phone' => $this->formatPhoneNumber($phone),
+            ]);
+
+            return false;
+        }
+
+        if ($this->getProvider() !== 'arkesel') {
+            Log::error('SMS provider is not supported for runtime sends', [
+                'provider' => $this->getProvider(),
+            ]);
+
+            return false;
+        }
+
         $apiKey = $this->getApiKey();
         $senderId = $this->getSenderId();
 
@@ -38,6 +54,8 @@ class SmsService
             if ($response->successful()) {
                 Log::info('SMS sent successfully', [
                     'phone' => $formattedPhone,
+                    'provider' => $this->getProvider(),
+                    'sender' => $senderId,
                     'response' => $response->json(),
                 ]);
                 return true;
@@ -45,6 +63,8 @@ class SmsService
 
             Log::error('SMS failed', [
                 'phone' => $formattedPhone,
+                'provider' => $this->getProvider(),
+                'sender' => $senderId,
                 'status' => $response->status(),
                 'response' => $response->body(),
             ]);
@@ -53,10 +73,24 @@ class SmsService
         } catch (\Exception $e) {
             Log::error('SMS exception', [
                 'phone' => $formattedPhone,
+                'provider' => $this->getProvider(),
+                'sender' => $senderId,
                 'error' => $e->getMessage(),
             ]);
             return false;
         }
+    }
+
+    protected function isEnabled(): bool
+    {
+        $value = PlatformSetting::getValue('sms_enabled', true);
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    protected function getProvider(): string
+    {
+        return strtolower(trim((string) PlatformSetting::getValue('sms_provider', 'arkesel')));
     }
 
     /**
@@ -72,6 +106,12 @@ class SmsService
      */
     protected function getSenderId(): ?string
     {
+        $senderId = PlatformSetting::getValue('sms_sender_id');
+
+        if (filled($senderId)) {
+            return (string) $senderId;
+        }
+
         return PlatformSetting::getValue('arkesel_sender_id', 'SHAXI');
     }
 
