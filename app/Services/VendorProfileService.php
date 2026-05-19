@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PlatformSetting;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
 
@@ -24,6 +25,7 @@ class VendorProfileService
             'message' => 'Profile retrieved successfully.',
             'data' => [
                 'user' => $this->formatVendor($vendor),
+                'app_config' => $this->formatAppConfig(),
             ],
         ];
     }
@@ -51,6 +53,7 @@ class VendorProfileService
             'message' => 'Profile updated successfully.',
             'data' => [
                 'user' => $this->formatVendor($vendor),
+                'app_config' => $this->formatAppConfig(),
             ],
         ];
     }
@@ -67,6 +70,16 @@ class VendorProfileService
             'phone' => $vendor->phone,
             'email' => $vendor->email,
             'created_at' => $vendor->created_at?->toISOString(),
+        ];
+    }
+
+    /**
+     * Format mobile app configuration values exposed to vendors.
+     */
+    protected function formatAppConfig(): array
+    {
+        return [
+            'support_phone' => PlatformSetting::getValue('platform_phone', ''),
         ];
     }
 }
