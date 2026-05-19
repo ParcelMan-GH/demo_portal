@@ -3499,6 +3499,18 @@ function shipmentShow() {
                 && ['submitted', 'invoice_accepted'].includes(this.shipment?.status);
         },
 
+        canManagePickupAssignment() {
+            if (!this.canManage) {
+                return false;
+            }
+
+            if (['cancelled', 'delivered'].includes(this.shipment?.status)) {
+                return false;
+            }
+
+            return !this.assignment || this.canEditCurrentAssignment();
+        },
+
         pickupAssignmentLockedLabel() {
             if (!this.assignment) {
                 return 'Assign a pickup driver before pickup starts.';

@@ -169,6 +169,11 @@
                     <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">HQ Controls</div>
                     <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
 
+                    <a href="{{ route('admin.operations.shipments.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.operations.shipments.*') || request()->routeIs('admin.shipments.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                        <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></div>
+                        <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Shipments</span>
+                        <template x-if="sidebarCollapsed"><span class="wh-tooltip">Shipments</span></template>
+                    </a>
                     @hasPermission('vendors.view')
                         <a href="{{ route('admin.vendors.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.vendors.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                             <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></div>

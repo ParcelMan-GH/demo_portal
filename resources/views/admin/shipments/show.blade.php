@@ -1,7 +1,7 @@
 @extends('admin.layouts.app')
 
 @section('title', 'Shipment - ' . $shipment->shipment_number)
-@section('breadcrumb-parent', 'Shipments')
+@section('breadcrumb-parent', 'Operations')
 @section('breadcrumb-current', $shipment->shipment_number)
 
 @php
@@ -65,279 +65,152 @@ $shipmentConfig = [
 <div x-data="shipmentShow()" data-shipment-show-config="{{ json_encode($shipmentConfig) }}" class="space-y-6">
 
     <!-- Hero Section -->
-    <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/30">
-        <div class="relative">
-            <!-- Background Pattern -->
-            <div class="absolute inset-0 opacity-10">
-                <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <defs>
-                        <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" stroke-width="0.5"/>
-                        </pattern>
-                    </defs>
-                    <rect width="100" height="100" fill="url(#grid)"/>
-                </svg>
-            </div>
+    <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 shadow-xl shadow-slate-300/20">
+        <div class="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
+            <div class="absolute inset-y-0 right-0 w-2/3 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.25),transparent_58%)]"></div>
+            <div class="absolute inset-y-0 left-0 w-1/2 bg-[radial-gradient(circle_at_bottom_left,rgba(15,23,42,0.95),transparent_70%)]"></div>
+        </div>
 
-            <div class="relative px-6 lg:px-8 py-6">
-                @php
-                    $statusColors = match($shipment->status->value ?? $shipment->status) {
-                        'draft' => 'bg-slate-500/20 text-slate-300',
-                        'submitted', 'invoice_sent', 'invoice_accepted' => 'bg-blue-500/20 text-blue-300',
-                        'pickup_assigned', 'picked_up', 'arrived_warehouse', 'at_warehouse', 'sorted' => 'bg-violet-500/20 text-violet-300',
-                        'in_transit', 'at_destination', 'out_for_delivery' => 'bg-amber-500/20 text-amber-300',
-                        'delivered' => 'bg-emerald-500/20 text-emerald-300',
-                        'cancelled' => 'bg-rose-500/20 text-rose-300',
-                        default => 'bg-slate-500/20 text-slate-300',
-                    };
-                    $dotColors = match($shipment->status->value ?? $shipment->status) {
-                        'draft' => 'bg-slate-400',
-                        'submitted', 'invoice_sent', 'invoice_accepted' => 'bg-blue-400',
-                        'pickup_assigned', 'picked_up', 'arrived_warehouse', 'at_warehouse', 'sorted' => 'bg-violet-400',
-                        'in_transit', 'at_destination', 'out_for_delivery' => 'bg-amber-400',
-                        'delivered' => 'bg-emerald-400',
-                        'cancelled' => 'bg-rose-400',
-                        default => 'bg-slate-400',
-                    };
-                @endphp
-                <!-- Top Row: Back Button + Action Buttons -->
-                <div class="flex items-center justify-between mb-6">
-                    <a href="{{ route('admin.shipments.index') }}" class="group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium transition-all backdrop-blur-sm hover:shadow-md">
-                        <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        <div class="relative p-5 sm:p-6">
+            @php
+                $statusColors = match($shipment->status->value ?? $shipment->status) {
+                    'draft' => 'bg-slate-500/15 text-slate-200 ring-1 ring-slate-400/30',
+                    'submitted', 'invoice_sent', 'invoice_accepted' => 'bg-blue-500/15 text-blue-100 ring-1 ring-blue-400/30',
+                    'pickup_assigned', 'picked_up', 'arrived_warehouse', 'at_warehouse', 'sorted' => 'bg-violet-500/15 text-violet-100 ring-1 ring-violet-400/30',
+                    'in_transit', 'at_destination', 'out_for_delivery' => 'bg-amber-500/15 text-amber-100 ring-1 ring-amber-400/30',
+                    'delivered' => 'bg-emerald-500/15 text-emerald-100 ring-1 ring-emerald-400/30',
+                    'cancelled' => 'bg-rose-500/15 text-rose-100 ring-1 ring-rose-400/30',
+                    default => 'bg-slate-500/15 text-slate-200 ring-1 ring-slate-400/30',
+                };
+                $dotColors = match($shipment->status->value ?? $shipment->status) {
+                    'submitted', 'invoice_sent', 'invoice_accepted' => 'bg-blue-300',
+                    'pickup_assigned', 'picked_up', 'arrived_warehouse', 'at_warehouse', 'sorted' => 'bg-violet-300',
+                    'in_transit', 'at_destination', 'out_for_delivery' => 'bg-amber-300',
+                    'delivered' => 'bg-emerald-300',
+                    'cancelled' => 'bg-rose-300',
+                    default => 'bg-slate-300',
+                };
+                $pickupSummary = $currentAssignment
+                    ? trim(($currentAssignment->driver?->name ?? 'Assigned') . ($currentAssignment->targetWarehouse?->name ? ' to ' . $currentAssignment->targetWarehouse->name : ''))
+                    : 'Needs rider';
+            @endphp
+
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <a href="{{ route('admin.operations.shipments.index') }}" class="inline-flex h-11 w-auto shrink-0 items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 text-sm font-black text-slate-100 transition hover:bg-white/15">
+                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    <span>Back</span>
+                </a>
+
+                <div class="ml-auto flex w-auto max-w-[calc(100%-5.75rem)] flex-wrap items-center justify-end gap-2 sm:max-w-none">
+                    <span class="inline-flex h-9 items-center whitespace-nowrap rounded-full px-3 text-xs font-black {{ $statusColors }}">
+                        <span class="mr-2 h-2 w-2 rounded-full {{ $dotColors }}"></span>
+                        {{ $shipment->status->label() }}
+                    </span>
+                    <button type="button"
+                            @@click="openTrackingHistoryModal()"
+                            class="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-400/30 bg-white/10 px-3 text-xs font-black text-slate-100 transition hover:bg-white/15">
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z"/>
                         </svg>
-                        <span class="text-xs">Back to Shipments</span>
-                    </a>
-                    <div class="flex flex-wrap items-center justify-end gap-2">
-                        <span class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-bold {{ $statusColors }} border border-white/10 backdrop-blur-sm">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $dotColors }}"></span>
-                            {{ $shipment->status->label() }}
-                        </span>
+                        Activity
+                    </button>
+                    @if($canManage)
                         <button type="button"
-                                @@click="openTrackingHistoryModal()"
-                                class="inline-flex items-center gap-2 px-3 py-2 bg-slate-500/20 hover:bg-slate-500/30 text-slate-300 text-xs font-semibold rounded-xl border border-slate-500/30 transition-all backdrop-blur-sm">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z"/></svg>
-                            Tracking History
-                        </button>
-                        @if($canManage)
-                        <!-- Fulfillment Type Changer -->
-                        <div class="relative" x-data="{ ftOpen: false }" x-show="canChangeFulfillmentType()" x-cloak>
-                            <button @@click="ftOpen = !ftOpen" :disabled="ftLoading" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-xs font-semibold rounded-xl border border-indigo-500/30 transition-all backdrop-blur-sm disabled:opacity-50">
-                                <svg x-show="!ftLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                                <svg x-show="ftLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                <span x-text="ftLoading ? 'Updating...' : fulfillmentTypeLabel()"></span>
-                                <svg x-show="!ftLoading" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                            </button>
-                            <div x-show="ftOpen && !ftLoading" @@click.outside="ftOpen = false" x-transition
-                                 class="absolute right-0 mt-1 w-56 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 py-1">
-                                <template x-for="ft in [
-                                    {v:'warehouse', label:'Warehouse Delivery', desc:'Standard flow'},
-                                    {v:'direct', label:'Direct Delivery', desc:'Driver delivers directly'}
-                                ]" :key="ft.v">
-                                    <button @@click="changeFulfillmentType(ft.v); ftOpen = false"
-                                            class="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors flex items-center justify-between"
-                                            :class="shipment.fulfillment_type === ft.v ? 'bg-blue-50' : ''">
-                                        <div>
-                                            <p class="text-xs font-bold text-slate-900" x-text="ft.label"></p>
-                                            <p class="text-[10px] text-slate-500" x-text="ft.desc"></p>
-                                        </div>
-                                        <svg x-show="shipment.fulfillment_type === ft.v" class="w-4 h-4 text-blue-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                                    </button>
-                                </template>
-                            </div>
-                        </div>
-                        <button
-                            x-show="['submitted', 'invoice_accepted'].includes(shipment.status)"
-                            x-cloak
-                            @@click="loadAssignmentDependencies(); assignDriverModalOpen = true"
-                            class="inline-flex items-center gap-2 px-4 py-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-300 text-xs font-semibold rounded-xl border border-violet-500/30 transition-all backdrop-blur-sm shadow-sm hover:shadow-md"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                x-show="canManagePickupAssignment()"
+                                x-cloak
+                                @@click="openAssignPickupDriver()"
+                                class="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-orange-400/45 bg-orange-500/15 px-3 text-xs font-black text-orange-100 transition hover:bg-orange-500/25">
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a8.25 8.25 0 0 1 15 0"/>
                             </svg>
-                            Assign Driver
+                            <span x-text="assignment ? 'Reassign Rider' : 'Assign Rider'"></span>
                         </button>
-                        {{-- Legacy pre-pickup Packages editor hidden in favor of the Receiving workspace now labelled Packages. --}}
-                        {{-- @if($editConfig)
-                        <button type="button" @@click="activeTab = 'packages'; window.scrollTo({ top: 0, behavior: 'smooth' })"
-                           class="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs font-semibold rounded-xl border border-blue-500/30 transition-all backdrop-blur-sm">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                            Edit Packages
-                        </button>
-                        @endif --}}
                         <button @@click="duplicateShipment()" :disabled="duplicating"
                                 title="Duplicate shipment"
                                 aria-label="Duplicate shipment"
-                                class="inline-flex h-10 w-10 items-center justify-center bg-slate-500/20 hover:bg-slate-500/30 text-slate-300 rounded-xl border border-slate-500/30 transition-all backdrop-blur-sm disabled:opacity-50">
-                            <svg x-show="!duplicating" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                            <svg x-show="duplicating" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" style="display:none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-slate-100 transition hover:bg-white/15 disabled:opacity-50">
+                            <svg x-show="!duplicating" class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 16H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2m-6 12h8a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2Z"/>
+                            </svg>
+                            <svg x-show="duplicating" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" style="display:none">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
+                            </svg>
                         </button>
-                        @endif
+                    @endif
+                </div>
+            </div>
+
+            <div class="relative mt-5 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div class="min-w-0 lg:max-w-[700px] lg:shrink">
+                    <div class="flex min-w-0 items-start gap-4">
+                        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-lg shadow-orange-950/25">
+                            <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m21 8-9-5-9 5 9 5 9-5ZM3 8v8l9 5 9-5V8"/>
+                            </svg>
+                        </div>
+
+                        <div class="min-w-0">
+                            <p class="text-xs font-black uppercase tracking-[0.16em] text-orange-200">Shipment Workspace</p>
+                            <h1 class="mt-1 max-w-4xl break-words text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl xl:text-2xl 2xl:text-3xl">{{ $shipment->shipment_number }}</h1>
+                            <div class="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-300">
+                                <span>{{ $shipment->vendor->name }}</span>
+                                @if($shipment->vendor->business_name)
+                                    <span class="text-slate-600">/</span>
+                                    <span>{{ $shipment->vendor->business_name }}</span>
+                                @endif
+                                <span class="text-slate-600">/</span>
+                                <span>{{ $shipment->created_at->format('d M Y, h:i A') }}</span>
+                            </div>
+                            <div class="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-400">
+                                @if($shipment->isPerItemDestination())
+                                    <span>Per-item recipients</span>
+                                @elseif($shipment->delivery_recipient_name || $shipment->delivery_recipient_phone)
+                                    <span>{{ trim(($shipment->delivery_recipient_name ?? '') . ($shipment->delivery_recipient_phone ? ' / ' . $shipment->delivery_recipient_phone : '')) }}</span>
+                                @else
+                                    <span>Recipient details pending</span>
+                                @endif
+                                <span class="text-slate-600">/</span>
+                                <span x-text="fulfillmentTypeLabel()"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Main Row: Profile LEFT, Summary + Actions RIGHT -->
-                <div class="flex flex-col lg:flex-row lg:items-start gap-6">
-                    <!-- LEFT: Shipment Info -->
-                    <div class="flex items-start gap-5 lg:flex-shrink-0">
-                        <!-- Icon -->
-                        <div class="relative flex-shrink-0">
-                            <div class="w-20 h-20 lg:w-24 lg:h-24 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white text-2xl lg:text-3xl font-bold shadow-xl shadow-blue-500/30 ring-4 ring-white/10">
-                                {{ strtoupper(substr($shipment->shipment_number, 0, 1)) }}
-                            </div>
-                        </div>
-
-                        <!-- Details -->
-                        <div class="space-y-2 min-w-0">
-                            <div>
-                                <h1 class="text-xl lg:text-2xl font-bold text-white truncate">{{ $shipment->shipment_number }}</h1>
-                                <p class="text-slate-400 text-sm mt-0.5 truncate">
-                                    {{ $shipment->vendor->name }}
-                                    @if($shipment->vendor->business_name)
-                                        &mdash; {{ $shipment->vendor->business_name }}
-                                    @endif
-                                </p>
-                            </div>
-
-                            <!-- Destination Info -->
-                            @if($shipment->isPerItemDestination())
-                                <div class="flex flex-wrap items-center gap-2 text-xs">
-                                    <div class="flex items-center gap-1.5 text-slate-300">
-                                        <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                                        </svg>
-                                        <span class="truncate">Per-item recipients</span>
-                                    </div>
-                                    <div class="flex items-center gap-1.5 text-slate-300">
-                                        <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                        </svg>
-                                        <span>{{ number_format($itemsCount) }} package(s)</span>
-                                    </div>
-                                </div>
-
-                                <div class="flex flex-wrap items-center gap-2 text-xs">
-                                    <div class="flex items-center gap-1.5 text-slate-300">
-                                        <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                        </svg>
-                                        <span class="truncate">Per-item destinations (set on each item)</span>
-                                    </div>
-                                </div>
-                            @else
-                                @if($shipment->delivery_recipient_name || $shipment->delivery_recipient_phone)
-                                <div class="flex flex-wrap items-center gap-2 text-xs">
-                                    @if($shipment->delivery_recipient_name)
-                                    <div class="flex items-center gap-1.5 text-slate-300">
-                                        <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                                        </svg>
-                                        <span class="truncate">{{ $shipment->delivery_recipient_name }}</span>
-                                    </div>
-                                    @endif
-                                    @if($shipment->delivery_recipient_phone)
-                                    <div class="flex items-center gap-1.5 text-slate-300">
-                                        <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                                        </svg>
-                                        {{ $shipment->delivery_recipient_phone }}
-                                    </div>
-                                    @endif
-                                </div>
-                                @endif
-
-                                @if($shipment->deliveryRegion?->name || $shipment->delivery_town)
-                                <div class="flex flex-wrap items-center gap-2 text-xs">
-                                    <div class="flex items-center gap-1.5 text-slate-300">
-                                        <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                        </svg>
-                                        <span class="truncate">
-                                            {{ $shipment->deliveryRegion?->name }}@if($shipment->deliveryDistrict?->name), {{ $shipment->deliveryDistrict?->name }}@endif
-                                            @if($shipment->delivery_town), {{ $shipment->delivery_town }}@endif
-                                        </span>
-                                    </div>
-                                </div>
-                                @endif
-                            @endif
-
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                @php
-                                    $dpColors = ($shipment->delivery_preference ?? 'deliver') === 'self_pickup'
-                                        ? 'bg-emerald-500/20 text-emerald-300'
-                                        : 'bg-blue-500/20 text-blue-300';
-                                    $ftColors = match($shipment->fulfillment_type?->value ?? null) {
-                                        'direct' => 'bg-amber-500/20 text-amber-300',
-                                        'warehouse' => 'bg-slate-500/20 text-slate-300',
-                                        default => '',
-                                    };
-                                @endphp
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $dpColors }}">
-                                    {{ ($shipment->delivery_preference ?? 'deliver') === 'self_pickup' ? 'Self Pickup' : 'Deliver to Recipient' }}
-                                </span>
-                                @if($shipment->fulfillment_type)
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $ftColors }}" x-text="fulfillmentTypeLabel()"></span>
-                                @endif
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-500/20 text-slate-300">
-                                    {{ $shipment->created_at->format('M d, Y') }}
-                                </span>
+                <div class="grid grid-cols-2 gap-2 sm:gap-3 lg:ml-auto lg:w-[560px] lg:shrink-0 2xl:w-[620px]">
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-3 sm:p-4">
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-500/20 text-orange-300 sm:h-9 sm:w-9">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20 7 12 3 4 7m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                </svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg" x-text="receivingPackageCount() + ' Packages'">{{ number_format($itemsCount) }} Packages</p>
+                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs"><span x-text="receivingReceivedUnits()">0</span> received</p>
                             </div>
                         </div>
                     </div>
 
-                    <!-- RIGHT: Summary Stats + Action Buttons -->
-                    <div class="flex flex-col gap-3 lg:ml-auto lg:items-end">
-                        <!-- Row 1: Package summary stats -->
-                        <div class="flex items-stretch gap-2 flex-wrap lg:flex-nowrap">
-                            <!-- Total Packages -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 h-20 lg:h-24 flex items-center gap-2.5 transition-colors">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/30 to-blue-600/20 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-white leading-none" x-text="receivingPackageCount()">{{ number_format($itemsCount) }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Total Packages</p>
-                                </div>
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-3 sm:p-4">
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-500/20 text-violet-300 sm:h-9 sm:w-9">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a8.25 8.25 0 0 1 15 0"/>
+                                </svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="truncate text-[15px] font-black leading-tight text-white sm:text-lg" x-text="assignment ? assignmentDriverName() : 'No Rider'">{{ $currentAssignment?->driver?->name ?? 'No Rider' }}</p>
+                                <p class="mt-1 truncate text-[11px] font-bold leading-snug text-slate-400 sm:text-xs">{{ $pickupSummary }}</p>
                             </div>
-
-                            <!-- Received Qty -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 h-20 lg:h-24 flex items-center gap-2.5 transition-colors">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-emerald-400 leading-none" x-text="receivingReceivedUnits()">0</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Received Qty</p>
-                                </div>
-                            </div>
-
-                            <!-- Pending Qty -->
-                            <div class="bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 px-3.5 h-20 lg:h-24 flex items-center gap-2.5 transition-colors">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500/30 to-amber-600/20 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-lg font-bold text-amber-400 leading-none" x-text="receivingPendingUnits()">0</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Pending Qty</p>
-                                </div>
-                            </div>
-
                         </div>
-
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
     <!-- Packages Workspace -->
     <div class="min-h-[680px]">
@@ -600,10 +473,6 @@ $shipmentConfig = [
                                     <div>
                                         <!-- Fee rows -->
                                         <div class="mb-4">
-                                            <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 text-xs mb-0.5">
-                                                <span class="text-slate-500">Pickup Fee</span>
-                                                <span class="font-bold text-slate-700" x-text="formatMoney(activeInvoice().pickup_fee, activeInvoice().currency)"></span>
-                                            </div>
                                             <div class="flex items-center justify-between px-3 py-2 text-xs mb-0.5">
                                                 <span class="text-slate-500">Transport Fee</span>
                                                 <span class="font-bold text-slate-700" x-text="formatMoney(activeInvoice().transport_fee, activeInvoice().currency)"></span>
@@ -707,7 +576,7 @@ $shipmentConfig = [
                                                 <p class="text-sm font-medium text-slate-500 mb-3">No driver assigned</p>
                                                 <button x-show="canManage" @@click="loadAssignmentDependencies(); assignDriverModalOpen = true" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-lg shadow-violet-500/25 transition-all">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                                    Assign Driver
+                                                    Assign Rider
                                                 </button>
                                             </div>
                                         </template>
@@ -1022,7 +891,7 @@ $shipmentConfig = [
                     </div>
                     <button x-show="canManage && ['submitted','invoice_accepted'].includes(shipment.status)" @@click="loadAssignmentDependencies(); assignDriverModalOpen = true" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-violet-500/25 transition-all">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        Assign Driver
+                        Assign Rider
                     </button>
                 </div>
 
@@ -1321,7 +1190,7 @@ $shipmentConfig = [
                     </template>
                 </div>
 
-                {{-- Assign Driver + Edit Assignment modals are placed globally below --}}
+                {{-- Assign Rider + Edit Assignment modals are placed globally below --}}
                 <template x-if="false"><div><div>
                         <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
                             <div class="flex items-center gap-3">
@@ -1332,7 +1201,7 @@ $shipmentConfig = [
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-base font-bold text-slate-900">Assign Driver</h3>
+                                    <h3 class="text-base font-bold text-slate-900">Assign Rider</h3>
                                     <p class="text-xs text-slate-500">Select driver and target warehouse</p>
                                 </div>
                             </div>
@@ -1395,7 +1264,7 @@ $shipmentConfig = [
                                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
-                                        <span x-text="assignmentForm.submitting ? 'Assigning...' : 'Assign Driver'"></span>
+                                        <span x-text="assignmentForm.submitting ? 'Assigning...' : 'Assign Rider'"></span>
                                     </button>
                                 </div>
                             </form>
@@ -2482,12 +2351,6 @@ $shipmentConfig = [
                             <p class="text-xs text-slate-500">Shipment-level pickup and station charges.</p>
                         </div>
                         <div class="flex items-center gap-2">
-                            <button x-show="canManageCharges && !hasPickupFee()" @@click="seedPickupFee()"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                                <span>Add Pickup Fee</span>
-                                <span class="text-slate-400" x-text="'(default GHS ' + (chargesDefaults.pickup_fee ?? 0).toFixed(2) + ')'"></span>
-                            </button>
                             <button x-show="canManageCharges" @@click="openAddCharge()"
                                     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -2569,75 +2432,6 @@ $shipmentConfig = [
                     </div>
                 </div>
 
-                {{-- ─── Pickup Fee modal ─────────────────────────────── --}}
-                <div x-show="pickupFeeModal.open" x-cloak x-transition.opacity
-                     class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display:none">
-                    <div @@click.away="closePickupFeeModal()" x-show="pickupFeeModal.open" x-transition
-                         class="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-                        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                            <div>
-                                <h3 class="text-sm font-bold text-slate-900">Pickup Fee</h3>
-                                <p class="mt-0.5 text-xs text-slate-500">Amount the pickup driver collects from the vendor.</p>
-                            </div>
-                            <button @@click="closePickupFeeModal()" class="p-1.5 rounded-lg hover:bg-slate-100">
-                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                            </button>
-                        </div>
-                        <div class="p-6 space-y-4">
-                            <div>
-                                <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Amount (GHS)</label>
-                                <input type="number" step="0.01" min="0" x-model.number="pickupFeeModal.amount"
-                                       class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white">
-                            </div>
-
-                            <div>
-                                <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Notes (optional)</label>
-                                <textarea x-model="pickupFeeModal.notes" rows="2"
-                                          class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white"
-                                          placeholder="e.g. Vendor will pay cash at pickup"></textarea>
-                            </div>
-
-                            <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700">
-                                <input type="checkbox" x-model="pickupFeeModal.mark_paid" :disabled="pickupFeeIsPaid()" class="rounded border-slate-300 disabled:opacity-60">
-                                <span>Mark as paid</span>
-                            </label>
-
-                            <template x-if="pickupFeeModal.mark_paid">
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Payment method</label>
-                                        <select x-model="pickupFeeModal.payment_method"
-                                                class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white">
-                                            <option value="cash">Cash</option>
-                                            <option value="momo">Mobile Money</option>
-                                            <option value="bank">Bank</option>
-                                            <option value="other">Other</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Reference</label>
-                                        <input type="text" x-model="pickupFeeModal.payment_reference"
-                                               class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white"
-                                               placeholder="MoMo txn ID, receipt #, etc.">
-                                    </div>
-                                </div>
-                            </template>
-                            <p x-show="pickupFeeIsPaid()" class="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                                This pickup fee is already paid. You can correct the amount, notes, or payment reference, but it will remain paid.
-                            </p>
-                        </div>
-                        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2">
-                            <button @@click="closePickupFeeModal()"
-                                    class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
-                            <button @@click="submitPickupFee()" :disabled="pickupFeeModal.saving || pickupFeeModal.amount === ''"
-                                    class="px-4 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                                <span x-show="!pickupFeeModal.saving" x-text="pickupFeeModal.chargeId ? 'Save Pickup Fee' : 'Set Pickup Fee'"></span>
-                                <span x-show="pickupFeeModal.saving">Saving…</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
                 {{-- ─── Mark Paid modal ──────────────────────────────── --}}
                 <div x-show="markPaidOpen" x-cloak x-transition.opacity
                      class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display:none">
@@ -2694,6 +2488,7 @@ $shipmentConfig = [
                     'finalizeDisabled' => '!canFinalizeReceiving()',
                     'finalizeLabelExpr' => 'finalizeReceivingButtonLabel()',
                     'finalizeSubtitle' => 'Mark all packages as received and move shipment to warehouse status.',
+                    'showPickupFee' => false,
                 ])
 
                 <div class="hidden">
@@ -2845,21 +2640,6 @@ $shipmentConfig = [
                                                 </p>
                                             </div>
                                             <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
-                                                <p class="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400 sm:w-32">Pickup Fee:</p>
-                                                <p class="min-w-0 font-semibold text-slate-900">
-                                                    <span x-text="pickupFeeValueLabel()"></span>
-                                                    <span x-show="pickupFeeStatusLabel()"
-                                                          class="ml-2 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide"
-                                                          :class="pickupFeeStatusClass()"
-                                                          x-text="pickupFeeStatusLabel()"></span>
-                                                    <button type="button"
-                                                            x-show="canManageCharges"
-                                                            @@click="openPickupFeeModal()"
-                                                            class="ml-2 text-[10px] font-black text-indigo-600 hover:text-indigo-800"
-                                                            x-text="pickupFeeActionLabel()"></button>
-                                                </p>
-                                            </div>
-                                            <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
                                                 <p class="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400 sm:w-32">Target Warehouse:</p>
                                                 <p class="min-w-0 font-semibold text-slate-900">
                                                     <span x-text="assignmentWarehouseName()"></span>
@@ -2940,12 +2720,6 @@ $shipmentConfig = [
                                             <p class="text-xs text-slate-500">Shipment-level pickup and station charges.</p>
                                         </div>
                                         <div class="flex items-center gap-2">
-                                            <button x-show="canManageCharges && !hasPickupFee()" @@click="seedPickupFee()"
-                                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                                                <span>Add Pickup Fee</span>
-                                                <span class="text-slate-400" x-text="'(default GHS ' + (chargesDefaults.pickup_fee ?? 0).toFixed(2) + ')'"></span>
-                                            </button>
                                             <button x-show="canManageCharges" @@click="openAddCharge()"
                                                     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -3228,10 +3002,6 @@ $shipmentConfig = [
 		                                            <div>
 		                                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Delivery Fee</p>
 		                                                <p class="mt-0.5 text-sm font-bold" :class="receivingDeliveryFeeClass(packageDetailsModal.pkg)" x-text="receivingDeliveryFeeLabel(packageDetailsModal.pkg)"></p>
-		                                            </div>
-		                                            <div>
-		                                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Pickup Fee</p>
-		                                                <p class="mt-0.5 text-sm font-bold text-slate-900" x-text="packageDetailsPickupFee(packageDetailsModal.pkg)"></p>
 		                                            </div>
 		                                        </div>
 		                                    </div>
@@ -4442,15 +4212,10 @@ $shipmentConfig = [
                     </div>
                 </template>
                 <form @@submit.prevent="createInvoice()">
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Pickup Fee</label>
-                            <input type="number" step="0.01" min="0" x-model="invoiceForm.pickup_fee"
-                                class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all" placeholder="0.00">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Transport Fee</label>
-                            <input type="number" step="0.01" min="0" x-model="invoiceForm.transport_fee"
+	                    <div class="grid grid-cols-2 gap-4 mb-4">
+	                        <div>
+	                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Transport Fee</label>
+	                            <input type="number" step="0.01" min="0" x-model="invoiceForm.transport_fee"
                                 class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all" placeholder="0.00">
                         </div>
                         <div>
@@ -4470,12 +4235,12 @@ $shipmentConfig = [
                                 <span class="text-[10px] font-semibold text-emerald-200 uppercase tracking-wider">Invoice Total</span>
                                 <div class="flex items-center gap-1">
                                     <svg class="w-3.5 h-3.5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                                    <span class="text-[10px] text-emerald-300 font-medium" x-text="[invoiceForm.pickup_fee, invoiceForm.transport_fee, invoiceForm.handling_fee, invoiceForm.other_fee].filter(f => parseFloat(f || 0) > 0).length + ' fee(s)'"></span>
+	                                <span class="text-[10px] text-emerald-300 font-medium" x-text="[invoiceForm.transport_fee, invoiceForm.handling_fee, invoiceForm.other_fee].filter(f => parseFloat(f || 0) > 0).length + ' fee(s)'"></span>
                                 </div>
                             </div>
                             <div class="flex items-baseline justify-end gap-1.5">
                                 <span class="text-sm font-semibold text-emerald-200">GHS</span>
-                                <span class="text-2xl font-extrabold text-white tracking-tight" x-text="(parseFloat(invoiceForm.pickup_fee || 0) + parseFloat(invoiceForm.transport_fee || 0) + parseFloat(invoiceForm.handling_fee || 0) + parseFloat(invoiceForm.other_fee || 0)).toFixed(2)"></span>
+                                <span class="text-2xl font-extrabold text-white tracking-tight" x-text="(parseFloat(invoiceForm.transport_fee || 0) + parseFloat(invoiceForm.handling_fee || 0) + parseFloat(invoiceForm.other_fee || 0)).toFixed(2)"></span>
                             </div>
                         </div>
                     </div>
@@ -4538,13 +4303,9 @@ $shipmentConfig = [
                         <!-- Fee breakdown -->
                         <div class="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden mb-5">
                             <div class="divide-y divide-slate-100">
-                                <div class="flex items-center justify-between px-5 py-3">
-                                    <span class="text-sm text-slate-600">Pickup Fee</span>
-                                    <span class="text-sm font-semibold text-slate-900" x-text="'GHS ' + (Number(invoiceDetail.pickup_fee) || 0).toFixed(2)"></span>
-                                </div>
-                                <div class="flex items-center justify-between px-5 py-3">
-                                    <span class="text-sm text-slate-600">Transport Fee</span>
-                                    <span class="text-sm font-semibold text-slate-900" x-text="'GHS ' + (Number(invoiceDetail.transport_fee) || 0).toFixed(2)"></span>
+	                                <div class="flex items-center justify-between px-5 py-3">
+	                                    <span class="text-sm text-slate-600">Transport Fee</span>
+	                                    <span class="text-sm font-semibold text-slate-900" x-text="'GHS ' + (Number(invoiceDetail.transport_fee) || 0).toFixed(2)"></span>
                                 </div>
                                 <div class="flex items-center justify-between px-5 py-3">
                                     <span class="text-sm text-slate-600">Handling Fee</span>
@@ -4608,34 +4369,51 @@ $shipmentConfig = [
         </div>
     </div>
 
-    <!-- ══ MODAL: Assign Driver ════════════════════════════════════════ -->
+    <!-- ══ MODAL: Assign Rider ════════════════════════════════════════ -->
     <div x-show="assignDriverModalOpen" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="assignDriverModalOpen = false">
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="assignDriverModalOpen = false"></div>
-        <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
-        <div class="relative z-10 bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl max-h-[95vh] overflow-y-auto">
-            <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+        <div x-show="assignDriverModalOpen"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
+             @@click="assignDriverModalOpen = false"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+        <div x-show="assignDriverModalOpen"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95"
+             @@click.stop
+             class="relative z-10 w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+            <div class="relative border-b border-slate-200 px-6 py-5">
+                <div class="flex items-start justify-between">
+                    <div class="flex items-start gap-4">
+                        <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
+                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a8.25 8.25 0 0 1 15 0"/>
                         </svg>
                     </div>
                     <div>
-                        <h3 class="text-base font-bold text-slate-900">Assign Driver</h3>
-                        <p class="text-xs text-slate-500">Select driver and target warehouse</p>
+                        <h3 class="text-xl font-bold text-slate-900" x-text="assignment ? 'Reassign Rider' : 'Assign Rider'"></h3>
+                        <p class="mt-1 text-sm text-slate-500">Select the pickup rider and receiving warehouse.</p>
                     </div>
                 </div>
-                <button @@click="assignDriverModalOpen = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <button @@click="assignDriverModalOpen = false" class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
+                </div>
             </div>
-            <div class="px-6 py-5">
-                <form @@submit.prevent="assignDriver()">
+            <form @@submit.prevent="assignDriver()">
+                <div class="max-h-[calc(100vh-240px)] space-y-5 overflow-y-auto px-6 py-6">
                     <div class="mb-4">
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Select Driver <span class="text-rose-500">*</span></label>
                         <div class="relative">
-                            <select x-model="assignmentForm.driver_id" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-sm text-slate-900 transition-all cursor-pointer appearance-none" required>
+                            <select x-model="assignmentForm.driver_id" class="w-full appearance-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100" required>
                                 <option value="">Choose a driver...</option>
                                 <template x-for="driver in availableDrivers" :key="driver.id">
                                     <option :value="driver.id" x-text="driver.name + ' (' + driver.phone + ')'"></option>
@@ -4655,7 +4433,7 @@ $shipmentConfig = [
                     <div class="mb-4">
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Target Warehouse <span class="text-rose-500">*</span></label>
                         <div class="relative">
-                            <select x-model="assignmentForm.target_warehouse_id" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-sm text-slate-900 transition-all cursor-pointer appearance-none" required>
+                            <select x-model="assignmentForm.target_warehouse_id" class="w-full appearance-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100" required>
                                 <option value="">Choose warehouse...</option>
                                 <template x-for="warehouse in availableWarehouses" :key="warehouse.id">
                                     <option :value="warehouse.id" x-text="warehouse.name + (warehouse.code ? ' (' + warehouse.code + ')' : '')"></option>
@@ -4674,53 +4452,71 @@ $shipmentConfig = [
                     </div>
                     <div class="mb-6">
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Notes <span class="text-slate-400 font-normal">(optional)</span></label>
-                        <textarea x-model="assignmentForm.notes" rows="3" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-sm text-slate-900 placeholder-slate-400 transition-all resize-none" placeholder="Optional pickup notes for the driver..."></textarea>
+                        <textarea x-model="assignmentForm.notes" rows="3" class="w-full resize-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Optional pickup notes for the rider..."></textarea>
                     </div>
-                    <div class="flex justify-end gap-3">
-                        <button type="button" @@click="assignDriverModalOpen = false" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
+                </div>
+                    <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <button type="button" @@click="assignDriverModalOpen = false" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50">
                             Cancel
                         </button>
-                        <button type="submit" :disabled="assignmentForm.submitting || !assignmentForm.driver_id || !assignmentForm.target_warehouse_id" class="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        <button type="submit" :disabled="assignmentForm.submitting || !assignmentForm.driver_id || !assignmentForm.target_warehouse_id" class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition-all hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none">
                             <svg x-show="assignmentForm.submitting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            <span x-text="assignmentForm.submitting ? 'Assigning...' : 'Assign Driver'"></span>
+                            <span x-text="assignmentForm.submitting ? 'Saving...' : (assignment ? 'Save Rider' : 'Assign Rider')"></span>
                         </button>
                     </div>
                 </form>
-            </div>
         </div>
         </div>
     </div>
 
     <!-- ══ MODAL: Edit Assignment ══════════════════════════════════════ -->
     <div x-show="editAssignmentOpen" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="editAssignmentOpen = false">
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="editAssignmentOpen = false"></div>
-        <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
-        <div class="relative z-10 bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl max-h-[95vh] overflow-y-auto">
-            <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        <div x-show="editAssignmentOpen"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
+             @@click="editAssignmentOpen = false"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+        <div x-show="editAssignmentOpen"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95"
+             @@click.stop
+             class="relative z-10 w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+            <div class="relative border-b border-slate-200 px-6 py-5">
+                <div class="flex items-start justify-between">
+                    <div class="flex items-start gap-4">
+                        <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
+                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 1 1 3.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                         </svg>
                     </div>
                     <div>
-                        <h3 class="text-base font-bold text-slate-900">Edit Assignment</h3>
-                        <p class="text-xs text-slate-500">Change driver or target warehouse</p>
+                        <h3 class="text-xl font-bold text-slate-900">Edit Assignment</h3>
+                        <p class="mt-1 text-sm text-slate-500">Change the rider or receiving warehouse.</p>
                     </div>
                 </div>
-                <button @@click="editAssignmentOpen = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <button @@click="editAssignmentOpen = false" class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
+                </div>
             </div>
-            <div class="px-6 py-5">
-                <form @@submit.prevent="updateAssignment()">
+            <form @@submit.prevent="updateAssignment()">
+                <div class="max-h-[calc(100vh-240px)] space-y-5 overflow-y-auto px-6 py-6">
                     <div class="mb-4">
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Driver</label>
                         <div class="relative">
-                            <select x-model="editAssignmentForm.driver_id" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm text-slate-900 transition-all cursor-pointer appearance-none">
+                            <select x-model="editAssignmentForm.driver_id" class="w-full appearance-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                 <option value="">Choose a driver...</option>
                                 <template x-for="driver in availableDriversForEdit" :key="driver.id">
                                     <option :value="driver.id" x-text="driver.name + ' (' + driver.phone + ')'"></option>
@@ -4737,7 +4533,7 @@ $shipmentConfig = [
                     <div class="mb-6">
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Target Warehouse</label>
                         <div class="relative">
-                            <select x-model="editAssignmentForm.target_warehouse_id" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm text-slate-900 transition-all cursor-pointer appearance-none">
+                            <select x-model="editAssignmentForm.target_warehouse_id" class="w-full appearance-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                 <option value="">Choose warehouse...</option>
                                 <template x-for="warehouse in availableWarehouses" :key="warehouse.id">
                                     <option :value="warehouse.id" x-text="warehouse.name + (warehouse.code ? ' (' + warehouse.code + ')' : '')"></option>
@@ -4751,11 +4547,12 @@ $shipmentConfig = [
                             <p class="mt-1.5 text-xs text-slate-400">Loading warehouses...</p>
                         </template>
                     </div>
-                    <div class="flex justify-end gap-3">
-                        <button type="button" @@click="editAssignmentOpen = false" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
+                </div>
+                    <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-5">
+                        <button type="button" @@click="editAssignmentOpen = false" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50">
                             Cancel
                         </button>
-                        <button type="submit" :disabled="editAssignmentForm.submitting" class="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        <button type="submit" :disabled="editAssignmentForm.submitting" class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition-all hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none">
                             <svg x-show="editAssignmentForm.submitting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -4765,40 +4562,57 @@ $shipmentConfig = [
                         </button>
                     </div>
                 </form>
-            </div>
         </div>
         </div>
     </div>
 
-    {{-- Unassign Driver Modal --}}
+    {{-- Unassign Rider Modal --}}
     <div x-show="showUnassignModal" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="showUnassignModal = false">
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="showUnassignModal = false"></div>
+        <div x-show="showUnassignModal"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
+             @@click="showUnassignModal = false"></div>
         <div class="relative flex min-h-full items-center justify-center p-4">
-            <div x-show="showUnassignModal" x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200/50 overflow-hidden">
-                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            <div x-show="showUnassignModal"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-95"
+                 @@click.stop
+                 class="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+                <div class="relative border-b border-slate-200 px-6 py-5">
+                    <div class="flex items-start justify-between">
+                    <div class="flex items-start gap-4">
+                        <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-600/20">
+                            <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
                         </div>
                         <div>
-                            <h3 class="text-sm font-bold text-slate-900">Unassign Driver</h3>
-                            <p class="text-xs text-slate-500">This action cannot be undone</p>
+                            <h3 class="text-xl font-bold text-slate-900">Unassign Rider</h3>
+                            <p class="mt-1 text-sm text-slate-500">Record why this pickup rider is being removed.</p>
                         </div>
                     </div>
-                    <button @@click="showUnassignModal = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <button @@click="showUnassignModal = false" class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
+                    </div>
                 </div>
-                <div class="px-5 py-4">
-                    <label for="unassign-reason" class="block text-xs font-semibold text-slate-700 mb-1.5">Reason for unassignment <span class="text-rose-500">*</span></label>
-                    <textarea id="unassign-reason" x-model="unassignReason" rows="3" placeholder="Provide a reason for unassigning this driver..." class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-rose-400/50 focus:border-rose-300 transition-colors resize-none"></textarea>
-                    <p class="text-[10px] text-slate-400 mt-1">Minimum 3 characters required</p>
+                <div class="px-6 py-6">
+                    <label for="unassign-reason" class="mb-2 block text-sm font-semibold text-slate-700">Reason for unassignment <span class="text-rose-500">*</span></label>
+                    <textarea id="unassign-reason" x-model="unassignReason" rows="4" placeholder="Provide a reason for unassigning this rider..." class="w-full resize-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-rose-400 focus:ring-4 focus:ring-rose-100"></textarea>
+                    <p class="mt-2 text-xs text-slate-500">Minimum 3 characters required.</p>
                 </div>
-                <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50/50">
-                    <button type="button" @@click="showUnassignModal = false" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">Cancel</button>
-                    <button type="button" @@click="confirmUnassign()" :disabled="assignmentActionLoading || !unassignReason.trim()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-rose-200 bg-white text-rose-700 text-sm font-semibold hover:bg-rose-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-5">
+                    <button type="button" @@click="showUnassignModal = false" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50">Cancel</button>
+                    <button type="button" @@click="confirmUnassign()" :disabled="assignmentActionLoading || !unassignReason.trim()" class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-rose-600/20 transition-all hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none">
                         <svg x-show="assignmentActionLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                        <span x-text="assignmentActionLoading ? 'Unassigning...' : 'Unassign Driver'"></span>
+                        <span x-text="assignmentActionLoading ? 'Unassigning...' : 'Unassign Rider'"></span>
                     </button>
                 </div>
             </div>

@@ -214,6 +214,10 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::patch('vendor-payouts/{payout}/confirm', [VendorPayoutController::class, 'confirm'])->name('vendor-payouts.confirm');
 
         // Shipment Management
+        Route::get('operations/shipments', [ShipmentController::class, 'index'])->name('operations.shipments.index');
+        Route::get('operations/shipments-data', [ShipmentController::class, 'data'])->name('operations.shipments.data');
+        Route::get('operations/shipments-export', [ShipmentController::class, 'export'])->name('operations.shipments.export');
+        Route::get('operations/shipments/{shipment}', [ShipmentController::class, 'showPage'])->name('operations.shipments.show');
         Route::get('shipments', [ShipmentController::class, 'index'])->name('shipments.index');
         Route::get('shipments-data', [ShipmentController::class, 'data'])->name('shipments.data');
         Route::get('shipments/create', [ShipmentController::class, 'create'])->name('shipments.create');

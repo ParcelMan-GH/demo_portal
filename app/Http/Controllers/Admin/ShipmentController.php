@@ -15,6 +15,7 @@ use App\Models\LabelCustodyEvent;
 use App\Models\PickupItemConfirmation;
 use App\Models\PickupPhoto;
 use App\Models\Region;
+use App\Models\Driver;
 use App\Models\Shipment;
 use App\Models\ShipmentCharge;
 use App\Models\ShipmentItem;
@@ -27,6 +28,7 @@ use App\Models\WarehouseReceiptItem;
 use App\Services\StorageService;
 use App\Services\WalkinShipmentService;
 use App\Services\Warehouse\WarehouseReceivingService;
+use App\Services\BackOfficeAccess;
 use App\Support\GenericPdfExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,6 +45,15 @@ class ShipmentController extends Controller
 
         return view('admin.shipments.index', [
             'statuses' => ShipmentStatus::toArray(),
+            'pickupStatuses' => PickupAssignmentStatus::toArray(),
+            'warehouses' => Warehouse::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'code']),
+            'drivers' => Driver::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']),
         ]);
     }
 
@@ -50,13 +61,24 @@ class ShipmentController extends Controller
     {
         $this->authorizePermission('shipments.view');
 
-        $query = Shipment::with(['vendor', 'deliveryRegion', 'deliveryDistrict'])->withCount('items');
+        $query = Shipment::with([
+            'vendor',
+            'deliveryRegion',
+            'deliveryDistrict',
+            'pickupRegion',
+            'pickupDistrict',
+            'pickupAssignment.driver',
+            'pickupAssignment.targetWarehouse',
+        ])->withCount('items');
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('shipment_number', 'like', "%{$search}%")
                     ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                     ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
+                    ->orWhere('pickup_contact_name', 'like', "%{$search}%")
+                    ->orWhere('pickup_contact_phone', 'like', "%{$search}%")
+                    ->orWhere('pickup_town', 'like', "%{$search}%")
                     ->orWhereHas('items', function ($itemQuery) use ($search) {
                         $itemQuery->where('delivery_recipient_name', 'like', "%{$search}%")
                             ->orWhere('delivery_recipient_phone', 'like', "%{$search}%");
@@ -64,6 +86,14 @@ class ShipmentController extends Controller
                     ->orWhereHas('vendor', function ($vq) use ($search) {
                         $vq->where('name', 'like', "%{$search}%")
                             ->orWhere('business_name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('pickupAssignment.driver', function ($dq) use ($search) {
+                        $dq->where('name', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('pickupAssignment.targetWarehouse', function ($wq) use ($search) {
+                        $wq->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
                     });
             });
         }
@@ -76,6 +106,26 @@ class ShipmentController extends Controller
             $query->where('vendor_id', $vendorId);
         }
 
+        if ($pickupStatus = $request->get('pickup_status')) {
+            $query->whereHas('pickupAssignment', fn ($q) => $q->where('status', $pickupStatus));
+        }
+
+        if ($driverId = $request->get('driver_id')) {
+            $query->whereHas('pickupAssignment', fn ($q) => $q->where('driver_id', $driverId));
+        }
+
+        if ($warehouseId = $request->get('target_warehouse_id')) {
+            $query->whereHas('pickupAssignment', fn ($q) => $q->where('target_warehouse_id', $warehouseId));
+        }
+
+        if ($assignmentState = $request->get('assignment_state')) {
+            if ($assignmentState === 'needs_assignment') {
+                $query->whereDoesntHave('pickupAssignment');
+            } elseif ($assignmentState === 'assigned') {
+                $query->whereHas('pickupAssignment');
+            }
+        }
+
         if ($dateFrom = $request->get('date_from')) {
             $query->whereDate('created_at', '>=', $dateFrom);
         }
@@ -85,7 +135,7 @@ class ShipmentController extends Controller
 
         $sortBy = $request->get('sort', 'created_at');
         $sortDirection = $request->get('direction', 'desc');
-        $allowedSorts = ['shipment_number', 'destination_mode', 'delivery_recipient_name', 'status', 'created_at', 'submitted_at', 'items_count'];
+        $allowedSorts = ['shipment_number', 'destination_mode', 'delivery_recipient_name', 'pickup_contact_name', 'status', 'created_at', 'submitted_at', 'items_count'];
 
         if ($sortBy === 'recipient_name') {
             $sortBy = 'delivery_recipient_name';
@@ -102,13 +152,23 @@ class ShipmentController extends Controller
             'data' => $shipments->map(function ($shipment) {
                 $summary = $this->buildDestinationSummary($shipment);
                 $location = $this->buildDeliveryLocationSummary($shipment);
+                $assignment = $shipment->pickupAssignment;
+                $pickupLocation = collect([
+                    $shipment->pickup_town,
+                    $shipment->pickupDistrict?->name,
+                    $shipment->pickupRegion?->name,
+                ])->filter()->implode(', ');
 
                 return [
                     'id' => $shipment->id,
                     'shipment_number' => $shipment->shipment_number,
+                    'view_url' => route('admin.operations.shipments.show', $shipment),
                     'vendor_name' => $shipment->vendor?->name,
                     'vendor_business' => $shipment->vendor?->business_name,
                     'vendor_phone' => $shipment->vendor?->phone,
+                    'pickup_contact_name' => $shipment->pickup_contact_name,
+                    'pickup_contact_phone' => $shipment->pickup_contact_phone,
+                    'pickup_location' => $pickupLocation,
                     'sender_notes' => $shipment->sender_notes,
                     'destination_mode' => $shipment->destination_mode?->value,
                     'destination_mode_label' => $shipment->destination_mode?->label() ?? 'Single Destination',
@@ -122,6 +182,18 @@ class ShipmentController extends Controller
                     'items_count' => $shipment->items_count,
                     'status' => $shipment->status->value,
                     'status_label' => $shipment->status->label(),
+                    'pickup_assignment_id' => $assignment?->id,
+                    'pickup_status' => $assignment?->status?->value ?? null,
+                    'pickup_status_label' => $assignment?->status?->label() ?? 'Needs Driver',
+                    'pickup_driver_name' => $assignment?->driver?->name,
+                    'pickup_driver_phone' => $assignment?->driver?->phone,
+                    'target_warehouse_id' => $assignment?->target_warehouse_id,
+                    'target_warehouse_name' => $assignment?->targetWarehouse?->name,
+                    'target_warehouse_code' => $assignment?->targetWarehouse?->code,
+                    'assigned_at' => $assignment?->assigned_at?->format('Y-m-d H:i:s'),
+                    'picked_up_at' => $assignment?->picked_up_at?->format('Y-m-d H:i:s'),
+                    'arrived_warehouse_at' => $assignment?->arrived_warehouse_at?->format('Y-m-d H:i:s'),
+                    'received_at' => $assignment?->received_at?->format('Y-m-d H:i:s'),
                     'submitted_at' => $shipment->submitted_at?->format('Y-m-d H:i:s'),
                     'created_at' => $shipment->created_at->format('Y-m-d H:i:s'),
                 ];
@@ -161,8 +233,11 @@ class ShipmentController extends Controller
 
         $itemsCount = $shipment->items()->count();
         $currentAdmin = Auth::guard('admin')->user();
-        $canManage = $currentAdmin->hasPermission('shipments.edit');
-        $canManageCharges = $currentAdmin->hasPermission('charges.manage');
+        $access = app(BackOfficeAccess::class);
+        $canManage = $currentAdmin
+            && ($access->isHq($currentAdmin) || $access->canUsePermission($currentAdmin, 'shipments.edit'));
+        $canManageCharges = $currentAdmin
+            && ($access->isHq($currentAdmin) || $access->canUsePermission($currentAdmin, 'charges.manage'));
         $currentAssignment = $shipment->pickupAssignment;
         if ($currentAssignment?->status === PickupAssignmentStatus::CANCELLED) {
             $currentAssignment = null;
@@ -602,20 +677,60 @@ class ShipmentController extends Controller
     {
         $this->authorizePermission('shipments.view');
 
-        $query = Shipment::with(['vendor', 'deliveryRegion', 'deliveryDistrict'])->withCount('items');
+        $query = Shipment::with([
+            'vendor',
+            'deliveryRegion',
+            'deliveryDistrict',
+            'pickupAssignment.driver',
+            'pickupAssignment.targetWarehouse',
+        ])->withCount('items');
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('shipment_number', 'like', "%{$search}%")
                     ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
+                    ->orWhere('pickup_contact_name', 'like', "%{$search}%")
+                    ->orWhere('pickup_contact_phone', 'like', "%{$search}%")
                     ->orWhereHas('items', function ($itemQuery) use ($search) {
                         $itemQuery->where('delivery_recipient_name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('vendor', function ($vq) use ($search) {
+                        $vq->where('name', 'like', "%{$search}%")
+                            ->orWhere('business_name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('pickupAssignment.driver', function ($dq) use ($search) {
+                        $dq->where('name', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('pickupAssignment.targetWarehouse', function ($wq) use ($search) {
+                        $wq->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
                     });
             });
         }
 
         if ($status = $request->get('status')) {
             $query->where('status', $status);
+        }
+
+        if ($pickupStatus = $request->get('pickup_status')) {
+            $query->whereHas('pickupAssignment', fn ($q) => $q->where('status', $pickupStatus));
+        }
+
+        if ($driverId = $request->get('driver_id')) {
+            $query->whereHas('pickupAssignment', fn ($q) => $q->where('driver_id', $driverId));
+        }
+
+        if ($warehouseId = $request->get('target_warehouse_id')) {
+            $query->whereHas('pickupAssignment', fn ($q) => $q->where('target_warehouse_id', $warehouseId));
+        }
+
+        if ($assignmentState = $request->get('assignment_state')) {
+            if ($assignmentState === 'needs_assignment') {
+                $query->whereDoesntHave('pickupAssignment');
+            } elseif ($assignmentState === 'assigned') {
+                $query->whereHas('pickupAssignment');
+            }
         }
 
         if ($dateFrom = $request->get('date_from')) {
@@ -630,15 +745,20 @@ class ShipmentController extends Controller
         $rows = $shipments->map(function ($s) {
             $summary = $this->buildDestinationSummary($s);
             $location = $this->buildDeliveryLocationSummary($s);
+            $assignment = $s->pickupAssignment;
 
             return [
                 'Shipment #' => $s->shipment_number,
                 'Vendor' => $s->vendor?->name,
+                'Pickup Contact' => trim(($s->pickup_contact_name ?: '-').' / '.($s->pickup_contact_phone ?: '-'), ' /'),
+                'Pickup Driver' => $assignment?->driver?->name,
+                'Target Warehouse' => $assignment?->targetWarehouse?->name,
                 'Destination Mode' => $s->destination_mode?->label() ?? 'Single Destination',
                 'Destination Summary' => trim($summary['title'].' - '.$summary['subtitle'], ' -'),
                 'Delivery Location' => trim($location['title'].' - '.$location['subtitle'], ' -'),
                 'Items' => $s->items_count,
                 'Status' => $s->status->label(),
+                'Pickup Status' => $assignment?->status?->label() ?? 'Needs Driver',
                 'Submitted At' => $s->submitted_at?->format('Y-m-d H:i:s'),
                 'Created At' => $s->created_at->format('Y-m-d H:i:s'),
             ];
@@ -817,7 +937,10 @@ class ShipmentController extends Controller
 
     protected function authorizePermission(string $permission): void
     {
-        if (! Auth::guard('admin')->user()->hasPermission($permission)) {
+        $user = Auth::guard('admin')->user();
+        $access = app(BackOfficeAccess::class);
+
+        if (! $user || (! $access->isHq($user) && ! $access->canUsePermission($user, $permission))) {
             abort(403, 'Unauthorized action.');
         }
     }

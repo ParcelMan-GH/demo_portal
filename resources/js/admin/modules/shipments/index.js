@@ -9,6 +9,10 @@ function buildShipmentsTable(config) {
         endpoint: config.endpoint,
         exportEndpoint: config.exportEndpoint,
         csrfToken: config.csrfToken,
+        statuses: config.statuses || [],
+        pickupStatuses: config.pickupStatuses || [],
+        warehouses: config.warehouses || [],
+        drivers: config.drivers || [],
         shipments: [],
         meta: {
             current_page: 1,
@@ -18,9 +22,14 @@ function buildShipmentsTable(config) {
             last_page: 1,
         },
         loading: false,
+        loadError: '',
+        filtersOpen: false,
         search: '',
         statusFilter: '',
-        statusFilterName: 'All statuses',
+        pickupStatusFilter: '',
+        assignmentStateFilter: '',
+        warehouseFilter: '',
+        driverFilter: '',
         createdFrom: '',
         createdTo: '',
         dateRangePicker: null,
@@ -30,35 +39,40 @@ function buildShipmentsTable(config) {
         columns: [
             { key: 'shipment_number', label: 'Shipment #' },
             { key: 'vendor', label: 'Vendor' },
-            { key: 'destination_mode', label: 'Destination Mode' },
-            { key: 'fulfillment_type', label: 'Fulfillment' },
-            { key: 'destination', label: 'Destination' },
-            { key: 'location', label: 'Delivery Location' },
+            { key: 'pickup_contact', label: 'Pickup Contact' },
+            { key: 'pickup_location', label: 'Pickup Location' },
+            { key: 'target_warehouse', label: 'Drop-off Warehouse' },
+            { key: 'pickup_driver', label: 'Pickup Driver' },
             { key: 'items', label: 'Packages' },
-            { key: 'status', label: 'Status' },
+            { key: 'status', label: 'Shipment Status' },
+            { key: 'pickup_status', label: 'Pickup Status' },
             { key: 'submitted_at', label: 'Submitted At' },
             { key: 'actions', label: 'Actions' },
         ],
         visibleColumns: {
             shipment_number: true,
             vendor: true,
-            destination_mode: true,
-            fulfillment_type: true,
-            destination: true,
-            location: true,
+            pickup_contact: true,
+            pickup_location: true,
+            target_warehouse: true,
+            pickup_driver: true,
             items: true,
             status: true,
+            pickup_status: true,
             submitted_at: true,
             actions: true,
         },
 
         init() {
             this.initDateRange();
-            this.loadData();
+            if (this.endpoint) {
+                this.loadData();
+            }
         },
 
         async loadData() {
             this.loading = true;
+            this.loadError = '';
             try {
                 const params = new URLSearchParams({
                     page: this.meta.current_page,
@@ -69,6 +83,10 @@ function buildShipmentsTable(config) {
 
                 if (this.search) params.append('search', this.search);
                 if (this.statusFilter) params.append('status', this.statusFilter);
+                if (this.pickupStatusFilter) params.append('pickup_status', this.pickupStatusFilter);
+                if (this.assignmentStateFilter) params.append('assignment_state', this.assignmentStateFilter);
+                if (this.warehouseFilter) params.append('target_warehouse_id', this.warehouseFilter);
+                if (this.driverFilter) params.append('driver_id', this.driverFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
 
@@ -79,7 +97,16 @@ function buildShipmentsTable(config) {
                     },
                 });
 
-                if (!response.ok) throw new Error('Failed to fetch data');
+                if (!response.ok) {
+                    let message = 'Failed to fetch shipments.';
+                    try {
+                        const error = await response.json();
+                        message = error.message || message;
+                    } catch (_) {
+                        message = response.status === 403 ? 'You are not allowed to load shipments.' : message;
+                    }
+                    throw new Error(message);
+                }
 
                 const result = await response.json();
                 this.shipments = result.data;
@@ -92,6 +119,8 @@ function buildShipmentsTable(config) {
                 };
             } catch (error) {
                 console.error('Error loading shipments:', error);
+                this.shipments = [];
+                this.loadError = error.message || 'Failed to load shipments.';
             } finally {
                 this.loading = false;
             }
@@ -105,6 +134,33 @@ function buildShipmentsTable(config) {
                 this.sortDirection = 'asc';
             }
             this.loadData();
+        },
+
+        resetFilters() {
+            this.search = '';
+            this.statusFilter = '';
+            this.pickupStatusFilter = '';
+            this.assignmentStateFilter = '';
+            this.warehouseFilter = '';
+            this.driverFilter = '';
+            this.createdFrom = '';
+            this.createdTo = '';
+            if (this.$refs.createdRange) {
+                this.$refs.createdRange.value = '';
+            }
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        activeFilterCount() {
+            return [
+                this.statusFilter,
+                this.pickupStatusFilter,
+                this.assignmentStateFilter,
+                this.warehouseFilter,
+                this.driverFilter,
+                this.createdFrom || this.createdTo,
+            ].filter(Boolean).length;
         },
 
         toggleColumn(key) {
@@ -235,6 +291,10 @@ function buildShipmentsTable(config) {
                 const params = new URLSearchParams();
                 if (this.search) params.append('search', this.search);
                 if (this.statusFilter) params.append('status', this.statusFilter);
+                if (this.pickupStatusFilter) params.append('pickup_status', this.pickupStatusFilter);
+                if (this.assignmentStateFilter) params.append('assignment_state', this.assignmentStateFilter);
+                if (this.warehouseFilter) params.append('target_warehouse_id', this.warehouseFilter);
+                if (this.driverFilter) params.append('driver_id', this.driverFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
                 params.append('format', format);
@@ -269,6 +329,10 @@ function buildShipmentsTable(config) {
                 const params = new URLSearchParams();
                 if (this.search) params.append('search', this.search);
                 if (this.statusFilter) params.append('status', this.statusFilter);
+                if (this.pickupStatusFilter) params.append('pickup_status', this.pickupStatusFilter);
+                if (this.assignmentStateFilter) params.append('assignment_state', this.assignmentStateFilter);
+                if (this.warehouseFilter) params.append('target_warehouse_id', this.warehouseFilter);
+                if (this.driverFilter) params.append('driver_id', this.driverFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
 
@@ -394,15 +458,62 @@ function buildShipmentsTable(config) {
 
         formatDateTime(value) {
             if (!value) return '-';
-            const date = new Date(value);
+            const date = new Date(String(value).replace(' ', 'T'));
             if (Number.isNaN(date.getTime())) return value;
-            return date.toLocaleString('en-US', {
+            return date.toLocaleString('en-GH', {
                 year: 'numeric',
                 month: 'short',
-                day: '2-digit',
-                hour: '2-digit',
+                day: 'numeric',
+                hour: 'numeric',
                 minute: '2-digit',
+                hour12: true,
             });
+        },
+
+        statusBadgeClass(status) {
+            switch ((status || '').toLowerCase()) {
+                case 'draft':
+                    return 'border-slate-200 bg-slate-50 text-slate-700';
+                case 'submitted':
+                case 'invoice_sent':
+                case 'invoice_accepted':
+                    return 'border-blue-200 bg-blue-50 text-blue-700';
+                case 'pickup_assigned':
+                case 'picked_up':
+                case 'arrived_warehouse':
+                case 'at_warehouse':
+                case 'sorted':
+                    return 'border-violet-200 bg-violet-50 text-violet-700';
+                case 'in_transit':
+                case 'at_destination':
+                case 'out_for_delivery':
+                    return 'border-amber-200 bg-amber-50 text-amber-700';
+                case 'delivered':
+                    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+                case 'cancelled':
+                    return 'border-rose-200 bg-rose-50 text-rose-700';
+                default:
+                    return 'border-slate-200 bg-white text-slate-700';
+            }
+        },
+
+        pickupBadgeClass(status) {
+            switch ((status || '').toLowerCase()) {
+                case 'assigned':
+                    return 'border-blue-200 bg-blue-50 text-blue-700';
+                case 'en_route':
+                    return 'border-indigo-200 bg-indigo-50 text-indigo-700';
+                case 'arrived':
+                    return 'border-amber-200 bg-amber-50 text-amber-700';
+                case 'picking_up':
+                    return 'border-violet-200 bg-violet-50 text-violet-700';
+                case 'completed':
+                    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+                case 'cancelled':
+                    return 'border-rose-200 bg-rose-50 text-rose-700';
+                default:
+                    return 'border-orange-200 bg-orange-50 text-orange-700';
+            }
         },
     };
 }
@@ -436,21 +547,28 @@ function registerShipmentsTable() {
         return;
     }
 
-    const config = getShipmentsConfig();
-    if (!config) {
-        return;
-    }
-
-    if (!window.shipmentsTable) {
-        window.shipmentsTable = () => buildShipmentsTable(config);
-    }
-
     Alpine.data('shipmentsTable', window.shipmentsTable);
 }
+
+window.shipmentsTable = () => {
+    const config = getShipmentsConfig();
+
+    if (!config) {
+        return buildShipmentsTable({
+            endpoint: '',
+            exportEndpoint: '',
+            statuses: [],
+            pickupStatuses: [],
+            warehouses: [],
+            drivers: [],
+        });
+    }
+
+    return buildShipmentsTable(config);
+};
 
 if (window.Alpine) {
     registerShipmentsTable();
 } else {
     document.addEventListener('alpine:init', registerShipmentsTable);
 }
-

@@ -263,6 +263,64 @@ function warehouseUsersTable(config) {
             this.visibleColumns[key] = !this.visibleColumns[key];
         },
 
+        columnVisible(key) {
+            return this.visibleColumns[key] !== false;
+        },
+
+        statusOptions() {
+            return [...new Set(this.allItems.map((row) => row.status || row.status_label).filter(Boolean))];
+        },
+
+        directionOptions() {
+            return [...new Set(this.allItems.map((row) => row.direction).filter(Boolean))];
+        },
+
+        hasStatusFilter() {
+            return this.statusOptions().length > 1;
+        },
+
+        hasDirectionFilter() {
+            return this.directionOptions().length > 1;
+        },
+
+        clearFilters() {
+            this.statusFilter = '';
+            this.directionFilter = '';
+            this.currentPage = 1;
+            this.recompute();
+        },
+
+        activeFilterChips() {
+            const chips = [];
+            if (this.statusFilter) chips.push({ key: 'status', label: 'Status: ' + this.statusFilter });
+            if (this.directionFilter) chips.push({ key: 'direction', label: 'Direction: ' + this.directionFilter });
+            return chips;
+        },
+
+        clearFilter(key) {
+            if (key === 'status') this.statusFilter = '';
+            if (key === 'direction') this.directionFilter = '';
+            this.currentPage = 1;
+            this.recompute();
+        },
+
+        primaryLine(row) {
+            return row._primary || row.manifest_number || row.batch_number || row.run_number || row.shipment_number || row.item_description || 'Record';
+        },
+
+        secondaryLine(row) {
+            return row._secondary || row.other_warehouse || row.driver || row.created_at || '';
+        },
+
+        mobileFields(row) {
+            return this.columns.filter((col) => col.key !== 'actions' && col.key !== '_primary' && col.key !== '_secondary').slice(0, 5).map((col) => ({
+                label: col.label,
+                value: row[col.key] || '-',
+                type: col.type || 'text',
+                className: row[col.classKey] || row[col.key + '_class'] || '',
+            }));
+        },
+
         visibleColumnCount() {
             return Object.values(this.visibleColumns).filter(Boolean).length;
         },
@@ -487,6 +545,9 @@ function clientSideTable({ items = [], columns = [], visibleColumns = {}, defaul
         columns: columns,
         visibleColumns: { ...visibleColumns },
         search: '',
+        showFilters: false,
+        statusFilter: '',
+        directionFilter: '',
         sortBy: defaultSort,
         sortDir: defaultSortDir,
         perPage: 25,
@@ -508,6 +569,12 @@ function clientSideTable({ items = [], columns = [], visibleColumns = {}, defaul
                 data = data.filter(row =>
                     Object.values(row).some(v => String(v ?? '').toLowerCase().includes(q))
                 );
+            }
+            if (this.statusFilter) {
+                data = data.filter(row => String(row.status || row.status_label || '').toLowerCase() === String(this.statusFilter).toLowerCase());
+            }
+            if (this.directionFilter) {
+                data = data.filter(row => String(row.direction || '').toLowerCase() === String(this.directionFilter).toLowerCase());
             }
             if (this.sortBy) {
                 data = [...data].sort((a, b) => {
@@ -541,6 +608,64 @@ function clientSideTable({ items = [], columns = [], visibleColumns = {}, defaul
             this.visibleColumns[key] = !this.visibleColumns[key];
         },
 
+        columnVisible(key) {
+            return this.visibleColumns[key] !== false;
+        },
+
+        statusOptions() {
+            return [...new Set(this.allItems.map((row) => row.status || row.status_label).filter(Boolean))];
+        },
+
+        directionOptions() {
+            return [...new Set(this.allItems.map((row) => row.direction).filter(Boolean))];
+        },
+
+        hasStatusFilter() {
+            return this.statusOptions().length > 1;
+        },
+
+        hasDirectionFilter() {
+            return this.directionOptions().length > 1;
+        },
+
+        clearFilters() {
+            this.statusFilter = '';
+            this.directionFilter = '';
+            this.currentPage = 1;
+            this.recompute();
+        },
+
+        activeFilterChips() {
+            const chips = [];
+            if (this.statusFilter) chips.push({ key: 'status', label: 'Status: ' + this.statusFilter });
+            if (this.directionFilter) chips.push({ key: 'direction', label: 'Direction: ' + this.directionFilter });
+            return chips;
+        },
+
+        clearFilter(key) {
+            if (key === 'status') this.statusFilter = '';
+            if (key === 'direction') this.directionFilter = '';
+            this.currentPage = 1;
+            this.recompute();
+        },
+
+        primaryLine(row) {
+            return row._primary || row.manifest_number || row.batch_number || row.run_number || row.shipment_number || row.item_description || 'Record';
+        },
+
+        secondaryLine(row) {
+            return row._secondary || row.other_warehouse || row.driver || row.created_at || '';
+        },
+
+        mobileFields(row) {
+            return this.columns.filter((col) => col.key !== 'actions').filter((col) => this.columnVisible(col.key)).slice(0, 5).map((col) => ({
+                label: col.label,
+                value: row[col.key] || '-',
+                type: col.type || 'text',
+                className: row[col.classKey] || row[col.key + '_class'] || '',
+            }));
+        },
+
         visibleColumnCount() {
             return Object.values(this.visibleColumns).filter(Boolean).length;
         },
@@ -556,6 +681,12 @@ function clientSideTable({ items = [], columns = [], visibleColumns = {}, defaul
             if (this.search.trim()) {
                 const q = this.search.toLowerCase();
                 data = data.filter(row => Object.values(row).some(v => String(v ?? '').toLowerCase().includes(q)));
+            }
+            if (this.statusFilter) {
+                data = data.filter(row => String(row.status || row.status_label || '').toLowerCase() === String(this.statusFilter).toLowerCase());
+            }
+            if (this.directionFilter) {
+                data = data.filter(row => String(row.direction || '').toLowerCase() === String(this.directionFilter).toLowerCase());
             }
             if (this.sortBy) {
                 data = [...data].sort((a, b) => {
@@ -615,15 +746,15 @@ function warehouseReceivedItemsTable(items) {
     return clientSideTable({
         items: Array.isArray(items) ? items : [],
         columns: [
-            { key: 'confirmed_at',    label: 'Confirmed At' },
-            { key: 'shipment_number', label: 'Shipment' },
-            { key: 'item_description',label: 'Item', exportable: true },
-            { key: 'qty',             label: 'Qty' },
+            { key: 'item_description',label: 'Package' },
+            { key: 'shipment_number', label: 'Shipment', type: 'link', hrefKey: 'view_url' },
+            { key: 'qty',             label: 'Qty', align: 'center' },
             { key: 'driver',          label: 'Driver' },
+            { key: 'confirmed_at',    label: 'Confirmed At' },
             { key: 'notes',           label: 'Notes', exportable: true },
-            { key: 'actions',         label: 'Actions', exportable: false },
+            { key: 'actions',         label: 'Actions', type: 'action', exportable: false },
         ],
-        visibleColumns: { confirmed_at: true, shipment_number: true, item_description: true, qty: true, driver: true, notes: true, actions: true },
+        visibleColumns: { item_description: true, shipment_number: true, qty: true, driver: true, confirmed_at: true, notes: true, actions: true },
         defaultSort: 'confirmed_at',
         defaultSortDir: 'desc',
         title: 'Received Items',
@@ -635,13 +766,13 @@ function warehouseReceivedPickupsTable(items) {
     return clientSideTable({
         items: Array.isArray(items) ? items : [],
         columns: [
-            { key: 'shipment_number',     label: 'Shipment' },
+            { key: 'shipment_number',     label: 'Shipment', type: 'link', hrefKey: 'view_url' },
             { key: 'driver',              label: 'Driver' },
-            { key: 'status_label',        label: 'Status' },
+            { key: 'status_label',        label: 'Status', type: 'status', classKey: 'status_badge_class' },
             { key: 'arrived_warehouse_at',label: 'Arrived Warehouse' },
             { key: 'received_at',         label: 'Received At' },
             { key: 'notes',               label: 'Notes', exportable: true },
-            { key: 'actions',             label: 'Actions', exportable: false },
+            { key: 'actions',             label: 'Actions', type: 'action', exportable: false },
         ],
         visibleColumns: { shipment_number: true, driver: true, status_label: true, arrived_warehouse_at: true, received_at: true, notes: true, actions: true },
         defaultSort: 'received_at',
@@ -655,12 +786,12 @@ function warehousePendingReceiptsTable(items) {
     return clientSideTable({
         items: Array.isArray(items) ? items : [],
         columns: [
-            { key: 'shipment_number',     label: 'Shipment' },
+            { key: 'shipment_number',     label: 'Shipment', type: 'link', hrefKey: 'view_url' },
             { key: 'driver',              label: 'Driver' },
-            { key: 'status_label',        label: 'Status' },
+            { key: 'status_label',        label: 'Status', type: 'status', classKey: 'status_badge_class' },
             { key: 'assigned_at',         label: 'Assigned At' },
             { key: 'arrived_warehouse_at',label: 'Arrived Warehouse' },
-            { key: 'actions',             label: 'Actions', exportable: false },
+            { key: 'actions',             label: 'Actions', type: 'action', exportable: false },
         ],
         visibleColumns: { shipment_number: true, driver: true, status_label: true, assigned_at: true, arrived_warehouse_at: true, actions: true },
         defaultSort: 'assigned_at',
@@ -674,15 +805,15 @@ function warehouseSortBatchesTable(items) {
     return clientSideTable({
         items: Array.isArray(items) ? items : [],
         columns: [
-            { key: 'batch_number',   label: 'Batch #' },
-            { key: 'direction',      label: 'Direction' },
+            { key: 'batch_number',   label: 'Batch #', type: 'link', hrefKey: 'view_url' },
+            { key: 'direction',      label: 'Direction', type: 'status', classKey: 'direction_class' },
             { key: 'other_warehouse',label: 'Other Warehouse' },
             { key: 'dispatch_mode',  label: 'Mode' },
-            { key: 'status',         label: 'Status' },
-            { key: 'items',          label: 'Items' },
+            { key: 'status',         label: 'Status', type: 'status', classKey: 'status_badge_class' },
+            { key: 'items',          label: 'Items', align: 'center' },
             { key: 'sealed_at',      label: 'Sealed At' },
             { key: 'created_at',     label: 'Created' },
-            { key: 'actions',        label: 'Actions', exportable: false },
+            { key: 'actions',        label: 'Actions', type: 'action', exportable: false },
         ],
         visibleColumns: { batch_number: true, direction: true, other_warehouse: true, dispatch_mode: true, status: true, items: true, sealed_at: true, created_at: true, actions: true },
         defaultSort: 'created_at',
@@ -696,16 +827,16 @@ function warehouseManifestsTable(items) {
     return clientSideTable({
         items: Array.isArray(items) ? items : [],
         columns: [
-            { key: 'manifest_number', label: 'Manifest #' },
-            { key: 'direction',       label: 'Direction' },
+            { key: 'manifest_number', label: 'Manifest #', type: 'link', hrefKey: 'view_url' },
+            { key: 'direction',       label: 'Direction', type: 'status', classKey: 'direction_class' },
             { key: 'other_warehouse', label: 'Other Warehouse' },
             { key: 'driver',          label: 'Driver' },
-            { key: 'status',          label: 'Status' },
-            { key: 'items',           label: 'Items' },
+            { key: 'status',          label: 'Status', type: 'status', classKey: 'status_badge_class' },
+            { key: 'items',           label: 'Items', align: 'center' },
             { key: 'dispatched_at',   label: 'Dispatched' },
             { key: 'arrived_at',      label: 'Arrived' },
             { key: 'created_at',      label: 'Created' },
-            { key: 'actions',         label: 'Actions', exportable: false },
+            { key: 'actions',         label: 'Actions', type: 'action', exportable: false },
         ],
         visibleColumns: { manifest_number: true, direction: true, other_warehouse: true, driver: true, status: true, items: true, dispatched_at: true, arrived_at: true, created_at: true, actions: true },
         defaultSort: 'created_at',
@@ -719,14 +850,14 @@ function warehouseDeliveryRunsTable(items) {
     return clientSideTable({
         items: Array.isArray(items) ? items : [],
         columns: [
-            { key: 'run_number',    label: 'Run #' },
+            { key: 'run_number',    label: 'Run #', type: 'link', hrefKey: 'view_url' },
             { key: 'driver',        label: 'Driver' },
-            { key: 'status',        label: 'Status' },
-            { key: 'stops',         label: 'Stops' },
+            { key: 'status',        label: 'Status', type: 'status', classKey: 'status_badge_class' },
+            { key: 'stops',         label: 'Stops', align: 'center' },
             { key: 'dispatched_at', label: 'Dispatched' },
             { key: 'completed_at',  label: 'Completed' },
             { key: 'created_at',    label: 'Created' },
-            { key: 'actions',       label: 'Actions', exportable: false },
+            { key: 'actions',       label: 'Actions', type: 'action', exportable: false },
         ],
         visibleColumns: { run_number: true, driver: true, status: true, stops: true, dispatched_at: true, completed_at: true, created_at: true, actions: true },
         defaultSort: 'created_at',
