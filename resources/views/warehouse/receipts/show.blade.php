@@ -536,8 +536,53 @@
                                     <select x-model="items[receiveModal.itemIndex].condition_status" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-900/10">
                                         <option value="ok">Good</option>
                                         <option value="damaged">Damaged</option>
-                                        <option value="lost">Lost</option>
+                                        <option value="partial">Partial Damage</option>
                                     </select>
+                                </div>
+
+                                {{-- Package destination for multiple drop-offs --}}
+                                <div x-show="isPerItemMode()" class="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4" style="display:none">
+                                    <div>
+                                        <p class="text-xs font-black uppercase tracking-wide text-slate-700">Package Destination</p>
+                                        <p class="mt-1 text-xs font-semibold text-slate-500">Recipient and location saved here apply only to this package.</p>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div>
+                                            <label class="mb-1.5 block text-xs font-bold text-slate-700">Recipient Name</label>
+                                            <input type="text"
+                                                   x-model="items[receiveModal.itemIndex].delivery_recipient_name"
+                                                   placeholder="Who receives it?"
+                                                   class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-900/10">
+                                        </div>
+                                        <div>
+                                            <label class="mb-1.5 block text-xs font-bold text-slate-700">Recipient Phone</label>
+                                            <input type="text"
+                                                   x-model="items[receiveModal.itemIndex].delivery_recipient_phone"
+                                                   placeholder="0241234567"
+                                                   class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-900/10">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-bold text-slate-700">Town / Area</label>
+                                        <input type="text"
+                                               x-model="items[receiveModal.itemIndex].delivery_town"
+                                               placeholder="Delivery town or area"
+                                               class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-900/10">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-bold text-slate-700">Landmark</label>
+                                        <input type="text"
+                                               x-model="items[receiveModal.itemIndex].delivery_landmark"
+                                               placeholder="Near..."
+                                               class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-900/10">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-bold text-slate-700">Delivery Instructions</label>
+                                        <textarea rows="2"
+                                                  x-model="items[receiveModal.itemIndex].delivery_instructions"
+                                                  placeholder="e.g. Call before delivery"
+                                                  class="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-900/10"></textarea>
+                                    </div>
                                 </div>
 
                                 {{-- Delivery method tag: direct vs bus courier --}}

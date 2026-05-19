@@ -354,8 +354,8 @@ function registerWarehouseReceiptShowPage() {
             switch (condition || 'ok') {
                 case 'damaged':
                     return 'Damaged';
-                case 'lost':
-                    return 'Lost';
+                case 'partial':
+                    return 'Partial Damage';
                 default:
                     return 'Good';
             }
@@ -365,8 +365,8 @@ function registerWarehouseReceiptShowPage() {
             switch (condition || 'ok') {
                 case 'damaged':
                     return 'text-amber-700';
-                case 'lost':
-                    return 'text-rose-700';
+                case 'partial':
+                    return 'text-amber-700';
                 default:
                     return 'text-emerald-700';
             }
@@ -706,6 +706,13 @@ function registerWarehouseReceiptShowPage() {
                 formData.append('condition_status', item.condition_status || 'ok');
                 formData.append('notes', item.notes || '');
                 formData.append('delivery_method', item.delivery_method || 'direct');
+                if (this.isPerItemMode()) {
+                    formData.append('delivery_recipient_name', item.delivery_recipient_name || '');
+                    formData.append('delivery_recipient_phone', item.delivery_recipient_phone || '');
+                    formData.append('delivery_town', item.delivery_town || '');
+                    formData.append('delivery_landmark', item.delivery_landmark || '');
+                    formData.append('delivery_instructions', item.delivery_instructions || '');
+                }
                 formData.append('_token', csrfToken());
 
                 (this.pendingFiles[itemId] || []).forEach((file) => {

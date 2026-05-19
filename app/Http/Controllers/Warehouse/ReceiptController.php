@@ -142,7 +142,11 @@ class ReceiptController extends AdminShipmentController
                     'tracking_code' => $item->tracking_code,
                     'delivery_recipient_name' => $item->delivery_recipient_name ?: $item->shipment?->delivery_recipient_name,
                     'delivery_recipient_phone' => $item->delivery_recipient_phone ?: $item->shipment?->delivery_recipient_phone,
+                    'delivery_region_id' => $item->delivery_region_id ?: $item->shipment?->delivery_region_id,
+                    'delivery_district_id' => $item->delivery_district_id ?: $item->shipment?->delivery_district_id,
                     'delivery_town' => $item->delivery_town ?: $item->shipment?->delivery_town,
+                    'delivery_landmark' => $item->delivery_landmark ?: $item->shipment?->delivery_landmark,
+                    'delivery_instructions' => $item->delivery_instructions ?: $item->shipment?->delivery_instructions,
                     'delivery_preference' => $item->delivery_preference ?? $item->shipment?->delivery_preference ?? 'deliver',
                     'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
                     'fulfillment_type' => $item->fulfillment_type?->value ?? $item->shipment?->fulfillment_type?->value ?? 'warehouse',
@@ -335,12 +339,43 @@ class ReceiptController extends AdminShipmentController
             // Tag the package for bus-courier handoff at the moment of
             // receiving, so the right driver picks it up downstream.
             'delivery_method' => ['nullable', 'in:direct,bus_handoff'],
+            'delivery_recipient_name' => ['nullable', 'string', 'max:255'],
+            'delivery_recipient_phone' => ['nullable', 'string', 'max:20'],
+            'delivery_town' => ['nullable', 'string', 'max:255'],
+            'delivery_landmark' => ['nullable', 'string', 'max:255'],
+            'delivery_instructions' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        // Persist delivery_method on the shipment item itself (independent of
-        // the receipt/qty flow). Only update if the caller sent it.
+        $shipment = $shipmentItem->shipment()->first();
+        $isPerItemMode = ($shipment?->destination_mode?->value ?? (string) $shipment?->destination_mode) === ShipmentDestinationMode::PER_ITEM->value;
+        $shipmentItemUpdates = [];
+
+        if ($isPerItemMode) {
+            foreach ([
+                'delivery_recipient_name',
+                'delivery_town',
+                'delivery_landmark',
+                'delivery_instructions',
+            ] as $key) {
+                if (array_key_exists($key, $validated)) {
+                    $shipmentItemUpdates[$key] = $validated[$key] ?? null;
+                }
+            }
+
+            if (array_key_exists('delivery_recipient_phone', $validated)) {
+                $shipmentItemUpdates['delivery_recipient_phone'] = ! empty($validated['delivery_recipient_phone'])
+                    ? PhoneHelper::format($validated['delivery_recipient_phone'])
+                    : null;
+            }
+        }
+
         if (array_key_exists('delivery_method', $validated) && $validated['delivery_method'] !== null) {
-            $shipmentItem->update(['delivery_method' => $validated['delivery_method']]);
+            $shipmentItemUpdates['delivery_method'] = $validated['delivery_method'];
+        }
+
+        if (! empty($shipmentItemUpdates)) {
+            $shipmentItem->update($shipmentItemUpdates);
+            $shipmentItem->refresh();
         }
 
         $result = $this->warehouseReceivingService->upsertReceiptItem(
@@ -987,7 +1022,11 @@ class ReceiptController extends AdminShipmentController
                 'tracking_code' => $item->tracking_code,
                 'delivery_recipient_name' => $item->delivery_recipient_name ?: $shipment->delivery_recipient_name,
                 'delivery_recipient_phone' => $item->delivery_recipient_phone ?: $shipment->delivery_recipient_phone,
+                'delivery_region_id' => $item->delivery_region_id ?: $shipment->delivery_region_id,
+                'delivery_district_id' => $item->delivery_district_id ?: $shipment->delivery_district_id,
                 'delivery_town' => $item->delivery_town ?: $shipment->delivery_town,
+                'delivery_landmark' => $item->delivery_landmark ?: $shipment->delivery_landmark,
+                'delivery_instructions' => $item->delivery_instructions ?: $shipment->delivery_instructions,
                 'delivery_preference' => $item->delivery_preference ?? $shipment->delivery_preference ?? 'deliver',
                 'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
                 'fulfillment_type' => $item->fulfillment_type?->value ?? $shipment->fulfillment_type?->value ?? 'warehouse',

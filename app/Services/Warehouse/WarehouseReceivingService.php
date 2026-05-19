@@ -569,7 +569,10 @@ class WarehouseReceivingService
 
     public function serializeReceiptItem(WarehouseReceiptItem $item): array
     {
-        $item->loadMissing(['photos', 'shipmentItem']);
+        $item->loadMissing(['photos', 'shipmentItem.shipment']);
+
+        $shipmentItem = $item->shipmentItem;
+        $shipment = $shipmentItem?->shipment;
 
         return [
             'id' => $item->id,
@@ -580,7 +583,14 @@ class WarehouseReceivingService
             'discrepancy_type' => $item->discrepancy_type,
             'condition_status' => $item->condition_status,
             'notes' => $item->notes,
-            'delivery_method' => $item->shipmentItem?->delivery_method ?? 'direct',
+            'delivery_recipient_name' => $shipmentItem?->delivery_recipient_name ?: $shipment?->delivery_recipient_name,
+            'delivery_recipient_phone' => $shipmentItem?->delivery_recipient_phone ?: $shipment?->delivery_recipient_phone,
+            'delivery_region_id' => $shipmentItem?->delivery_region_id ?: $shipment?->delivery_region_id,
+            'delivery_district_id' => $shipmentItem?->delivery_district_id ?: $shipment?->delivery_district_id,
+            'delivery_town' => $shipmentItem?->delivery_town ?: $shipment?->delivery_town,
+            'delivery_landmark' => $shipmentItem?->delivery_landmark ?: $shipment?->delivery_landmark,
+            'delivery_instructions' => $shipmentItem?->delivery_instructions ?: $shipment?->delivery_instructions,
+            'delivery_method' => $shipmentItem?->delivery_method ?? 'direct',
             'barcode_value' => $item->barcode_value,
             'barcode_format' => $item->barcode_format,
             'barcode_printed_at' => optional($item->barcode_printed_at)?->toIso8601String(),
