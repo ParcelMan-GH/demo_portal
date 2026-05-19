@@ -32,6 +32,9 @@
         $canDeliveryAssign = $authUser?->hasPermission('warehouse.delivery.assign');
         $canContacts = $authUser?->hasPermission('warehouse.contacts.manage');
         $canRecipientPayments = $authUser?->hasPermission('warehouse.recipient_payments.view');
+        $canHqControls = ($backOfficeIsHq ?? false)
+            || ($authUser && collect(['vendors.view', 'vendors.manage', 'drivers.view', 'warehouses.view', 'settings.view'])
+                ->contains(fn (string $permission) => $backOfficeAccess->canUsePermission($authUser, $permission)));
     @endphp
 
     <div class="min-h-screen flex">
@@ -184,15 +187,23 @@
                 @endif
                 @endif
 
-                @if(($backOfficeIsHq ?? false) || $authUser?->hasAnyPermission(['vendors.view', 'drivers.view', 'settings.view']))
+                @if($canHqControls)
                 <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">HQ Controls</div>
                 <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
 
                 @hasPermission('vendors.view')
-                <a href="{{ route('admin.vendors.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.vendors.*') || request()->routeIs('admin.vendor-payouts.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                <a href="{{ route('admin.vendors.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.vendors.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                     <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></div>
                     <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Vendors</span>
                     <template x-if="sidebarCollapsed"><span class="wh-tooltip">Vendors</span></template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('vendors.manage')
+                <a href="{{ route('admin.vendor-payouts.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.vendor-payouts.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 10v2m8-6a8 8 0 11-16 0 8 8 0 0116 0z"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Commission Payouts</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Commission Payouts</span></template>
                 </a>
                 @endhasPermission
 
@@ -201,6 +212,14 @@
                     <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
                     <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Riders & Drivers</span>
                     <template x-if="sidebarCollapsed"><span class="wh-tooltip">Riders & Drivers</span></template>
+                </a>
+                @endhasPermission
+
+                @hasPermission('warehouses.view')
+                <a href="{{ route('admin.warehouses.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.warehouses.*') || request()->routeIs('admin.locations.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 21h18M4 10h16v11H4V10Zm-.5-3L12 3l8.5 4M8 14v3m4-3v3m4-3v3"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Warehouses</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Warehouses</span></template>
                 </a>
                 @endhasPermission
 
