@@ -190,17 +190,21 @@ class RoleSeeder extends Seeder
         ];
 
         foreach ($roles as $definition) {
-            $role = Role::updateOrCreate(
-                ['slug' => $definition['slug']],
-                [
-                    'name' => $definition['name'],
-                    'description' => $definition['description'],
-                    'is_system_role' => true,
-                    'is_warehouse_role' => true,
-                    'is_assignable_by_warehouse_manager' => $definition['assignable'],
-                    'is_active' => true,
-                ]
-            );
+            $role = Role::query()
+                ->where('slug', $definition['slug'])
+                ->orWhere('name', $definition['name'])
+                ->first() ?? new Role();
+
+            $role->fill([
+                'slug' => $definition['slug'],
+                'name' => $definition['name'],
+                'description' => $definition['description'],
+                'is_system_role' => true,
+                'is_warehouse_role' => true,
+                'is_assignable_by_warehouse_manager' => $definition['assignable'],
+                'is_active' => true,
+            ]);
+            $role->save();
 
             $role->permissions()->sync($definition['permissions']);
         }
