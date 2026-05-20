@@ -55,6 +55,7 @@ $shipmentConfig = [
     'invoiceHistory' => $invoiceHistory,
     'assignment' => $currentAssignment,
     'assignmentHistory' => $assignmentHistory,
+    'quantitySummary' => $quantitySummary,
     'sortBatchShowUrlTemplate' => route('admin.sort-batches.show', ['batch' => '__ID__']),
     'transportManifestShowUrlTemplate' => route('admin.transport-manifests.show', ['manifest' => '__ID__']),
     'deliveryRunShowUrlTemplate' => route('admin.delivery-runs.show', ['run' => '__ID__']),
@@ -2475,6 +2476,47 @@ $shipmentConfig = [
             <!-- RECEIVING TAB                           -->
             <!-- ═══════════════════════════════════════ -->
             <div x-show="activeTab === 'receiving'" x-cloak>
+                <section class="mb-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="flex items-start gap-3">
+                            <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 7h6M9 12h6M9 17h4M5 5.5A2.5 2.5 0 017.5 3h9A2.5 2.5 0 0119 5.5v13A2.5 2.5 0 0116.5 21h-9A2.5 2.5 0 015 18.5v-13Z"/>
+                                </svg>
+                            </span>
+                            <div>
+                                <h3 class="text-base font-black text-slate-950">Quantity Reconciliation</h3>
+                                <p class="mt-0.5 text-sm font-medium text-slate-500">Compare vendor, rider, and warehouse counts for this shipment.</p>
+                            </div>
+                        </div>
+                        <span class="inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-black"
+                              :class="quantityDifferenceTone()"
+                              x-text="quantityDifferenceLabel()"></span>
+                    </div>
+
+                    <div class="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-4">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p class="text-[11px] font-black uppercase tracking-wide text-slate-400">Vendor declared total</p>
+                            <p class="mt-2 text-3xl font-black leading-none text-slate-950" x-text="formatQuantityValue(quantityVendorDeclared())"></p>
+                            <p class="mt-1 text-xs font-bold text-slate-500">Entered by vendor</p>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p class="text-[11px] font-black uppercase tracking-wide text-slate-400">Rider picked total</p>
+                            <p class="mt-2 text-3xl font-black leading-none text-slate-950" x-text="formatQuantityValue(quantityDriverPicked())"></p>
+                            <p class="mt-1 text-xs font-bold text-slate-500" x-text="quantityDriverPicked() === null ? 'Waiting for pickup' : 'Recorded at pickup'"></p>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p class="text-[11px] font-black uppercase tracking-wide text-slate-400">Warehouse received total</p>
+                            <p class="mt-2 text-3xl font-black leading-none text-slate-950" x-text="formatQuantityValue(quantityWarehouseReceived())"></p>
+                            <p class="mt-1 text-xs font-bold text-slate-500" x-text="quantityWarehouseReceived() === null ? 'Waiting for receiving' : 'Saved at warehouse'"></p>
+                        </div>
+                        <div class="rounded-2xl border px-4 py-3" :class="quantityDifferenceCardClass()">
+                            <p class="text-[11px] font-black uppercase tracking-wide" :class="quantityDifferenceTextClass()">Difference / discrepancy</p>
+                            <p class="mt-2 text-3xl font-black leading-none" :class="quantityDifferenceValueClass()" x-text="formatSignedQuantity(quantityDifference())"></p>
+                            <p class="mt-1 text-xs font-bold" :class="quantityDifferenceTextClass()" x-text="quantityDifferenceHelpText()"></p>
+                        </div>
+                    </div>
+                </section>
 
                 @include('shared.receiving.workspace', [
                     'packagesExpr' => 'receiving.packages',

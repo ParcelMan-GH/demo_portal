@@ -53,6 +53,7 @@ function shipmentShow() {
         finalizeNotes: '',
         approvalReason: '',
         canApproveReceivingDiscrepancy: false,
+        quantitySummary: { vendor_declared: 0, driver_picked: null, warehouse_received: null, difference: null },
 
         // Charges
         chargesLoaded: false,
@@ -1146,11 +1147,127 @@ function shipmentShow() {
             return Math.max(this.receivingPackageCount() - this.receivingReceivedPackageCount(), 0);
         },
 
-	        receivingReceivedUnits() {
-	            return (this.receiving.packages || []).reduce((total, pkg) => {
-	                const received = Number(pkg?.received_quantity ?? 0);
+        receivingReceivedUnits() {
+            return (this.receiving.packages || []).reduce((total, pkg) => {
+                const received = Number(pkg?.received_quantity ?? 0);
                 return total + (Number.isFinite(received) ? received : 0);
             }, 0);
+        },
+
+        formatQuantityValue(value) {
+            if (value === null || value === undefined || value === '') return '—';
+            const number = Number(value);
+            return Number.isFinite(number) ? new Intl.NumberFormat().format(number) : '—';
+        },
+
+        formatSignedQuantity(value) {
+            if (value === null || value === undefined || value === '') return '—';
+            const number = Number(value);
+            if (!Number.isFinite(number)) return '—';
+            if (number === 0) return '0';
+            return `${number > 0 ? '+' : ''}${new Intl.NumberFormat().format(number)}`;
+        },
+
+        quantityVendorDeclared() {
+            const configured = Number(this.quantitySummary?.vendor_declared ?? 0);
+            if (Number.isFinite(configured) && configured > 0) return configured;
+            return this.receivingDeclaredQuantity();
+        },
+
+        quantityDriverPicked() {
+            const configured = this.quantitySummary?.driver_picked;
+            if (configured !== null && configured !== undefined && configured !== '') {
+                const number = Number(configured);
+                if (Number.isFinite(number)) return number;
+            }
+
+            const assignmentPicked = this.assignment?.driver_picked_quantity;
+            if (assignmentPicked !== null && assignmentPicked !== undefined && assignmentPicked !== '') {
+                const number = Number(assignmentPicked);
+                if (Number.isFinite(number)) return number;
+            }
+
+            const packagePicked = this.receiving.packages?.find((pkg) => pkg?.driver_picked_quantity !== null && pkg?.driver_picked_quantity !== undefined)?.driver_picked_quantity;
+            if (packagePicked !== null && packagePicked !== undefined && packagePicked !== '') {
+                const number = Number(packagePicked);
+                if (Number.isFinite(number)) return number;
+            }
+
+            return null;
+        },
+
+        quantityWarehouseReceived() {
+            const hasLivePackages = Array.isArray(this.receiving.packages) && this.receiving.packages.length > 0;
+            const packageTotal = this.receivingReceivedUnits();
+            if (hasLivePackages && (packageTotal > 0 || this.receiving.packages.some((pkg) => this.receivingPackageHasReceipt(pkg)))) {
+                return packageTotal;
+            }
+
+            const configured = this.quantitySummary?.warehouse_received;
+            if (configured !== null && configured !== undefined && configured !== '') {
+                const number = Number(configured);
+                if (Number.isFinite(number)) return number;
+            }
+
+            return null;
+        },
+
+        quantityDifference() {
+            const received = this.quantityWarehouseReceived();
+            const picked = this.quantityDriverPicked();
+            const declared = this.quantityVendorDeclared();
+            const comparison = received !== null ? received : picked;
+
+            if (comparison === null || comparison === undefined || !Number.isFinite(Number(declared))) {
+                return null;
+            }
+
+            return Number(comparison) - Number(declared);
+        },
+
+        quantityDifferenceLabel() {
+            const difference = this.quantityDifference();
+            if (difference === null) return 'Waiting for counts';
+            if (difference === 0) return 'Balanced';
+            return difference > 0 ? 'Excess recorded' : 'Shortage recorded';
+        },
+
+        quantityDifferenceHelpText() {
+            const received = this.quantityWarehouseReceived();
+            const picked = this.quantityDriverPicked();
+            const difference = this.quantityDifference();
+            if (difference === null) return 'Rider or warehouse count is not available yet.';
+            if (difference === 0) return received !== null ? 'Warehouse matches vendor total.' : 'Rider matches vendor total.';
+            const source = received !== null ? 'warehouse' : (picked !== null ? 'rider' : 'current');
+            return `${Math.abs(difference)} ${difference > 0 ? 'extra' : 'short'} against vendor total (${source} count).`;
+        },
+
+        quantityDifferenceTone() {
+            const difference = this.quantityDifference();
+            if (difference === null) return 'border-slate-200 bg-slate-100 text-slate-600';
+            if (difference === 0) return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+            return 'border-rose-200 bg-rose-50 text-rose-700';
+        },
+
+        quantityDifferenceCardClass() {
+            const difference = this.quantityDifference();
+            if (difference === null) return 'border-slate-200 bg-slate-50';
+            if (difference === 0) return 'border-emerald-200 bg-emerald-50';
+            return 'border-rose-200 bg-rose-50';
+        },
+
+        quantityDifferenceTextClass() {
+            const difference = this.quantityDifference();
+            if (difference === null) return 'text-slate-500';
+            if (difference === 0) return 'text-emerald-700';
+            return 'text-rose-700';
+        },
+
+        quantityDifferenceValueClass() {
+            const difference = this.quantityDifference();
+            if (difference === null) return 'text-slate-950';
+            if (difference === 0) return 'text-emerald-700';
+            return 'text-rose-700';
         },
 
         receivingAllPackagesReceived() {
@@ -2828,6 +2945,7 @@ function shipmentShow() {
             }
             this.assignment = this.config.assignment;
             this.assignmentHistory = this.config.assignmentHistory || [];
+            this.quantitySummary = this.config.quantitySummary || this.quantitySummary;
 
             // Honour ?tab=<name> query param so deep-links (including the
             // legacy /edit redirect) open the right tab.

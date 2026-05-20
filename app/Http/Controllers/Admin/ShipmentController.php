@@ -225,6 +225,7 @@ class ShipmentController extends Controller
             'pickupAssignment.driver',
             'pickupAssignment.targetWarehouse',
             'pickupAssignment.receivedWarehouse',
+            'pickupAssignment.warehouseReceipt.items',
             'pickupAssignments.driver',
             'pickupAssignments.assignedBy',
             'pickupAssignments.targetWarehouse',
@@ -242,6 +243,18 @@ class ShipmentController extends Controller
         if ($currentAssignment?->status === PickupAssignmentStatus::CANCELLED) {
             $currentAssignment = null;
         }
+
+        $vendorDeclaredQuantity = (int) ($shipment->vendor_declared_quantity ?? $shipment->items()->sum('quantity'));
+        $driverPickedQuantity = $currentAssignment && ! is_null($currentAssignment->driver_picked_quantity)
+            ? (int) $currentAssignment->driver_picked_quantity
+            : null;
+        $warehouseReceivedQuantity = $currentAssignment?->warehouseReceipt?->items
+            ? (int) $currentAssignment->warehouseReceipt->items->sum('received_quantity')
+            : null;
+        $comparisonQuantity = $warehouseReceivedQuantity ?? $driverPickedQuantity;
+        $quantityDifference = is_null($comparisonQuantity)
+            ? null
+            : (int) $comparisonQuantity - $vendorDeclaredQuantity;
 
         $currentInvoice = $shipment->invoice;
         if (! $currentInvoice) {
@@ -324,6 +337,12 @@ class ShipmentController extends Controller
             'canManageCharges' => $canManageCharges,
             'invoiceHistory' => $invoiceHistory,
             'assignmentHistory' => $assignmentHistory,
+            'quantitySummary' => [
+                'vendor_declared' => $vendorDeclaredQuantity,
+                'driver_picked' => $driverPickedQuantity,
+                'warehouse_received' => $warehouseReceivedQuantity,
+                'difference' => $quantityDifference,
+            ],
             'statuses' => ShipmentStatus::toArray(),
             'invoiceStatuses' => InvoiceStatus::toArray(),
             'assignmentStatuses' => PickupAssignmentStatus::toArray(),
