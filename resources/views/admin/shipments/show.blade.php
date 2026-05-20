@@ -10,10 +10,6 @@ $shipmentConfig = [
     'saveUrl' => route('admin.shipments.update', $shipment),
     'itemsEndpoint' => route('admin.shipments.items', $shipment),
     'trackingEndpoint' => route('admin.shipments.tracking', $shipment),
-    'invoiceStoreEndpoint' => route('admin.invoices.store', $shipment),
-    'invoiceDownloadUrlTemplate' => route('admin.invoices.download', ['invoice' => '__INVOICE__']),
-    'invoiceSendEndpointTemplate' => route('admin.invoices.send', ['invoice' => '__INVOICE__']),
-    'invoiceCancelEndpointTemplate' => route('admin.invoices.cancel', ['invoice' => '__INVOICE__']),
     'assignDriverEndpoint' => route('admin.assignments.assign', $shipment),
     'cancelAssignmentEndpointTemplate' => route('admin.assignments.cancel', ['pickupAssignment' => '__ASSIGNMENT__']),
     'updateAssignmentEndpointTemplate' => route('admin.assignments.update', ['pickupAssignment' => '__ASSIGNMENT__']),
@@ -44,15 +40,7 @@ $shipmentConfig = [
     'townsSearchUrl' => route('admin.locations.towns.data'),
     'canApproveReceivingDiscrepancy' => Auth::guard('admin')->user()?->hasPermission('warehouse.receiving.approve_discrepancy') ?? false,
     'canManage' => $canManage,
-    'canManageCharges' => $canManageCharges ?? false,
     'isSuperAdmin' => auth('admin')->user()?->isHqUser() ?? false,
-    'paymentsDataEndpoint' => route('admin.shipments.payments.data', $shipment),
-    'storePaymentEndpoint' => route('admin.shipments.payments.store', $shipment),
-    'destroyPaymentEndpointTemplate' => route('admin.payments.destroy', ['payment' => '__PAYMENT__']),
-    'downloadReceiptUrlTemplate' => route('admin.payments.download', ['payment' => '__PAYMENT__']),
-    'printReceiptUrlTemplate' => route('admin.payments.print', ['payment' => '__PAYMENT__']),
-    'invoice' => $currentInvoice,
-    'invoiceHistory' => $invoiceHistory,
     'assignment' => $currentAssignment,
     'assignmentHistory' => $assignmentHistory,
     'quantitySummary' => $quantitySummary,
@@ -60,6 +48,24 @@ $shipmentConfig = [
     'transportManifestShowUrlTemplate' => route('admin.transport-manifests.show', ['manifest' => '__ID__']),
     'deliveryRunShowUrlTemplate' => route('admin.delivery-runs.show', ['run' => '__ID__']),
 ];
+
+$timeline = [
+    ['label' => 'Created', 'value' => $shipment->created_at, 'dot' => 'bg-slate-400'],
+    ['label' => 'Submitted', 'value' => $shipment->submitted_at ?? null, 'dot' => 'bg-blue-500'],
+    ['label' => 'Rider Assigned', 'value' => $currentAssignment?->assigned_at, 'dot' => 'bg-orange-600'],
+    ['label' => 'En Route', 'value' => $currentAssignment?->en_route_at, 'dot' => 'bg-indigo-500'],
+    ['label' => 'Arrived Pickup', 'value' => $currentAssignment?->arrived_at, 'dot' => 'bg-amber-500'],
+    ['label' => 'Picked Up', 'value' => $currentAssignment?->picked_up_at, 'dot' => 'bg-violet-500'],
+    ['label' => 'Arrived Warehouse', 'value' => $currentAssignment?->arrived_warehouse_at, 'dot' => 'bg-sky-500'],
+    ['label' => 'Received Warehouse', 'value' => $currentAssignment?->received_at, 'dot' => 'bg-teal-500'],
+    ['label' => 'Completed', 'value' => $currentAssignment?->completed_at, 'dot' => 'bg-emerald-500'],
+];
+
+$timelineEvents = collect($timeline)->filter(fn ($event) => filled($event['value']))->values();
+$latestTimelineEvent = $timelineEvents->last();
+$formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
+    ? $value->format('d M Y, h:i A')
+    : \Illuminate\Support\Carbon::parse($value)->format('d M Y, h:i A');
 @endphp
 
 @section('content')
@@ -76,7 +82,7 @@ $shipmentConfig = [
             @php
                 $statusColors = match($shipment->status->value ?? $shipment->status) {
                     'draft' => 'bg-slate-500/15 text-slate-200 ring-1 ring-slate-400/30',
-                    'submitted', 'invoice_sent', 'invoice_accepted' => 'bg-blue-500/15 text-blue-100 ring-1 ring-blue-400/30',
+                    'submitted' => 'bg-blue-500/15 text-blue-100 ring-1 ring-blue-400/30',
                     'pickup_assigned', 'picked_up', 'arrived_warehouse', 'at_warehouse', 'sorted' => 'bg-violet-500/15 text-violet-100 ring-1 ring-violet-400/30',
                     'in_transit', 'at_destination', 'out_for_delivery' => 'bg-amber-500/15 text-amber-100 ring-1 ring-amber-400/30',
                     'delivered' => 'bg-emerald-500/15 text-emerald-100 ring-1 ring-emerald-400/30',
@@ -84,7 +90,7 @@ $shipmentConfig = [
                     default => 'bg-slate-500/15 text-slate-200 ring-1 ring-slate-400/30',
                 };
                 $dotColors = match($shipment->status->value ?? $shipment->status) {
-                    'submitted', 'invoice_sent', 'invoice_accepted' => 'bg-blue-300',
+                    'submitted' => 'bg-blue-300',
                     'pickup_assigned', 'picked_up', 'arrived_warehouse', 'at_warehouse', 'sorted' => 'bg-violet-300',
                     'in_transit', 'at_destination', 'out_for_delivery' => 'bg-amber-300',
                     'delivered' => 'bg-emerald-300',
@@ -240,6 +246,47 @@ $shipmentConfig = [
             </div>
         </div>
     </section>
+
+    @if($latestTimelineEvent)
+        <section x-data="{ timelineOpen: false }" class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-300/30">
+            <button type="button" @@click="timelineOpen = !timelineOpen" class="flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition hover:bg-slate-50 sm:px-5">
+                <div class="min-w-0">
+                    <p class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Shipment Timeline</p>
+                    <div class="mt-1 flex min-w-0 flex-wrap items-center gap-2">
+                        <span class="text-sm font-black text-slate-950">{{ $latestTimelineEvent['label'] }}</span>
+                        <span class="text-slate-300">/</span>
+                        <span class="text-xs font-bold text-slate-500">{{ $formatTimelineDate($latestTimelineEvent['value']) }}</span>
+                    </div>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                    <span class="hidden rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600 sm:inline">{{ $timelineEvents->count() }} events</span>
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500">
+                        <svg class="h-4 w-4 transition-transform" :class="timelineOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6"/>
+                        </svg>
+                    </span>
+                </div>
+            </button>
+
+            <div x-show="timelineOpen" x-cloak x-transition.opacity.duration.150ms class="border-t border-slate-100 px-4 py-2 sm:px-5" style="display: none;">
+                <div class="divide-y divide-slate-100">
+                    @foreach($timelineEvents as $event)
+                        <div class="flex gap-3 py-3">
+                            <div class="flex w-3 shrink-0 justify-center pt-1.5">
+                                <span class="h-2 w-2 rounded-full {{ $event['dot'] ?? 'bg-slate-400' }}"></span>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                    <p class="text-sm font-black text-slate-900">{{ $event['label'] }}</p>
+                                    <p class="text-xs font-bold text-slate-500">{{ $formatTimelineDate($event['value']) }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </section>
+    @endif
 
     <!-- Packages Workspace -->
     <div class="min-h-[680px]">
@@ -437,123 +484,6 @@ $shipmentConfig = [
                     <!-- Right Column: Action Widgets -->
                     <div class="xl:col-span-2 space-y-4">
 
-                        <!-- Widget 1: Invoice -->
-                        <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200/80">
-                            <!-- Gradient Header -->
-                            <div class="bg-gradient-to-br from-emerald-500 to-teal-600 px-5 py-4">
-                                <div class="flex items-start justify-between gap-2">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
-                                            <svg class="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <h3 class="text-sm font-bold text-white leading-none">Active Invoice</h3>
-                                            <template x-if="activeInvoice()">
-                                                <p class="text-[11px] text-white/60 mt-0.5" x-text="'#' + activeInvoice().invoice_number"></p>
-                                            </template>
-                                            <template x-if="!activeInvoice()">
-                                                <p class="text-[11px] text-white/50 mt-0.5">No active invoice</p>
-                                            </template>
-                                        </div>
-                                    </div>
-                                    <div class="flex flex-col items-end gap-1.5">
-                                        <template x-if="activeInvoice()">
-                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold bg-white/20 text-white ring-1 ring-white/30 capitalize" x-text="activeInvoice().status_label || activeInvoice().status"></span>
-                                        </template>
-	                                    </div>
-	                                </div>
-                            </div>
-                            <!-- Body -->
-                            <div class="p-5">
-                                <template x-if="invoiceUiError">
-                                    <div class="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700" x-text="invoiceUiError"></div>
-                                </template>
-                                <!-- No active invoice -->
-                                <template x-if="!activeInvoice()">
-                                    <div>
-                                        <template x-if="canCreateInvoice()">
-                                            <div class="text-center py-4">
-                                                <div class="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto mb-3">
-                                                    <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                                    </svg>
-                                                </div>
-                                                <p class="text-sm font-medium text-slate-500 mb-3">No invoice yet</p>
-                                                <button x-show="canManage" @@click="openCreateInvoiceModal()" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-500/25 transition-all">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                                    Create Invoice
-                                                </button>
-                                            </div>
-                                        </template>
-                                        <template x-if="!canCreateInvoice()">
-                                            <div class="text-center py-4">
-                                                <svg class="w-9 h-9 mx-auto mb-2 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                                </svg>
-                                                <p class="text-xs text-slate-400" x-text="activeInvoiceBlockReason()"></p>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </template>
-                                <!-- Has active invoice -->
-                                <template x-if="activeInvoice()">
-                                    <div>
-                                        <!-- Fee rows -->
-                                        <div class="mb-4">
-                                            <div class="flex items-center justify-between px-3 py-2 text-xs mb-0.5">
-                                                <span class="text-slate-500">Transport Fee</span>
-                                                <span class="font-bold text-slate-700" x-text="formatMoney(activeInvoice().transport_fee, activeInvoice().currency)"></span>
-                                            </div>
-                                            <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 text-xs mb-0.5">
-                                                <span class="text-slate-500">Handling Fee</span>
-                                                <span class="font-bold text-slate-700" x-text="formatMoney(activeInvoice().handling_fee, activeInvoice().currency)"></span>
-                                            </div>
-                                            <template x-if="activeInvoice().other_fee > 0">
-                                                <div class="flex items-center justify-between px-3 py-2 text-xs mb-0.5">
-                                                    <span class="text-slate-500">Other Fee</span>
-                                                    <span class="font-bold text-slate-700" x-text="formatMoney(activeInvoice().other_fee, activeInvoice().currency)"></span>
-                                                </div>
-                                            </template>
-                                            <!-- Total featured -->
-                                            <div class="mt-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl px-4 py-3 flex items-center justify-between shadow-sm shadow-emerald-200/60">
-                                                <span class="text-[11px] font-bold text-white/70 uppercase tracking-wide">Total</span>
-                                                <span class="text-base font-black text-white" x-text="formatMoney(activeInvoice().total_amount, activeInvoice().currency)"></span>
-                                            </div>
-                                        </div>
-                                        <!-- Action buttons -->
-                                        <div class="flex flex-wrap justify-end gap-2">
-                                            <a :href="config.invoiceDownloadUrlTemplate.replace('__INVOICE__', activeInvoice().id)" target="_blank"
-                                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold transition-colors">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                                PDF
-                                            </a>
-                                            <button x-show="canManage && activeInvoice().status === 'pending'" @@click="sendInvoice(activeInvoice().id)"
-                                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-bold shadow-sm hover:opacity-90 transition-opacity">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                                                Send
-                                            </button>
-                                            <button x-show="canManage && activeInvoice().status === 'sent'" @@click="adminAcceptInvoice(activeInvoice().id)"
-                                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold shadow-sm hover:opacity-90 transition-opacity">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                                Accept
-                                            </button>
-                                            <button @@click="openActiveInvoiceModal()"
-                                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold transition-colors">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                                View
-                                            </button>
-                                            <button x-show="canManage && ['pending','sent','accepted'].includes(activeInvoice().status)" @@click="openCancelInvoiceModal(activeInvoice().id)"
-                                                class="inline-flex items-center px-3 py-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 text-xs font-semibold transition-colors">
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-
                         <!-- Widget 2: Pickup Assignment -->
                         <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200/80">
                             <!-- Gradient Header -->
@@ -594,7 +524,7 @@ $shipmentConfig = [
                                 <!-- No assignment -->
                                 <template x-if="!assignment">
                                     <div>
-                                        <template x-if="['submitted', 'invoice_accepted'].includes(shipment.status)">
+                                        <template x-if="shipment.status === 'submitted'">
                                             <div class="text-center py-4">
                                                 <div class="w-11 h-11 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center mx-auto mb-3">
                                                     <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -609,7 +539,7 @@ $shipmentConfig = [
                                                 </button>
                                             </div>
                                         </template>
-                                        <template x-if="!['submitted', 'invoice_accepted'].includes(shipment.status)">
+                                        <template x-if="shipment.status !== 'submitted'">
                                             <div class="text-center py-4">
                                                 <svg class="w-9 h-9 mx-auto mb-2 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
@@ -709,197 +639,6 @@ $shipmentConfig = [
             </div>
 
             <!-- ═══════════════════════════════════════ -->
-            <!-- INVOICE TAB (history only)              -->
-            <!-- ═══════════════════════════════════════ -->
-            <div x-show="activeTab === 'invoice'" x-cloak>
-                <!-- Section Header -->
-                <div class="flex items-center justify-between mb-5">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="text-base font-bold text-slate-900">Invoice History</h3>
-                            <p class="text-xs text-slate-500">All invoices created for this shipment</p>
-                        </div>
-                    </div>
-                    <button type="button" x-show="canManage" @@click="openCreateInvoiceModal()" :disabled="!canCreateInvoice()" :title="!canCreateInvoice() ? activeInvoiceBlockReason() : 'Create invoice'" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        Create Invoice
-                    </button>
-                </div>
-
-                <div class="space-y-4">
-                    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                                <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-                                    <div class="relative flex-1 max-w-xs">
-                                        <input
-                                            type="text"
-                                            x-model="invoiceTable.search"
-                                            @@input.debounce.300ms="invoiceTable.page = 1"
-                                            placeholder="Search invoices..."
-                                            class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400 transition-colors"
-                                        >
-                                        <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                        </svg>
-                                    </div>
-
-                                    <div x-data="{ open: false }" class="relative w-full sm:w-56">
-                                        <button type="button" @@click="open = !open" class="w-full inline-flex items-center justify-between px-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-medium text-slate-700 hover:bg-white/90 transition-colors">
-                                            <span x-text="invoiceTable.statusFilterLabel"></span>
-                                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                            </svg>
-                                        </button>
-                                        <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/85 shadow-2xl p-2 z-50 backdrop-blur-xl" style="display: none;">
-                                            <button type="button" @@click="setInvoiceStatusFilter('')" class="w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70" :class="invoiceTable.statusFilter === '' ? 'bg-white/70 shadow-sm' : ''">All statuses</button>
-                                            <button type="button" @@click="setInvoiceStatusFilter('pending')" class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70" :class="invoiceTable.statusFilter === 'pending' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''">Pending</button>
-                                            <button type="button" @@click="setInvoiceStatusFilter('sent')" class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70" :class="invoiceTable.statusFilter === 'sent' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''">Sent</button>
-                                            <button type="button" @@click="setInvoiceStatusFilter('accepted')" class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70" :class="invoiceTable.statusFilter === 'accepted' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''">Accepted</button>
-                                            <button type="button" @@click="setInvoiceStatusFilter('rejected')" class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70" :class="invoiceTable.statusFilter === 'rejected' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''">Rejected</button>
-                                            <button type="button" @@click="setInvoiceStatusFilter('cancelled')" class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-slate-700 hover:bg-white/70" :class="invoiceTable.statusFilter === 'cancelled' ? 'bg-white/70 shadow-sm ring-1 ring-slate-200/60' : ''">Cancelled</button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="flex flex-wrap items-center justify-end gap-3">
-                                    <div x-data="{ open: false }" class="relative">
-                                        <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
-                                            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/>
-                                            </svg>
-                                            View
-                                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                            </svg>
-                                        </button>
-                                        <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-52 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50" style="display: none;">
-                                            <template x-for="col in invoiceTable.columns" :key="col.key">
-                                                <button type="button" @@click="toggleInvoiceColumn(col.key)" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70">
-                                                    <span x-text="col.label"></span>
-                                                    <svg x-show="invoiceTable.visibleColumns[col.key]" class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                                    </svg>
-                                                </button>
-                                            </template>
-                                        </div>
-                                    </div>
-                                    <div x-data="{ open: false }" class="relative">
-                                        <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
-                                            Export
-                                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                            </svg>
-                                        </button>
-                                        <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-40 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50" style="display: none;">
-                                            <button type="button" @@click="exportInvoiceData('csv'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">CSV</button>
-                                            <button type="button" @@click="exportInvoiceData('json'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">JSON</button>
-                                            <button type="button" @@click="exportInvoiceData('print'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">Print</button>
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        x-show="activeInvoice()"
-                                        @@click="openActiveInvoiceModal()"
-                                        class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors"
-                                    >
-                                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                        </svg>
-                                        View Active Invoice
-                                    </button>
-                                </div>
-                            </div>
-                    </div>
-
-                    <div class="mt-4 rounded-xl border border-slate-200/50 relative">
-                                <div class="overflow-x-auto">
-                                    <table class="w-full min-w-[980px] divide-y divide-slate-200/50 text-xs">
-                                        <thead class="bg-slate-50/50">
-                                            <tr>
-                                                <th x-show="invoiceTable.visibleColumns.invoice_number" @@click="sortInvoice('invoice_number')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">INVOICE #</th>
-                                                <th x-show="invoiceTable.visibleColumns.status" @@click="sortInvoice('status')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">STATUS</th>
-                                                <th x-show="invoiceTable.visibleColumns.is_active" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ACTIVE</th>
-                                                <th x-show="invoiceTable.visibleColumns.total_amount" @@click="sortInvoice('total_amount')" class="px-4 py-2 text-right text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">TOTAL</th>
-                                                <th x-show="invoiceTable.visibleColumns.created_at" @@click="sortInvoice('created_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">CREATED</th>
-                                                <th x-show="invoiceTable.visibleColumns.actions" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ACTIONS</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="bg-transparent divide-y divide-slate-100/50">
-                                            <template x-if="paginatedInvoiceRows().length === 0">
-                                                <tr>
-                                                    <td :colspan="visibleInvoiceColumnCount()" class="px-4 py-8 text-center text-gray-500 text-xs">No invoices found</td>
-                                                </tr>
-                                            </template>
-                                            <template x-for="historyInvoice in paginatedInvoiceRows()" :key="historyInvoice.id">
-                                                <tr class="hover:bg-slate-50/70">
-                                                    <td x-show="invoiceTable.visibleColumns.invoice_number" class="px-4 py-2.5 whitespace-nowrap text-xs font-semibold text-slate-900" x-text="historyInvoice.invoice_number"></td>
-                                                    <td x-show="invoiceTable.visibleColumns.status" class="px-4 py-2.5 whitespace-nowrap text-xs">
-                                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="invoiceStatusClass(historyInvoice.status)" x-text="historyInvoice.status_label || historyInvoice.status"></span>
-                                                    </td>
-                                                    <td x-show="invoiceTable.visibleColumns.is_active" class="px-4 py-2.5 whitespace-nowrap text-xs">
-                                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="historyInvoice.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'" x-text="historyInvoice.is_active ? 'Yes' : 'No'"></span>
-                                                    </td>
-                                                    <td x-show="invoiceTable.visibleColumns.total_amount" class="px-4 py-2.5 whitespace-nowrap text-right text-xs text-slate-700 font-semibold" x-text="formatMoney(historyInvoice.total_amount, historyInvoice.currency)"></td>
-                                                    <td x-show="invoiceTable.visibleColumns.created_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(historyInvoice.created_at)"></td>
-                                                    <td x-show="invoiceTable.visibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center text-xs font-medium">
-                                                        <div class="inline-flex items-center gap-1">
-                                                            <button @@click="viewInvoice(historyInvoice.id)" class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="View invoice">
-                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                                                </svg>
-                                                            </button>
-                                                            <button x-show="canManage && historyInvoice.status === 'pending'" @@click="sendInvoice(historyInvoice.id)" class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Send invoice">
-                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.868v4.264a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12a7 7 0 1114 0A7 7 0 015 12z"/>
-                                                                </svg>
-                                                            </button>
-                                                            <button x-show="canManage && ['pending', 'sent', 'accepted'].includes(historyInvoice.status)" @@click="openCancelInvoiceModal(historyInvoice.id)" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Cancel invoice">
-                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                                                </svg>
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            </template>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="px-4 py-2.5 border-t border-slate-200/50 bg-slate-50/30">
-                                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                        <div class="text-xs text-slate-600">
-                                            Showing <span x-text="invoiceMeta().from"></span> to <span x-text="invoiceMeta().to"></span> of <span x-text="invoiceMeta().total"></span> results
-                                        </div>
-                                        <div class="flex flex-wrap items-center gap-3">
-                                            <div class="text-xs font-medium text-slate-600">Page <span x-text="invoiceMeta().page"></span> of <span x-text="invoiceMeta().lastPage"></span></div>
-                                            <div class="flex space-x-1">
-                                                <button @@click="invoiceFirstPage()" :disabled="invoiceMeta().page === 1" :class="invoiceMeta().page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
-                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/></svg>
-                                                </button>
-                                                <button @@click="invoicePreviousPage()" :disabled="invoiceMeta().page === 1" :class="invoiceMeta().page === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
-                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                                                </button>
-                                                <button @@click="invoiceNextPage()" :disabled="invoiceMeta().page >= invoiceMeta().lastPage" :class="invoiceMeta().page >= invoiceMeta().lastPage ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
-                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                                                </button>
-                                                <button @@click="invoiceLastPage()" :disabled="invoiceMeta().page >= invoiceMeta().lastPage" :class="invoiceMeta().page >= invoiceMeta().lastPage ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'" class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
-                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                    </div>
-            </div>
-
-            <!-- ═══════════════════════════════════════ -->
             <!-- ASSIGNMENT TAB (history only)           -->
             <!-- ═══════════════════════════════════════ -->
             <div x-show="activeTab === 'assignment'" x-cloak>
@@ -918,7 +657,7 @@ $shipmentConfig = [
                             <p class="text-xs text-slate-500">All pickup assignments for this shipment</p>
                         </div>
                     </div>
-                    <button x-show="canManage && ['submitted','invoice_accepted'].includes(shipment.status)" @@click="loadAssignmentDependencies(); assignDriverModalOpen = true" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-violet-500/25 transition-all">
+                    <button x-show="canManage && shipment.status === 'submitted'" @@click="loadAssignmentDependencies(); assignDriverModalOpen = true" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-violet-500/25 transition-all">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                         Assign Rider
                     </button>
@@ -1378,437 +1117,6 @@ $shipmentConfig = [
 
             </div>
 
-            <!-- Payments Tab -->
-            <div x-show="activeTab === 'payments'" x-cloak>
-
-                <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">
-                    <!-- Card Header -->
-                    <div class="px-6 py-5 border-b border-slate-200/50">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-teal-100">
-                                    <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h2 class="text-lg font-semibold text-slate-900">Payments</h2>
-                                    <p class="mt-0.5 text-sm text-slate-500">Payment transactions for this shipment</p>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-slate-100 text-slate-700" x-text="filteredPayments().length + ' Total Payments'"></span>
-                                <template x-if="canManage && !config.invoice">
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                        No active invoice
-                                    </span>
-                                </template>
-                                <button x-show="canManage && config.invoice" @@click="paymentForm.open = true; paymentForm.payment_date = new Date().toISOString().split('T')[0]"
-                                    class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-xs font-semibold rounded-xl hover:bg-slate-800 transition-colors shadow-sm">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                                    </svg>
-                                    Record Payment
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Summary Cards -->
-                    <div class="px-6 pt-5">
-                        <div class="grid grid-cols-3 gap-4 mb-4">
-                            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 p-5 shadow-md">
-                                <div class="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/5 -translate-y-8 translate-x-8"></div>
-                                <div class="relative">
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <div class="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center">
-                                            <svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                            </svg>
-                                        </div>
-                                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Invoiced</p>
-                                    </div>
-                                    <p class="text-2xl font-bold text-white" x-text="'GHS ' + (paymentsData.summary?.total_invoiced || 0).toFixed(2)">GHS 0.00</p>
-                                </div>
-                            </div>
-                            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-5 shadow-md">
-                                <div class="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/10 -translate-y-8 translate-x-8"></div>
-                                <div class="relative">
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <div class="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
-                                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                            </svg>
-                                        </div>
-                                        <p class="text-xs font-semibold text-emerald-100 uppercase tracking-wider">Total Paid</p>
-                                    </div>
-                                    <p class="text-2xl font-bold text-white" x-text="'GHS ' + (paymentsData.summary?.total_paid || 0).toFixed(2)">GHS 0.00</p>
-                                </div>
-                            </div>
-                            <div class="relative overflow-hidden rounded-2xl p-5 shadow-md"
-                                :class="(paymentsData.summary?.balance_due || 0) > 0 ? 'bg-gradient-to-br from-rose-500 to-pink-600' : 'bg-gradient-to-br from-emerald-500 to-teal-600'">
-                                <div class="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/10 -translate-y-8 translate-x-8"></div>
-                                <div class="relative">
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <div class="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
-                                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                            </svg>
-                                        </div>
-                                        <p class="text-xs font-semibold text-white/80 uppercase tracking-wider">Balance Due</p>
-                                    </div>
-                                    <p class="text-2xl font-bold text-white" x-text="'GHS ' + (paymentsData.summary?.balance_due || 0).toFixed(2)">GHS 0.00</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Table Controls -->
-                    <div class="px-6 pb-0">
-                        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                            <!-- Left: Search -->
-                            <div class="flex flex-wrap items-center gap-3">
-                                <div class="relative w-full sm:w-64">
-                                    <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                    </svg>
-                                    <input type="text" x-model="paymentSearch" @@input="paymentPage = 1" placeholder="Search payments..." class="w-full pl-10 pr-3 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300">
-                                </div>
-                            </div>
-
-                            <!-- Right: Export & View -->
-                            <div class="flex items-center gap-2">
-                                <!-- Export -->
-                                <div x-data="{ open: false }" class="relative">
-                                    <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
-                                        <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                        </svg>
-                                        Export
-                                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                        </svg>
-                                    </button>
-                                    <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50" style="display: none;">
-                                        <button type="button" @@click="exportPayments('csv'); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                            CSV
-                                        </button>
-                                        <div class="border-t border-slate-200/50 my-1"></div>
-                                        <button type="button" @@click="printPayments(); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70 transition-colors">
-                                            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                                            Print
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Customize Columns -->
-                                <div x-data="{ open: false }" class="relative">
-                                    <button @@click="open = !open" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm text-sm font-semibold text-slate-700 shadow-sm hover:bg-white/90 transition-colors">
-                                        <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6M4 18h6M14 6h6M14 18h6M4 12h16"/>
-                                        </svg>
-                                        View
-                                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                        </svg>
-                                    </button>
-                                    <div x-show="open" @@click.away="open = false" x-transition class="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200/70 bg-white/85 backdrop-blur-xl shadow-2xl p-2 z-50" style="display: none;">
-                                        <template x-for="col in paymentColumns" :key="col.key">
-                                            <button type="button" @@click="togglePaymentColumn(col.key)" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-white/70">
-                                                <span x-text="col.label"></span>
-                                                <svg x-show="paymentVisibleColumns[col.key]" class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                                </svg>
-                                            </button>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Table -->
-                    <div class="px-6 py-4">
-                        <div class="rounded-xl border border-slate-200/50 relative">
-                            <!-- Loading overlay -->
-                            <div x-show="!paymentsLoaded" x-transition.opacity.duration.150ms class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center" style="display: none;">
-                                <div class="flex items-center gap-2 text-slate-400 text-sm">
-                                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                                    </svg>
-                                    Loading payments...
-                                </div>
-                            </div>
-
-                            <div class="overflow-x-auto">
-                                <table class="w-full min-w-[900px] md:min-w-full divide-y divide-slate-200/50 text-xs">
-                                    <thead class="bg-slate-50/50">
-                                        <tr>
-                                            <th x-show="paymentVisibleColumns.payment_date" @@click="sortPayments('payment_date')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                                                <div class="flex items-center">
-                                                    DATE
-                                                    <svg class="w-2.5 h-2.5 ml-1" :class="paymentSortBy === 'payment_date' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
-                                                    </svg>
-                                                </div>
-                                            </th>
-                                            <th x-show="paymentVisibleColumns.amount" @@click="sortPayments('amount')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                                                <div class="flex items-center">
-                                                    AMOUNT
-                                                    <svg class="w-2.5 h-2.5 ml-1" :class="paymentSortBy === 'amount' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
-                                                    </svg>
-                                                </div>
-                                            </th>
-                                            <th x-show="paymentVisibleColumns.method" @@click="sortPayments('method_label')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
-                                                <div class="flex items-center">
-                                                    METHOD
-                                                    <svg class="w-2.5 h-2.5 ml-1" :class="paymentSortBy === 'method_label' ? 'text-slate-600' : 'text-slate-400 opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5-5 5 5"/>
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5 5 5-5"/>
-                                                    </svg>
-                                                </div>
-                                            </th>
-                                            <th x-show="paymentVisibleColumns.reference" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                                                REFERENCE
-                                            </th>
-                                            <th x-show="paymentVisibleColumns.invoice" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                                                INVOICE
-                                            </th>
-                                            <th x-show="paymentVisibleColumns.recorded_by" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                                                RECORDED BY
-                                            </th>
-                                            <th x-show="paymentVisibleColumns.notes" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                                                NOTES
-                                            </th>
-                                            <th x-show="paymentVisibleColumns.actions" class="px-4 py-2 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                                                ACTIONS
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-transparent divide-y divide-slate-100/50">
-                                        <template x-if="paymentsLoaded && filteredPayments().length === 0">
-                                            <tr>
-                                                <td colspan="8" class="px-4 py-8 text-center text-gray-500 text-xs">
-                                                    <div class="flex flex-col items-center gap-2">
-                                                        <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-                                                        </svg>
-                                                        <span>No payments found</span>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </template>
-
-                                        <template x-for="payment in paginatedPayments()" :key="payment.id">
-                                            <tr class="hover:bg-slate-50/70 transition-colors">
-                                                <td x-show="paymentVisibleColumns.payment_date" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="payment.payment_date"></td>
-                                                <td x-show="paymentVisibleColumns.amount" class="px-4 py-2.5 whitespace-nowrap">
-                                                    <span class="text-xs font-semibold text-emerald-700" x-text="'GHS ' + payment.formatted_amount"></span>
-                                                </td>
-                                                <td x-show="paymentVisibleColumns.method" class="px-4 py-2.5 whitespace-nowrap">
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700" x-text="payment.method_label"></span>
-                                                </td>
-                                                <td x-show="paymentVisibleColumns.reference" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-500 font-mono" x-text="payment.reference_number || '—'"></td>
-                                                <td x-show="paymentVisibleColumns.invoice" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-500" x-text="payment.invoice_number || '—'"></td>
-                                                <td x-show="paymentVisibleColumns.recorded_by" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="payment.recorded_by || '—'"></td>
-                                                <td x-show="paymentVisibleColumns.notes" class="px-4 py-2.5 text-xs text-slate-500 max-w-[150px] truncate" x-text="payment.notes || '—'"></td>
-                                                <td x-show="paymentVisibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap">
-                                                    <div class="flex items-center justify-end gap-1">
-                                                        <a :href="config.downloadReceiptUrlTemplate.replace('__PAYMENT__', payment.id)" target="_blank"
-                                                            class="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors inline-flex" title="Download receipt PDF">
-                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                                        </a>
-                                                        <a :href="config.printReceiptUrlTemplate.replace('__PAYMENT__', payment.id)" target="_blank"
-                                                            class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors inline-flex" title="Print receipt">
-                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                                                        </a>
-                                                        <button x-show="isSuperAdmin" @@click="voidPayment(payment.id)"
-                                                            class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors inline-flex" title="Void payment">
-                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <!-- Pagination -->
-                            <div x-show="paymentsLoaded && filteredPayments().length > 0" class="px-4 py-2.5 border-t border-slate-200/50 bg-slate-50/30">
-                                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                    <div class="text-xs text-slate-600">
-                                        Showing
-                                        <span x-text="Math.min(((paymentPage - 1) * paymentPerPage) + 1, filteredPayments().length)"></span>
-                                        to
-                                        <span x-text="Math.min(paymentPage * paymentPerPage, filteredPayments().length)"></span>
-                                        of
-                                        <span x-text="filteredPayments().length"></span>
-                                        results
-                                    </div>
-
-                                    <div class="flex flex-wrap items-center gap-3">
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-xs font-medium text-slate-600">Rows per page</span>
-                                            <div x-data="{ open: false }" class="relative">
-                                                <button type="button" @@click="open = !open"
-                                                    class="inline-flex items-center justify-between gap-1.5 px-2.5 py-1 min-w-[60px] border border-slate-200/70 rounded-lg bg-white/70 backdrop-blur-sm text-xs font-medium text-slate-700 hover:bg-white/90 transition-colors">
-                                                    <span x-text="paymentPerPage"></span>
-                                                    <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                                    </svg>
-                                                </button>
-                                                <div x-show="open" @@click.away="open = false" x-transition
-                                                    class="absolute bottom-full mb-1 right-0 w-16 rounded-lg border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-lg p-1 z-[9999]" style="display: none;">
-                                                    <button type="button" @@click="paymentPerPage = 10; paymentPage = 1; open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="paymentPerPage == 10 ? 'bg-slate-100/70' : ''">10</button>
-                                                    <button type="button" @@click="paymentPerPage = 25; paymentPage = 1; open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="paymentPerPage == 25 ? 'bg-slate-100/70' : ''">25</button>
-                                                    <button type="button" @@click="paymentPerPage = 50; paymentPage = 1; open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="paymentPerPage == 50 ? 'bg-slate-100/70' : ''">50</button>
-                                                    <button type="button" @@click="paymentPerPage = 100; paymentPage = 1; open = false" class="w-full text-center px-2 py-1 rounded text-xs font-medium text-slate-700 hover:bg-slate-100/70" :class="paymentPerPage == 100 ? 'bg-slate-100/70' : ''">100</button>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div class="text-xs font-medium text-slate-600">
-                                            Page <span x-text="paymentPage"></span> of <span x-text="paymentLastPage()"></span>
-                                        </div>
-
-                                        <div class="flex space-x-1">
-                                            <button @@click="paymentPage = 1" :disabled="paymentPage === 1"
-                                                :class="paymentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/></svg>
-                                            </button>
-                                            <button @@click="paymentPage = Math.max(1, paymentPage - 1)" :disabled="paymentPage === 1"
-                                                :class="paymentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                                            </button>
-                                            <button @@click="paymentPage = Math.min(paymentLastPage(), paymentPage + 1)" :disabled="paymentPage >= paymentLastPage()"
-                                                :class="paymentPage >= paymentLastPage() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                                            </button>
-                                            <button @@click="paymentPage = paymentLastPage()" :disabled="paymentPage >= paymentLastPage()"
-                                                :class="paymentPage >= paymentLastPage() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/80'"
-                                                class="w-7 h-7 border border-slate-200/70 rounded-lg bg-white/50 text-slate-600 flex items-center justify-center transition-colors">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Record Payment Modal -->
-            <div x-show="paymentForm.open" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="paymentForm.open = false"></div>
-                <div class="relative z-10 bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl max-h-[95vh] overflow-y-auto">
-                    <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
-                        <div class="flex items-center gap-3">
-                            <div class="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center">
-                                <svg class="w-4.5 h-4.5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-                                </svg>
-                            </div>
-                            <h3 class="text-sm font-bold text-slate-900">Record Payment</h3>
-                        </div>
-                        <button @@click="paymentForm.open = false" class="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
-                    </div>
-                    <form @@submit.prevent="submitPayment()" class="px-6 py-5">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">Amount <span class="text-rose-500">*</span></label>
-                                <input type="number" step="0.01" min="0.01" x-model="paymentForm.amount" required
-                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400/50 focus:border-teal-300">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">Payment Method <span class="text-rose-500">*</span></label>
-                                <select x-model="paymentForm.payment_method" required
-                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400/50 focus:border-teal-300">
-                                    <option value="">Select method</option>
-                                    <option value="cash">Cash</option>
-                                    <option value="bank_transfer">Bank Transfer</option>
-                                    <option value="mobile_money">Mobile Money</option>
-                                    <option value="cheque">Cheque</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">Payment Date <span class="text-rose-500">*</span></label>
-                                <input type="date" x-model="paymentForm.payment_date" required
-                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400/50 focus:border-teal-300">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">Reference Number</label>
-                                <input type="text" x-model="paymentForm.reference_number"
-                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400/50 focus:border-teal-300" placeholder="Optional">
-                            </div>
-                            <div class="col-span-2">
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">Notes</label>
-                                <textarea x-model="paymentForm.notes" rows="2"
-                                    class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400/50 focus:border-teal-300" placeholder="Optional notes"></textarea>
-                            </div>
-                        </div>
-                        <div class="flex justify-end gap-2 mt-5 pt-4 border-t border-slate-100">
-                            <button type="button" @@click="paymentForm.open = false"
-                                class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
-                                Cancel
-                            </button>
-                            <button type="submit" :disabled="paymentForm.submitting"
-                                class="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                <svg x-show="paymentForm.submitting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span x-text="paymentForm.submitting ? 'Saving...' : 'Record Payment'"></span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Void Payment Confirm Modal -->
-            <div x-show="voidConfirm.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="voidConfirm.open = false"></div>
-                <div class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-                    <div class="flex items-start gap-4">
-                        <div class="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center flex-shrink-0">
-                            <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900">Void this payment?</h3>
-                            <p class="text-xs text-slate-500 mt-1 leading-relaxed">This action is permanent and cannot be undone. The payment record will be removed.</p>
-                        </div>
-                    </div>
-                    <div class="flex justify-end gap-2 mt-5">
-                        <button type="button" @@click="voidConfirm.open = false" :disabled="voidConfirm.loading"
-                            class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors disabled:opacity-50">
-                            Cancel
-                        </button>
-                        <button type="button" @@click="confirmVoidPayment()" :disabled="voidConfirm.loading"
-                            class="inline-flex items-center gap-2 px-4 py-2 border border-rose-200 bg-white text-rose-700 hover:bg-rose-50 text-sm font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                            <svg x-show="voidConfirm.loading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span x-text="voidConfirm.loading ? 'Voiding...' : 'Yes, Void Payment'"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             <!-- Tracking Tab -->
             <div x-show="activeTab === 'tracking'" x-cloak>
 
@@ -1875,9 +1183,6 @@ $shipmentConfig = [
                                                      :class="timelineEventDotClass(event.status)">
                                                     <template x-if="['created','submitted'].includes(event.status)">
                                                         <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                    </template>
-                                                    <template x-if="event.status.startsWith('invoice')">
-                                                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                                     </template>
                                                     <template x-if="['pickup_assigned','en_route','arrived','picked_up','arrived_warehouse','at_warehouse'].includes(event.status)">
                                                         <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
@@ -3317,52 +2622,54 @@ $shipmentConfig = [
 	                </div>
 
 	                {{-- Receiving Package Modal --}}
-	                <div x-show="receivingPackageModal.open" x-transition.opacity class="fixed inset-0 z-[190] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" style="display:none">
+	                <div x-show="receivingPackageModal.open" x-transition.opacity class="fixed inset-0 z-[190] flex min-h-dvh w-screen items-end justify-center bg-black/55 px-4 py-6 backdrop-blur-sm sm:items-center sm:p-4" style="display:none">
 	                    <template x-if="receivingPackageModal.pkg">
-	                        <div @@click.stop class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-	                            <div class="border-b border-slate-100 px-5 py-4">
+	                        <div @@click.stop class="relative flex max-h-[calc(100dvh-3rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+	                            <div class="shrink-0 border-b border-slate-100 bg-white p-5 sm:p-6">
 	                                <div class="flex items-start justify-between gap-4">
-	                                    <div class="flex min-w-0 items-start gap-3">
-	                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm">
-	                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25m0-9L3 7.5m9 5.25v9M3 7.5v9l9 5.25"/></svg>
+	                                    <div class="flex min-w-0 items-start gap-4">
+	                                        <span class="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-orange-600 text-white shadow-xl shadow-orange-500/25">
+	                                            <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 6.75V15m0 0l-2.25-2.25M9 15l2.25-2.25M15 6.75h.01M18.25 17.25V6.75A2.25 2.25 0 0016 4.5H8a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 008 19.5h8a2.25 2.25 0 002.25-2.25z"/></svg>
 	                                        </span>
 	                                        <div class="min-w-0">
-	                                            <h3 class="text-base font-bold text-slate-900" x-text="receivingPackageModalTitle()"></h3>
-	                                            <p class="mt-0.5 text-xs text-slate-500" x-show="receivingPackageModal.step === 1">
-	                                                <span x-text="receivingPackageModalIntro()"></span>
-	                                            </p>
-	                                            <p class="mt-0.5 text-xs text-slate-500" x-show="receivingPackageModal.step === 2" style="display:none">
-	                                                <span x-text="receivingPackageModalIntro()"></span>
-	                                            </p>
-	                                            <p class="mt-2 flex flex-wrap items-center gap-2 text-xs">
-	                                                <span class="rounded-lg bg-slate-100 px-2 py-1 font-black text-slate-900" x-text="receivingPackageModal.packageLabel"></span>
-	                                                <span x-show="receivingPackageModal.pkg.tracking_code" class="font-mono text-[10px] font-bold text-slate-400" x-text="receivingPackageModal.pkg.tracking_code"></span>
-	                                            </p>
+	                                            <h3 class="text-2xl font-black leading-tight text-slate-950" x-text="receiving.canReceive ? 'Receive Package' : 'Package Details'"></h3>
+	                                            <p class="mt-1 text-sm font-semibold leading-relaxed text-slate-500" x-text="isPerItemMode() ? 'Confirm the line, quantity, condition, and destination before saving.' : 'Confirm the line, quantity, condition, and notes before saving.'"></p>
 	                                        </div>
 	                                    </div>
-	                                    <button type="button" @@click="closeReceivingPackageModal()" class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700">
-	                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+	                                    <button type="button" @@click="closeReceivingPackageModal()" class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700">
+	                                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
 	                                    </button>
-	                                </div>
-	                                <div x-show="!isPerItemMode() && receiving.canReceive" class="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-	                                    One Drop-off is active. This form only receives the package; destination is managed from Edit Shared Destination.
 	                                </div>
 	                            </div>
 
-	                            <div class="flex-1 overflow-y-auto px-5 py-4">
+	                            <div class="flex-1 overflow-y-auto p-5 sm:p-6">
 	                                <div x-show="receivingPackageModal.step === 1" class="space-y-4">
-	                                    <div x-show="receiving.canReceive" class="grid grid-cols-1 gap-3 sm:grid-cols-3" style="display:none">
-	                                        <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-	                                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Expected</p>
-	                                            <p class="mt-1 text-lg font-bold text-slate-900" x-text="receivingExpectedQuantity(receivingPackageModal.pkg)"></p>
-	                                        </div>
-	                                        <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-	                                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Driver Confirmed</p>
-	                                            <p class="mt-1 text-lg font-bold text-slate-900" x-text="receivingPackageModal.pkg.driver_confirmed_quantity ?? '-'"></p>
-	                                        </div>
-	                                        <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-	                                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Vendor Qty</p>
-	                                            <p class="mt-1 text-lg font-bold text-slate-900" x-text="receivingPackageModal.pkg.vendor_quantity ?? '-'"></p>
+	                                    <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+	                                        <p class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Package</p>
+	                                        <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+	                                            <div class="min-w-0">
+	                                                <h4 class="break-words text-2xl font-black leading-tight text-slate-950" x-text="receivingPackageModal.pkg.description || receivingPackageModal.packageLabel || 'Package'"></h4>
+	                                                <p class="mt-1 font-mono text-base font-black text-slate-500" x-text="receivingPackageModal.pkg.tracking_code || receivingPackageModal.packageLabel"></p>
+	                                                <p class="mt-3 text-sm font-bold text-slate-600">
+	                                                    <span x-text="receivingPackageModal.pkg.recipient_name || receivingPackageModal.pkg.delivery_recipient_name || 'Recipient pending'"></span>
+	                                                    <span x-show="receivingPackageModal.pkg.recipient_phone || receivingPackageModal.pkg.delivery_recipient_phone" class="text-slate-300"> / </span>
+	                                                    <span x-text="receivingPackageModal.pkg.recipient_phone || receivingPackageModal.pkg.delivery_recipient_phone || ''"></span>
+	                                                </p>
+	                                            </div>
+	                                            <div class="grid min-w-[240px] grid-cols-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+	                                                <div class="border-r border-slate-200 p-3">
+	                                                    <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Expected</p>
+	                                                    <p class="mt-1 text-2xl font-black text-slate-950" x-text="receivingExpectedQuantity(receivingPackageModal.pkg)"></p>
+	                                                </div>
+	                                                <div class="border-r border-slate-200 p-3">
+	                                                    <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Picked</p>
+	                                                    <p class="mt-1 text-2xl font-black text-slate-950" x-text="receivingPackageModal.pkg.driver_confirmed_quantity ?? '-'"></p>
+	                                                </div>
+	                                                <div class="p-3">
+	                                                    <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Received</p>
+	                                                    <p class="mt-1 text-2xl font-black text-emerald-700" x-text="receivingPackageModal.pkg.received_quantity ?? 0"></p>
+	                                                </div>
+	                                            </div>
 	                                        </div>
 	                                    </div>
 	                                    <div>
@@ -4211,192 +3518,6 @@ $shipmentConfig = [
     {{-- GLOBAL MODALS — inside x-data scope, outside the card             --}}
     {{-- ═══════════════════════════════════════════════════════════════════ --}}
 
-    <!-- ══ MODAL: Create Invoice ════════════════════════════════════════ -->
-    <div x-show="invoiceModalOpen" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="invoiceModalOpen = false">
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="invoiceModalOpen = false"></div>
-        <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
-        <div class="relative z-10 bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl max-h-[95vh] overflow-y-auto">
-            <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-base font-bold text-slate-900">Create Invoice</h3>
-                        <p class="text-xs text-slate-500">Set fees for this shipment</p>
-                    </div>
-                </div>
-                <button @@click="invoiceModalOpen = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-            <div class="px-6 py-5">
-                <template x-if="invoiceUiError">
-                    <div class="mb-4 flex items-start gap-2.5 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">
-                        <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-                        <span x-text="invoiceUiError"></span>
-                    </div>
-                </template>
-                <form @@submit.prevent="createInvoice()">
-	                    <div class="grid grid-cols-2 gap-4 mb-4">
-	                        <div>
-	                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Transport Fee</label>
-	                            <input type="number" step="0.01" min="0" x-model="invoiceForm.transport_fee"
-                                class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all" placeholder="0.00">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Handling Fee</label>
-                            <input type="number" step="0.01" min="0" x-model="invoiceForm.handling_fee"
-                                class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all" placeholder="0.00">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Other Fee</label>
-                            <input type="number" step="0.01" min="0" x-model="invoiceForm.other_fee"
-                                class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all" placeholder="0.00">
-                        </div>
-                    </div>
-                    <div class="mb-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 p-[1px] shadow-lg shadow-emerald-500/15">
-                        <div class="rounded-[11px] bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3.5">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-semibold text-emerald-200 uppercase tracking-wider">Invoice Total</span>
-                                <div class="flex items-center gap-1">
-                                    <svg class="w-3.5 h-3.5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-	                                <span class="text-[10px] text-emerald-300 font-medium" x-text="[invoiceForm.transport_fee, invoiceForm.handling_fee, invoiceForm.other_fee].filter(f => parseFloat(f || 0) > 0).length + ' fee(s)'"></span>
-                                </div>
-                            </div>
-                            <div class="flex items-baseline justify-end gap-1.5">
-                                <span class="text-sm font-semibold text-emerald-200">GHS</span>
-                                <span class="text-2xl font-extrabold text-white tracking-tight" x-text="(parseFloat(invoiceForm.transport_fee || 0) + parseFloat(invoiceForm.handling_fee || 0) + parseFloat(invoiceForm.other_fee || 0)).toFixed(2)"></span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Notes <span class="text-slate-400 font-normal">(optional)</span></label>
-                        <textarea x-model="invoiceForm.notes" rows="2"
-                            class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 resize-none transition-all" placeholder="Optional notes..."></textarea>
-                    </div>
-                    <label class="flex items-center gap-3 mb-6 cursor-pointer select-none">
-                        <input type="checkbox" x-model="invoiceForm.send_now"
-                            class="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400">
-                        <span class="text-sm text-slate-700">Send invoice to vendor immediately</span>
-                    </label>
-                    <div class="flex justify-end gap-3">
-                        <button type="button" @@click="invoiceModalOpen = false"
-                            class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
-                            Cancel
-                        </button>
-                        <button type="submit" :disabled="invoiceForm.submitting"
-                            class="inline-flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                            <svg x-show="invoiceForm.submitting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span x-text="invoiceForm.submitting ? 'Creating...' : (invoiceForm.send_now ? 'Create & Send' : 'Create Invoice')"></span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        </div>
-    </div>
-
-    <!-- ══ MODAL: Invoice Detail ════════════════════════════════════════ -->
-    <div x-show="invoiceDetailModalOpen" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="invoiceDetailModalOpen = false">
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="invoiceDetailModalOpen = false"></div>
-        <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
-        <div class="relative z-10 bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl max-h-[95vh] overflow-y-auto">
-            <template x-if="invoiceDetail">
-                <div>
-                    <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
-                        <div class="flex items-center gap-3">
-                            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-sm">
-                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 class="text-base font-bold text-slate-900" x-text="'Invoice ' + (invoiceDetail.invoice_number || '')"></h3>
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1"
-                                    :class="invoiceStatusClass(invoiceDetail.status)"
-                                    x-text="invoiceDetail.status_label || invoiceDetail.status"></span>
-                            </div>
-                        </div>
-                        <button @@click="invoiceDetailModalOpen = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
-                    </div>
-                    <div class="px-6 py-5">
-                        <!-- Fee breakdown -->
-                        <div class="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden mb-5">
-                            <div class="divide-y divide-slate-100">
-	                                <div class="flex items-center justify-between px-5 py-3">
-	                                    <span class="text-sm text-slate-600">Transport Fee</span>
-	                                    <span class="text-sm font-semibold text-slate-900" x-text="'GHS ' + (Number(invoiceDetail.transport_fee) || 0).toFixed(2)"></span>
-                                </div>
-                                <div class="flex items-center justify-between px-5 py-3">
-                                    <span class="text-sm text-slate-600">Handling Fee</span>
-                                    <span class="text-sm font-semibold text-slate-900" x-text="'GHS ' + (Number(invoiceDetail.handling_fee) || 0).toFixed(2)"></span>
-                                </div>
-                                <template x-if="invoiceDetail.other_fee && Number(invoiceDetail.other_fee) > 0">
-                                    <div class="flex items-center justify-between px-5 py-3">
-                                        <span class="text-sm text-slate-600">Other Fee</span>
-                                        <span class="text-sm font-semibold text-slate-900" x-text="'GHS ' + Number(invoiceDetail.other_fee).toFixed(2)"></span>
-                                    </div>
-                                </template>
-                                <div class="flex items-center justify-between px-5 py-3.5 bg-white">
-                                    <span class="text-sm font-bold text-slate-900">Total</span>
-                                    <span class="text-base font-bold text-slate-900" x-text="'GHS ' + (Number(invoiceDetail.total_amount) || 0).toFixed(2)"></span>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Notes -->
-                        <template x-if="invoiceDetail.notes">
-                            <div class="mb-5 bg-amber-50 rounded-xl border border-amber-100 px-4 py-3">
-                                <p class="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mb-1">Notes</p>
-                                <p class="text-sm text-slate-700" x-text="invoiceDetail.notes"></p>
-                            </div>
-                        </template>
-                        <!-- Dates -->
-                        <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500 mb-5">
-                            <span x-show="invoiceDetail.created_at">Created: <span class="font-medium text-slate-700" x-text="formatDateTime(invoiceDetail.created_at)"></span></span>
-                            <span x-show="invoiceDetail.sent_at">Sent: <span class="font-medium text-slate-700" x-text="formatDateTime(invoiceDetail.sent_at)"></span></span>
-                            <span x-show="invoiceDetail.accepted_at">Accepted: <span class="font-medium text-slate-700" x-text="formatDateTime(invoiceDetail.accepted_at)"></span></span>
-                            <span x-show="invoiceDetail.cancelled_at" class="text-rose-600">Cancelled: <span x-text="formatDateTime(invoiceDetail.cancelled_at)"></span></span>
-                        </div>
-                        <!-- Actions -->
-                        <div class="flex flex-wrap justify-end gap-2">
-                            <button type="button" @@click="invoiceDetailModalOpen = false"
-                                class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
-                                Close
-                            </button>
-                            <button type="button" x-show="canManage && invoiceDetail.status === 'pending'"
-                                @@click="sendInvoice(invoiceDetail.id)"
-                                class="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                                Send to Vendor
-                            </button>
-                            <button type="button" x-show="canManage && invoiceDetail.status === 'sent'"
-                                @@click="adminAcceptInvoice(invoiceDetail.id)"
-                                class="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                                Admin Accept
-                            </button>
-                            <button type="button" x-show="canManage && ['pending','sent'].includes(invoiceDetail.status)"
-                                @@click="openCancelInvoiceModal(invoiceDetail.id)"
-                                class="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 text-sm font-semibold rounded-xl shadow-sm transition-colors">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                Cancel Invoice
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </template>
-        </div>
-        </div>
-    </div>
-
     <!-- ══ MODAL: Assign Rider ════════════════════════════════════════ -->
     <div x-show="assignDriverModalOpen" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="assignDriverModalOpen = false">
         <div x-show="assignDriverModalOpen"
@@ -4641,41 +3762,6 @@ $shipmentConfig = [
                     <button type="button" @@click="confirmUnassign()" :disabled="assignmentActionLoading || !unassignReason.trim()" class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-rose-600/20 transition-all hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none">
                         <svg x-show="assignmentActionLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                         <span x-text="assignmentActionLoading ? 'Unassigning...' : 'Unassign Rider'"></span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Cancel Invoice Modal --}}
-    <div x-show="showCancelInvoiceModal" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="showCancelInvoiceModal = false">
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @@click="showCancelInvoiceModal = false"></div>
-        <div class="relative flex min-h-full items-center justify-center p-4">
-            <div x-show="showCancelInvoiceModal" x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200/50 overflow-hidden">
-                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </div>
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900">Cancel Invoice</h3>
-                            <p class="text-xs text-slate-500">This action cannot be undone</p>
-                        </div>
-                    </div>
-                    <button @@click="showCancelInvoiceModal = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
-                </div>
-                <div class="px-5 py-4">
-                    <p class="text-sm text-slate-600 mb-3">Are you sure you want to cancel this invoice? This will void the invoice and cannot be reversed.</p>
-                    <label for="cancel-invoice-reason" class="block text-xs font-semibold text-slate-700 mb-1.5">Cancellation reason <span class="text-slate-400">(optional)</span></label>
-                    <textarea id="cancel-invoice-reason" x-model="cancelInvoiceReason" rows="3" placeholder="Provide a reason for cancellation..." class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-rose-400/50 focus:border-rose-300 transition-colors resize-none"></textarea>
-                </div>
-                <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50/50">
-                    <button type="button" @@click="showCancelInvoiceModal = false" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">Go Back</button>
-                    <button type="button" @@click="confirmCancelInvoice()" :disabled="cancelInvoiceLoading" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-rose-200 bg-white text-rose-700 text-sm font-semibold hover:bg-rose-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                        <svg x-show="cancelInvoiceLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                        <span x-text="cancelInvoiceLoading ? 'Cancelling...' : 'Cancel Invoice'"></span>
                     </button>
                 </div>
             </div>

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\InvoiceStatus;
 use App\Enums\ItemStatus;
 use App\Enums\PickupAssignmentStatus;
 use App\Enums\ShipmentDestinationMode;
@@ -220,8 +219,6 @@ class ShipmentController extends Controller
             'pickupDistrict',
             'deliveryRegion',
             'deliveryDistrict',
-            'invoice',
-            'invoices',
             'pickupAssignment.driver',
             'pickupAssignment.targetWarehouse',
             'pickupAssignment.receivedWarehouse',
@@ -237,8 +234,6 @@ class ShipmentController extends Controller
         $access = app(BackOfficeAccess::class);
         $canManage = $currentAdmin
             && ($access->isHq($currentAdmin) || $access->canUsePermission($currentAdmin, 'shipments.edit'));
-        $canManageCharges = $currentAdmin
-            && ($access->isHq($currentAdmin) || $access->canUsePermission($currentAdmin, 'charges.manage'));
         $currentAssignment = $shipment->pickupAssignment;
         if ($currentAssignment?->status === PickupAssignmentStatus::CANCELLED) {
             $currentAssignment = null;
@@ -255,43 +250,6 @@ class ShipmentController extends Controller
         $quantityDifference = is_null($comparisonQuantity)
             ? null
             : (int) $comparisonQuantity - $vendorDeclaredQuantity;
-
-        $currentInvoice = $shipment->invoice;
-        if (! $currentInvoice) {
-            $currentInvoice = $shipment->invoices
-                ->first(fn ($invoice) => $invoice->status->isActive())
-                ?? $shipment->invoices->first();
-        }
-
-        $invoiceHistory = $shipment->invoices
-            ->sortByDesc('id')
-            ->values()
-            ->map(function ($invoice) {
-                return [
-                    'id' => $invoice->id,
-                    'invoice_number' => $invoice->invoice_number,
-                    'status' => $invoice->status->value,
-                    'status_label' => $invoice->status->label(),
-                    'is_active' => $invoice->status->isActive(),
-                    'pickup_fee' => (float) ($invoice->pickup_fee ?? 0),
-                    'transport_fee' => (float) ($invoice->transport_fee ?? 0),
-                    'handling_fee' => (float) ($invoice->handling_fee ?? 0),
-                    'other_fee' => (float) ($invoice->other_fee ?? 0),
-                    'total_amount' => (float) ($invoice->total_amount ?? 0),
-                    'currency' => $invoice->currency,
-                    'notes' => $invoice->notes,
-                    'vendor_notes' => $invoice->vendor_notes,
-                    'rejection_reason' => $invoice->rejection_reason,
-                    'cancel_reason' => $invoice->cancel_reason,
-                    'sent_at' => $invoice->sent_at,
-                    'accepted_at' => $invoice->accepted_at,
-                    'rejected_at' => $invoice->rejected_at,
-                    'cancelled_at' => $invoice->cancelled_at,
-                    'created_at' => $invoice->created_at,
-                    'updated_at' => $invoice->updated_at,
-                ];
-            })
-            ->toArray();
 
         $assignmentHistory = $shipment->pickupAssignments
             ->sortByDesc('id')
@@ -330,12 +288,9 @@ class ShipmentController extends Controller
 
         return view('admin.shipments.show', [
             'shipment' => $shipment,
-            'currentInvoice' => $currentInvoice,
             'currentAssignment' => $currentAssignment,
             'itemsCount' => $itemsCount,
             'canManage' => $canManage,
-            'canManageCharges' => $canManageCharges,
-            'invoiceHistory' => $invoiceHistory,
             'assignmentHistory' => $assignmentHistory,
             'quantitySummary' => [
                 'vendor_declared' => $vendorDeclaredQuantity,
@@ -344,7 +299,6 @@ class ShipmentController extends Controller
                 'difference' => $quantityDifference,
             ],
             'statuses' => ShipmentStatus::toArray(),
-            'invoiceStatuses' => InvoiceStatus::toArray(),
             'assignmentStatuses' => PickupAssignmentStatus::toArray(),
             // Full editor config for the Packages tab (same payload the old
             // /edit page used to consume).
@@ -406,7 +360,6 @@ class ShipmentController extends Controller
 
         // Unified eager-load covering all pipeline stages
         $shipment->loadMissing([
-            'invoices',
             'pickupAssignments.driver',
             'pickupAssignments.targetWarehouse',
             'pickupAssignments.receivedWarehouse',
@@ -447,26 +400,6 @@ class ShipmentController extends Controller
                 'timestamp' => $submittedAt,
                 'created_at' => $submittedAt,
             ];
-        }
-
-        // --- Invoice lifecycle ---
-        foreach ($shipment->invoices as $invoice) {
-            if ($invoice->sent_at) {
-                $ts = $invoice->sent_at->format('Y-m-d H:i:s');
-                $timeline[] = ['status' => 'invoice_sent', 'label' => "Invoice Sent ({$invoice->invoice_number})", 'status_label' => 'Invoice Sent', 'timestamp' => $ts, 'created_at' => $ts];
-            }
-            if ($invoice->accepted_at) {
-                $ts = $invoice->accepted_at->format('Y-m-d H:i:s');
-                $timeline[] = ['status' => 'invoice_accepted', 'label' => "Invoice Accepted ({$invoice->invoice_number})", 'status_label' => 'Invoice Accepted', 'timestamp' => $ts, 'created_at' => $ts];
-            }
-            if ($invoice->rejected_at) {
-                $ts = $invoice->rejected_at->format('Y-m-d H:i:s');
-                $timeline[] = ['status' => 'invoice_rejected', 'label' => "Invoice Rejected ({$invoice->invoice_number})", 'status_label' => 'Invoice Rejected', 'timestamp' => $ts, 'created_at' => $ts];
-            }
-            if ($invoice->cancelled_at) {
-                $ts = $invoice->cancelled_at->format('Y-m-d H:i:s');
-                $timeline[] = ['status' => 'invoice_cancelled', 'label' => "Invoice Cancelled ({$invoice->invoice_number})", 'status_label' => 'Invoice Cancelled', 'timestamp' => $ts, 'created_at' => $ts];
-            }
         }
 
         // --- Pickup assignment lifecycle ---
@@ -2029,7 +1962,6 @@ class ShipmentController extends Controller
             'items.deliveryDistrict',
             'items.charges',
             'charges',
-            'currentInvoice',
             'deliveryRegion',
             'deliveryDistrict',
             'pickupAssignment.driver',
@@ -2527,7 +2459,6 @@ class ShipmentController extends Controller
             'pickupRegion',
             'pickupDistrict',
             'charges',
-            'currentInvoice',
             'deliveryRegion',
             'deliveryDistrict',
             'items.images',

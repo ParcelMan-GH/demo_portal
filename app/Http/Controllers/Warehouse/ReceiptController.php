@@ -71,8 +71,6 @@ class ReceiptController extends AdminShipmentController
             'shipment.items.images',
             'shipment.items.deliveryRegion:id,name',
             'shipment.items.deliveryDistrict:id,name',
-            'shipment.invoice',
-            'shipment.invoices',
             'driver:id,name,phone',
             'targetWarehouse:id,name,code',
             'photos:id,pickup_assignment_id,shipment_item_id,path,type,created_at',
@@ -179,67 +177,6 @@ class ReceiptController extends AdminShipmentController
                 ];
             })->values() ?? [],
         ];
-
-        $shipment = $pickupAssignment->shipment;
-        $invoice  = $shipment?->invoice;
-        $invoices = $shipment?->invoices ?? collect();
-        $admin    = Auth::guard('admin')->user();
-
-        // Merge invoice/payment URLs and data into receiptConfig so one JSON attribute covers everything
-        $receiptConfig['invoice_store_url']      = route('warehouse.invoices.store', ['pickupAssignment' => $pickupAssignment]);
-        $receiptConfig['payments_data_url']       = route('warehouse.receipts.payments.data', ['pickupAssignment' => $pickupAssignment]);
-        $receiptConfig['payments_store_url']      = route('warehouse.receipts.payments.store', ['pickupAssignment' => $pickupAssignment]);
-        $receiptConfig['payment_destroy_url']     = route('warehouse.payments.destroy', ['payment' => '__ID__']);
-        $receiptConfig['payment_download_url']    = route('warehouse.payments.download', ['payment' => '__ID__']);
-        $receiptConfig['payment_print_url']       = route('warehouse.payments.print', ['payment' => '__ID__']);
-        $receiptConfig['invoice_show_url']        = route('warehouse.invoices.show', ['invoice' => '__INVOICE__']);
-        $receiptConfig['can_create_invoice']      = $admin->hasPermission('warehouse.invoices.create');
-        $receiptConfig['can_edit_invoice']        = $admin->hasPermission('warehouse.invoices.edit');
-        $receiptConfig['can_view_invoice']        = $admin->hasPermission('warehouse.invoices.view');
-        $receiptConfig['is_hq_user']              = $admin->isHqUser();
-        $receiptConfig['is_super_admin']          = $admin->isHqUser();
-        $receiptConfig['invoice']                 = $invoice ? [
-            'id'                => $invoice->id,
-            'invoice_number'    => $invoice->invoice_number,
-            'status'            => $invoice->status?->value ?? (string) $invoice->status,
-            'pickup_fee'        => (float) $invoice->pickup_fee,
-            'transport_fee'     => (float) $invoice->transport_fee,
-            'handling_fee'      => (float) $invoice->handling_fee,
-            'other_fee'         => (float) $invoice->other_fee,
-            'total_amount'      => (float) $invoice->total_amount,
-            'notes'             => $invoice->notes,
-            'sent_at'           => $invoice->sent_at?->format('Y-m-d H:i'),
-            'accepted_at'       => $invoice->accepted_at?->format('Y-m-d H:i'),
-            'rejected_at'       => $invoice->rejected_at?->format('Y-m-d H:i'),
-            'cancelled_at'      => $invoice->cancelled_at?->format('Y-m-d H:i'),
-            'download_url'      => route('warehouse.invoices.download', ['invoice' => $invoice]),
-            'print_url'         => route('warehouse.invoices.print', ['invoice' => $invoice]),
-            'update_url'        => route('warehouse.invoices.update', ['invoice' => $invoice]),
-            'send_url'          => route('warehouse.invoices.send', ['invoice' => $invoice]),
-            'cancel_url'        => route('warehouse.invoices.cancel', ['invoice' => $invoice]),
-            'admin_accept_url'  => route('warehouse.invoices.admin-accept', ['invoice' => $invoice]),
-            'payments_data_url' => route('warehouse.invoices.payments.data', ['invoice' => $invoice]),
-        ] : null;
-        $receiptConfig['invoice_history'] = $invoices->map(fn ($inv) => [
-            'id'                => $inv->id,
-            'invoice_number'    => $inv->invoice_number,
-            'status'            => $inv->status?->value ?? (string) $inv->status,
-            'status_label'      => ucfirst($inv->status?->value ?? (string) $inv->status),
-            'is_active'         => in_array($inv->status?->value ?? (string) $inv->status, ['pending', 'sent', 'accepted']),
-            'total_amount'      => (float) $inv->total_amount,
-            'notes'             => $inv->notes,
-            'created_at'        => $inv->created_at?->format('Y-m-d H:i'),
-            'sent_at'           => $inv->sent_at?->format('Y-m-d H:i'),
-            'accepted_at'       => $inv->accepted_at?->format('Y-m-d H:i'),
-            'cancelled_at'      => $inv->cancelled_at?->format('Y-m-d H:i'),
-            'download_url'      => route('warehouse.invoices.download', ['invoice' => $inv]),
-            'print_url'         => route('warehouse.invoices.print', ['invoice' => $inv]),
-            'update_url'        => route('warehouse.invoices.update', ['invoice' => $inv]),
-            'send_url'          => route('warehouse.invoices.send', ['invoice' => $inv]),
-            'cancel_url'        => route('warehouse.invoices.cancel', ['invoice' => $inv]),
-            'admin_accept_url'  => route('warehouse.invoices.admin-accept', ['invoice' => $inv]),
-            'payments_data_url' => route('warehouse.invoices.payments.data', ['invoice' => $inv]),
-        ])->values()->all();
 
         return view('warehouse.receipts.show', [
             'warehouse'     => $warehouse,
@@ -706,8 +643,6 @@ class ReceiptController extends AdminShipmentController
             'shipment.items.images',
             'shipment.items.deliveryRegion:id,name',
             'shipment.items.deliveryDistrict:id,name',
-            'shipment.invoice',
-            'shipment.invoices',
             'driver:id,name,phone',
             'targetWarehouse:id,name,code',
             'photos:id,pickup_assignment_id,shipment_item_id,path,type,created_at',
@@ -789,66 +724,6 @@ class ReceiptController extends AdminShipmentController
                 ];
             })->values() ?? [],
         ];
-
-        $shipment = $pickupAssignment->shipment;
-        $invoice  = $shipment?->invoice;
-        $invoices = $shipment?->invoices ?? collect();
-        $admin    = Auth::guard('admin')->user();
-
-        $receiptConfig['invoice_store_url']   = route('warehouse.invoices.store', ['pickupAssignment' => $pickupAssignment]);
-        $receiptConfig['payments_data_url']   = route('warehouse.receipts.payments.data', ['pickupAssignment' => $pickupAssignment]);
-        $receiptConfig['payments_store_url']  = route('warehouse.receipts.payments.store', ['pickupAssignment' => $pickupAssignment]);
-        $receiptConfig['payment_destroy_url'] = route('warehouse.payments.destroy', ['payment' => '__ID__']);
-        $receiptConfig['payment_download_url'] = route('warehouse.payments.download', ['payment' => '__ID__']);
-        $receiptConfig['payment_print_url']   = route('warehouse.payments.print', ['payment' => '__ID__']);
-        $receiptConfig['invoice_show_url']    = route('warehouse.invoices.show', ['invoice' => '__INVOICE__']);
-        $receiptConfig['can_create_invoice']  = $admin->hasPermission('warehouse.invoices.create');
-        $receiptConfig['can_edit_invoice']    = $admin->hasPermission('warehouse.invoices.edit');
-        $receiptConfig['can_view_invoice']    = $admin->hasPermission('warehouse.invoices.view');
-        $receiptConfig['is_hq_user']          = $admin->isHqUser();
-        $receiptConfig['is_super_admin']      = $admin->isHqUser();
-        $receiptConfig['invoice']             = $invoice ? [
-            'id'             => $invoice->id,
-            'invoice_number' => $invoice->invoice_number,
-            'status'         => $invoice->status?->value ?? (string) $invoice->status,
-            'pickup_fee'     => (float) $invoice->pickup_fee,
-            'transport_fee'  => (float) $invoice->transport_fee,
-            'handling_fee'   => (float) $invoice->handling_fee,
-            'other_fee'      => (float) $invoice->other_fee,
-            'total_amount'   => (float) $invoice->total_amount,
-            'notes'          => $invoice->notes,
-            'sent_at'        => $invoice->sent_at?->format('Y-m-d H:i'),
-            'accepted_at'    => $invoice->accepted_at?->format('Y-m-d H:i'),
-            'rejected_at'    => $invoice->rejected_at?->format('Y-m-d H:i'),
-            'cancelled_at'   => $invoice->cancelled_at?->format('Y-m-d H:i'),
-            'download_url'   => route('warehouse.invoices.download', ['invoice' => $invoice]),
-            'print_url'      => route('warehouse.invoices.print', ['invoice' => $invoice]),
-            'update_url'     => route('warehouse.invoices.update', ['invoice' => $invoice]),
-            'send_url'       => route('warehouse.invoices.send', ['invoice' => $invoice]),
-            'cancel_url'     => route('warehouse.invoices.cancel', ['invoice' => $invoice]),
-            'admin_accept_url' => route('warehouse.invoices.admin-accept', ['invoice' => $invoice]),
-            'payments_data_url' => route('warehouse.invoices.payments.data', ['invoice' => $invoice]),
-        ] : null;
-        $receiptConfig['invoice_history'] = $invoices->map(fn ($inv) => [
-            'id'               => $inv->id,
-            'invoice_number'   => $inv->invoice_number,
-            'status'           => $inv->status?->value ?? (string) $inv->status,
-            'status_label'     => ucfirst($inv->status?->value ?? (string) $inv->status),
-            'is_active'        => in_array($inv->status?->value ?? (string) $inv->status, ['pending', 'sent', 'accepted']),
-            'total_amount'     => (float) $inv->total_amount,
-            'notes'            => $inv->notes,
-            'created_at'       => $inv->created_at?->format('Y-m-d H:i'),
-            'sent_at'          => $inv->sent_at?->format('Y-m-d H:i'),
-            'accepted_at'      => $inv->accepted_at?->format('Y-m-d H:i'),
-            'cancelled_at'     => $inv->cancelled_at?->format('Y-m-d H:i'),
-            'download_url'     => route('warehouse.invoices.download', ['invoice' => $inv]),
-            'print_url'        => route('warehouse.invoices.print', ['invoice' => $inv]),
-            'update_url'       => route('warehouse.invoices.update', ['invoice' => $inv]),
-            'send_url'         => route('warehouse.invoices.send', ['invoice' => $inv]),
-            'cancel_url'       => route('warehouse.invoices.cancel', ['invoice' => $inv]),
-            'admin_accept_url' => route('warehouse.invoices.admin-accept', ['invoice' => $inv]),
-            'payments_data_url' => route('warehouse.invoices.payments.data', ['invoice' => $inv]),
-        ])->values()->all();
 
         return view('warehouse.receipts.show', [
             'warehouse'   => $warehouse,

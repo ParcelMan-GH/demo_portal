@@ -3,13 +3,14 @@
  * Extracted from Blade inline scripts and bundled via Vite.
  */
 
+import { createReceivingWorkspaceState } from '../../../shared/receiving-workspace.js';
+
 function shipmentShow() {
     return {
+        ...createReceivingWorkspaceState(),
         config: {},
         shipment: {},
         canManage: false,
-        invoice: null,
-        invoiceHistory: [],
         assignment: null,
         assignmentHistory: [],
         assignmentUiError: '',
@@ -84,46 +85,6 @@ function shipmentShow() {
             loading: false
         },
 
-        // Invoice form state
-        invoiceForm: {
-            pickup_fee: '',
-            transport_fee: '',
-            handling_fee: '',
-            other_fee: '',
-            notes: '',
-            send_now: false,
-            submitting: false
-        },
-        invoiceModalOpen: false,
-        invoiceDetailModalOpen: false,
-        invoiceDetail: null,
-        invoiceUiError: '',
-        invoiceTable: {
-            search: '',
-            statusFilter: '',
-            statusFilterLabel: 'All statuses',
-            sortBy: 'created_at',
-            sortDirection: 'desc',
-            page: 1,
-            perPage: 10,
-            columns: [
-                { key: 'invoice_number', label: 'Invoice Number' },
-                { key: 'status', label: 'Status' },
-                { key: 'is_active', label: 'Active' },
-                { key: 'total_amount', label: 'Total' },
-                { key: 'created_at', label: 'Created' },
-                { key: 'actions', label: 'Actions' },
-            ],
-            visibleColumns: {
-                invoice_number: true,
-                status: true,
-                is_active: true,
-                total_amount: true,
-                created_at: true,
-                actions: true,
-            }
-        },
-
         // Assignment form state
         assignmentForm: {
             driver_id: '',
@@ -142,10 +103,6 @@ function shipmentShow() {
         assignDriverModalOpen: false,
         showUnassignModal: false,
         unassignReason: '',
-        showCancelInvoiceModal: false,
-        cancelInvoiceReason: '',
-        cancelInvoiceId: null,
-        cancelInvoiceLoading: false,
 
         // Edit assignment form state
         editAssignmentOpen: false,
@@ -165,50 +122,6 @@ function shipmentShow() {
             loading: false,
             itemsExpanded: {},
         },
-
-        // Payments tab
-        paymentsLoaded: false,
-        paymentsData: { payments: [], summary: { total_invoiced: 0, total_paid: 0, balance_due: 0 } },
-        paymentSearch: '',
-        paymentSortBy: 'payment_date',
-        paymentSortDir: 'desc',
-        paymentPage: 1,
-        paymentPerPage: 10,
-        paymentColumns: [
-            { key: 'payment_date', label: 'Date' },
-            { key: 'amount', label: 'Amount' },
-            { key: 'method', label: 'Method' },
-            { key: 'reference', label: 'Reference' },
-            { key: 'invoice', label: 'Invoice' },
-            { key: 'recorded_by', label: 'Recorded By' },
-            { key: 'notes', label: 'Notes' },
-            { key: 'actions', label: 'Actions' },
-        ],
-        paymentVisibleColumns: {
-            payment_date: true,
-            amount: true,
-            method: true,
-            reference: true,
-            invoice: true,
-            recorded_by: true,
-            notes: true,
-            actions: true,
-        },
-        paymentForm: {
-            open: false,
-            submitting: false,
-            amount: '',
-            payment_method: '',
-            reference_number: '',
-            notes: '',
-            payment_date: '',
-        },
-        voidConfirm: {
-            open: false,
-            paymentId: null,
-            loading: false,
-        },
-        isSuperAdmin: false,
 
         shipmentDestinationMode() {
             const mode = this.shipment?.destination_mode;
@@ -1103,18 +1016,6 @@ function shipmentShow() {
             this.pickupEditModal.saving = false;
         },
 
-        receivingExpectedQuantity(pkg) {
-            const expected = Number(pkg?.expected_quantity ?? pkg?.driver_confirmed_quantity ?? pkg?.vendor_quantity ?? 0);
-            return Number.isFinite(expected) ? expected : 0;
-        },
-
-        receivingObservedQuantity(pkg) {
-            const received = Number(pkg?.received_quantity ?? 0);
-            const damaged = Number(pkg?.damaged_quantity ?? 0);
-
-            return (Number.isFinite(received) ? received : 0) + (Number.isFinite(damaged) ? damaged : 0);
-        },
-
         receivingDeclaredQuantity() {
             const declared = Number(this.shipment?.vendor_declared_quantity ?? 0);
             if (Number.isFinite(declared) && declared > 0) {
@@ -1124,33 +1025,6 @@ function shipmentShow() {
             return (this.receiving.packages || this.shipment?.items || []).reduce((total, item) => {
                 const quantity = Number(item?.vendor_quantity ?? item?.quantity ?? 0);
                 return total + (Number.isFinite(quantity) ? quantity : 0);
-            }, 0);
-        },
-
-	        receivingPackageCount() {
-	            if (Array.isArray(this.receiving.packages) && this.receiving.packages.length > 0) {
-	                return this.receiving.packages.length;
-	            }
-
-	            if (Array.isArray(this.shipment?.items)) {
-	                return this.shipment.items.length;
-	            }
-
-	            return 0;
-	        },
-
-        receivingReceivedPackageCount() {
-            return (this.receiving.packages || []).filter((pkg) => this.receivingPackageIsReceived(pkg)).length;
-        },
-
-        receivingPendingPackageCount() {
-            return Math.max(this.receivingPackageCount() - this.receivingReceivedPackageCount(), 0);
-        },
-
-        receivingReceivedUnits() {
-            return (this.receiving.packages || []).reduce((total, pkg) => {
-                const received = Number(pkg?.received_quantity ?? 0);
-                return total + (Number.isFinite(received) ? received : 0);
             }, 0);
         },
 
@@ -1270,22 +1144,6 @@ function shipmentShow() {
             return 'text-rose-700';
         },
 
-        receivingAllPackagesReceived() {
-            const packages = this.receiving.packages || [];
-            if (packages.length === 0) return false;
-
-            return packages.every((pkg) => this.receivingPackageHasReceipt(pkg));
-        },
-
-        receivingPackageHasReceipt(pkg) {
-            if (pkg?.receipt_item_id) return true;
-            if (pkg?.barcode_value) return true;
-            if (Array.isArray(pkg?.photos) && pkg.photos.length > 0) return true;
-            if (Number(pkg?.received_quantity ?? 0) > 0) return true;
-            if (Number(pkg?.damaged_quantity ?? 0) > 0) return true;
-            return Boolean(pkg?.discrepancy_type && pkg.discrepancy_type !== 'none');
-        },
-
         receivingIsFinalized() {
             return this.receiving.receipt?.status === 'finalized';
         },
@@ -1315,14 +1173,6 @@ function shipmentShow() {
             }
 
             return 'The driver has not confirmed pickup yet. Saving receipt quantities will automatically mark pickup as completed first.';
-        },
-
-        receivingPendingUnits() {
-            return (this.receiving.packages || []).reduce((total, pkg) => {
-                const expected = this.receivingExpectedQuantity(pkg);
-                const observed = this.receivingObservedQuantity(pkg);
-                return total + Math.max(expected - observed, 0);
-            }, 0);
         },
 
         receivingDiscrepancyType(pkg) {
@@ -1367,73 +1217,6 @@ function shipmentShow() {
                     return 'Mixed';
                 default:
 	                    return 'No discrepancy';
-	            }
-	        },
-
-	        receivingPendingQuantity(pkg) {
-	            return Math.max(this.receivingExpectedQuantity(pkg) - this.receivingObservedQuantity(pkg), 0);
-	        },
-
-	        receivingPackageIsReceived(pkg) {
-	            return Number(pkg?.received_quantity ?? 0) > 0;
-	        },
-
-	        receivingPackageStatusLabel(pkg) {
-	            if (this.receivingPackageIsReceived(pkg)) return 'Received';
-	            return this.receivingPendingQuantity(pkg) > 0 ? 'Pending' : 'Ready';
-	        },
-
-	        receivingPackageStatusClass(pkg) {
-	            if (this.receivingPackageIsReceived(pkg)) {
-	                return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-	            }
-
-	            return this.receivingPendingQuantity(pkg) > 0
-	                ? 'bg-amber-50 text-amber-700 border-amber-200'
-	                : 'bg-slate-50 text-slate-600 border-slate-200';
-	        },
-
-	        receivingPackageStatusTextClass(pkg) {
-	            if (this.receivingPackageIsReceived(pkg)) {
-	                return 'text-emerald-700';
-	            }
-
-	            return this.receivingPendingQuantity(pkg) > 0 ? 'text-amber-700' : 'text-slate-600';
-	        },
-
-	        receivingConditionLabel(status) {
-	            if (!status) return 'Not checked';
-	            switch (String(status)) {
-	                case 'damaged':
-	                    return 'Damaged';
-	                case 'partial':
-	                    return 'Partial';
-	                default:
-	                    return 'OK';
-	            }
-	        },
-
-	        receivingConditionClass(status) {
-	            if (!status) return 'bg-slate-50 text-slate-500 border-slate-200';
-	            switch (String(status)) {
-	                case 'damaged':
-	                    return 'bg-rose-50 text-rose-700 border-rose-200';
-	                case 'partial':
-	                    return 'bg-amber-50 text-amber-700 border-amber-200';
-	                default:
-	                    return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-	            }
-	        },
-
-	        receivingConditionTextClass(status) {
-	            if (!status) return 'text-slate-500';
-	            switch (String(status)) {
-	                case 'damaged':
-	                    return 'text-rose-700';
-	                case 'partial':
-	                    return 'text-amber-700';
-	                default:
-	                    return 'text-emerald-700';
 	            }
 	        },
 
@@ -2937,12 +2720,6 @@ function shipmentShow() {
             this.canManageCharges = this.config.canManageCharges ?? false;
             this.canApproveReceivingDiscrepancy = !!this.config.canApproveReceivingDiscrepancy;
             this.isSuperAdmin = this.config.isSuperAdmin ?? false;
-            this.invoice = this.config.invoice;
-            this.invoiceHistory = this.config.invoiceHistory || [];
-            if (!this.invoice && this.invoiceHistory.length > 0) {
-                const activeInvoice = this.invoiceHistory.find(row => !!row.is_active);
-                this.invoice = activeInvoice || this.invoiceHistory[0];
-            }
             this.assignment = this.config.assignment;
             this.assignmentHistory = this.config.assignmentHistory || [];
             this.quantitySummary = this.config.quantitySummary || this.quantitySummary;
@@ -2951,9 +2728,8 @@ function shipmentShow() {
             // legacy /edit redirect) open the right tab.
             const tabParam = new URLSearchParams(window.location.search).get('tab');
             if (tabParam) {
-                const normalizedTab = ['overview', 'packages', 'invoice', 'payments', 'assignment', 'tracking', 'charges', 'custody'].includes(tabParam)
-                    ? 'receiving'
-                    : tabParam;
+                const allowedTabs = ['overview', 'packages', 'assignment', 'tracking', 'custody', 'receiving'];
+                const normalizedTab = allowedTabs.includes(tabParam) ? tabParam : 'receiving';
 
                 this.activeTab = normalizedTab;
                 if (normalizedTab === 'receiving' && !this.receivingLoaded) {
@@ -3074,10 +2850,6 @@ function shipmentShow() {
             const map = {
                 created:               'bg-slate-400',
                 submitted:             'bg-blue-400',
-                invoice_sent:          'bg-sky-500',
-                invoice_accepted:      'bg-cyan-500',
-                invoice_rejected:      'bg-rose-500',
-                invoice_cancelled:     'bg-rose-400',
                 pickup_assigned:       'bg-violet-500',
                 en_route:              'bg-violet-400',
                 arrived:               'bg-violet-600',
@@ -3099,10 +2871,6 @@ function shipmentShow() {
             const map = {
                 created:               'bg-slate-100 text-slate-700',
                 submitted:             'bg-blue-100 text-blue-700',
-                invoice_sent:          'bg-sky-100 text-sky-700',
-                invoice_accepted:      'bg-cyan-100 text-cyan-700',
-                invoice_rejected:      'bg-rose-100 text-rose-700',
-                invoice_cancelled:     'bg-rose-100 text-rose-600',
                 pickup_assigned:       'bg-violet-100 text-violet-700',
                 en_route:              'bg-violet-100 text-violet-600',
                 arrived:               'bg-violet-100 text-violet-800',
@@ -3122,511 +2890,6 @@ function shipmentShow() {
 
         activeStatuses() {
             return ['pending', 'sent', 'accepted'];
-        },
-
-        hasActiveInvoice() {
-            return this.invoiceHistory.some(row => this.activeStatuses().includes(row.status));
-        },
-
-        canCreateInvoice() {
-            // Super admins can create invoices regardless of shipment status
-            if (this.isSuperAdmin) {
-                return this.canManage && !this.hasActiveInvoice();
-            }
-            // Phase 3: Invoice can be created at 'submitted' (old flow) OR 'at_warehouse' (new flow after pickup)
-            const invoiceableStatuses = ['submitted', 'at_warehouse'];
-            return this.canManage && invoiceableStatuses.includes(this.shipment.status) && !this.hasActiveInvoice();
-        },
-
-        activeInvoiceBlockReason() {
-            if (this.hasActiveInvoice()) {
-                return 'Shipment already has an active invoice (pending, sent, or accepted).';
-            }
-            if (!this.isSuperAdmin) {
-                const invoiceableStatuses = ['submitted', 'at_warehouse'];
-                if (!invoiceableStatuses.includes(this.shipment.status)) {
-                    return 'Invoice can be created when the shipment is submitted or received at warehouse.';
-                }
-            }
-            return '';
-        },
-
-        activeInvoice() {
-            return this.invoiceHistory.find(row => this.activeStatuses().includes(row.status)) || null;
-        },
-
-        openCreateInvoiceModal() {
-            this.invoiceUiError = '';
-            if (!this.canCreateInvoice()) {
-                this.invoiceUiError = this.activeInvoiceBlockReason() || 'Cannot create invoice right now.';
-                if (window.showToast && this.invoiceUiError) {
-                    window.showToast(this.invoiceUiError, 'error');
-                }
-                return;
-            }
-            this.invoiceModalOpen = true;
-        },
-
-        closeCreateInvoiceModal() {
-            this.invoiceModalOpen = false;
-        },
-
-        openInvoiceDetailModal(invoiceId = null) {
-            const targetInvoice = invoiceId
-                ? this.invoiceHistory.find(row => Number(row.id) === Number(invoiceId))
-                : (this.activeInvoice() || this.invoice);
-
-            if (!targetInvoice) {
-                return;
-            }
-
-            window.open('/admin/invoices/' + targetInvoice.id, '_blank');
-        },
-
-        openActiveInvoiceModal() {
-            const active = this.activeInvoice();
-            if (active) {
-                window.open('/admin/invoices/' + active.id, '_blank');
-            }
-        },
-
-        closeInvoiceDetailModal() {
-            this.invoiceDetailModalOpen = false;
-        },
-
-        setInvoiceStatusFilter(value) {
-            this.invoiceTable.statusFilter = value;
-            this.invoiceTable.statusFilterLabel = value ? value.charAt(0).toUpperCase() + value.slice(1) : 'All statuses';
-            this.invoiceTable.page = 1;
-        },
-
-        toggleInvoiceColumn(key) {
-            if (!(key in this.invoiceTable.visibleColumns)) return;
-            const enabledCount = Object.values(this.invoiceTable.visibleColumns).filter(Boolean).length;
-            if (this.invoiceTable.visibleColumns[key] && enabledCount <= 1) {
-                return;
-            }
-            this.invoiceTable.visibleColumns[key] = !this.invoiceTable.visibleColumns[key];
-        },
-
-        visibleInvoiceColumnCount() {
-            return Object.values(this.invoiceTable.visibleColumns).filter(Boolean).length;
-        },
-
-        filteredInvoiceRows() {
-            let rows = Array.isArray(this.invoiceHistory) ? [...this.invoiceHistory] : [];
-
-            const search = (this.invoiceTable.search || '').trim().toLowerCase();
-            if (search) {
-                rows = rows.filter(row => {
-                    const haystacks = [
-                        row.invoice_number,
-                        row.status,
-                        row.status_label,
-                        row.notes,
-                        row.vendor_notes,
-                        row.rejection_reason,
-                        row.cancel_reason,
-                    ];
-                    return haystacks.some(value => (value || '').toString().toLowerCase().includes(search));
-                });
-            }
-
-            if (this.invoiceTable.statusFilter) {
-                rows = rows.filter(row => row.status === this.invoiceTable.statusFilter);
-            }
-
-            const direction = this.invoiceTable.sortDirection === 'asc' ? 1 : -1;
-            const sortBy = this.invoiceTable.sortBy;
-            rows.sort((a, b) => {
-                const aValue = a?.[sortBy];
-                const bValue = b?.[sortBy];
-
-                if (sortBy === 'created_at') {
-                    const aDate = aValue ? new Date(aValue).getTime() : 0;
-                    const bDate = bValue ? new Date(bValue).getTime() : 0;
-                    return aDate > bDate ? direction : -direction;
-                }
-
-                if (sortBy === 'total_amount') {
-                    const aNum = Number(aValue ?? 0);
-                    const bNum = Number(bValue ?? 0);
-                    if (aNum === bNum) return 0;
-                    return aNum > bNum ? direction : -direction;
-                }
-
-                const aText = (aValue || '').toString().toLowerCase();
-                const bText = (bValue || '').toString().toLowerCase();
-                if (aText === bText) return 0;
-                return aText > bText ? direction : -direction;
-            });
-
-            return rows;
-        },
-
-        paginatedInvoiceRows() {
-            const rows = this.filteredInvoiceRows();
-            const totalPages = Math.max(1, Math.ceil(rows.length / this.invoiceTable.perPage));
-            if (this.invoiceTable.page > totalPages) {
-                this.invoiceTable.page = totalPages;
-            }
-            const start = (this.invoiceTable.page - 1) * this.invoiceTable.perPage;
-            return rows.slice(start, start + this.invoiceTable.perPage);
-        },
-
-        invoiceMeta() {
-            const rows = this.filteredInvoiceRows();
-            const total = rows.length;
-            const lastPage = Math.max(1, Math.ceil(total / this.invoiceTable.perPage));
-            const page = Math.min(this.invoiceTable.page, lastPage);
-            const from = total === 0 ? 0 : ((page - 1) * this.invoiceTable.perPage) + 1;
-            const to = Math.min(page * this.invoiceTable.perPage, total);
-
-            return { total, page, lastPage, from, to };
-        },
-
-        sortInvoice(field) {
-            if (this.invoiceTable.sortBy === field) {
-                this.invoiceTable.sortDirection = this.invoiceTable.sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                this.invoiceTable.sortBy = field;
-                this.invoiceTable.sortDirection = 'asc';
-            }
-            this.invoiceTable.page = 1;
-        },
-
-        invoiceFirstPage() {
-            this.invoiceTable.page = 1;
-        },
-
-        invoicePreviousPage() {
-            this.invoiceTable.page = Math.max(1, this.invoiceTable.page - 1);
-        },
-
-        invoiceNextPage() {
-            const meta = this.invoiceMeta();
-            this.invoiceTable.page = Math.min(meta.lastPage, this.invoiceTable.page + 1);
-        },
-
-        invoiceLastPage() {
-            this.invoiceTable.page = this.invoiceMeta().lastPage;
-        },
-
-        viewInvoice(invoiceId) {
-            if (invoiceId) {
-                window.open('/admin/invoices/' + invoiceId, '_blank');
-            }
-        },
-
-        invoiceStatusClass(status) {
-            if (status === 'pending' || status === 'sent') return 'bg-amber-50 text-amber-700 ring-amber-200';
-            if (status === 'accepted') return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
-            if (status === 'rejected' || status === 'cancelled') return 'bg-rose-50 text-rose-700 ring-rose-200';
-            return 'bg-slate-50 text-slate-600 ring-slate-200';
-        },
-
-        assignmentStatusClass(status) {
-            if (status === 'assigned') return 'bg-amber-50 text-amber-700 ring-amber-200';
-            if (status === 'en_route') return 'bg-blue-50 text-blue-700 ring-blue-200';
-            if (status === 'arrived') return 'bg-sky-50 text-sky-700 ring-sky-200';
-            if (status === 'picking_up') return 'bg-teal-50 text-teal-700 ring-teal-200';
-            if (status === 'completed') return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
-            if (status === 'cancelled') return 'bg-rose-50 text-rose-700 ring-rose-200';
-            return 'bg-slate-50 text-slate-600 ring-slate-200';
-        },
-
-        exportInvoiceData(format) {
-            const rows = this.filteredInvoiceRows();
-            if (format === 'csv') {
-                const header = ['Invoice Number', 'Status', 'Is Active', 'Total Amount', 'Created At'];
-                const lines = rows.map(row => [
-                    row.invoice_number,
-                    row.status_label || row.status,
-                    row.is_active ? 'Yes' : 'No',
-                    row.total_amount ?? 0,
-                    row.created_at || '',
-                ]);
-                const csv = [header, ...lines]
-                    .map(columns => columns.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
-                    .join('\n');
-                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `shipment-${this.shipment.id}-invoices.csv`;
-                link.click();
-                URL.revokeObjectURL(link.href);
-                return;
-            }
-
-            if (format === 'json') {
-                const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json;charset=utf-8;' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `shipment-${this.shipment.id}-invoices.json`;
-                link.click();
-                URL.revokeObjectURL(link.href);
-                return;
-            }
-
-            if (format === 'print') {
-                window.print();
-            }
-        },
-
-        async createInvoice() {
-            this.invoiceUiError = '';
-            if (!this.canCreateInvoice()) {
-                this.invoiceUiError = this.activeInvoiceBlockReason() || 'Cannot create invoice right now.';
-                if (window.showToast) {
-                    window.showToast(this.invoiceUiError, 'error');
-                }
-                return;
-            }
-
-            this.invoiceForm.submitting = true;
-            try {
-                const response = await fetch(this.config.invoiceStoreEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({
-                        pickup_fee: this.invoiceForm.pickup_fee,
-                        transport_fee: this.invoiceForm.transport_fee,
-                        handling_fee: this.invoiceForm.handling_fee,
-                        other_fee: this.invoiceForm.other_fee,
-                        notes: this.invoiceForm.notes,
-                        send_now: this.invoiceForm.send_now ? 1 : 0
-                    })
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.message || 'Failed to create invoice');
-                }
-
-                if (window.showToast) {
-                    window.showToast('Invoice created successfully', 'success');
-                }
-
-                this.closeCreateInvoiceModal();
-                // Reload page to reflect changes
-                window.location.reload();
-            } catch (error) {
-                console.error('Create invoice error:', error);
-                this.invoiceUiError = error.message || 'Failed to create invoice';
-                if (window.showToast) {
-                    window.showToast(error.message || 'Failed to create invoice', 'error');
-                }
-            } finally {
-                this.invoiceForm.submitting = false;
-            }
-        },
-
-        buildInvoiceEndpoint(template, invoiceId) {
-            return (template || '').replace('__INVOICE__', invoiceId);
-        },
-
-        async sendInvoice(invoiceId = null) {
-            const targetId = invoiceId || this.invoice?.id;
-            if (!targetId) return;
-
-            try {
-                const endpoint = this.buildInvoiceEndpoint(this.config.invoiceSendEndpointTemplate, targetId);
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    }
-                });
-
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.message || 'Failed to send invoice');
-                }
-
-                if (window.showToast) {
-                    window.showToast(data.message || 'Invoice sent to vendor', 'success');
-                }
-                window.location.reload();
-            } catch (error) {
-                this.invoiceUiError = error.message || 'Failed to send invoice';
-                if (window.showToast) {
-                    window.showToast(error.message || 'Failed to send invoice', 'error');
-                }
-            }
-        },
-
-        openCancelInvoiceModal(invoiceId = null) {
-            const targetId = invoiceId || this.invoice?.id;
-            if (!targetId) return;
-            this.cancelInvoiceId = targetId;
-            this.cancelInvoiceReason = '';
-            this.cancelInvoiceLoading = false;
-            this.showCancelInvoiceModal = true;
-        },
-
-        async confirmCancelInvoice() {
-            if (!this.cancelInvoiceId) return;
-            this.cancelInvoiceLoading = true;
-
-            try {
-                const endpoint = this.buildInvoiceEndpoint(this.config.invoiceCancelEndpointTemplate, this.cancelInvoiceId);
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({
-                        cancel_reason: this.cancelInvoiceReason.trim() || null
-                    })
-                });
-
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.message || 'Failed to cancel invoice');
-                }
-
-                this.showCancelInvoiceModal = false;
-
-                if (window.showToast) {
-                    window.showToast(data.message || 'Invoice cancelled', 'success');
-                }
-                window.location.reload();
-            } catch (error) {
-                this.cancelInvoiceLoading = false;
-                this.invoiceUiError = error.message || 'Failed to cancel invoice';
-                if (window.showToast) {
-                    window.showToast(error.message || 'Failed to cancel invoice', 'error');
-                }
-            }
-        },
-
-        async adminAcceptInvoice(invoiceId = null) {
-            const targetId = invoiceId || this.invoice?.id;
-            if (!targetId) return;
-
-            const confirmed = window.confirm(
-                'Accept this invoice on behalf of the vendor?\n\n' +
-                'This is an admin override action. The invoice will be marked as accepted ' +
-                'and the shipment will proceed to the next stage.\n\n' +
-                'This action will be recorded in the audit log.'
-            );
-            if (!confirmed) return;
-
-            const adminNotes = window.prompt('Optional notes for this override (visible in audit log):') ?? '';
-            if (adminNotes === null) return;
-
-            try {
-                const endpoint = `/admin/invoices/${targetId}/admin-accept`;
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({ admin_notes: adminNotes || null })
-                });
-
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.message || 'Failed to accept invoice');
-                }
-
-                if (window.showToast) {
-                    window.showToast(data.message || 'Invoice accepted on behalf of vendor', 'success');
-                }
-                window.location.reload();
-            } catch (error) {
-                this.invoiceUiError = error.message || 'Failed to accept invoice';
-                if (window.showToast) {
-                    window.showToast(error.message || 'Failed to accept invoice', 'error');
-                }
-            }
-        },
-
-        async loadAvailableDrivers() {
-            this.assignmentForm.loadingDrivers = true;
-            try {
-                const endpoint = new URL(this.config.availableDriversEndpoint, window.location.origin);
-                endpoint.searchParams.set('assignment_type', 'pickup');
-                const response = await fetch(endpoint.toString());
-                const data = await response.json();
-                this.availableDrivers = data.data || data;
-            } catch (error) {
-                console.error('Failed to load available drivers:', error);
-            } finally {
-                this.assignmentForm.loadingDrivers = false;
-            }
-        },
-
-        async loadAvailableWarehouses() {
-            this.assignmentForm.loadingWarehouses = true;
-            try {
-                const response = await fetch(this.config.availableWarehousesEndpoint);
-                const data = await response.json();
-                this.availableWarehouses = data.data || data;
-            } catch (error) {
-                console.error('Failed to load available warehouses:', error);
-            } finally {
-                this.assignmentForm.loadingWarehouses = false;
-            }
-        },
-
-        async loadAssignmentDependencies() {
-            await Promise.all([
-                this.loadAvailableDrivers(),
-                this.loadAvailableWarehouses(),
-            ]);
-        },
-
-        canUnassignCurrentAssignment() {
-            if (!this.assignment) {
-                return false;
-            }
-
-            if (this.assignment.cancelled_at || this.assignment.completed_at || this.assignment.picked_up_at) {
-                return false;
-            }
-
-            return this.assignment.status !== 'cancelled' && this.assignment.status !== 'completed';
-        },
-
-        canReceiveCurrentAssignment() {
-            if (!this.assignment) {
-                return false;
-            }
-
-            if (this.assignment.cancelled_at || this.assignment.received_at) {
-                return false;
-            }
-
-            return Boolean(this.assignment.picked_up_at || this.assignment.completed_at);
-        },
-
-        canEditCurrentAssignment() {
-            if (!this.assignment) {
-                return false;
-            }
-
-            if (this.assignment.cancelled_at || this.assignment.completed_at || this.assignment.picked_up_at) {
-                return false;
-            }
-
-            return !['cancelled', 'completed'].includes(this.assignment.status);
-        },
-
-        canCreatePickupAssignment() {
-            return this.canManage
-                && !this.assignment
-                && ['submitted', 'invoice_accepted'].includes(this.shipment?.status);
         },
 
         canManagePickupAssignment() {
@@ -3735,7 +2998,7 @@ function shipmentShow() {
 
             this.assignment = this.normalizeAssignment(assignment);
 
-            if (['submitted', 'invoice_accepted'].includes(this.shipment?.status)) {
+            if (this.shipment?.status === 'submitted') {
                 this.shipment.status = 'pickup_assigned';
             }
         },
@@ -4012,237 +3275,6 @@ function shipmentShow() {
             return `${value.toFixed(2)} ${currency || 'GHS'}`;
         },
 
-        async loadPayments() {
-            try {
-                const endpoint = this.config.paymentsDataEndpoint;
-                const response = await fetch(endpoint, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    }
-                });
-                const data = await response.json();
-                this.paymentsData = data;
-                this.paymentsLoaded = true;
-            } catch (e) {
-                console.error('Failed to load payments:', e);
-                this.paymentsLoaded = true;
-            }
-        },
-
-        filteredPayments() {
-            let list = this.paymentsData.payments || [];
-            if (this.paymentSearch) {
-                const q = this.paymentSearch.toLowerCase();
-                list = list.filter(p =>
-                    (p.payment_date || '').toLowerCase().includes(q) ||
-                    (p.method_label || '').toLowerCase().includes(q) ||
-                    (p.reference_number || '').toLowerCase().includes(q) ||
-                    (p.recorded_by || '').toLowerCase().includes(q) ||
-                    (p.invoice_number || '').toLowerCase().includes(q) ||
-                    (p.notes || '').toLowerCase().includes(q) ||
-                    String(p.amount).includes(q)
-                );
-            }
-            const dir = this.paymentSortDir === 'asc' ? 1 : -1;
-            const key = this.paymentSortBy;
-            list = [...list].sort((a, b) => {
-                const av = key === 'amount' ? parseFloat(a[key]) : (a[key] || '');
-                const bv = key === 'amount' ? parseFloat(b[key]) : (b[key] || '');
-                if (av < bv) return -1 * dir;
-                if (av > bv) return 1 * dir;
-                return 0;
-            });
-            return list;
-        },
-
-        paginatedPayments() {
-            const all = this.filteredPayments();
-            const start = (this.paymentPage - 1) * this.paymentPerPage;
-            return all.slice(start, start + this.paymentPerPage);
-        },
-
-        paymentLastPage() {
-            return Math.max(1, Math.ceil(this.filteredPayments().length / this.paymentPerPage));
-        },
-
-        sortPayments(column) {
-            if (this.paymentSortBy === column) {
-                this.paymentSortDir = this.paymentSortDir === 'asc' ? 'desc' : 'asc';
-            } else {
-                this.paymentSortBy = column;
-                this.paymentSortDir = 'asc';
-            }
-            this.paymentPage = 1;
-        },
-
-        togglePaymentColumn(key) {
-            this.paymentVisibleColumns[key] = !this.paymentVisibleColumns[key];
-        },
-
-        exportPayments(format) {
-            const data = this.filteredPayments();
-            if (!data.length) { alert('No data to export'); return; }
-
-            const rows = data.map(p => ({
-                'Date': p.payment_date || '',
-                'Amount': p.formatted_amount || p.amount || '',
-                'Method': p.method_label || '',
-                'Reference': p.reference_number || '',
-                'Invoice': p.invoice_number || '',
-                'Recorded By': p.recorded_by || '',
-                'Notes': p.notes || '',
-            }));
-
-            if (format === 'csv') {
-                const headers = Object.keys(rows[0]);
-                const csvContent = [
-                    headers.join(','),
-                    ...rows.map(row =>
-                        headers.map(h => {
-                            let cell = row[h] ?? '';
-                            cell = String(cell).replace(/"/g, '""');
-                            return `"${cell}"`;
-                        }).join(',')
-                    )
-                ].join('\n');
-
-                const blob = new Blob([csvContent], { type: 'text/csv' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = 'shipment-payments.csv';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            }
-        },
-
-        printPayments() {
-            const data = this.filteredPayments();
-            if (!data.length) { alert('No data to print'); return; }
-
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) { alert('Pop-up blocked. Please allow pop-ups to print.'); return; }
-
-            const doc = printWindow.document;
-            const headers = ['Date', 'Amount', 'Method', 'Reference', 'Invoice', 'Recorded By', 'Notes'];
-
-            doc.title = 'Shipment Payments';
-            doc.body.innerHTML = '';
-
-            const style = doc.createElement('style');
-            style.textContent = [
-                'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 20px; }',
-                'h1 { font-size: 24px; margin-bottom: 20px; color: #1e293b; }',
-                'table { width: 100%; border-collapse: collapse; margin-top: 20px; }',
-                'th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; font-size: 12px; }',
-                'th { background-color: #f1f5f9; font-weight: 600; color: #475569; }',
-                'tr:nth-child(even) { background-color: #f8fafc; }',
-            ].join('\n');
-            doc.head.appendChild(style);
-
-            const title = doc.createElement('h1');
-            title.textContent = 'Shipment Payments — ' + (this.shipment?.tracking_number || '');
-            doc.body.appendChild(title);
-
-            const meta = doc.createElement('p');
-            meta.style.color = '#64748b';
-            meta.style.fontSize = '14px';
-            meta.style.marginBottom = '20px';
-            meta.textContent = 'Generated on ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            doc.body.appendChild(meta);
-
-            const table = doc.createElement('table');
-            const thead = doc.createElement('thead');
-            const headRow = doc.createElement('tr');
-            headers.forEach(h => { const th = doc.createElement('th'); th.textContent = h; headRow.appendChild(th); });
-            thead.appendChild(headRow);
-            table.appendChild(thead);
-
-            const tbody = doc.createElement('tbody');
-            data.forEach(p => {
-                const tr = doc.createElement('tr');
-                ['GHS ' + (p.formatted_amount || p.amount), p.method_label, p.reference_number || '—', p.invoice_number || '—', p.recorded_by || '—', p.notes || '—'].forEach((val, i) => {
-                    const td = doc.createElement('td');
-                    td.textContent = i === 0 ? p.payment_date : val;
-                    tr.appendChild(td);
-                });
-                // Fix: first column is date, then amount with currency
-                tr.innerHTML = '';
-                [p.payment_date, 'GHS ' + (p.formatted_amount || p.amount), p.method_label, p.reference_number || '—', p.invoice_number || '—', p.recorded_by || '—', p.notes || '—'].forEach(val => {
-                    const td = doc.createElement('td');
-                    td.textContent = val || '—';
-                    tr.appendChild(td);
-                });
-                tbody.appendChild(tr);
-            });
-            table.appendChild(tbody);
-            doc.body.appendChild(table);
-
-            setTimeout(() => printWindow.print(), 250);
-        },
-
-        async submitPayment() {
-            this.paymentForm.submitting = true;
-            try {
-                const endpoint = this.config.storePaymentEndpoint;
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({
-                        amount: this.paymentForm.amount,
-                        payment_method: this.paymentForm.payment_method,
-                        reference_number: this.paymentForm.reference_number || null,
-                        notes: this.paymentForm.notes || null,
-                        payment_date: this.paymentForm.payment_date,
-                    })
-                });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.message || 'Failed to record payment');
-                if (window.showToast) window.showToast(data.message || 'Payment recorded', 'success');
-                this.paymentForm = { open: false, submitting: false, amount: '', payment_method: '', reference_number: '', notes: '', payment_date: '' };
-                await this.loadPayments();
-            } catch (e) {
-                console.error('Failed to record payment:', e);
-                if (window.showToast) window.showToast(e.message || 'Failed to record payment', 'error');
-            } finally {
-                this.paymentForm.submitting = false;
-            }
-        },
-
-        voidPayment(paymentId) {
-            this.voidConfirm.paymentId = paymentId;
-            this.voidConfirm.open = true;
-        },
-
-        async confirmVoidPayment() {
-            this.voidConfirm.loading = true;
-            try {
-                const endpoint = (this.config.destroyPaymentEndpointTemplate || '').replace('__PAYMENT__', this.voidConfirm.paymentId);
-                const response = await fetch(endpoint, {
-                    method: 'DELETE',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    }
-                });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.message || 'Failed to void payment');
-                this.voidConfirm = { open: false, paymentId: null, loading: false };
-                if (window.showToast) window.showToast(data.message || 'Payment voided', 'success');
-                await this.loadPayments();
-            } catch (e) {
-                console.error('Failed to void payment:', e);
-                if (window.showToast) window.showToast(e.message || 'Failed to void payment', 'error');
-                this.voidConfirm.loading = false;
-            }
-        }
     };
 }
 
