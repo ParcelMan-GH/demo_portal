@@ -1227,7 +1227,7 @@ function shipmentShow() {
 
         quantityDifferenceLabel() {
             const difference = this.quantityDifference();
-            if (difference === null) return 'Waiting for counts';
+            if (difference === null) return 'Awaiting count';
             if (difference === 0) return 'Balanced';
             return difference > 0 ? 'Excess recorded' : 'Shortage recorded';
         },

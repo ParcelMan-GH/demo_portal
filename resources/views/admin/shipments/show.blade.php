@@ -180,7 +180,7 @@ $shipmentConfig = [
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2 sm:gap-3 lg:ml-auto lg:w-[560px] lg:shrink-0 2xl:w-[620px]">
+                <div class="grid grid-cols-2 gap-2 sm:gap-3 lg:ml-auto lg:w-[760px] lg:shrink-0 lg:grid-cols-4 2xl:w-[880px]">
                     <div class="rounded-2xl border border-white/10 bg-white/10 p-3 sm:p-4">
                         <div class="flex items-center gap-2 sm:gap-3">
                             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-500/20 text-orange-300 sm:h-9 sm:w-9">
@@ -189,8 +189,8 @@ $shipmentConfig = [
                                 </svg>
                             </span>
                             <div class="min-w-0">
-                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg" x-text="receivingDeclaredQuantity() + ' Declared'">{{ number_format($shipment->vendor_declared_quantity ?: $itemsCount) }} Declared</p>
-                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs"><span x-text="receivingReceivedUnits()">0</span> received at warehouse</p>
+                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg" x-text="formatQuantityValue(quantityVendorDeclared())">{{ number_format($shipment->vendor_declared_quantity ?: $itemsCount) }}</p>
+                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs">Vendor declared</p>
                             </div>
                         </div>
                     </div>
@@ -203,8 +203,36 @@ $shipmentConfig = [
                                 </svg>
                             </span>
                             <div class="min-w-0">
-                                <p class="truncate text-[15px] font-black leading-tight text-white sm:text-lg" x-text="assignment ? assignmentDriverName() : 'No Rider'">{{ $currentAssignment?->driver?->name ?? 'No Rider' }}</p>
-                                <p class="mt-1 truncate text-[11px] font-bold leading-snug text-slate-400 sm:text-xs">{{ $pickupSummary }}</p>
+                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg" x-text="formatQuantityValue(quantityDriverPicked())"></p>
+                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs" x-text="quantityDriverPicked() === null ? 'Rider pending' : 'Rider picked'"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-3 sm:p-4">
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300 sm:h-9 sm:w-9">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg" x-text="formatQuantityValue(quantityWarehouseReceived())"></p>
+                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs" x-text="quantityWarehouseReceived() === null ? 'Warehouse pending' : 'Warehouse received'"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-white/10 bg-white/10 p-3 sm:p-4">
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-500/20 text-rose-300 sm:h-9 sm:w-9">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 9v3.75m0 3.75h.008M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+                                </svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg" x-text="formatSignedQuantity(quantityDifference())"></p>
+                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs" x-text="quantityDifferenceLabel()"></p>
                             </div>
                         </div>
                     </div>
@@ -2476,48 +2504,6 @@ $shipmentConfig = [
             <!-- RECEIVING TAB                           -->
             <!-- ═══════════════════════════════════════ -->
             <div x-show="activeTab === 'receiving'" x-cloak>
-                <section class="mb-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="flex items-start gap-3">
-                            <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 7h6M9 12h6M9 17h4M5 5.5A2.5 2.5 0 017.5 3h9A2.5 2.5 0 0119 5.5v13A2.5 2.5 0 0116.5 21h-9A2.5 2.5 0 015 18.5v-13Z"/>
-                                </svg>
-                            </span>
-                            <div>
-                                <h3 class="text-base font-black text-slate-950">Quantity Reconciliation</h3>
-                                <p class="mt-0.5 text-sm font-medium text-slate-500">Compare vendor, rider, and warehouse counts for this shipment.</p>
-                            </div>
-                        </div>
-                        <span class="inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-black"
-                              :class="quantityDifferenceTone()"
-                              x-text="quantityDifferenceLabel()"></span>
-                    </div>
-
-                    <div class="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-4">
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                            <p class="text-[11px] font-black uppercase tracking-wide text-slate-400">Vendor declared total</p>
-                            <p class="mt-2 text-3xl font-black leading-none text-slate-950" x-text="formatQuantityValue(quantityVendorDeclared())"></p>
-                            <p class="mt-1 text-xs font-bold text-slate-500">Entered by vendor</p>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                            <p class="text-[11px] font-black uppercase tracking-wide text-slate-400">Rider picked total</p>
-                            <p class="mt-2 text-3xl font-black leading-none text-slate-950" x-text="formatQuantityValue(quantityDriverPicked())"></p>
-                            <p class="mt-1 text-xs font-bold text-slate-500" x-text="quantityDriverPicked() === null ? 'Waiting for pickup' : 'Recorded at pickup'"></p>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                            <p class="text-[11px] font-black uppercase tracking-wide text-slate-400">Warehouse received total</p>
-                            <p class="mt-2 text-3xl font-black leading-none text-slate-950" x-text="formatQuantityValue(quantityWarehouseReceived())"></p>
-                            <p class="mt-1 text-xs font-bold text-slate-500" x-text="quantityWarehouseReceived() === null ? 'Waiting for receiving' : 'Saved at warehouse'"></p>
-                        </div>
-                        <div class="rounded-2xl border px-4 py-3" :class="quantityDifferenceCardClass()">
-                            <p class="text-[11px] font-black uppercase tracking-wide" :class="quantityDifferenceTextClass()">Difference / discrepancy</p>
-                            <p class="mt-2 text-3xl font-black leading-none" :class="quantityDifferenceValueClass()" x-text="formatSignedQuantity(quantityDifference())"></p>
-                            <p class="mt-1 text-xs font-bold" :class="quantityDifferenceTextClass()" x-text="quantityDifferenceHelpText()"></p>
-                        </div>
-                    </div>
-                </section>
-
                 @include('shared.receiving.workspace', [
                     'packagesExpr' => 'receiving.packages',
                     'showPackageToolbar' => true,
