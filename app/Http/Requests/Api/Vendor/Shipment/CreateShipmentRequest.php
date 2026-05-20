@@ -55,6 +55,7 @@ class CreateShipmentRequest extends FormRequest
 
             // Sender notes
             'sender_notes' => ['nullable', 'string', 'max:2000'],
+            'vendor_declared_quantity' => ['nullable', 'integer', 'min:1'],
 
             // Inline items — at least one item with at least one image
             'items' => ['required', 'array', 'min:1'],

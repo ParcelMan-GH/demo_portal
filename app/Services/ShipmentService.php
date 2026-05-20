@@ -188,6 +188,7 @@ class ShipmentService
             'pickupAssignment.receivedWarehouse',
             'pickupAssignment.itemConfirmations',
             'pickupAssignment.photos',
+            'pickupAssignment.warehouseReceipt.items',
             'charges',
         ]);
 
@@ -374,6 +375,9 @@ class ShipmentService
             'pickup_landmark' => $data['pickup_landmark'] ?? $shipment?->pickup_landmark,
             'pickup_instructions' => $data['pickup_instructions'] ?? $shipment?->pickup_instructions,
             'sender_notes' => $data['sender_notes'] ?? $shipment?->sender_notes,
+            'vendor_declared_quantity' => array_key_exists('vendor_declared_quantity', $data)
+                ? $data['vendor_declared_quantity']
+                : ($shipment?->vendor_declared_quantity ?? null),
         ];
 
         if ($mode === ShipmentDestinationMode::SINGLE->value) {
@@ -430,6 +434,16 @@ class ShipmentService
         $pickupAssignment = $shipment->relationLoaded('pickupAssignment')
             ? $shipment->pickupAssignment
             : null;
+
+        $vendorDeclaredQuantity = (int) (
+            $shipment->vendor_declared_quantity
+            ?? ($shipment->relationLoaded('items') ? $shipment->items->sum('quantity') : 0)
+        );
+        $driverPickedQuantity = $pickupAssignment?->driver_picked_quantity;
+        $warehouseReceivedQuantity = null;
+        if ($pickupAssignment?->relationLoaded('warehouseReceipt') && $pickupAssignment->warehouseReceipt?->relationLoaded('items')) {
+            $warehouseReceivedQuantity = (int) $pickupAssignment->warehouseReceipt->items->sum('received_quantity');
+        }
 
         $confirmationsByItemId = [];
         $pickupPhotosByItemId = [];
@@ -557,6 +571,18 @@ class ShipmentService
             'fulfillment_type' => $shipment->fulfillment_type?->value ?? null,
             'destination_mode' => $shipment->destination_mode->value,
             'sender_notes' => $shipment->sender_notes,
+            'vendor_declared_quantity' => $vendorDeclaredQuantity,
+            'driver_picked_quantity' => is_null($driverPickedQuantity) ? null : (int) $driverPickedQuantity,
+            'warehouse_received_quantity' => $warehouseReceivedQuantity,
+            'quantity_discrepancy' => [
+                'vendor_vs_driver' => is_null($driverPickedQuantity) ? null : (int) $driverPickedQuantity - $vendorDeclaredQuantity,
+                'driver_vs_warehouse' => is_null($driverPickedQuantity) || is_null($warehouseReceivedQuantity)
+                    ? null
+                    : $warehouseReceivedQuantity - (int) $driverPickedQuantity,
+                'vendor_vs_warehouse' => is_null($warehouseReceivedQuantity)
+                    ? null
+                    : $warehouseReceivedQuantity - $vendorDeclaredQuantity,
+            ],
         ];
 
         if ($includeLegacyDeliveryAliases) {

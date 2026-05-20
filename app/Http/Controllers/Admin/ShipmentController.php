@@ -2557,6 +2557,16 @@ class ShipmentController extends Controller
         $this->ensureTrackingCodeForReceivingPackage($shipment, $item, $assignment, $receiptItem);
 
         $driverConfirmation = $assignment?->itemConfirmations?->firstWhere('shipment_item_id', $item->id);
+        $vendorDeclaredQuantity = (int) (
+            $shipment->vendor_declared_quantity
+            ?? ($shipment->relationLoaded('items') ? $shipment->items->sum('quantity') : $shipment->items()->sum('quantity'))
+        );
+        $driverPickedQuantity = $assignment && !is_null($assignment->driver_picked_quantity)
+            ? (int) $assignment->driver_picked_quantity
+            : null;
+        $warehouseReceivedQuantity = $assignment?->warehouseReceipt?->items
+            ? (int) $assignment->warehouseReceipt->items->sum('received_quantity')
+            : null;
         $driverPhotos = $assignment
             ? $assignment->photos
                 ->where('shipment_item_id', $item->id)
@@ -2584,6 +2594,9 @@ class ShipmentController extends Controller
             'tracking_code' => $item->tracking_code,
             'item_status' => $item->status?->value ?? $item->getRawOriginal('status'),
             'vendor_quantity' => (int) $item->quantity,
+            'vendor_declared_quantity' => $vendorDeclaredQuantity,
+            'driver_picked_quantity' => $driverPickedQuantity,
+            'warehouse_received_quantity' => $warehouseReceivedQuantity,
             'driver_confirmed_quantity' => $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : null,
             'expected_quantity' => $driverConfirmation ? (int) $driverConfirmation->confirmed_quantity : (int) $item->quantity,
             'vendor_photos' => $vendorPhotos,
@@ -2649,6 +2662,18 @@ class ShipmentController extends Controller
                 'created_at' => $shipment->created_at?->toIso8601String(),
                 'vendor_name' => $shipment->vendor?->business_name ?: $shipment->vendor?->name,
                 'vendor_phone' => $shipment->vendor?->phone,
+            ],
+            'shipment_totals' => [
+                'vendor_declared' => (int) (
+                    $shipment->vendor_declared_quantity
+                    ?? ($shipment->relationLoaded('items') ? $shipment->items->sum('quantity') : $shipment->items()->sum('quantity'))
+                ),
+                'driver_picked' => $assignment && !is_null($assignment->driver_picked_quantity)
+                    ? (int) $assignment->driver_picked_quantity
+                    : null,
+                'warehouse_received' => $assignment?->warehouseReceipt?->items
+                    ? (int) $assignment->warehouseReceipt->items->sum('received_quantity')
+                    : null,
             ],
             'quantities' => [
                 'vendor_submitted' => (int) $item->quantity,

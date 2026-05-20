@@ -154,6 +154,8 @@ class ReceiptController extends AdminShipmentController
                     'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
                     'fulfillment_type' => $item->fulfillment_type?->value ?? $item->shipment?->fulfillment_type?->value ?? 'warehouse',
                     'vendor_quantity' => $vendorQuantity,
+                    'vendor_declared_quantity' => (int) ($item->shipment?->vendor_declared_quantity ?? $vendorQuantity),
+                    'driver_picked_quantity' => $pickupAssignment && !is_null($pickupAssignment->driver_picked_quantity) ? (int) $pickupAssignment->driver_picked_quantity : null,
                     'driver_confirmed_quantity' => $driverQuantity,
                     'driver_qty_matches_vendor' => $driverQuantity !== null
                         ? $driverQuantity === $vendorQuantity
@@ -764,6 +766,8 @@ class ReceiptController extends AdminShipmentController
                     'delivery_method'             => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
                     'fulfillment_type'            => $item->fulfillment_type?->value ?? $item->shipment?->fulfillment_type?->value ?? 'warehouse',
                     'vendor_quantity'             => $vendorQuantity,
+                    'vendor_declared_quantity'    => (int) ($item->shipment?->vendor_declared_quantity ?? $vendorQuantity),
+                    'driver_picked_quantity'      => $pickupAssignment && !is_null($pickupAssignment->driver_picked_quantity) ? (int) $pickupAssignment->driver_picked_quantity : null,
                     'driver_confirmed_quantity'   => $driverQuantity,
                     'driver_qty_matches_vendor'   => $driverQuantity !== null ? $driverQuantity === $vendorQuantity : null,
                     'vendor_photos'               => $vendorPhotos,
@@ -1040,6 +1044,8 @@ class ReceiptController extends AdminShipmentController
                 'delivery_method' => $item->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
                 'fulfillment_type' => $item->fulfillment_type?->value ?? $shipment->fulfillment_type?->value ?? 'warehouse',
                 'vendor_quantity' => $vendorQuantity,
+                'vendor_declared_quantity' => (int) ($shipment->vendor_declared_quantity ?? $vendorQuantity),
+                'driver_picked_quantity' => $pickupAssignment && !is_null($pickupAssignment->driver_picked_quantity) ? (int) $pickupAssignment->driver_picked_quantity : null,
                 'driver_confirmed_quantity' => $driverQuantity,
                 'driver_qty_matches_vendor' => $driverQuantity !== null ? $driverQuantity === $vendorQuantity : null,
                 'vendor_photos' => $vendorPhotos,

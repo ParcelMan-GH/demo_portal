@@ -33,6 +33,7 @@ class PickupAssignment extends Model
         'cancellation_reason',
         'pickup_latitude',
         'pickup_longitude',
+        'driver_picked_quantity',
         'notes',
     ];
 
@@ -48,6 +49,7 @@ class PickupAssignment extends Model
         'cancelled_at' => 'datetime',
         'pickup_latitude' => 'decimal:8',
         'pickup_longitude' => 'decimal:8',
+        'driver_picked_quantity' => 'integer',
     ];
 
     public function shipment(): BelongsTo

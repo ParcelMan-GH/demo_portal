@@ -845,6 +845,7 @@ function driverPickupShowPage() {
                     method: 'POST',
                     role: 'driver',
                     data: {
+                        driver_picked_quantity: Number(this.pickup?.shipment?.vendor_declared_quantity ?? 0),
                         latitude,
                         longitude,
                         notes: String(this.finalizeForm.notes || '').trim() || null,

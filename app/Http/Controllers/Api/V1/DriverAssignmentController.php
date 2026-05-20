@@ -349,6 +349,7 @@ class DriverAssignmentController extends Controller
         }
 
         $validated = $request->validate([
+            'driver_picked_quantity' => ['required', 'integer', 'min:0'],
             'latitude' => ['nullable', 'required_with:longitude', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'required_with:latitude', 'numeric', 'between:-180,180'],
             'notes' => ['nullable', 'string'],
@@ -356,6 +357,7 @@ class DriverAssignmentController extends Controller
 
         $result = $this->pickupAssignmentService->finalizePickup(
             $assignment,
+            (int) $validated['driver_picked_quantity'],
             $validated['latitude'] ?? null,
             $validated['longitude'] ?? null,
             $validated['notes'] ?? null
@@ -474,6 +476,7 @@ class DriverAssignmentController extends Controller
             'direct_delivery' => $directDelivery,
             'cancellation_reason' => $assignment->cancellation_reason,
             'notes' => $assignment->notes,
+            'driver_picked_quantity' => is_null($assignment->driver_picked_quantity) ? null : (int) $assignment->driver_picked_quantity,
             'pickup_latitude' => $assignment->pickup_latitude,
             'pickup_longitude' => $assignment->pickup_longitude,
             'timeline' => $this->buildPickupTimeline($assignment),
@@ -511,6 +514,13 @@ class DriverAssignmentController extends Controller
             'shipment_number' => $shipment->shipment_number,
             'status' => $shipment->status->value,
             'vendor_name' => $shipment->vendor?->name,
+            'vendor_declared_quantity' => (int) (
+                $shipment->vendor_declared_quantity
+                ?? ($shipment->relationLoaded('items') ? $shipment->items->sum('quantity') : 0)
+            ),
+            'driver_picked_quantity' => $assignment && !is_null($assignment->driver_picked_quantity)
+                ? (int) $assignment->driver_picked_quantity
+                : null,
             'pickup' => [
                 'contact_name' => $shipment->pickup_contact_name,
                 'contact_phone' => $shipment->pickup_contact_phone,

@@ -32,6 +32,7 @@ class UpdateShipmentRequest extends FormRequest
                 'destination_mode' => ['sometimes', 'string', Rule::in($modes)],
                 'pickup_town' => ['sometimes', 'nullable', 'string', 'max:255'],
                 'sender_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
+                'vendor_declared_quantity' => ['sometimes', 'nullable', 'integer', 'min:1'],
                 'new_photos' => ['sometimes', 'array'],
                 'new_photos.*' => ['file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
                 'new_photos_phones' => ['nullable', 'array'],
@@ -72,6 +73,7 @@ class UpdateShipmentRequest extends FormRequest
             'delivery_instructions' => ['nullable', 'string', 'max:1000'],
 
             'sender_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'vendor_declared_quantity' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ];
     }
 

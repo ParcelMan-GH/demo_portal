@@ -188,8 +188,8 @@ $shipmentConfig = [
                                 </svg>
                             </span>
                             <div class="min-w-0">
-                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg" x-text="receivingPackageCount() + ' Packages'">{{ number_format($itemsCount) }} Packages</p>
-                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs"><span x-text="receivingReceivedUnits()">0</span> received</p>
+                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg" x-text="receivingDeclaredQuantity() + ' Declared'">{{ number_format($shipment->vendor_declared_quantity ?: $itemsCount) }} Declared</p>
+                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs"><span x-text="receivingReceivedUnits()">0</span> received at warehouse</p>
                             </div>
                         </div>
                     </div>

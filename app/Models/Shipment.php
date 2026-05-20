@@ -55,6 +55,7 @@ class Shipment extends Model
         'delivery_instructions',
         'delivery_preference',
         'sender_notes',
+        'vendor_declared_quantity',
         'submitted_at',
         'cancelled_at',
         'cancellation_reason',
@@ -74,6 +75,7 @@ class Shipment extends Model
         'pickup_longitude' => 'decimal:8',
         'delivery_latitude' => 'decimal:8',
         'delivery_longitude' => 'decimal:8',
+        'vendor_declared_quantity' => 'integer',
         'submitted_at' => 'datetime',
         'cancelled_at' => 'datetime',
     ];

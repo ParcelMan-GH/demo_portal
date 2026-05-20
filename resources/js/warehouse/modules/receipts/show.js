@@ -319,6 +319,18 @@ function registerWarehouseReceiptShowPage() {
             return this.items.length;
         },
 
+        receivingDeclaredQuantity() {
+            const firstDeclared = Number(this.items?.[0]?.vendor_declared_quantity ?? 0);
+            if (Number.isFinite(firstDeclared) && firstDeclared > 0) {
+                return firstDeclared;
+            }
+
+            return this.items.reduce((total, item) => {
+                const quantity = Number(item?.vendor_quantity ?? 0);
+                return total + (Number.isFinite(quantity) ? quantity : 0);
+            }, 0);
+        },
+
         receivingReceivedPackageCount() {
             return this.items.filter((item) => this.receivingPackageIsReceived(item)).length;
         },

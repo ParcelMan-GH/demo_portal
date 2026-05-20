@@ -152,8 +152,8 @@
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                             </span>
                             <div class="min-w-0">
-                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg"><span x-text="receivingPackageCount()">{{ number_format($items->count()) }}</span> packages</p>
-                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs"><span x-text="receivingReceivedPackageCount()">0</span> received</p>
+                                <p class="whitespace-nowrap text-[15px] font-black leading-tight text-white sm:text-lg"><span x-text="receivingDeclaredQuantity()">{{ number_format($items->first()?->shipment?->vendor_declared_quantity ?: $items->sum('quantity')) }}</span> declared</p>
+                                <p class="mt-1 text-[11px] font-bold leading-snug text-slate-400 sm:text-xs"><span x-text="receivingReceivedUnits()">0</span> received at warehouse</p>
                             </div>
                         </div>
                     </div>

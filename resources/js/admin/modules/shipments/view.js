@@ -1114,6 +1114,18 @@ function shipmentShow() {
             return (Number.isFinite(received) ? received : 0) + (Number.isFinite(damaged) ? damaged : 0);
         },
 
+        receivingDeclaredQuantity() {
+            const declared = Number(this.shipment?.vendor_declared_quantity ?? 0);
+            if (Number.isFinite(declared) && declared > 0) {
+                return declared;
+            }
+
+            return (this.receiving.packages || this.shipment?.items || []).reduce((total, item) => {
+                const quantity = Number(item?.vendor_quantity ?? item?.quantity ?? 0);
+                return total + (Number.isFinite(quantity) ? quantity : 0);
+            }, 0);
+        },
+
 	        receivingPackageCount() {
 	            if (Array.isArray(this.receiving.packages) && this.receiving.packages.length > 0) {
 	                return this.receiving.packages.length;

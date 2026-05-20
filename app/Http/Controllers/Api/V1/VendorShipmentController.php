@@ -144,6 +144,11 @@ class VendorShipmentController extends Controller
         $itemsData = $validated['items'] ?? [];
         unset($validated['items']);
 
+        if (empty($validated['vendor_declared_quantity'])) {
+            $validated['vendor_declared_quantity'] = collect($itemsData)
+                ->sum(fn (array $item) => (int) ($item['quantity'] ?? 1));
+        }
+
         // Create shipment
         $result = $this->shipmentService->create($vendor, $validated, $request);
 

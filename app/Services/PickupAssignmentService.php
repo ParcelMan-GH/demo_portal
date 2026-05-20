@@ -499,6 +499,7 @@ class PickupAssignmentService
 
     public function finalizePickup(
         PickupAssignment $assignment,
+        int $driverPickedQuantity,
         ?float $lat = null,
         ?float $lng = null,
         ?string $notes = null
@@ -508,6 +509,13 @@ class PickupAssignmentService
             return [
                 'success' => false,
                 'message' => 'Driver must have arrived to finalize pickup.',
+            ];
+        }
+
+        if ($driverPickedQuantity < 0) {
+            return [
+                'success' => false,
+                'message' => 'Picked quantity must be zero or greater.',
             ];
         }
 
@@ -524,32 +532,12 @@ class PickupAssignmentService
             ->get()
             ->keyBy('shipment_item_id');
 
-        foreach ($shipmentItems as $shipmentItemId => $item) {
-            if (!$confirmations->has($shipmentItemId)) {
-                return [
-                    'success' => false,
-                    'message' => 'All shipment items must be confirmed before finalizing pickup.',
-                ];
-            }
-
-            $photoCount = PickupPhoto::query()
-                ->where('pickup_assignment_id', $assignment->id)
-                ->where('shipment_item_id', $shipmentItemId)
-                ->count();
-
-            if ($photoCount < 1) {
-                return [
-                    'success' => false,
-                    'message' => 'Each confirmed item must include at least one photo before finalizing pickup.',
-                ];
-            }
-        }
-
-        return DB::transaction(function () use ($assignment, $shipmentItems, $confirmations, $lat, $lng, $notes) {
+        return DB::transaction(function () use ($assignment, $shipmentItems, $confirmations, $driverPickedQuantity, $lat, $lng, $notes) {
             $pickedUpAt = now();
 
             $payload = [
                 'status' => PickupAssignmentStatus::COMPLETED,
+                'driver_picked_quantity' => $driverPickedQuantity,
                 'picked_up_at' => $pickedUpAt,
                 'completed_at' => $pickedUpAt,
             ];
@@ -576,14 +564,25 @@ class PickupAssignmentService
                 $pickedUpAt,
                 $pickupLocation,
                 $assignment,
-                $confirmations
+                &$confirmations
             ) {
                 $item->update(['status' => ItemStatus::PICKED_UP]);
 
                 $confirmation = $confirmations->get($item->id);
+                if (!$confirmation) {
+                    $confirmation = PickupItemConfirmation::query()->create([
+                        'pickup_assignment_id' => $assignment->id,
+                        'shipment_item_id' => $item->id,
+                        'expected_quantity' => (int) $item->quantity,
+                        'confirmed_quantity' => (int) $item->quantity,
+                        'notes' => 'Auto-confirmed when rider recorded shipment-level pickup quantity.',
+                        'confirmed_at' => $pickedUpAt,
+                    ]);
+                    $confirmations->put($item->id, $confirmation);
+                }
                 $confirmed = (int) ($confirmation?->confirmed_quantity ?? 0);
                 $expected = (int) $item->quantity;
-                $baseNote = "Driver confirmed pickup quantity {$confirmed}/{$expected}.";
+                $baseNote = "Driver recorded shipment pickup total {$assignment->driver_picked_quantity}. Line reference {$confirmed}/{$expected}.";
                 $extraNote = $confirmation?->notes;
 
                 ShipmentItemTracking::create([
