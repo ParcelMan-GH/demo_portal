@@ -1822,6 +1822,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                     'finalizeLabelExpr' => 'finalizeReceivingButtonLabel()',
                     'finalizeSubtitle' => 'Mark all packages as received and move shipment to warehouse status.',
                     'showPickupFee' => false,
+                    'showDropOffSelect' => false,
                 ])
 
                 <div class="hidden">

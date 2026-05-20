@@ -49,18 +49,13 @@
                     Add Package
                 </button>
                 <button type="button"
+                        x-show="receiving.canAutoGroup || receiving.autoGrouping"
                         @@click="autoGroupReceivingPackagesByPhone()"
-                        :disabled="receiving.autoGrouping || !receiving.canAutoGroup"
+                        :disabled="receiving.autoGrouping"
                         class="inline-flex h-10 items-center gap-2 rounded-xl border border-orange-100 bg-orange-50 px-4 text-sm font-black text-orange-700 shadow-sm transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50">
                     <svg x-show="!receiving.autoGrouping" class="h-4 w-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                     <svg x-show="receiving.autoGrouping" class="h-4 w-4 animate-spin text-orange-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <span x-text="receiving.autoGrouping ? 'Grouping...' : 'Auto-group by Phone'"></span>
-                </button>
-                <button type="button"
-                        @@click="loadReceiving()"
-                        class="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
-                    <svg class="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    Refresh
                 </button>
                 @if($showFinalize)
                     <button @@click="{{ $finalizeClick }}" :disabled="{{ $finalizeDisabled }}"
@@ -68,6 +63,13 @@
                         <span x-text="{{ $finalizeLabelExpr }}"></span>
                     </button>
                 @endif
+                <button type="button"
+                        @@click="loadReceiving()"
+                        title="Refresh"
+                        aria-label="Refresh packages"
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    <svg class="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
             </div>
         @endif
     </div>
@@ -205,7 +207,7 @@
                     <th class="px-4 py-3 text-[10px] font-black uppercase tracking-wide text-slate-500">Recipient</th>
                     <th class="px-4 py-3 text-[10px] font-black uppercase tracking-wide text-slate-500">Delivery Method</th>
                     <th class="px-4 py-3 text-[10px] font-black uppercase tracking-wide text-slate-500">Custody</th>
-                    <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-wide text-slate-500">Actions</th>
+                    <th class="w-[360px] px-4 py-3 text-right text-[10px] font-black uppercase tracking-wide text-slate-500">Actions</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 bg-white">
@@ -309,37 +311,37 @@
                                 </span>
                             </button>
                         </td>
-                        <td class="px-4 py-4 text-right">
-                            <div class="flex flex-col items-end gap-1.5">
+                        <td class="w-[360px] px-4 py-4 text-right">
+                            <div class="flex flex-nowrap items-center justify-end gap-2">
                                 <button type="button"
                                         @@click="{{ $receiveClick }}"
-                                        class="inline-flex items-center gap-1 rounded-xl bg-orange-600 px-3 py-2 text-[11px] font-black text-white shadow-sm shadow-orange-500/20 transition hover:bg-orange-700">
+                                        class="inline-flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-xl bg-orange-600 px-3 text-[11px] font-black text-white shadow-sm shadow-orange-500/20 transition hover:bg-orange-700">
                                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.5 7.125L16.875 4.5"/></svg>
                                     <span x-text="receivingPackageActionLabel(pkg)"></span>
                                 </button>
                                 <button type="button"
                                         @@click="{{ $photosClick }}"
-                                        class="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
+                                        class="inline-flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
                                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6.827 6.175A2.31 2.31 0 019.186 4.5h5.628a2.31 2.31 0 012.36 1.675l.365 1.286A1.875 1.875 0 0019.342 8.8H20.25A2.25 2.25 0 0122.5 11.05v6.2a2.25 2.25 0 01-2.25 2.25H3.75a2.25 2.25 0 01-2.25-2.25v-6.2A2.25 2.25 0 013.75 8.8h.908a1.875 1.875 0 001.803-1.339l.366-1.286z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 13.5a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                    View Photos
+                                    Photos
                                 </button>
                                     @if($showSplitControls)
 	                                        <button type="button"
 	                                                x-show="{{ $splitVisibleExpr }}"
 	                                                @@click="openReceivingSplitModal(pkg)"
 	                                                :disabled="!pkg.can_split || (pkg.vendor_photos || []).length < 2"
-	                                            class="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-black transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+	                                            class="inline-flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border px-3 text-[11px] font-black transition-colors disabled:cursor-not-allowed disabled:opacity-40"
 	                                            :class="{{ $splitVisibleExpr }} ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950' : 'border-slate-100 bg-slate-50 text-slate-400'"
 	                                            style="display:none">
 	                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.047 1.124-.047s.751.016 1.124.047c1.131.094 1.976 1.057 1.976 2.192V7.5M8.25 7.5h7.5M8.25 7.5l-.621 8.696A2.25 2.25 0 009.873 18.6h4.254a2.25 2.25 0 002.244-2.404L15.75 7.5"/></svg>
-	                                            Split Photos
+	                                            Split
 	                                        </button>
                                     @endif
                                     @if($showRemoveControls)
                                         <button type="button"
                                                 @@click="removeReceivingPackage(pkg)"
                                                 :disabled="!pkg.can_delete"
-                                            class="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-black transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                                            class="inline-flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border px-3 text-[11px] font-black transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                                             :class="pkg.can_delete ? 'border-rose-100 bg-white text-rose-700 hover:bg-rose-50 hover:text-rose-900' : 'border-slate-100 bg-slate-50 text-slate-400'">
                                         <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12"/></svg>
                                         Remove
@@ -348,9 +350,9 @@
                                 <div x-show="receivingPackageIsReceived(pkg)" class="inline-flex" style="display:none">
                                     <button type="button"
                                             @@click="{{ $printClick }}"
-                                            class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950">
+                                            class="inline-flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950">
                                         <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6.75 7.5V6A2.25 2.25 0 019 3.75h6A2.25 2.25 0 0117.25 6v1.5m-10.5 0h10.5m-10.5 0A2.25 2.25 0 004.5 9.75v3A2.25 2.25 0 006.75 15h.75m9.75-7.5A2.25 2.25 0 0119.5 9.75v3A2.25 2.25 0 0117.25 15h-.75m-9 0v5.25h9V15m-9 0h9"/></svg>
-                                        Print Labels
+                                        Print
                                     </button>
                                 </div>
                             </div>

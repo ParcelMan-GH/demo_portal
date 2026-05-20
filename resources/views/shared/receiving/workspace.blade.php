@@ -42,20 +42,36 @@
     <template x-if="!{{ $loadingExpr }}">
         <div class="space-y-6">
             <section class="grid gap-4 lg:grid-cols-2">
-                <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-300/25">
-                    <div class="border-b border-orange-100 bg-orange-50 px-4 py-4 sm:px-5">
-                        <div class="flex items-start justify-between gap-3">
+                <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-lg shadow-slate-300/20 sm:p-5">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div class="flex min-w-0 items-start gap-3">
-                                <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-orange-600 shadow-sm ring-1 ring-orange-100">
+                                <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
                                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 6.75V15m0 0l-2.25-2.25M9 15l2.25-2.25M15 6.75h.01M18.25 17.25V6.75A2.25 2.25 0 0 0 16 4.5H8a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 8 19.5h8a2.25 2.25 0 0 0 2.25-2.25Z"/></svg>
                                 </span>
                                 <div class="min-w-0">
-                                    <h3 class="text-base font-black text-slate-950">Pickup Details</h3>
-                                    <p class="mt-0.5 text-sm font-medium text-slate-500">Pickup contact, rider, and warehouse handoff summary.</p>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 class="text-sm font-black uppercase tracking-[0.12em] text-slate-500">Pickup</h3>
+                                        @if(!$showPickupActions && $pickupBadgeLabel)
+                                            <span class="inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide {{ $pickupBadgeClasses }}">
+                                                {{ $pickupBadgeLabel }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <p class="mt-1 text-sm font-black text-slate-950">
+                                        <span x-text="pickupLocationSummary()"></span>
+                                        <span x-show="shipment.pickup_landmark" class="text-slate-500" x-text="' - ' + shipment.pickup_landmark"></span>
+                                    </p>
+                                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-slate-500">
+                                        <span>Rider: <strong class="font-black text-slate-800" x-text="assignment ? assignmentDriverName() : 'Unassigned'"></strong></span>
+                                        <span x-show="assignmentDriverPhone()" class="hidden h-1 w-1 rounded-full bg-slate-300 sm:inline-flex"></span>
+                                        <span x-show="assignmentDriverPhone()" x-text="assignmentDriverPhone()"></span>
+                                        <span x-show="shipment.pickup_instructions" class="hidden h-1 w-1 rounded-full bg-slate-300 sm:inline-flex"></span>
+                                        <span x-show="shipment.pickup_instructions" class="min-w-0 truncate" x-text="shipment.pickup_instructions"></span>
+                                    </div>
                                 </div>
                             </div>
                             @if($showPickupActions)
-                                <div class="flex shrink-0 flex-wrap justify-end gap-2">
+                                <div class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
                                     <button type="button" x-show="assignmentHistory.length > 1" @@click="openAssignmentHistoryModal()" class="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
                                         Rider History
                                     </button>
@@ -63,92 +79,58 @@
                                         Edit Pickup
                                     </button>
                                 </div>
-                            @elseif($pickupBadgeLabel)
-                                <span class="inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-3 py-2 text-xs font-black uppercase tracking-wide {{ $pickupBadgeClasses }}">
-                                    {{ $pickupBadgeLabel }}
-                                </span>
                             @endif
                         </div>
-                    </div>
 
-                    <div class="grid gap-3 px-4 py-4 text-[12px] sm:grid-cols-2 sm:px-5">
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 sm:col-span-2">
-                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Location</p>
-                            <p class="mt-1 text-sm font-black text-slate-900">
-                                <span x-text="pickupLocationSummary()"></span>
-                                <span x-show="shipment.pickup_landmark" class="text-slate-500" x-text="' - ' + shipment.pickup_landmark"></span>
-                            </p>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Instructions</p>
-                            <p class="mt-1 font-semibold text-slate-700" x-text="shipment.pickup_instructions || '-'"></p>
-                        </div>
-                        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Pickup Rider</p>
-                            <p class="mt-1 font-black text-slate-900">
-                                <span x-text="assignment ? (assignmentDriverName() + ', ' + assignmentDriverPhone()) : 'Unassigned'"></span>
-                                @if($showPickupActions)
-                                    <button type="button" x-show="canCreatePickupAssignment()" @@click="openAssignPickupDriver()" class="ml-2 text-[10px] font-black text-orange-700 hover:text-orange-900">Assign</button>
-                                    <button type="button" x-show="canManage && canEditCurrentAssignment()" @@click="openEditAssignment()" class="ml-2 text-[10px] font-black text-orange-700 hover:text-orange-900">Change</button>
+                        @if($showPickupFee || $showTargetWarehouse)
+                            <div class="mt-3 flex flex-wrap gap-2 text-xs">
+                                @if($showPickupFee)
+                                    <button type="button" x-show="canManageCharges" @@click="openPickupFeeModal()" class="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 font-black text-slate-700">
+                                        <span x-text="pickupFeeValueLabel()"></span>
+                                        <span x-show="pickupFeeStatusLabel()" class="rounded-full border px-1.5 py-0.5 text-[9px] uppercase tracking-wide" :class="pickupFeeStatusClass()" x-text="pickupFeeStatusLabel()"></span>
+                                    </button>
+                                    <span x-show="!canManageCharges" class="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 font-black text-slate-700">
+                                        <span x-text="pickupFeeValueLabel()"></span>
+                                        <span x-show="pickupFeeStatusLabel()" class="rounded-full border px-1.5 py-0.5 text-[9px] uppercase tracking-wide" :class="pickupFeeStatusClass()" x-text="pickupFeeStatusLabel()"></span>
+                                    </span>
                                 @endif
-                            </p>
-                        </div>
-                        @if($showPickupFee)
-                            <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Pickup Fee</p>
-                                <p class="mt-1 font-black text-slate-900">
-                                    <span x-text="pickupFeeValueLabel()"></span>
-                                    <span x-show="pickupFeeStatusLabel()" class="ml-2 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide" :class="pickupFeeStatusClass()" x-text="pickupFeeStatusLabel()"></span>
-                                    <button type="button" x-show="canManageCharges" @@click="openPickupFeeModal()" class="ml-2 text-[10px] font-black text-orange-700 hover:text-orange-900" x-text="pickupFeeActionLabel()"></button>
-                                </p>
+                                @if($showTargetWarehouse)
+                                    <span class="inline-flex h-8 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 font-black text-slate-700">
+                                        <span x-text="assignmentWarehouseName()"></span>
+                                        <span x-show="assignmentWarehouseCode()" class="text-slate-500" x-text="' (' + assignmentWarehouseCode() + ')'"></span>
+                                    </span>
+                                @endif
                             </div>
                         @endif
-                        @if($showTargetWarehouse)
-                            <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Target Warehouse</p>
-                                <p class="mt-1 font-black text-slate-900">
-                                    <span x-text="assignmentWarehouseName()"></span>
-                                    <span x-show="assignmentWarehouseCode()" class="text-slate-500" x-text="' (' + assignmentWarehouseCode() + ')'"></span>
-                                </p>
-                            </div>
-                        @endif
-                    </div>
                 </div>
 
-                <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-300/25">
-                    <div class="border-b border-orange-100 bg-orange-50 px-4 py-4 sm:px-5">
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="flex min-w-0 items-center gap-3">
-                                <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-orange-600 shadow-sm ring-1 ring-orange-100">
+                <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-lg shadow-slate-300/20 sm:p-5">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div class="flex min-w-0 items-start gap-3">
+                                <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
                                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 20 3.553 17.276A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7m0 13 6-3m-6 3V7m6 10 4.553 2.276A1 1 0 0 0 21 18.382V7.618a1 1 0 0 0-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
                                 </span>
                                 <div class="min-w-0">
-                                    <p class="text-base font-black text-slate-950">Drop-off Type</p>
-                                    <p class="text-sm font-medium text-slate-500">Shared destination or package-by-package delivery details.</p>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 class="text-sm font-black uppercase tracking-[0.12em] text-slate-500">Drop-off</h3>
+                                        @if($showDropOffSelect)
+                                            <select :value="{{ $destinationModeExpr }}" @@change="{{ $destinationModeChange }}" :disabled="{{ $dropOffSavingExpr }}" class="h-8 rounded-xl border border-orange-200 bg-white px-2.5 text-[11px] font-black text-slate-800 shadow-sm outline-none transition focus:border-orange-300 focus:ring-4 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400">
+                                                <option value="single">One Drop-off</option>
+                                                <option value="per_item">Multiple Drop-offs</option>
+                                            </select>
+                                        @else
+                                            <span class="inline-flex h-7 shrink-0 items-center whitespace-nowrap rounded-full border border-orange-200 bg-orange-50 px-2.5 text-[10px] font-black uppercase tracking-wide text-orange-700" x-text="isPerItemMode() ? 'Multiple Drop-offs' : 'One Drop-off'"></span>
+                                        @endif
+                                    </div>
+                                    <p class="mt-1 text-sm font-black text-slate-950" x-text="isPerItemMode() ? 'Package destinations' : receivingSharedDestinationSummary()"></p>
+                                    <p class="mt-1 text-xs font-semibold text-slate-500" x-text="isPerItemMode() ? 'Each package carries its own recipient details.' : 'Shared recipient details apply to all packages.'"></p>
                                 </div>
                             </div>
-                            @if($showDropOffSelect)
-                                <select :value="{{ $destinationModeExpr }}" @@change="{{ $destinationModeChange }}" :disabled="{{ $dropOffSavingExpr }}" class="h-10 min-w-[190px] rounded-xl border border-orange-200 bg-white px-3 text-xs font-black text-slate-800 shadow-sm outline-none transition focus:border-orange-300 focus:ring-4 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400">
-                                    <option value="single">One Drop-off</option>
-                                    <option value="per_item">Multiple Drop-offs</option>
-                                </select>
-                            @else
-                                <span class="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-orange-200 bg-white px-3 py-2 text-xs font-black uppercase tracking-wide text-orange-700" x-text="isPerItemMode() ? 'Multiple Drop-offs' : 'One Drop-off'"></span>
-                            @endif
+                            <button type="button" x-show="{{ $showSharedDestinationEditExpr }}" @@click="{{ $sharedDestinationClick }}" class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-950">
+                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.862 4.487 18.55 2.8a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.5 7.125 16.875 4.5"/></svg>
+                                Edit
+                            </button>
                         </div>
-                    </div>
-
-                    <div class="px-4 py-4 sm:px-5">
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                            <p class="text-[10px] font-black uppercase tracking-wide text-slate-400" x-text="isPerItemMode() ? 'Package destinations' : 'Shared destination'"></p>
-                            <p class="mt-1 text-sm font-black text-slate-900" x-text="isPerItemMode() ? 'Set recipient and location inside each package.' : receivingSharedDestinationSummary()"></p>
-                            <p class="mt-0.5 text-xs font-semibold text-slate-500" x-text="isPerItemMode() ? 'Use this when packages are going to different phone numbers or places.' : 'Use this when the packages go to one recipient or location.'"></p>
-                        </div>
-                        <button type="button" x-show="{{ $showSharedDestinationEditExpr }}" @@click="{{ $sharedDestinationClick }}" class="mt-3 inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-950">
-                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.862 4.487 18.55 2.8a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.5 7.125 16.875 4.5"/></svg>
-                            Edit Shared Destination
-                        </button>
-                    </div>
                 </div>
             </section>
 
