@@ -1505,11 +1505,11 @@
 
     <?php if($canManageWallets): ?>
     <template x-teleport="body">
-    <div x-show="walletModalOpen" x-cloak x-transition.opacity class="fixed inset-0 z-[110] flex min-h-screen items-center justify-center bg-black/55 p-4 backdrop-blur-sm" @click="walletAgentsOpen = false" style="display:none">
+    <div x-show="walletModalOpen" x-cloak x-transition.opacity class="fixed inset-0 z-[110] flex min-h-screen items-center justify-center overflow-y-auto bg-black/55 p-4 backdrop-blur-sm" @click="walletAgentsOpen = false" style="display:none">
         <div @click.stop class="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
             <div class="flex items-start justify-between border-b border-slate-100 p-5">
                 <div class="flex items-start gap-3">
-                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-orange-600">
+                    <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-700 text-white shadow-lg shadow-orange-500/25">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 9V7a5 5 0 00-10 0v2M5 9h14l-1 11H6L5 9zm5 4h4"/>
                         </svg>
@@ -1523,50 +1523,50 @@
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div class="grid gap-4 p-5 md:grid-cols-2">
+            <div class="grid max-h-[calc(100vh-14rem)] gap-4 overflow-y-auto p-5 md:grid-cols-2">
                 <div class="md:col-span-2">
-                    <label class="mb-1 block text-xs font-bold text-slate-600">Wallet name</label>
-                    <input x-model="walletForm.name" placeholder="e.g. Kumasi MoMo Main" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Wallet name</label>
+                    <input x-model="walletForm.name" placeholder="e.g. Kumasi MoMo Main" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-bold text-slate-600">Provider</label>
-                    <select x-model="walletForm.provider" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Provider</label>
+                    <select x-model="walletForm.provider" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                         <template x-for="provider in walletProviderOptions" :key="provider">
                             <option :value="provider" x-text="provider"></option>
                         </template>
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-bold text-slate-600">Phone number</label>
-                    <input x-model="walletForm.phone_number" placeholder="+233..." class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Phone number</label>
+                    <input x-model="walletForm.phone_number" placeholder="+233..." class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                 </div>
                 <div class="md:col-span-2">
-                    <label class="mb-1 block text-xs font-bold text-slate-600">Account owner</label>
-                    <input x-model="walletForm.account_owner" placeholder="Account owner" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Account owner</label>
+                    <input x-model="walletForm.account_owner" placeholder="Account owner" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                     <p class="mt-1 text-[11px] text-slate-400">Registered name on the mobile money account.</p>
                 </div>
-                <div class="relative md:col-span-2" x-ref="walletAgentsSelect">
-                    <label class="mb-1 block text-xs font-bold text-slate-600">Assigned agents</label>
+                <div class="md:col-span-2" x-ref="walletAgentsSelect">
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Assigned agents</label>
                     <button type="button" @click.stop="walletAgentsOpen = !walletAgentsOpen; $nextTick(() => $refs.walletAgentSearch?.focus())"
-                            class="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm outline-none transition hover:border-slate-300 focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            class="flex w-full items-center justify-between rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-left text-base font-semibold outline-none transition hover:border-slate-300 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                         <span :class="walletForm.user_ids.length ? 'text-slate-800' : 'text-slate-400'" x-text="selectedWalletAgentText()"></span>
                         <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                         </svg>
                     </button>
-                    <div x-show="walletAgentsOpen" @click.stop x-transition class="absolute z-[130] mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl" style="display:none">
+                    <div x-show="walletAgentsOpen" @click.stop x-transition class="mt-2 w-full overflow-hidden rounded-xl border-2 border-slate-200 bg-white shadow-xl shadow-slate-300/30" style="display:none">
                         <div class="relative">
                             <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                             </svg>
-                            <input x-ref="walletAgentSearch" x-model="walletAgentSearch" placeholder="Search agents..." class="w-full border-b border-slate-100 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none">
+                            <input x-ref="walletAgentSearch" x-model="walletAgentSearch" placeholder="Search agents..." class="w-full border-b border-slate-100 bg-slate-50 py-3 pl-9 pr-3 text-sm font-semibold text-slate-900 outline-none placeholder-slate-400">
                         </div>
-                        <div class="max-h-52 overflow-y-auto">
+                        <div class="max-h-64 overflow-y-auto">
                             <template x-if="filteredWalletAgents().length === 0">
                                 <p class="px-3 py-3 text-sm text-slate-400">No agents found.</p>
                             </template>
                             <template x-for="worker in filteredWalletAgents()" :key="worker.id">
-                                <label class="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm transition hover:bg-orange-50">
+                                <label class="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm transition hover:bg-orange-50">
                                     <input type="checkbox" :checked="isWalletAgentSelected(worker.id)" @change="toggleWalletAgent(worker.id)" class="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
                                     <span class="font-medium text-slate-700" x-text="worker.name"></span>
                                 </label>
@@ -1575,8 +1575,8 @@
                     </div>
                 </div>
                 <div class="md:col-span-2" x-show="warehouses.length > 1">
-                    <label class="mb-1 block text-xs font-bold text-slate-600">Warehouse</label>
-                    <select x-model="walletForm.warehouse_id" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Warehouse</label>
+                    <select x-model="walletForm.warehouse_id" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                         <option value="">All warehouses</option>
                         <template x-for="wh in warehouses" :key="wh.id">
                             <option :value="wh.id" x-text="wh.name"></option>
@@ -1584,9 +1584,9 @@
                     </select>
                 </div>
             </div>
-            <div class="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4">
-                <button type="button" @click="walletModalOpen = false" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600">Cancel</button>
-                <button type="button" @click="saveWallet()" class="rounded-xl bg-orange-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-orange-600/20 transition hover:bg-orange-700" x-text="walletModalMode === 'edit' ? 'Save Changes' : 'Save Wallet'"></button>
+            <div class="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 p-4">
+                <button type="button" @click="walletModalOpen = false" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-base font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:text-sm">Cancel</button>
+                <button type="button" @click="saveWallet()" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-base font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 sm:text-sm" x-text="walletModalMode === 'edit' ? 'Save Changes' : 'Save Wallet'"></button>
             </div>
         </div>
     </div>
