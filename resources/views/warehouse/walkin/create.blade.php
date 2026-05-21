@@ -368,10 +368,10 @@
                                 <span class="block text-xs font-bold uppercase tracking-wide text-slate-500">Bus station</span>
                                 <span class="block text-sm font-black text-slate-900">Send to bus station</span>
                             </span>
-                            <input type="checkbox" x-model="packageForm.send_to_bus_station" class="h-5 w-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
+                            <input type="checkbox" x-model="packageForm.send_to_bus_station" @@change="if (packageForm.send_to_bus_station) packageForm.forward_to_warehouse_id = ''" class="h-5 w-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
                         </label>
 
-                        <div class="rounded-xl border-2 border-orange-100 bg-orange-50/40 px-3 py-3">
+                        <div x-show="!packageForm.send_to_bus_station" class="rounded-xl border-2 border-orange-100 bg-orange-50/40 px-3 py-3" style="display:none">
                             <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-orange-600">Forward to warehouse</label>
                             <select x-model="packageForm.forward_to_warehouse_id"
                                     class="w-full rounded-xl border-2 border-orange-100 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
@@ -520,7 +520,9 @@ function walkinShipment() {
             const item = this.cloneItem(this.packageForm);
             item.delivery.recipient_name = item.delivery.recipient_name?.trim() || 'Recipient';
             item.delivery_method = item.send_to_bus_station ? 'bus_handoff' : 'direct';
-            item.forward_to_warehouse_id = item.forward_to_warehouse_id ? Number(item.forward_to_warehouse_id) : null;
+            item.forward_to_warehouse_id = item.send_to_bus_station
+                ? null
+                : (item.forward_to_warehouse_id ? Number(item.forward_to_warehouse_id) : null);
             delete item.send_to_bus_station;
             if (this.packageModalIndex === null) {
                 this.items.push(item);
@@ -744,7 +746,9 @@ function walkinShipment() {
                 description: item.description,
                 quantity: item.quantity,
                 delivery_method: item.delivery_method,
-                forward_to_warehouse_id: item.forward_to_warehouse_id || null,
+                ...(item.delivery_method !== 'bus_handoff' && item.forward_to_warehouse_id
+                    ? { forward_to_warehouse_id: item.forward_to_warehouse_id }
+                    : {}),
                 delivery: this.deliveryPayload(item.delivery),
             }));
 

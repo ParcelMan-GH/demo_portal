@@ -1327,9 +1327,13 @@ class ShipmentController extends Controller
             'delivery_fee_notes' => ['nullable', 'string', 'max:1000'],
             'delivery_fee_payment_method' => ['nullable', 'string', 'max:32'],
             'delivery_fee_payment_reference' => ['nullable', 'string', 'max:100'],
+            'forward_to_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'photos' => ['nullable', 'array'],
             'photos.*' => ['file', 'image', 'max:12288'],
         ]);
+        if (($validated['delivery_method'] ?? null) === ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF) {
+            $validated['forward_to_warehouse_id'] = null;
+        }
 
         $item = $shipment->items()->create([
             'description' => $validated['description'] ?? null,
@@ -1368,6 +1372,13 @@ class ShipmentController extends Controller
             if (($receivingResult['success'] ?? false) !== true) {
                 return response()->json($receivingResult, 422);
             }
+
+            $this->routeReceivingPackageToForwardWarehouse(
+                receiptItemId: (int) ($receivingResult['data']['item']['id'] ?? 0),
+                forwardWarehouseId: ! empty($validated['forward_to_warehouse_id']) ? (int) $validated['forward_to_warehouse_id'] : null,
+                warehouse: $assignment->targetWarehouse,
+                user: Auth::guard('admin')->user()
+            );
         }
 
         if ($assignment && $this->isPickupCompleteForReceiving($shipment, $assignment)) {
@@ -1396,6 +1407,28 @@ class ShipmentController extends Controller
                     : null,
             ],
         ]);
+    }
+
+    protected function routeReceivingPackageToForwardWarehouse(
+        int $receiptItemId,
+        ?int $forwardWarehouseId,
+        ?Warehouse $warehouse,
+        ?User $user,
+    ): ?array {
+        if (! $receiptItemId || ! $forwardWarehouseId || ! $warehouse || ! $user) {
+            return null;
+        }
+
+        if ($forwardWarehouseId === (int) $warehouse->id) {
+            return null;
+        }
+
+        return app(\App\Services\Warehouse\WarehouseSortingService::class)->autoRouteReceiptItemsToDestinationBatches([
+            [
+                'warehouse_receipt_item_id' => $receiptItemId,
+                'destination_warehouse_id' => $forwardWarehouseId,
+            ],
+        ], $warehouse, $user);
     }
 
     public function updatePackage(Request $request, Shipment $shipment, ShipmentItem $item): JsonResponse
@@ -3285,11 +3318,35 @@ class ShipmentController extends Controller
         }
 
         if ($shipment->destination_mode === ShipmentDestinationMode::SINGLE) {
+            if ($this->receivingPackageShouldSplitDestinationMode($shipment, $validated)) {
+                $this->seedPackageDeliveryFromShipment($shipment);
+                $shipment->update(array_merge(
+                    ['destination_mode' => ShipmentDestinationMode::PER_ITEM],
+                    $this->emptyShipmentDeliveryAttributes()
+                ));
+
+                return;
+            }
+
             $shipmentUpdates = $this->buildReceivingShipmentDeliveryUpdates($validated);
             if (! empty($shipmentUpdates)) {
                 $shipment->update($shipmentUpdates);
             }
         }
+    }
+
+    protected function receivingPackageShouldSplitDestinationMode(Shipment $shipment, array $validated): bool
+    {
+        if (! array_key_exists('delivery_recipient_phone', $validated) || empty($validated['delivery_recipient_phone'])) {
+            return false;
+        }
+
+        if ($shipment->items()->count() < 2 || ! $shipment->delivery_recipient_phone) {
+            return false;
+        }
+
+        return $this->normalizePhotoPhone($validated['delivery_recipient_phone'])
+            !== $this->normalizePhotoPhone($shipment->delivery_recipient_phone);
     }
 
     protected function initialStatusForAdminCreatedPackage(Shipment $shipment, mixed $assignment): string

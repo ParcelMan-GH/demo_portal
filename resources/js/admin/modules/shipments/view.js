@@ -39,6 +39,17 @@ function shipmentShow() {
         receivingAddPackageModal: {
             open: false,
             saving: false,
+            description: '',
+            quantity: 1,
+            delivery_recipient_name: '',
+            delivery_recipient_phone: '',
+            delivery_region_id: '',
+            delivery_district_id: '',
+            delivery_town: '',
+            delivery_landmark: '',
+            delivery_instructions: '',
+            delivery_method: 'direct',
+            forward_to_warehouse_id: '',
             delivery_fee: {
                 mode: 'none',
                 status: 'none',
@@ -48,6 +59,16 @@ function shipmentShow() {
                 payment_method: 'cash',
                 payment_reference: '',
             },
+            _town_query: '',
+            _town_results: [],
+            _town_open: false,
+            _town_loading: false,
+            _town_request: 0,
+            _town_debounce: null,
+            _town_linked: false,
+            _town_context: '',
+            _town_selected_display: null,
+            _receipt_photo_files: [],
         },
         pickupEditModal: { open: false, saving: false, form: null },
         receiving: { loading: false, saving: false, detailsSaving: false, dropOffSaving: false, autoGrouping: false, completingPickup: false, canReceive: false, canAutoGroup: false, autoGroupLockReason: '', packages: [], receipt: null, assignmentId: null },
@@ -2149,6 +2170,7 @@ function shipmentShow() {
                 delivery_landmark: '',
                 delivery_instructions: '',
                 delivery_method: 'direct',
+                forward_to_warehouse_id: '',
                 delivery_fee: {
                     mode: 'none',
                     status: 'none',
@@ -2177,6 +2199,7 @@ function shipmentShow() {
             const draft = this.receivingAddPackageDraft({ open: true });
 
             this.receivingAddPackageModal = draft;
+            this.ensureAddPackageWarehousesLoaded();
         },
 
         closeReceivingAddPackageModal() {
@@ -2208,10 +2231,13 @@ function shipmentShow() {
             try {
                 const files = Array.isArray(modal._receipt_photo_files) ? modal._receipt_photo_files : [];
                 const payload = {
-                    ...(this.isPerItemMode() ? this.receivingDetailsPayload(modal) : {}),
+                    ...this.receivingDetailsPayload(modal),
                     description: modal.description || null,
                     quantity: Number(modal.quantity),
                 };
+                if (modal.delivery_method !== 'bus_handoff' && modal.forward_to_warehouse_id) {
+                    payload.forward_to_warehouse_id = modal.forward_to_warehouse_id;
+                }
                 let body;
                 let headers = {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
@@ -2258,6 +2284,37 @@ function shipmentShow() {
             }
 
             modal.saving = false;
+        },
+
+        addPackageTransferWarehouses() {
+            return Array.isArray(this.availableWarehouses) ? this.availableWarehouses : [];
+        },
+
+        addPackageCanSave(modal) {
+            if (!modal || modal.saving) return false;
+
+            return Boolean(
+                String(modal.description || '').trim()
+                && Number(modal.quantity || 0) > 0
+                && String(modal.delivery_recipient_phone || '').trim()
+                && String(modal.delivery_town || modal._town_query || '').trim()
+                && Array.isArray(modal._receipt_photo_files)
+                && modal._receipt_photo_files.length > 0
+            );
+        },
+
+        async ensureAddPackageWarehousesLoaded() {
+            if (!this.config.availableWarehousesEndpoint || this.availableWarehouses.length) return;
+
+            try {
+                const response = await fetch(this.config.availableWarehousesEndpoint, {
+                    headers: { Accept: 'application/json' },
+                });
+                const result = await response.json();
+                this.availableWarehouses = Array.isArray(result.data) ? result.data : [];
+            } catch (error) {
+                console.error('Failed to load warehouses for package forwarding:', error);
+            }
         },
 
         async removeReceivingPackage(pkg) {
@@ -2904,6 +2961,10 @@ function shipmentShow() {
             return !this.assignment || this.canEditCurrentAssignment();
         },
 
+        canCreatePickupAssignment() {
+            return !this.assignment && this.canManagePickupAssignment();
+        },
+
         pickupAssignmentLockedLabel() {
             if (!this.assignment) {
                 return 'Assign a pickup driver before pickup starts.';
@@ -2956,6 +3017,48 @@ function shipmentShow() {
             this.resetAssignmentForm();
             this.assignDriverModalOpen = true;
             await this.loadAssignmentDependencies();
+        },
+
+        async loadAssignmentDependencies() {
+            if (!this.config.availableDriversEndpoint || !this.config.availableWarehousesEndpoint) {
+                return;
+            }
+
+            this.assignmentForm.loadingDrivers = true;
+            this.assignmentForm.loadingWarehouses = true;
+
+            try {
+                const [driversRes, warehousesRes] = await Promise.all([
+                    fetch(`${this.config.availableDriversEndpoint}?assignment_type=pickup`, {
+                        headers: { Accept: 'application/json' },
+                    }),
+                    fetch(this.config.availableWarehousesEndpoint, {
+                        headers: { Accept: 'application/json' },
+                    }),
+                ]);
+
+                const driversData = await driversRes.json();
+                const warehousesData = await warehousesRes.json();
+
+                if (!driversRes.ok) {
+                    throw new Error(driversData.message || 'Unable to load pickup drivers.');
+                }
+
+                if (!warehousesRes.ok) {
+                    throw new Error(warehousesData.message || 'Unable to load warehouses.');
+                }
+
+                this.availableDrivers = Array.isArray(driversData.data) ? driversData.data : [];
+                this.availableWarehouses = Array.isArray(warehousesData.data) ? warehousesData.data : [];
+            } catch (error) {
+                console.error('Failed to load assignment options:', error);
+                window.showToast?.(error.message || 'Unable to load rider and warehouse options.', 'error');
+                this.availableDrivers = [];
+                this.availableWarehouses = [];
+            } finally {
+                this.assignmentForm.loadingDrivers = false;
+                this.assignmentForm.loadingWarehouses = false;
+            }
         },
 
         normalizeAssignment(assignment) {

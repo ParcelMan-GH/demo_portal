@@ -79,6 +79,11 @@ class ReceiptController extends AdminShipmentController
         ]);
 
         $receipt = $this->portalService->receiptForAssignment($pickupAssignment, $warehouse);
+        $transferWarehouses = Warehouse::query()
+            ->where('is_active', true)
+            ->whereKeyNot($warehouse->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code']);
 
         $receiptConfig = [
             'save_item_url' => route('warehouse.receipts.pending.items.save', ['pickupAssignment' => $pickupAssignment, 'shipmentItem' => '__ITEM__']),
@@ -92,6 +97,11 @@ class ReceiptController extends AdminShipmentController
             'can_receive' => !is_null($pickupAssignment->picked_up_at),
             'can_auto_group' => $this->canAutoGroupByPhoneDuringReceiving($pickupAssignment, $pickupAssignment->shipment),
             'auto_group_lock_reason' => $this->receivingAutoGroupLockReason($pickupAssignment, $pickupAssignment->shipment),
+            'transfer_warehouses' => $transferWarehouses->map(fn (Warehouse $candidate) => [
+                'id' => $candidate->id,
+                'name' => $candidate->name,
+                'code' => $candidate->code,
+            ])->values(),
             'shipment' => $this->serializeReceiptShipment($pickupAssignment->shipment),
             'assignment' => [
                 'id' => $pickupAssignment->id,
@@ -444,10 +454,21 @@ class ReceiptController extends AdminShipmentController
         $validated = $request->validate([
             'description' => ['required', 'string', 'max:500'],
             'quantity' => ['required', 'integer', 'min:1'],
+            'delivery_recipient_name' => ['nullable', 'string', 'max:255'],
+            'delivery_recipient_phone' => ['nullable', 'string', 'max:20'],
+            'delivery_region_id' => ['nullable', 'exists:regions,id'],
+            'delivery_district_id' => ['nullable', 'exists:districts,id'],
+            'delivery_town' => ['nullable', 'string', 'max:255'],
+            'delivery_landmark' => ['nullable', 'string', 'max:255'],
+            'delivery_instructions' => ['nullable', 'string', 'max:1000'],
             'delivery_method' => ['nullable', 'in:direct,bus_handoff'],
+            'forward_to_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'photos' => ['nullable', 'array'],
             'photos.*' => ['file', 'image', 'max:12288'],
         ]);
+        if (($validated['delivery_method'] ?? null) === ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF) {
+            $validated['forward_to_warehouse_id'] = null;
+        }
 
         $item = $shipment->items()->create([
             'description' => $validated['description'],
@@ -458,6 +479,7 @@ class ReceiptController extends AdminShipmentController
             'delivery_method' => $validated['delivery_method'] ?? ShipmentItem::DELIVERY_METHOD_DIRECT,
         ]);
 
+        $this->applyReceivingPackageDetails($shipment, $item, $validated, true);
         $this->ensurePickupConfirmationForAdminCreatedPackage($assignment, $item);
 
         $result = $this->warehouseReceivingService->upsertReceiptItem(
@@ -476,6 +498,13 @@ class ReceiptController extends AdminShipmentController
         if (($result['success'] ?? false) !== true) {
             return response()->json($result, 422);
         }
+
+        $this->routeReceivingPackageToForwardWarehouse(
+            receiptItemId: (int) ($result['data']['item']['id'] ?? 0),
+            forwardWarehouseId: ! empty($validated['forward_to_warehouse_id']) ? (int) $validated['forward_to_warehouse_id'] : null,
+            warehouse: $warehouse,
+            user: Auth::guard('admin')->user()
+        );
 
         return response()->json([
             'success' => true,

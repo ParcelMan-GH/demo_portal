@@ -80,6 +80,10 @@ class WalkinController extends Controller
         $validated['created_by_user_id'] = $user->id;
         $validated['item_photos']        = $request->file('item_photos', []);
         $validated['items'] = collect($validated['items'])->map(function (array $item) use ($warehouse) {
+            if (($item['delivery_method'] ?? 'direct') === 'bus_handoff') {
+                $item['forward_to_warehouse_id'] = null;
+            }
+
             if (!empty($item['forward_to_warehouse_id']) && (int) $item['forward_to_warehouse_id'] === (int) $warehouse->id) {
                 $item['forward_to_warehouse_id'] = null;
             }

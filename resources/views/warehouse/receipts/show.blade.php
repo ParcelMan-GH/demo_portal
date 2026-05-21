@@ -268,71 +268,11 @@
     ])
 
                 <template x-teleport="body">
-                    <div x-show="addPackageModal.open" x-transition.opacity class="fixed inset-0 z-[188] flex min-h-dvh w-screen items-end justify-center bg-black/55 px-4 py-6 backdrop-blur-sm sm:items-center sm:p-4" style="display:none">
-                        <div @@click.stop class="relative flex max-h-[calc(100dvh-3rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-                            <div class="shrink-0 border-b border-slate-100 bg-white p-5">
-                                <div class="flex items-start justify-between gap-4">
-                                    <div class="flex items-start gap-4">
-                                        <span class="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-600 to-orange-700 text-white shadow-lg shadow-orange-500/25">
-                                            <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v16m8-8H4"/></svg>
-                                        </span>
-                                        <div>
-                                            <h3 class="text-lg font-extrabold text-slate-950">Add Package</h3>
-                                            <p class="mt-1 text-sm leading-relaxed text-slate-500">Create an extra package received with this shipment.</p>
-                                        </div>
-                                    </div>
-                                    <button type="button" @@click="closeReceivingAddPackageModal()" :disabled="addPackageModal.saving" class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
-                                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18 18 6M6 6l12 12"/></svg>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="flex-1 space-y-5 overflow-y-auto px-5 py-5">
-                                <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4">
-                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                        <div>
-                                            <p class="text-xs font-black uppercase tracking-wide text-slate-700">Receipt Photos</p>
-                                            <p class="mt-1 text-xs text-slate-500">Attach photos for this package.</p>
-                                            <p x-show="addPackageModal.files.length" class="mt-1 text-[11px] font-semibold text-slate-700" x-text="addPackageModal.files.length + ' photo' + (addPackageModal.files.length === 1 ? '' : 's') + ' selected'" style="display:none"></p>
-                                        </div>
-                                        <label class="inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100">
-                                            <input type="file" class="hidden" multiple accept="image/*" :disabled="addPackageModal.saving" @@change="setAddPackageFiles($event)">
-                                            Choose Photos
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_120px]">
-                                    <div>
-                                        <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">Description <span class="text-rose-500">*</span></label>
-                                        <input type="text" x-model="addPackageModal.description" :disabled="addPackageModal.saving" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:bg-slate-50">
-                                    </div>
-                                    <div>
-                                        <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">Qty <span class="text-rose-500">*</span></label>
-                                        <input type="number" min="1" x-model.number="addPackageModal.quantity" :disabled="addPackageModal.saving" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:bg-slate-50">
-                                    </div>
-                                </div>
-
-                                <label class="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3">
-                                    <div>
-                                        <p class="text-sm font-black text-slate-900">Bus handoff</p>
-                                        <p class="mt-0.5 text-xs text-slate-500">Mark this package for bus-courier handling.</p>
-                                    </div>
-                                    <input type="checkbox" :checked="addPackageModal.delivery_method === 'bus_handoff'" @@change="addPackageModal.delivery_method = $event.target.checked ? 'bus_handoff' : 'direct'" class="h-5 w-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
-                                </label>
-                            </div>
-
-                            <div class="shrink-0 border-t border-slate-100 bg-slate-50 px-5 py-4">
-                                <div class="flex items-center justify-end gap-3">
-                                    <button type="button" @@click="closeReceivingAddPackageModal()" :disabled="addPackageModal.saving" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50">Cancel</button>
-                                    <button type="button" @@click="submitAddPackage()" :disabled="addPackageModal.saving || !String(addPackageModal.description || '').trim() || Number(addPackageModal.quantity || 0) < 1" class="inline-flex items-center gap-2 rounded-2xl bg-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
-                                        <svg x-show="addPackageModal.saving" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" style="display:none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                                        <span x-text="addPackageModal.saving ? 'Adding...' : 'Add Package'"></span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    @include('shared.receiving.add-package-modal', [
+                        'modal' => 'receivingAddPackageModal',
+                        'closeAction' => 'closeReceivingAddPackageModal()',
+                        'saveAction' => 'addReceivingPackage()',
+                    ])
                 </template>
 
                 <template x-teleport="body">

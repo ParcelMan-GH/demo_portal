@@ -59,6 +59,31 @@ function registerWarehouseReceiptShowPage() {
             delivery_method: 'direct',
             files: [],
         },
+        receivingAddPackageModal: {
+            open: false,
+            saving: false,
+            description: '',
+            quantity: 1,
+            delivery_recipient_name: '',
+            delivery_recipient_phone: '',
+            delivery_region_id: '',
+            delivery_district_id: '',
+            delivery_town: '',
+            delivery_landmark: '',
+            delivery_instructions: '',
+            delivery_method: 'direct',
+            forward_to_warehouse_id: '',
+            _town_query: '',
+            _town_results: [],
+            _town_open: false,
+            _town_loading: false,
+            _town_request: 0,
+            _town_debounce: null,
+            _town_linked: false,
+            _town_context: '',
+            _town_selected_display: null,
+            _receipt_photo_files: [],
+        },
         splitModal: {
             open: false,
             saving: false,
@@ -76,6 +101,7 @@ function registerWarehouseReceiptShowPage() {
 
         init() {
             this.items = this.items.map((item) => this.prepareReceivingTownState(item));
+            this.receivingAddPackageModal = this.receivingAddPackageDraft();
             if (!this.receipt && this.items.length > 0) {
                 this.receipt = { status: 'draft' };
             }
@@ -416,21 +442,51 @@ function registerWarehouseReceiptShowPage() {
             }
         },
 
-        openReceivingAddPackageModal() {
-            if (this.isFinalized()) return;
-            this.addPackageModal = {
-                open: true,
+        receivingAddPackageDraft(overrides = {}) {
+            return {
+                open: false,
                 saving: false,
-                description: `Package ${this.items.length + 1}`,
+                description: '',
                 quantity: 1,
+                delivery_recipient_name: '',
+                delivery_recipient_phone: '',
+                delivery_region_id: '',
+                delivery_district_id: '',
+                delivery_town: '',
+                delivery_landmark: '',
+                delivery_instructions: '',
                 delivery_method: 'direct',
-                files: [],
+                forward_to_warehouse_id: '',
+                _town_query: '',
+                _town_results: [],
+                _town_open: false,
+                _town_loading: false,
+                _town_request: 0,
+                _town_debounce: null,
+                _town_linked: false,
+                _town_context: '',
+                _town_selected_display: null,
+                _receipt_photo_files: [],
+                ...overrides,
             };
         },
 
+        openReceivingAddPackageModal() {
+            if (this.isFinalized()) return;
+            this.receivingAddPackageModal = this.receivingAddPackageDraft({
+                open: true,
+                description: `Package ${this.items.length + 1}`,
+            });
+        },
+
         closeReceivingAddPackageModal() {
-            if (this.addPackageModal.saving) return;
-            this.addPackageModal.open = false;
+            if (this.receivingAddPackageModal?.saving) return;
+
+            if (this.receivingAddPackageModal?._town_debounce) {
+                clearTimeout(this.receivingAddPackageModal._town_debounce);
+            }
+
+            this.receivingAddPackageModal = this.receivingAddPackageDraft();
         },
 
         loadReceiving() {
@@ -441,22 +497,68 @@ function registerWarehouseReceiptShowPage() {
             this.addPackageModal.files = Array.from(event?.target?.files || []);
         },
 
-        async submitAddPackage() {
-            if (this.addPackageModal.saving || !config.add_package_url) return;
-            const description = (this.addPackageModal.description || '').trim();
+        setReceivingReceiptPhotos(pkg, files) {
+            if (!pkg) return;
+            pkg._receipt_photo_files = Array.from(files || []);
+        },
+
+        receivingReceiptPhotoNames(pkg) {
+            const files = Array.isArray(pkg?._receipt_photo_files) ? pkg._receipt_photo_files : [];
+            if (!files.length) return '';
+            if (files.length === 1) return files[0].name;
+            return `${files.length} receipt photos selected`;
+        },
+
+        addPackageTransferWarehouses() {
+            return Array.isArray(config.transfer_warehouses) ? config.transfer_warehouses : [];
+        },
+
+        addPackageCanSave(modal) {
+            if (!modal || modal.saving) return false;
+
+            return Boolean(
+                String(modal.description || '').trim()
+                && Number(modal.quantity || 0) > 0
+                && String(modal.delivery_recipient_phone || '').trim()
+                && String(modal.delivery_town || modal._town_query || '').trim()
+                && Array.isArray(modal._receipt_photo_files)
+                && modal._receipt_photo_files.length > 0
+            );
+        },
+
+        async addReceivingPackage() {
+            const modal = this.receivingAddPackageModal;
+            if (!modal || modal.saving || !config.add_package_url) return;
+            const description = (modal.description || '').trim();
             if (!description) {
                 window.showToast?.('Package description is required.', 'error');
                 return;
             }
 
-            this.addPackageModal.saving = true;
+            if (!Number.isFinite(Number(modal.quantity)) || Number(modal.quantity) < 1) {
+                window.showToast?.('Package quantity must be at least 1.', 'error');
+                modal.quantity = 1;
+                return;
+            }
+
+            modal.saving = true;
             try {
                 const formData = new FormData();
                 formData.append('description', description);
-                formData.append('quantity', String(Math.max(Number(this.addPackageModal.quantity || 1), 1)));
-                formData.append('delivery_method', this.addPackageModal.delivery_method || 'direct');
+                formData.append('quantity', String(Math.max(Number(modal.quantity || 1), 1)));
+                formData.append('delivery_recipient_name', modal.delivery_recipient_name || '');
+                formData.append('delivery_recipient_phone', modal.delivery_recipient_phone || '');
+                formData.append('delivery_region_id', modal.delivery_region_id || '');
+                formData.append('delivery_district_id', modal.delivery_district_id || '');
+                formData.append('delivery_town', modal.delivery_town || '');
+                formData.append('delivery_landmark', modal.delivery_landmark || '');
+                formData.append('delivery_instructions', modal.delivery_instructions || '');
+                formData.append('delivery_method', modal.delivery_method || 'direct');
+                if (modal.delivery_method !== 'bus_handoff' && modal.forward_to_warehouse_id) {
+                    formData.append('forward_to_warehouse_id', modal.forward_to_warehouse_id);
+                }
                 formData.append('_token', csrfToken());
-                (this.addPackageModal.files || []).forEach((file) => formData.append('photos[]', file));
+                (modal._receipt_photo_files || []).forEach((file) => formData.append('photos[]', file));
 
                 const response = await fetch(config.add_package_url, {
                     method: 'POST',
@@ -469,14 +571,18 @@ function registerWarehouseReceiptShowPage() {
                 }
 
                 this.applyReceivingPayload(result.data || {});
-                this.addPackageModal.open = false;
+                this.closeReceivingAddPackageModal();
                 window.showToast?.(result.message || 'Package added.', 'success');
             } catch (error) {
                 console.error(error);
                 window.showToast?.(error.message || 'Unable to add package.', 'error');
             } finally {
-                this.addPackageModal.saving = false;
+                modal.saving = false;
             }
+        },
+
+        async submitAddPackage() {
+            return this.addReceivingPackage();
         },
 
         async autoGroupReceivingPackagesByPhone() {
