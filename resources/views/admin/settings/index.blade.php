@@ -7,13 +7,14 @@
 @section('content')
 @php
     $tabGroups = [
-        'General' => ['platform', 'delivery', 'pricing'],
+        'General' => ['platform', 'delivery', 'pickup-vehicles', 'pricing'],
         'Communication' => ['sms', 'mail', 'push', 'email-templates'],
         'Logs' => ['email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'notification-logs'],
         'System' => ['health', 'logs'],
     ];
-    $readOnlyTabs = ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates', 'notification-logs'];
+    $readOnlyTabs = ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates', 'notification-logs', 'pickup-vehicles'];
     $activeGroup = collect($tabGroups)->filter(fn ($keys) => in_array($activeTab, $keys, true))->keys()->first() ?? 'General';
+    $canEditSettings = auth('admin')->user()?->hasPermission('settings.edit') ?? false;
 @endphp
 
 <div class="space-y-5" x-data="settingsManager()">
@@ -118,6 +119,8 @@
                                 Review available system email templates.
                             @elseif($activeTab === 'pricing')
                                 Manage vendor commission and payout rules.
+                            @elseif($activeTab === 'pickup-vehicles')
+                                Manage optional vehicle requests vendors can add to pickup requests.
                             @else
                                 Configure values used across the platform.
                             @endif
@@ -135,6 +138,15 @@
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             Create Template
                         </button>
+                    @elseif($activeTab === 'pickup-vehicles')
+                        @if($canEditSettings)
+                            <button type="button"
+                                    @@click="$dispatch('pickup-vehicle-create')"
+                                    class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Add Vehicle
+                            </button>
+                        @endif
                     @elseif($activeTab === 'notification-logs')
                         <div x-data="{ open: false }" class="relative">
                             <button @@click="open = !open" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
@@ -200,6 +212,10 @@ window.settingsConfig = {
     adminAuditLogsDataEndpoint: @json(route('admin.settings.admin-audit-logs.data')),
     adminAuditLogsExportEndpoint: @json(route('admin.settings.admin-audit-logs.export')),
     notificationLogsDataEndpoint: @json(route('admin.notifications.data')),
+    pickupVehiclesStoreEndpoint: @json(route('admin.settings.pickup-vehicles.store')),
+    pickupVehiclesUpdateEndpoint: @json(route('admin.settings.pickup-vehicles.update', ['pickupVehicleType' => '__ID__'])),
+    pickupVehiclesToggleEndpoint: @json(route('admin.settings.pickup-vehicles.toggle', ['pickupVehicleType' => '__ID__'])),
+    pickupVehiclesDeleteEndpoint: @json(route('admin.settings.pickup-vehicles.delete', ['pickupVehicleType' => '__ID__'])),
     testEmailEndpoint: @json(route('admin.settings.test-email')),
     testSmsEndpoint: @json(route('admin.settings.test-sms')),
     clearCacheEndpoint: @json(route('admin.settings.clear-cache')),

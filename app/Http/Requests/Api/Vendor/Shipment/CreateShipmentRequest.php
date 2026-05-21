@@ -10,6 +10,16 @@ use Illuminate\Validation\Rule;
 
 class CreateShipmentRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if (is_string($this->input('pickup_vehicles'))) {
+            $decoded = json_decode($this->input('pickup_vehicles'), true);
+            if (is_array($decoded)) {
+                $this->merge(['pickup_vehicles' => $decoded]);
+            }
+        }
+    }
+
     public function authorize(): bool
     {
         return true;
@@ -56,6 +66,13 @@ class CreateShipmentRequest extends FormRequest
             // Sender notes
             'sender_notes' => ['nullable', 'string', 'max:2000'],
             'vendor_declared_quantity' => ['nullable', 'integer', 'min:1'],
+            'pickup_vehicles' => ['nullable', 'array'],
+            'pickup_vehicles.*.vehicle_type_id' => [
+                'required_with:pickup_vehicles',
+                'integer',
+                Rule::exists('pickup_vehicle_types', 'id')->where('is_active', true),
+            ],
+            'pickup_vehicles.*.quantity' => ['required_with:pickup_vehicles', 'integer', 'min:1', 'max:99'],
 
             // Inline items — at least one item with at least one image
             'items' => ['required', 'array', 'min:1'],

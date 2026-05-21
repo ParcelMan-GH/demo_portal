@@ -11,6 +11,16 @@ use Illuminate\Validation\Rule;
 
 class UpdateShipmentRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if (is_string($this->input('pickup_vehicles'))) {
+            $decoded = json_decode($this->input('pickup_vehicles'), true);
+            if (is_array($decoded)) {
+                $this->merge(['pickup_vehicles' => $decoded]);
+            }
+        }
+    }
+
     public function authorize(): bool
     {
         return true;
@@ -33,6 +43,13 @@ class UpdateShipmentRequest extends FormRequest
                 'pickup_town' => ['sometimes', 'nullable', 'string', 'max:255'],
                 'sender_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
                 'vendor_declared_quantity' => ['sometimes', 'nullable', 'integer', 'min:1'],
+                'pickup_vehicles' => ['sometimes', 'array'],
+                'pickup_vehicles.*.vehicle_type_id' => [
+                    'required_with:pickup_vehicles',
+                    'integer',
+                    Rule::exists('pickup_vehicle_types', 'id')->where('is_active', true),
+                ],
+                'pickup_vehicles.*.quantity' => ['required_with:pickup_vehicles', 'integer', 'min:1', 'max:99'],
                 'new_photos' => ['sometimes', 'array'],
                 'new_photos.*' => ['file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
                 'new_photos_phones' => ['nullable', 'array'],
@@ -74,6 +91,13 @@ class UpdateShipmentRequest extends FormRequest
 
             'sender_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'vendor_declared_quantity' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'pickup_vehicles' => ['sometimes', 'array'],
+            'pickup_vehicles.*.vehicle_type_id' => [
+                'required_with:pickup_vehicles',
+                'integer',
+                Rule::exists('pickup_vehicle_types', 'id')->where('is_active', true),
+            ],
+            'pickup_vehicles.*.quantity' => ['required_with:pickup_vehicles', 'integer', 'min:1', 'max:99'],
         ];
     }
 

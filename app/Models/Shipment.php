@@ -260,6 +260,11 @@ class Shipment extends Model
         return $this->hasMany(PickupAssignment::class);
     }
 
+    public function pickupVehicleRequests(): HasMany
+    {
+        return $this->hasMany(ShipmentPickupVehicleRequest::class);
+    }
+
     public function collection(): HasOne
     {
         return $this->hasOne(ShipmentCollection::class);

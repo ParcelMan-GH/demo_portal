@@ -534,6 +534,10 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::post('settings/save', [SettingsController::class, 'save'])->name('settings.save');
         Route::post('settings/upload', [SettingsController::class, 'uploadFile'])->name('settings.upload');
+        Route::post('settings/pickup-vehicles', [SettingsController::class, 'storePickupVehicle'])->name('settings.pickup-vehicles.store');
+        Route::put('settings/pickup-vehicles/{pickupVehicleType}', [SettingsController::class, 'updatePickupVehicle'])->name('settings.pickup-vehicles.update');
+        Route::patch('settings/pickup-vehicles/{pickupVehicleType}/toggle', [SettingsController::class, 'togglePickupVehicle'])->name('settings.pickup-vehicles.toggle');
+        Route::delete('settings/pickup-vehicles/{pickupVehicleType}', [SettingsController::class, 'deletePickupVehicle'])->name('settings.pickup-vehicles.delete');
         Route::post('settings/email-templates', [SettingsController::class, 'storeEmailTemplate'])->name('settings.email-templates.store');
         Route::put('settings/email-templates/{emailTemplate}', [SettingsController::class, 'updateEmailTemplate'])->name('settings.email-templates.update');
         Route::patch('settings/email-templates/{emailTemplate}/toggle', [SettingsController::class, 'toggleEmailTemplate'])->name('settings.email-templates.toggle');

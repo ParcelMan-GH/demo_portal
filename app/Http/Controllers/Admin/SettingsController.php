@@ -7,6 +7,7 @@ use App\Models\AdminAuditLog;
 use App\Models\EmailTemplate;
 use App\Models\NotificationLog;
 use App\Models\OtpCode;
+use App\Models\PickupVehicleType;
 use App\Models\PlatformSetting;
 use App\Services\EmailTemplateService;
 use App\Services\SmsService;
@@ -17,6 +18,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class SettingsController extends Controller
@@ -35,6 +38,7 @@ class SettingsController extends Controller
         'admin-audit-logs' => ['label' => 'Admin Audit Logs', 'icon' => 'shield'],
         'notification-logs' => ['label' => 'Notification Logs', 'icon' => 'bell'],
         'delivery' => ['label' => 'Delivery Settings', 'icon' => 'truck'],
+        'pickup-vehicles' => ['label' => 'Pickup Vehicles', 'icon' => 'truck'],
         'pricing' => ['label' => 'Vendor Commissions', 'icon' => 'cash'],
         'push' => ['label' => 'Push Notifications', 'icon' => 'bell'],
         'health' => ['label' => 'System Health', 'icon' => 'heart'],
@@ -137,8 +141,27 @@ class SettingsController extends Controller
             'health' => $this->getSystemHealth(),
             'email-templates' => $this->getEmailTemplates(),
             'notification-logs' => $this->getNotificationLogsMeta(),
+            'pickup-vehicles' => $this->getPickupVehiclesMeta(),
             default => [],
         };
+    }
+
+    protected function getPickupVehiclesMeta(): array
+    {
+        return [
+            'vehicleTypes' => PickupVehicleType::query()
+                ->latest('id')
+                ->get()
+                ->map(fn (PickupVehicleType $type) => [
+                    'id' => $type->id,
+                    'name' => $type->name,
+                    'slug' => $type->slug,
+                    'capacity_hint' => $type->capacity_hint,
+                    'sort_order' => $type->sort_order,
+                    'is_active' => $type->is_active,
+                ])
+                ->values(),
+        ];
     }
 
     /**
@@ -410,6 +433,101 @@ class SettingsController extends Controller
             'success' => true,
             'message' => 'Settings saved successfully.',
         ]);
+    }
+
+    public function storePickupVehicle(Request $request): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:80', 'unique:pickup_vehicle_types,name'],
+            'capacity_hint' => ['nullable', 'string', 'max:180'],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $type = PickupVehicleType::create([
+            'name' => $validated['name'],
+            'slug' => Str::slug($validated['name']),
+            'icon' => 'car',
+            'capacity_hint' => $validated['capacity_hint'] ?? null,
+            'sort_order' => $validated['sort_order'] ?? ((PickupVehicleType::max('sort_order') ?? 0) + 1),
+            'is_active' => $validated['is_active'] ?? true,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pickup vehicle type created.',
+            'vehicle_type' => $this->pickupVehiclePayload($type),
+        ], 201);
+    }
+
+    public function updatePickupVehicle(Request $request, PickupVehicleType $pickupVehicleType): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:80', Rule::unique('pickup_vehicle_types', 'name')->ignore($pickupVehicleType->id)],
+            'capacity_hint' => ['nullable', 'string', 'max:180'],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $pickupVehicleType->update([
+            'name' => $validated['name'],
+            'slug' => Str::slug($validated['name']),
+            'capacity_hint' => $validated['capacity_hint'] ?? null,
+            'sort_order' => $validated['sort_order'] ?? $pickupVehicleType->sort_order,
+            'is_active' => $validated['is_active'] ?? $pickupVehicleType->is_active,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pickup vehicle type updated.',
+            'vehicle_type' => $this->pickupVehiclePayload($pickupVehicleType->fresh()),
+        ]);
+    }
+
+    public function togglePickupVehicle(PickupVehicleType $pickupVehicleType): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $pickupVehicleType->update(['is_active' => !$pickupVehicleType->is_active]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pickup vehicle type status updated.',
+            'vehicle_type' => $this->pickupVehiclePayload($pickupVehicleType->fresh()),
+        ]);
+    }
+
+    public function deletePickupVehicle(PickupVehicleType $pickupVehicleType): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $pickupVehicleType->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pickup vehicle type deleted.',
+        ]);
+    }
+
+    private function pickupVehiclePayload(PickupVehicleType $type): array
+    {
+        return [
+            'id' => $type->id,
+            'name' => $type->name,
+            'slug' => $type->slug,
+            'capacity_hint' => $type->capacity_hint,
+            'sort_order' => $type->sort_order,
+            'is_active' => $type->is_active,
+        ];
+    }
+
+    private function authorizeSettingsEdit(): void
+    {
+        abort_unless(auth('admin')->user()?->hasPermission('settings.edit'), 403);
     }
 
     /**

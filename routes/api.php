@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\VendorLocationController;
 use App\Http\Controllers\Api\V1\VendorProfileController;
 use App\Http\Controllers\Api\V1\VendorEarningsController;
 use App\Http\Controllers\Api\V1\VendorNotificationController;
+use App\Http\Controllers\Api\V1\VendorPickupVehicleTypeController;
 use App\Http\Controllers\Api\V1\VendorShipmentController;
 use App\Http\Controllers\Api\V1\VendorShipmentItemController;
 use App\Http\Controllers\Api\V1\DriverNotificationController;
@@ -50,6 +51,7 @@ Route::prefix('v1/vendor')->middleware(['auth:sanctum', 'vendor.active'])->group
     Route::get('regions', [VendorLocationController::class, 'regions']);
     Route::get('regions/{region}/districts', [VendorLocationController::class, 'districts']);
     Route::get('locations/search', [VendorLocationController::class, 'searchLocations']);
+    Route::get('pickup-vehicle-types', [VendorPickupVehicleTypeController::class, 'index']);
 
     // Shipment endpoints
     Route::get('shipments', [VendorShipmentController::class, 'index']);

@@ -7,10 +7,12 @@ use App\Enums\ShipmentStatus;
 use App\Models\Invoice;
 use App\Models\OtpCode;
 use App\Models\PickupAssignment;
+use App\Models\PickupVehicleType;
 use App\Models\PlatformSetting;
 use App\Models\PickupItemConfirmation;
 use App\Models\PickupPhoto;
 use App\Models\Shipment;
+use App\Models\ShipmentPickupVehicleRequest;
 use App\Models\ShipmentItem;
 use App\Models\Vendor;
 use App\Enums\ItemStatus;
@@ -44,6 +46,7 @@ class ShipmentService
             'pickupAssignment.driver',
             'pickupAssignment.targetWarehouse',
             'pickupAssignment.receivedWarehouse',
+            'pickupVehicleRequests.vehicleType',
             'charges',
         ];
 
@@ -156,7 +159,10 @@ class ShipmentService
         $payload['status'] = ShipmentStatus::DRAFT;
 
         $shipment = $vendor->shipments()->create($payload);
-        $shipment->load(['deliveryRegion', 'deliveryDistrict', 'pickupRegion', 'pickupDistrict', 'items']);
+        if (array_key_exists('pickup_vehicles', $data)) {
+            $this->syncPickupVehicleRequests($shipment, $data['pickup_vehicles'] ?? []);
+        }
+        $shipment->load(['deliveryRegion', 'deliveryDistrict', 'pickupRegion', 'pickupDistrict', 'items', 'pickupVehicleRequests.vehicleType']);
 
         $this->activityLogService->logVendor(
             vendor: $vendor,
@@ -194,6 +200,7 @@ class ShipmentService
             'pickupAssignment.itemConfirmations',
             'pickupAssignment.photos',
             'pickupAssignment.warehouseReceipt.items',
+            'pickupVehicleRequests.vehicleType',
             'charges',
         ]);
 
@@ -238,7 +245,10 @@ class ShipmentService
 
         $payload = $this->buildShipmentPayload($data, $shipment);
         $shipment->update($payload);
-        $shipment->load(['deliveryRegion', 'deliveryDistrict', 'pickupRegion', 'pickupDistrict', 'items']);
+        if (array_key_exists('pickup_vehicles', $data)) {
+            $this->syncPickupVehicleRequests($shipment, $data['pickup_vehicles'] ?? []);
+        }
+        $shipment->load(['deliveryRegion', 'deliveryDistrict', 'pickupRegion', 'pickupDistrict', 'items', 'pickupVehicleRequests.vehicleType']);
 
         $this->activityLogService->logVendor(
             vendor: $shipment->vendor,
@@ -340,7 +350,7 @@ class ShipmentService
             'submitted_at' => now(),
         ]);
 
-        $shipment->load(['deliveryRegion', 'deliveryDistrict', 'pickupRegion', 'pickupDistrict', 'items']);
+        $shipment->load(['deliveryRegion', 'deliveryDistrict', 'pickupRegion', 'pickupDistrict', 'items', 'pickupVehicleRequests.vehicleType']);
 
         $this->activityLogService->logVendor(
             vendor: $shipment->vendor,
@@ -417,6 +427,41 @@ class ShipmentService
         }
 
         return $payload;
+    }
+
+    private function syncPickupVehicleRequests(Shipment $shipment, array $vehicles): void
+    {
+        $shipment->pickupVehicleRequests()->delete();
+
+        $vehicles = collect($vehicles)
+            ->map(fn ($row) => [
+                'vehicle_type_id' => (int) ($row['vehicle_type_id'] ?? 0),
+                'quantity' => max(1, (int) ($row['quantity'] ?? 1)),
+            ])
+            ->filter(fn ($row) => $row['vehicle_type_id'] > 0)
+            ->values();
+
+        if ($vehicles->isEmpty()) {
+            return;
+        }
+
+        $types = PickupVehicleType::query()
+            ->whereIn('id', $vehicles->pluck('vehicle_type_id')->all())
+            ->get()
+            ->keyBy('id');
+
+        foreach ($vehicles as $row) {
+            $type = $types->get($row['vehicle_type_id']);
+            if (!$type) {
+                continue;
+            }
+
+            $shipment->pickupVehicleRequests()->create([
+                'pickup_vehicle_type_id' => $type->id,
+                'vehicle_name_snapshot' => $type->name,
+                'quantity' => $row['quantity'],
+            ]);
+        }
     }
 
     private function hasValidPickupLocation(Shipment $shipment): bool
@@ -591,6 +636,8 @@ class ShipmentService
                     ? null
                     : $warehouseReceivedQuantity - $vendorDeclaredQuantity,
             ],
+            'pickup_vehicles' => $this->transformPickupVehicleRequests($shipment),
+            'pickup_vehicle_summary' => $this->pickupVehicleSummary($shipment),
         ];
 
         if ($includeLegacyDeliveryAliases) {
@@ -677,6 +724,38 @@ class ShipmentService
         return collect($shipments)->map(
             fn($shipment) => $this->transformShipment($shipment, $options)
         )->values()->toArray();
+    }
+
+    private function transformPickupVehicleRequests(Shipment $shipment): array
+    {
+        if (!$shipment->relationLoaded('pickupVehicleRequests')) {
+            return [];
+        }
+
+        return $shipment->pickupVehicleRequests
+            ->map(fn (ShipmentPickupVehicleRequest $request) => [
+                'id' => $request->id,
+                'vehicle_type_id' => $request->pickup_vehicle_type_id,
+                'name' => $request->vehicleType?->name ?? $request->vehicle_name_snapshot,
+                'vehicle_name' => $request->vehicleType?->name ?? $request->vehicle_name_snapshot,
+                'vehicle_name_snapshot' => $request->vehicle_name_snapshot,
+                'capacity_hint' => $request->vehicleType?->capacity_hint,
+                'quantity' => $request->quantity,
+            ])
+            ->values()
+            ->toArray();
+    }
+
+    private function pickupVehicleSummary(Shipment $shipment): ?string
+    {
+        $vehicles = $this->transformPickupVehicleRequests($shipment);
+        if (empty($vehicles)) {
+            return null;
+        }
+
+        return collect($vehicles)
+            ->map(fn (array $row) => number_format((int) $row['quantity']) . ' ' . ($row['name'] ?? 'Vehicle'))
+            ->implode(', ');
     }
 
     private function transformPickupItemConfirmationForApi(?PickupItemConfirmation $confirmation): ?array
