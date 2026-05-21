@@ -169,10 +169,10 @@
                     <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">HQ Controls</div>
                     <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
 
-                    <a href="{{ route('admin.operations.shipments.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.operations.shipments.*') || request()->routeIs('admin.shipments.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <a href="{{ route('admin.orders.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.orders.*') || request()->routeIs('admin.operations.orders.*') || request()->routeIs('admin.operations.shipments.*') || request()->routeIs('admin.shipments.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                         <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></div>
-                        <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Shipments</span>
-                        <template x-if="sidebarCollapsed"><span class="wh-tooltip">Shipments</span></template>
+                        <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Orders</span>
+                        <template x-if="sidebarCollapsed"><span class="wh-tooltip">Orders</span></template>
                     </a>
                     @hasPermission('vendors.view')
                         <a href="{{ route('admin.vendors.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.vendors.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
@@ -262,7 +262,7 @@
                             <svg x-show="!searching" class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                             <svg x-show="searching" x-cloak class="w-4 h-4 text-orange-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                         </div>
-                        <input type="text" x-model="query" @input="search()" @focus="if(query.length >= 2) open = true" placeholder="Search shipments, vendors, drivers..." class="w-full h-9 pl-10 pr-16 text-[13px] bg-slate-50/80 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 focus:bg-white transition-all placeholder-slate-400">
+                        <input type="text" x-model="query" @input="search()" @focus="if(query.length >= 2) open = true" placeholder="Search orders, vendors, drivers..." class="w-full h-9 pl-10 pr-16 text-[13px] bg-slate-50/80 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 focus:bg-white transition-all placeholder-slate-400">
                         <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
                             <span class="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded-md border border-slate-200/60 font-medium tracking-wide">⌘K</span>
                         </div>

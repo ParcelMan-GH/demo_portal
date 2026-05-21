@@ -675,7 +675,7 @@ $vendorConfig = [
                                             <p class="mt-1 font-mono text-[11px] font-semibold text-slate-500" x-text="pkg.tracking_code || 'No tracking code'"></p>
                                         </td>
                                         <td class="px-4 py-3 whitespace-nowrap">
-                                            <a :href="'/admin/shipments/' + pkg.shipment_id" class="text-xs font-black text-orange-700 hover:underline" x-text="pkg.shipment_number || '-'"></a>
+                                            <a :href="'/admin/orders/' + pkg.shipment_id" class="text-xs font-black text-orange-700 hover:underline" x-text="pkg.shipment_number || '-'"></a>
                                         </td>
                                         <td class="px-4 py-3">
                                             <p class="font-bold text-slate-800" x-text="pkg.recipient_name || '-'"></p>
@@ -694,7 +694,7 @@ $vendorConfig = [
                                                 x-text="pkg.status_label"></span>
                                         </td>
                                         <td class="px-4 py-3 text-right">
-                                            <a :href="'/admin/shipments/' + pkg.shipment_id" class="inline-flex rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700 hover:bg-orange-100">Open</a>
+                                            <a :href="'/admin/orders/' + pkg.shipment_id" class="inline-flex rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700 hover:bg-orange-100">Open</a>
                                         </td>
                                     </tr>
                                 </template>
@@ -715,13 +715,13 @@ $vendorConfig = [
                                     <span class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black" :class="statusBadgeClass(pkg.status)" x-text="pkg.status_label"></span>
                                 </div>
                                 <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
-                                    <div><p class="font-black uppercase tracking-wide text-slate-400">Shipment</p><a :href="'/admin/shipments/' + pkg.shipment_id" class="font-black text-orange-700" x-text="pkg.shipment_number || '-'"></a></div>
+                                    <div><p class="font-black uppercase tracking-wide text-slate-400">Shipment</p><a :href="'/admin/orders/' + pkg.shipment_id" class="font-black text-orange-700" x-text="pkg.shipment_number || '-'"></a></div>
                                     <div><p class="font-black uppercase tracking-wide text-slate-400">Qty</p><p class="font-black text-slate-900" x-text="pkg.quantity || 1"></p></div>
                                     <div><p class="font-black uppercase tracking-wide text-slate-400">Recipient</p><p class="font-bold text-slate-800" x-text="pkg.recipient_name || '-'"></p><p class="font-semibold text-slate-500" x-text="pkg.recipient_phone || '-'"></p></div>
                                     <div><p class="font-black uppercase tracking-wide text-slate-400">Method</p><p class="font-bold text-slate-800" x-text="pkg.delivery_method_label"></p></div>
                                     <div class="col-span-2"><p class="font-black uppercase tracking-wide text-slate-400">Location</p><p class="font-bold text-slate-800" x-text="pkg.location || '-'"></p></div>
                                 </div>
-                                <a :href="'/admin/shipments/' + pkg.shipment_id" class="mt-4 inline-flex rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700">Open</a>
+                                <a :href="'/admin/orders/' + pkg.shipment_id" class="mt-4 inline-flex rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700">Open</a>
                             </div>
                         </template>
                     </div>

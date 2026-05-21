@@ -1,42 +1,42 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Shipment - ' . $shipment->shipment_number)
+@section('title', 'Order - ' . $shipment->shipment_number)
 @section('breadcrumb-parent', 'Operations')
 @section('breadcrumb-current', $shipment->shipment_number)
 
 @php
 $shipmentConfig = [
     'shipment' => $shipment,
-    'saveUrl' => route('admin.shipments.update', $shipment),
-    'itemsEndpoint' => route('admin.shipments.items', $shipment),
-    'trackingEndpoint' => route('admin.shipments.tracking', $shipment),
+    'saveUrl' => route('admin.orders.update', $shipment),
+    'itemsEndpoint' => route('admin.orders.items', $shipment),
+    'trackingEndpoint' => route('admin.orders.tracking', $shipment),
     'assignDriverEndpoint' => route('admin.assignments.assign', $shipment),
     'cancelAssignmentEndpointTemplate' => route('admin.assignments.cancel', ['pickupAssignment' => '__ASSIGNMENT__']),
     'updateAssignmentEndpointTemplate' => route('admin.assignments.update', ['pickupAssignment' => '__ASSIGNMENT__']),
     'availableDriversEndpoint' => route('admin.assignments.available-drivers'),
     'availableWarehousesEndpoint' => route('admin.assignments.available-warehouses'),
     'receiveAssignmentEndpointTemplate' => route('admin.assignments.receive', ['pickupAssignment' => '__ASSIGNMENT__']),
-    'updateFulfillmentTypeEndpoint' => route('admin.shipments.update-fulfillment-type', $shipment),
-    'duplicateEndpoint' => route('admin.shipments.duplicate', $shipment),
-    'custodyDataEndpoint' => route('admin.shipments.custody-data', $shipment),
-    'createRunFromClaimsEndpoint' => route('admin.shipments.create-run-from-claims'),
-    'adminCompletePickupEndpoint' => route('admin.shipments.admin-complete-pickup', $shipment),
-    'chargesIndexEndpoint' => route('admin.shipments.charges.index', $shipment),
-    'chargesStoreEndpoint' => route('admin.shipments.charges.store', $shipment),
-    'chargesSeedPickupFeeEndpoint' => route('admin.shipments.charges.seed-pickup-fee', $shipment),
-    'chargesUpdateEndpointTemplate' => route('admin.shipments.charges.update', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
-    'chargesMarkPaidEndpointTemplate' => route('admin.shipments.charges.mark-paid', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
-    'chargesWaiveEndpointTemplate' => route('admin.shipments.charges.waive', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
-    'chargesCancelEndpointTemplate' => route('admin.shipments.charges.cancel', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
-    'receivingDataEndpoint' => route('admin.shipments.receiving-data', $shipment),
-    'addPackageUrl' => route('admin.shipments.packages.add', $shipment),
-    'deletePackageUrlTemplate' => route('admin.shipments.packages.delete', ['shipment' => $shipment->id, 'item' => '__PKG__']),
-    'receivingDetailsSaveEndpoint' => route('admin.shipments.receiving.details', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
-    'receiveSaveEndpoint' => route('admin.shipments.receiving.save', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
-    'receivePrintLabelEndpoint' => route('admin.shipments.receiving.print-label', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
-    'receiveFinalizeEndpoint' => route('admin.shipments.receiving.finalize', $shipment),
-    'splitPackageUrlTemplate' => route('admin.shipments.packages.split', ['shipment' => $shipment->id, 'item' => '__PKG__']),
-    'autoGroupByPhoneEndpoint' => route('admin.shipments.auto-group-by-phone', $shipment),
+    'updateFulfillmentTypeEndpoint' => route('admin.orders.update-fulfillment-type', $shipment),
+    'duplicateEndpoint' => route('admin.orders.duplicate', $shipment),
+    'custodyDataEndpoint' => route('admin.orders.custody-data', $shipment),
+    'createRunFromClaimsEndpoint' => route('admin.orders.create-run-from-claims'),
+    'adminCompletePickupEndpoint' => route('admin.orders.admin-complete-pickup', $shipment),
+    'chargesIndexEndpoint' => route('admin.orders.charges.index', $shipment),
+    'chargesStoreEndpoint' => route('admin.orders.charges.store', $shipment),
+    'chargesSeedPickupFeeEndpoint' => route('admin.orders.charges.seed-pickup-fee', $shipment),
+    'chargesUpdateEndpointTemplate' => route('admin.orders.charges.update', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
+    'chargesMarkPaidEndpointTemplate' => route('admin.orders.charges.mark-paid', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
+    'chargesWaiveEndpointTemplate' => route('admin.orders.charges.waive', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
+    'chargesCancelEndpointTemplate' => route('admin.orders.charges.cancel', ['shipment' => $shipment->id, 'charge' => '__CHARGE__']),
+    'receivingDataEndpoint' => route('admin.orders.receiving-data', $shipment),
+    'addPackageUrl' => route('admin.orders.packages.add', $shipment),
+    'deletePackageUrlTemplate' => route('admin.orders.packages.delete', ['shipment' => $shipment->id, 'item' => '__PKG__']),
+    'receivingDetailsSaveEndpoint' => route('admin.orders.receiving.details', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
+    'receiveSaveEndpoint' => route('admin.orders.receiving.save', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
+    'receivePrintLabelEndpoint' => route('admin.orders.receiving.print-label', ['shipment' => $shipment->id, 'item' => '__ITEM__']),
+    'receiveFinalizeEndpoint' => route('admin.orders.receiving.finalize', $shipment),
+    'splitPackageUrlTemplate' => route('admin.orders.packages.split', ['shipment' => $shipment->id, 'item' => '__PKG__']),
+    'autoGroupByPhoneEndpoint' => route('admin.orders.auto-group-by-phone', $shipment),
     'townsSearchUrl' => route('admin.locations.towns.data'),
     'canApproveReceivingDiscrepancy' => Auth::guard('admin')->user()?->hasPermission('warehouse.receiving.approve_discrepancy') ?? false,
     'canManage' => $canManage,
@@ -103,7 +103,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
             @endphp
 
             <div class="flex flex-wrap items-start justify-between gap-3">
-                <a href="{{ route('admin.operations.shipments.index') }}" class="inline-flex h-11 w-auto shrink-0 items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 text-sm font-black text-slate-100 transition hover:bg-white/15">
+                <a href="{{ route('admin.orders.index') }}" class="inline-flex h-11 w-auto shrink-0 items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 text-sm font-black text-slate-100 transition hover:bg-white/15">
                     <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                     </svg>
@@ -135,8 +135,8 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                             <span x-text="assignment ? 'Reassign Rider' : 'Assign Rider'"></span>
                         </button>
                         <button @@click="duplicateShipment()" :disabled="duplicating"
-                                title="Duplicate shipment"
-                                aria-label="Duplicate shipment"
+                                title="Duplicate order"
+                                aria-label="Duplicate order"
                                 class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-slate-100 transition hover:bg-white/15 disabled:opacity-50">
                             <svg x-show="!duplicating" class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 16H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2m-6 12h8a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2Z"/>
@@ -160,7 +160,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                         </div>
 
                         <div class="min-w-0">
-                            <p class="text-xs font-black uppercase tracking-[0.16em] text-orange-200">Shipment Workspace</p>
+                            <p class="text-xs font-black uppercase tracking-[0.16em] text-orange-200">Order Workspace</p>
                             <h1 class="mt-1 max-w-4xl break-words text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl xl:text-2xl 2xl:text-3xl">{{ $shipment->shipment_number }}</h1>
                             <div class="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-300">
                                 <span>{{ $shipment->vendor->name }}</span>
@@ -251,7 +251,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
         <section x-data="{ timelineOpen: false }" class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-300/30">
             <button type="button" @@click="timelineOpen = !timelineOpen" class="flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition hover:bg-slate-50 sm:px-5">
                 <div class="min-w-0">
-                    <p class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Shipment Timeline</p>
+                    <p class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Order Timeline</p>
                     <div class="mt-1 flex min-w-0 flex-wrap items-center gap-2">
                         <span class="text-sm font-black text-slate-950">{{ $latestTimelineEvent['label'] }}</span>
                         <span class="text-slate-300">/</span>
@@ -314,21 +314,21 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 
                 <div class="grid grid-cols-1 xl:grid-cols-5 gap-5">
 
-                    <!-- Left Column: Shipment Info + Packages -->
+                    <!-- Left Column: Order Info + Packages -->
                     <div class="xl:col-span-3 space-y-4">
 
-                        <!-- Card A: Shipment Profile -->
+                        <!-- Card A: Order Profile -->
                         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
                             <div class="flex items-start justify-between gap-3 mb-4">
                                 <div>
-                                    <h3 class="text-sm font-bold text-slate-900">Shipment Profile</h3>
+                                    <h3 class="text-sm font-bold text-slate-900">Order Profile</h3>
                                     <p class="text-xs text-slate-500 mt-0.5">Core details and workflow context</p>
                                 </div>
                                 <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold" :class="shipmentDestinationModeBadgeClass()" x-text="shipmentDestinationModeLabel()"></span>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div class="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Shipment #</p>
+                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Order #</p>
                                     <p class="text-sm font-bold text-slate-900" x-text="shipment.shipment_number || '—'"></p>
                                 </div>
                                 <div class="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
@@ -654,7 +654,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                         </div>
                         <div>
                             <h3 class="text-base font-bold text-slate-900">Assignment History</h3>
-                            <p class="text-xs text-slate-500">All pickup assignments for this shipment</p>
+                            <p class="text-xs text-slate-500">All pickup assignments for this order</p>
                         </div>
                     </div>
                     <button x-show="canManage && shipment.status === 'submitted'" @@click="loadAssignmentDependencies(); assignDriverModalOpen = true" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-violet-500/25 transition-all">
@@ -1134,7 +1134,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                 <template x-if="!tracking.loading">
                     <div class="space-y-10">
 
-                        {{-- ─── SECTION 1: Shipment Timeline ─── --}}
+                        {{-- ─── SECTION 1: Order Timeline ─── --}}
                         <div>
                             <!-- Section Header -->
                             <div class="flex items-center justify-between mb-6">
@@ -1145,7 +1145,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                         </svg>
                                     </div>
                                     <div>
-                                        <h3 class="text-base font-bold text-slate-900">Shipment Timeline</h3>
+                                        <h3 class="text-base font-bold text-slate-900">Order Timeline</h3>
                                         <p class="text-xs text-slate-400 mt-0.5">Full pipeline history from creation to delivery</p>
                                     </div>
                                 </div>
@@ -1161,7 +1161,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                         </svg>
                                     </div>
                                     <p class="text-slate-600 text-sm font-bold mb-1">No events yet</p>
-                                    <p class="text-slate-400 text-xs max-w-xs leading-relaxed">Timeline events appear as this shipment progresses through the pipeline</p>
+                                    <p class="text-slate-400 text-xs max-w-xs leading-relaxed">Timeline events appear as this order progresses through the pipeline</p>
                                 </div>
                             </template>
 
@@ -1682,7 +1682,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                     <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h3 class="text-sm font-bold text-slate-900">Charges Ledger</h3>
-                            <p class="text-xs text-slate-500">Shipment-level pickup and station charges.</p>
+                            <p class="text-xs text-slate-500">Order-level pickup and station charges.</p>
                         </div>
                         <div class="flex items-center gap-2">
                             <button x-show="canManageCharges" @@click="openAddCharge()"
@@ -1709,7 +1709,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                             <tbody>
                                 <tr x-show="chargesData.length === 0">
                                     <td colspan="6" class="px-4 py-10 text-center text-sm text-slate-400">
-                                        No charges on this shipment yet.
+                                        No charges on this order yet.
                                     </td>
                                 </tr>
                                 <template x-for="charge in chargesData" :key="charge.id">
@@ -1820,7 +1820,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                     'finalizeClick' => 'openFinalizeConfirm()',
                     'finalizeDisabled' => '!canFinalizeReceiving()',
                     'finalizeLabelExpr' => 'finalizeReceivingButtonLabel()',
-                    'finalizeSubtitle' => 'Mark all packages as received and move shipment to warehouse status.',
+                    'finalizeSubtitle' => 'Mark all packages as received and move order to warehouse status.',
                     'showPickupFee' => false,
                     'showDropOffSelect' => false,
                 ])
@@ -2035,7 +2035,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 	                            'finalizeClick' => 'openFinalizeConfirm()',
 	                            'finalizeDisabled' => '!canFinalizeReceiving()',
 	                            'finalizeLabelExpr' => 'finalizeReceivingButtonLabel()',
-	                            'finalizeSubtitle' => 'Mark all packages as received and move shipment to warehouse status.',
+	                            'finalizeSubtitle' => 'Mark all packages as received and move order to warehouse status.',
 	                        ])
 
                             <!-- Charges Ledger -->
@@ -2051,7 +2051,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                     <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
                                             <h3 class="text-sm font-bold text-slate-900">Charges Ledger</h3>
-                                            <p class="text-xs text-slate-500">Shipment-level pickup and station charges.</p>
+                                            <p class="text-xs text-slate-500">Order-level pickup and station charges.</p>
                                         </div>
                                         <div class="flex items-center gap-2">
                                             <button x-show="canManageCharges" @@click="openAddCharge()"
@@ -2077,7 +2077,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                             <tbody>
                                                 <tr x-show="chargesData.length === 0">
                                                     <td colspan="6" class="px-4 py-10 text-center text-sm text-slate-400">
-                                                        No charges on this shipment yet.
+                                                        No charges on this order yet.
                                                     </td>
                                                 </tr>
                                                 <template x-for="charge in chargesData" :key="charge.id">
@@ -2150,7 +2150,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 	                        <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
 	                            <div>
 	                                <h3 class="text-lg font-bold text-slate-900">Driver Assignment History</h3>
-	                                <p class="mt-1 text-sm text-slate-500">Pickup driver assignment records for this shipment.</p>
+	                                <p class="mt-1 text-sm text-slate-500">Pickup driver assignment records for this order.</p>
 	                            </div>
 	                            <button type="button" @@click="assignmentHistoryModalOpen = false" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700">
 	                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -2213,7 +2213,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 	                        <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
 	                            <div>
 	                                <h3 class="text-lg font-bold text-slate-900">Tracking History</h3>
-	                                <p class="mt-1 text-sm text-slate-500">Shipment timeline events from creation through delivery.</p>
+	                                <p class="mt-1 text-sm text-slate-500">Order timeline events from creation through delivery.</p>
 	                            </div>
 	                            <button type="button" @@click="trackingHistoryModalOpen = false" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700">
 	                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>

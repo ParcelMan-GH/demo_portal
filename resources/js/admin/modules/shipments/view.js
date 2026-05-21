@@ -207,7 +207,7 @@ function shipmentShow() {
             if (this.isPerItemMode()) {
                 return item.delivery_location_title || '-';
             }
-            return this.shipment?.delivery_region?.name || 'Shared shipment destination';
+            return this.shipment?.delivery_region?.name || 'Shared order destination';
         },
 
         itemLocationSubtitle(item) {
@@ -270,7 +270,7 @@ function shipmentShow() {
         },
 
         async duplicateShipment() {
-            if (!confirm('Create a duplicate of this shipment as a draft? All packages and photos will be copied.')) return;
+            if (!confirm('Create a duplicate of this order as a draft? All packages and photos will be copied.')) return;
             this.duplicating = true;
             try {
                 const url = this.config.duplicateEndpoint;
@@ -1359,7 +1359,7 @@ function shipmentShow() {
 
             const message = newMode === 'per_item'
                 ? 'Switch to Multiple Drop-offs? Shared destination details will be copied into packages that do not already have package-level delivery details.'
-                : 'Switch to One Drop-off? Package-level destinations will be replaced by one shared destination for this shipment.';
+                : 'Switch to One Drop-off? Package-level destinations will be replaced by one shared destination for this order.';
 
             if (!confirm(message)) {
                 return;

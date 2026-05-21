@@ -71,7 +71,7 @@
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                             @php
                                 $receiving = [
-                                    ['title' => 'New Parcel', 'desc' => 'Create shipment', 'img' => 'new-parcel.svg', 'route' => route('admin.shipments.create')],
+                                    ['title' => 'Walk-in', 'desc' => 'Create shipment', 'img' => 'new-parcel.svg', 'route' => route('warehouse.walkin.create')],
                                     ['title' => 'Receive Packages', 'desc' => 'In pickup queue', 'img' => 'receive-package.svg', 'route' => route('admin.pickups.index')],
                                     ['title' => 'Package Tracking', 'desc' => 'Custody history', 'img' => 'print-labels.svg', 'route' => route('admin.package-tracking.index')],
                                     ['title' => 'Mark Picked Up', 'desc' => 'Pickup list', 'img' => 'pickup-confirm.svg', 'route' => route('admin.pickups.index')],
@@ -114,7 +114,7 @@
                             @php
                                 $finance = [
                                     ['title' => 'All Invoices', 'desc' => 'Invoice list', 'img' => 'create-invoice.svg', 'route' => route('admin.invoices.index')],
-                                    ['title' => 'Record Payment', 'desc' => 'Per shipment', 'img' => 'record-payment.svg', 'route' => route('admin.shipments.index')],
+                                    ['title' => 'Record Payment', 'desc' => 'Per shipment', 'img' => 'record-payment.svg', 'route' => route('admin.orders.index')],
                                     ['title' => 'Pending Invoices', 'desc' => 'Awaiting response', 'img' => 'pending-invoices.svg', 'route' => route('admin.invoices.index') . '?status=sent'],
                                     ['title' => 'Accepted Invoices', 'desc' => 'Paid / confirmed', 'img' => 'create-invoice.svg', 'route' => route('admin.invoices.index') . '?status=accepted'],
                                 ];
@@ -160,11 +160,11 @@
                 <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
                 <h2 class="text-sm font-bold text-amber-900">{{ $totalNeedsAttention }} parcel{{ $totalNeedsAttention > 1 ? 's' : '' }} need{{ $totalNeedsAttention === 1 ? 's' : '' }} your attention</h2>
             </div>
-            <a href="{{ route('admin.shipments.index') }}?status=submitted" class="text-xs font-semibold text-amber-700 hover:text-amber-900">View all &rarr;</a>
+            <a href="{{ route('admin.orders.index') }}?status=submitted" class="text-xs font-semibold text-amber-700 hover:text-amber-900">View all &rarr;</a>
         </div>
         <div class="divide-y divide-amber-100">
             @foreach($needsAttention as $parcel)
-            <a href="{{ route('admin.shipments.edit', $parcel) }}" class="flex items-center gap-4 px-5 py-3 hover:bg-amber-100/50 transition-colors">
+            <a href="{{ route('admin.orders.edit', $parcel) }}" class="flex items-center gap-4 px-5 py-3 hover:bg-amber-100/50 transition-colors">
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-bold text-slate-900">{{ $parcel->shipment_number }}</span>
@@ -230,11 +230,11 @@
             <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                 <div class="px-5 py-4 flex items-center justify-between border-b border-slate-100">
                     <h2 class="text-sm font-bold text-slate-900">Recent Parcels</h2>
-                    <a href="{{ route('admin.shipments.index') }}" class="text-xs font-semibold text-blue-600 hover:text-blue-800">View all &rarr;</a>
+                    <a href="{{ route('admin.orders.index') }}" class="text-xs font-semibold text-blue-600 hover:text-blue-800">View all &rarr;</a>
                 </div>
                 <div class="divide-y divide-slate-50">
                     @forelse($recentShipments as $shipment)
-                    <a href="{{ route('admin.shipments.show', $shipment) }}" class="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
+                    <a href="{{ route('admin.orders.show', $shipment) }}" class="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
                         <div class="flex-1 min-w-0">
                             <span class="text-sm font-semibold text-slate-900">{{ $shipment->shipment_number }}</span>
                             <span class="text-xs text-slate-400 ml-2">{{ $shipment->vendor?->name }}</span>
@@ -275,19 +275,19 @@
                     <h2 class="text-sm font-bold text-slate-900">Operations</h2>
                 </div>
                 <div class="p-5 space-y-3">
-                    <a href="{{ route('admin.shipments.index') }}?status=submitted" class="flex items-center justify-between py-1 group">
+                    <a href="{{ route('admin.orders.index') }}?status=submitted" class="flex items-center justify-between py-1 group">
                         <span class="text-sm text-slate-600 group-hover:text-slate-900">Submitted</span>
                         <span class="text-sm font-bold text-slate-900">{{ number_format($submitted) }}</span>
                     </a>
-                    <a href="{{ route('admin.shipments.index') }}?status=pickup_assigned" class="flex items-center justify-between py-1 group">
+                    <a href="{{ route('admin.orders.index') }}?status=pickup_assigned" class="flex items-center justify-between py-1 group">
                         <span class="text-sm text-slate-600 group-hover:text-slate-900">Pickup assigned</span>
                         <span class="text-sm font-bold text-slate-900">{{ number_format($pendingPickups) }}</span>
                     </a>
-                    <a href="{{ route('admin.shipments.index') }}?status=at_warehouse" class="flex items-center justify-between py-1 group">
+                    <a href="{{ route('admin.orders.index') }}?status=at_warehouse" class="flex items-center justify-between py-1 group">
                         <span class="text-sm text-slate-600 group-hover:text-slate-900">At warehouse</span>
                         <span class="text-sm font-bold text-slate-900">{{ number_format($atWarehouse) }}</span>
                     </a>
-                    <a href="{{ route('admin.shipments.index') }}?status=out_for_delivery" class="flex items-center justify-between py-1 group">
+                    <a href="{{ route('admin.orders.index') }}?status=out_for_delivery" class="flex items-center justify-between py-1 group">
                         <span class="text-sm text-slate-600 group-hover:text-slate-900">Out for delivery</span>
                         <span class="text-sm font-bold text-orange-600">{{ number_format($outForDelivery) }}</span>
                     </a>

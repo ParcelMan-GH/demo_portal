@@ -22,11 +22,12 @@ function registerPendingReceiptsPage() {
     const pageConfig = {
         endpoint: config.endpoint,
         defaultSort: 'assigned_at',
+        defaultPerPage: 25,
         exportFileName: 'warehouse-incoming-packages',
         printTitle: 'Warehouse Incoming Packages',
         statuses: (config.statuses || []).filter((status) => status.value !== 'assigned'),
         columns: [
-            { key: 'shipment_number', label: 'Shipment #', exportLabel: 'Shipment Number' },
+            { key: 'shipment_number', label: 'Order #', exportLabel: 'Order Number' },
             { key: 'driver_name', label: 'Driver', exportLabel: 'Driver Name' },
             { key: 'driver_phone', label: 'Driver Phone' },
             { key: 'status', label: 'Status' },
@@ -41,6 +42,7 @@ function registerPendingReceiptsPage() {
 
         return {
             ...page,
+            filtersOpen: false,
             dateFrom: '',
             dateTo: '',
             dateRangePicker: null,
@@ -89,16 +91,12 @@ function registerPendingReceiptsPage() {
                         this.dateFrom = picker.startDate.format('YYYY-MM-DD');
                         this.dateTo = picker.endDate.format('YYYY-MM-DD');
                         $input.val(`${this.dateFrom} - ${this.dateTo}`);
-                        this.meta.current_page = 1;
-                        this.loadData();
                     });
 
                     $input.on('cancel.daterangepicker', () => {
                         this.dateFrom = '';
                         this.dateTo = '';
                         $input.val('');
-                        this.meta.current_page = 1;
-                        this.loadData();
                     });
 
                     this.dateRangePicker = $input.data('daterangepicker');
@@ -135,6 +133,37 @@ function registerPendingReceiptsPage() {
                         return loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js');
                     })
                     .then(setupPicker);
+            },
+
+            applyFilters() {
+                this.meta.current_page = 1;
+                this.loadData();
+            },
+
+            clearFilters() {
+                this.statusFilter = '';
+                this.statusFilterName = 'All statuses';
+                this.dateFrom = '';
+                this.dateTo = '';
+
+                if (this.$refs.dateRange) {
+                    this.$refs.dateRange.value = '';
+                    const picker = window.$?.(this.$refs.dateRange)?.data?.('daterangepicker');
+                    if (picker) {
+                        picker.setStartDate(window.moment ? window.moment() : new Date());
+                        picker.setEndDate(window.moment ? window.moment() : new Date());
+                    }
+                }
+
+                this.meta.current_page = 1;
+                this.loadData();
+            },
+
+            activeFilterCount() {
+                let count = 0;
+                if (this.statusFilter) count += 1;
+                if (this.dateFrom || this.dateTo) count += 1;
+                return count;
             },
 
             statusBadgeClass(status) {

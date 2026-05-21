@@ -197,7 +197,7 @@ class ReceiptController extends AdminShipmentController
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function (Builder $q) use ($search) {
                 $q->whereHas('shipment', fn (Builder $sq) => $sq->where('shipment_number', 'like', "%{$search}%"))
-                    ->orWhereHas('driver', fn (Builder $dq) => $dq->where('name', 'like', "%{$search}%"));
+                    ->orWhereHas('driver', fn (Builder $dq) => $dq->where('name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%"));
             });
         }
 
@@ -739,10 +739,20 @@ class ReceiptController extends AdminShipmentController
         $this->authorizePermission('warehouse.receiving.manage');
 
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        $drivers = Driver::query()
+            ->whereIn('id', PickupAssignment::query()
+                ->where('received_warehouse_id', $warehouse->id)
+                ->whereNotNull('received_at')
+                ->whereNotNull('driver_id')
+                ->select('driver_id')
+            )
+            ->orderBy('name')
+            ->get(['id', 'name', 'phone']);
 
         return view('warehouse.pickups.received', [
             'warehouse' => $warehouse,
-            'statuses' => $this->allPickupStatuses(),
+            'statuses' => $this->receivedPickupStatuses(),
+            'drivers' => $drivers,
         ]);
     }
 
@@ -764,6 +774,42 @@ class ReceiptController extends AdminShipmentController
             $query->where('status', $status);
         }
 
+        if ($driverId = $request->input('driver_id')) {
+            $query->where('driver_id', $driverId);
+        }
+
+        if ($notesState = $request->input('notes')) {
+            if ($notesState === 'with_notes') {
+                $query->whereNotNull('receive_notes')->where('receive_notes', '!=', '');
+            } elseif ($notesState === 'without_notes') {
+                $query->where(fn (Builder $q) => $q->whereNull('receive_notes')->orWhere('receive_notes', ''));
+            }
+        }
+
+        if (($min = $request->input('driver_qty_min')) !== null && $min !== '') {
+            $query->where('driver_picked_quantity', '>=', (int) $min);
+        }
+
+        if (($max = $request->input('driver_qty_max')) !== null && $max !== '') {
+            $query->where('driver_picked_quantity', '<=', (int) $max);
+        }
+
+        if ($assignedFrom = $request->input('assigned_from')) {
+            $query->whereDate('assigned_at', '>=', $assignedFrom);
+        }
+
+        if ($assignedTo = $request->input('assigned_to')) {
+            $query->whereDate('assigned_at', '<=', $assignedTo);
+        }
+
+        if ($arrivedFrom = $request->input('arrived_from')) {
+            $query->whereDate('arrived_warehouse_at', '>=', $arrivedFrom);
+        }
+
+        if ($arrivedTo = $request->input('arrived_to')) {
+            $query->whereDate('arrived_warehouse_at', '<=', $arrivedTo);
+        }
+
         if ($dateFrom = $request->input('date_from')) {
             $query->whereDate('received_at', '>=', $dateFrom);
         }
@@ -772,10 +818,41 @@ class ReceiptController extends AdminShipmentController
             $query->whereDate('received_at', '<=', $dateTo);
         }
 
+        if ($receiptResult = $request->input('receipt_result')) {
+            match ($receiptResult) {
+                'matched' => $query->whereDoesntHave('warehouseReceipt.items', function (Builder $itemQuery) {
+                    $itemQuery->whereColumn('received_quantity', '!=', 'expected_quantity')
+                        ->orWhere('damaged_quantity', '>', 0);
+                }),
+                'discrepancy' => $query->whereHas('warehouseReceipt.items', function (Builder $itemQuery) {
+                    $itemQuery->whereColumn('received_quantity', '!=', 'expected_quantity')
+                        ->orWhere('damaged_quantity', '>', 0);
+                }),
+                'shortage' => $query->whereHas('warehouseReceipt.items', fn (Builder $itemQuery) => $itemQuery->whereColumn('received_quantity', '<', 'expected_quantity')),
+                'overage' => $query->whereHas('warehouseReceipt.items', fn (Builder $itemQuery) => $itemQuery->whereColumn('received_quantity', '>', 'expected_quantity')),
+                'damaged' => $query->whereHas('warehouseReceipt.items', fn (Builder $itemQuery) => $itemQuery->where('damaged_quantity', '>', 0)),
+                default => null,
+            };
+        }
+
         $sortBy = $request->input('sort', 'received_at');
         $sortDirection = $request->input('direction', 'desc') === 'asc' ? 'asc' : 'desc';
         $allowedSorts = ['assigned_at', 'received_at', 'arrived_warehouse_at', 'status', 'created_at'];
-        if (in_array($sortBy, $allowedSorts, true)) {
+        if ($sortBy === 'shipment_number') {
+            $query->orderBy(
+                Shipment::select('shipment_number')
+                    ->whereColumn('shipments.id', 'pickup_assignments.shipment_id')
+                    ->limit(1),
+                $sortDirection
+            );
+        } elseif ($sortBy === 'driver_name') {
+            $query->orderBy(
+                Driver::select('name')
+                    ->whereColumn('drivers.id', 'pickup_assignments.driver_id')
+                    ->limit(1),
+                $sortDirection
+            );
+        } elseif (in_array($sortBy, $allowedSorts, true)) {
             $query->orderBy($sortBy, $sortDirection);
         } else {
             $query->latest('received_at');
@@ -1111,6 +1188,14 @@ class ReceiptController extends AdminShipmentController
             'value' => $status->value,
             'label' => $this->statusLabel($status->value),
         ], PickupAssignmentStatus::cases());
+    }
+
+    private function receivedPickupStatuses(): array
+    {
+        return [[
+            'value' => PickupAssignmentStatus::COMPLETED->value,
+            'label' => 'Received',
+        ]];
     }
 
     private function statusLabel(?string $status): string

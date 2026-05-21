@@ -1,19 +1,32 @@
 import './view.js';
 
 /**
- * Shipments page Alpine component
+ * Orders page Alpine component
  */
 
-function buildShipmentsTable(config) {
+function buildOrdersTable(config) {
     return {
         endpoint: config.endpoint,
         exportEndpoint: config.exportEndpoint,
         csrfToken: config.csrfToken,
         statuses: config.statuses || [],
         pickupStatuses: config.pickupStatuses || [],
+        sources: config.sources || [],
+        destinationModes: config.destinationModes || [],
+        fulfillmentTypes: config.fulfillmentTypes || [],
+        deliveryPreferences: config.deliveryPreferences || [],
+        regions: config.regions || [],
         warehouses: config.warehouses || [],
         drivers: config.drivers || [],
         shipments: [],
+        summary: {
+            total: 0,
+            needs_driver: 0,
+            assigned_pickup: 0,
+            picked_up: 0,
+            received_warehouse: 0,
+            discrepancies: 0,
+        },
         meta: {
             current_page: 1,
             from: 0,
@@ -27,24 +40,46 @@ function buildShipmentsTable(config) {
         search: '',
         statusFilter: '',
         pickupStatusFilter: '',
+        sourceFilter: '',
+        destinationModeFilter: '',
+        deliveryPreferenceFilter: '',
+        fulfillmentTypeFilter: '',
         assignmentStateFilter: '',
         warehouseFilter: '',
         driverFilter: '',
+        pickupRegionFilter: '',
+        deliveryRegionFilter: '',
+        quantityStateFilter: '',
+        summaryStateFilter: '',
+        itemsMin: '',
+        itemsMax: '',
+        vendorQtyMin: '',
+        vendorQtyMax: '',
+        driverQtyMin: '',
+        driverQtyMax: '',
         createdFrom: '',
         createdTo: '',
-        dateRangePicker: null,
+        submittedFrom: '',
+        submittedTo: '',
+        assignedFrom: '',
+        assignedTo: '',
+        pickedFrom: '',
+        pickedTo: '',
+        receivedFrom: '',
+        receivedTo: '',
+        dateRangePickers: {},
         perPage: 50,
         sortBy: 'created_at',
         sortDirection: 'desc',
         columns: [
-            { key: 'shipment_number', label: 'Shipment #' },
+            { key: 'shipment_number', label: 'Order #' },
             { key: 'vendor', label: 'Vendor' },
             { key: 'pickup_contact', label: 'Pickup Contact' },
             { key: 'pickup_location', label: 'Pickup Location' },
             { key: 'target_warehouse', label: 'Drop-off Warehouse' },
             { key: 'pickup_driver', label: 'Pickup Driver' },
             { key: 'items', label: 'Packages' },
-            { key: 'status', label: 'Shipment Status' },
+            { key: 'status', label: 'Order Status' },
             { key: 'pickup_status', label: 'Pickup Status' },
             { key: 'submitted_at', label: 'Submitted At' },
             { key: 'actions', label: 'Actions' },
@@ -62,6 +97,14 @@ function buildShipmentsTable(config) {
             submitted_at: true,
             actions: true,
         },
+        statCards: [
+            { key: 'total', label: 'Total Orders', icon: 'package', iconClass: 'bg-slate-50 text-slate-700 ring-slate-200' },
+            { key: 'needs_driver', label: 'Needs Driver', icon: 'user', iconClass: 'bg-amber-50 text-amber-700 ring-amber-100' },
+            { key: 'assigned_pickup', label: 'Assigned / Pickup', icon: 'truck', iconClass: 'bg-blue-50 text-blue-700 ring-blue-100' },
+            { key: 'picked_up', label: 'Picked Up', icon: 'check', iconClass: 'bg-indigo-50 text-indigo-700 ring-indigo-100' },
+            { key: 'received_warehouse', label: 'Received at Warehouse', icon: 'warehouse', iconClass: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },
+            { key: 'discrepancies', label: 'Discrepancies', icon: 'alert', iconClass: 'bg-rose-50 text-rose-700 ring-rose-100' },
+        ],
 
         init() {
             this.initDateRange();
@@ -81,14 +124,7 @@ function buildShipmentsTable(config) {
                     direction: this.sortDirection,
                 });
 
-                if (this.search) params.append('search', this.search);
-                if (this.statusFilter) params.append('status', this.statusFilter);
-                if (this.pickupStatusFilter) params.append('pickup_status', this.pickupStatusFilter);
-                if (this.assignmentStateFilter) params.append('assignment_state', this.assignmentStateFilter);
-                if (this.warehouseFilter) params.append('target_warehouse_id', this.warehouseFilter);
-                if (this.driverFilter) params.append('driver_id', this.driverFilter);
-                if (this.createdFrom) params.append('date_from', this.createdFrom);
-                if (this.createdTo) params.append('date_to', this.createdTo);
+                this.appendFilters(params);
 
                 const response = await fetch(`${this.endpoint}?${params}`, {
                     headers: {
@@ -98,18 +134,22 @@ function buildShipmentsTable(config) {
                 });
 
                 if (!response.ok) {
-                    let message = 'Failed to fetch shipments.';
+                    let message = 'Failed to fetch orders.';
                     try {
                         const error = await response.json();
                         message = error.message || message;
                     } catch (_) {
-                        message = response.status === 403 ? 'You are not allowed to load shipments.' : message;
+                        message = response.status === 403 ? 'You are not allowed to load orders.' : message;
                     }
                     throw new Error(message);
                 }
 
                 const result = await response.json();
                 this.shipments = result.data;
+                this.summary = {
+                    ...this.summary,
+                    ...(result.summary || {}),
+                };
                 this.meta = {
                     current_page: result.meta.current_page,
                     from: result.meta.from,
@@ -118,9 +158,9 @@ function buildShipmentsTable(config) {
                     last_page: result.meta.last_page,
                 };
             } catch (error) {
-                console.error('Error loading shipments:', error);
+                console.error('Error loading orders:', error);
                 this.shipments = [];
-                this.loadError = error.message || 'Failed to load shipments.';
+                this.loadError = error.message || 'Failed to load orders.';
             } finally {
                 this.loading = false;
             }
@@ -140,14 +180,34 @@ function buildShipmentsTable(config) {
             this.search = '';
             this.statusFilter = '';
             this.pickupStatusFilter = '';
+            this.sourceFilter = '';
+            this.destinationModeFilter = '';
+            this.deliveryPreferenceFilter = '';
+            this.fulfillmentTypeFilter = '';
             this.assignmentStateFilter = '';
             this.warehouseFilter = '';
             this.driverFilter = '';
+            this.pickupRegionFilter = '';
+            this.deliveryRegionFilter = '';
+            this.quantityStateFilter = '';
+            this.summaryStateFilter = '';
+            this.itemsMin = '';
+            this.itemsMax = '';
+            this.vendorQtyMin = '';
+            this.vendorQtyMax = '';
+            this.driverQtyMin = '';
+            this.driverQtyMax = '';
             this.createdFrom = '';
             this.createdTo = '';
-            if (this.$refs.createdRange) {
-                this.$refs.createdRange.value = '';
-            }
+            this.submittedFrom = '';
+            this.submittedTo = '';
+            this.assignedFrom = '';
+            this.assignedTo = '';
+            this.pickedFrom = '';
+            this.pickedTo = '';
+            this.receivedFrom = '';
+            this.receivedTo = '';
+            ['created', 'submitted', 'assigned', 'picked', 'received'].forEach((key) => this.clearDateFilter(key));
             this.meta.current_page = 1;
             this.loadData();
         },
@@ -156,15 +216,84 @@ function buildShipmentsTable(config) {
             return [
                 this.statusFilter,
                 this.pickupStatusFilter,
+                this.sourceFilter,
+                this.destinationModeFilter,
+                this.deliveryPreferenceFilter,
+                this.fulfillmentTypeFilter,
                 this.assignmentStateFilter,
                 this.warehouseFilter,
                 this.driverFilter,
+                this.pickupRegionFilter,
+                this.deliveryRegionFilter,
+                this.quantityStateFilter,
+                this.summaryStateFilter,
+                this.itemsMin,
+                this.itemsMax,
+                this.vendorQtyMin,
+                this.vendorQtyMax,
+                this.driverQtyMin,
+                this.driverQtyMax,
                 this.createdFrom || this.createdTo,
+                this.submittedFrom || this.submittedTo,
+                this.assignedFrom || this.assignedTo,
+                this.pickedFrom || this.pickedTo,
+                this.receivedFrom || this.receivedTo,
             ].filter(Boolean).length;
+        },
+
+        appendFilters(params) {
+            const filters = {
+                search: this.search,
+                status: this.statusFilter,
+                pickup_status: this.pickupStatusFilter,
+                source: this.sourceFilter,
+                destination_mode: this.destinationModeFilter,
+                delivery_preference: this.deliveryPreferenceFilter,
+                fulfillment_type: this.fulfillmentTypeFilter,
+                assignment_state: this.assignmentStateFilter,
+                target_warehouse_id: this.warehouseFilter,
+                driver_id: this.driverFilter,
+                pickup_region_id: this.pickupRegionFilter,
+                delivery_region_id: this.deliveryRegionFilter,
+                quantity_state: this.quantityStateFilter,
+                summary_state: this.summaryStateFilter,
+                items_min: this.itemsMin,
+                items_max: this.itemsMax,
+                vendor_qty_min: this.vendorQtyMin,
+                vendor_qty_max: this.vendorQtyMax,
+                driver_qty_min: this.driverQtyMin,
+                driver_qty_max: this.driverQtyMax,
+                created_from: this.createdFrom,
+                created_to: this.createdTo,
+                submitted_from: this.submittedFrom,
+                submitted_to: this.submittedTo,
+                assigned_from: this.assignedFrom,
+                assigned_to: this.assignedTo,
+                picked_from: this.pickedFrom,
+                picked_to: this.pickedTo,
+                received_from: this.receivedFrom,
+                received_to: this.receivedTo,
+            };
+
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value !== '' && value !== null && value !== undefined) {
+                    params.append(key, value);
+                }
+            });
         },
 
         toggleColumn(key) {
             this.visibleColumns[key] = !this.visibleColumns[key];
+        },
+
+        applySummaryFilter(key) {
+            this.summaryStateFilter = key === 'total' || this.summaryStateFilter === key ? '' : key;
+            this.meta.current_page = 1;
+            this.loadData();
+        },
+
+        isSummaryActive(key) {
+            return key !== 'total' && this.summaryStateFilter === key;
         },
 
         visibleColumnCount() {
@@ -172,43 +301,52 @@ function buildShipmentsTable(config) {
         },
 
         initDateRange() {
-            if (!this.$refs.createdRange) return;
+            const ranges = [
+                { key: 'created', ref: 'createdRange', from: 'createdFrom', to: 'createdTo' },
+                { key: 'submitted', ref: 'submittedRange', from: 'submittedFrom', to: 'submittedTo' },
+                { key: 'assigned', ref: 'assignedRange', from: 'assignedFrom', to: 'assignedTo' },
+                { key: 'picked', ref: 'pickedRange', from: 'pickedFrom', to: 'pickedTo' },
+                { key: 'received', ref: 'receivedRange', from: 'receivedFrom', to: 'receivedTo' },
+            ];
 
             const setupPicker = () => {
                 if (!window.$ || !window.moment || !window.$.fn.daterangepicker) return;
 
-                const $input = window.$(this.$refs.createdRange);
+                ranges.forEach((range) => {
+                    if (!this.$refs[range.ref]) return;
 
-                $input.daterangepicker({
-                    autoUpdateInput: false,
-                    alwaysShowCalendars: true,
-                    opens: 'right',
-                    locale: {
-                        format: 'YYYY-MM-DD',
-                        cancelLabel: 'Clear',
-                    },
-                    ranges: {
-                        'Today': [window.moment(), window.moment()],
-                        'Yesterday': [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
-                        'Last 7 Days': [window.moment().subtract(6, 'days'), window.moment()],
-                        'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
-                        'This Month': [window.moment().startOf('month'), window.moment().endOf('month')],
-                        'Last Month': [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
-                    },
+                    const $input = window.$(this.$refs[range.ref]);
+
+                    $input.daterangepicker({
+                        autoUpdateInput: false,
+                        alwaysShowCalendars: true,
+                        opens: 'right',
+                        locale: {
+                            format: 'YYYY-MM-DD',
+                            cancelLabel: 'Clear',
+                        },
+                        ranges: {
+                            'Today': [window.moment(), window.moment()],
+                            'Yesterday': [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
+                            'Last 7 Days': [window.moment().subtract(6, 'days'), window.moment()],
+                            'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
+                            'This Month': [window.moment().startOf('month'), window.moment().endOf('month')],
+                            'Last Month': [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
+                        },
+                    });
+
+                    $input.on('apply.daterangepicker', (ev, picker) => {
+                        this[range.from] = picker.startDate.format('YYYY-MM-DD');
+                        this[range.to] = picker.endDate.format('YYYY-MM-DD');
+                        $input.val(`${this[range.from]} - ${this[range.to]}`);
+                    });
+
+                    $input.on('cancel.daterangepicker', () => {
+                        this.clearDateFilter(range.key);
+                    });
+
+                    this.dateRangePickers[range.key] = $input.data('daterangepicker');
                 });
-
-                $input.on('apply.daterangepicker', (ev, picker) => {
-                    this.createdFrom = picker.startDate.format('YYYY-MM-DD');
-                    this.createdTo = picker.endDate.format('YYYY-MM-DD');
-                    $input.val(`${this.createdFrom} - ${this.createdTo}`);
-                    this.loadData();
-                });
-
-                $input.on('cancel.daterangepicker', () => {
-                    this.clearDateFilter();
-                });
-
-                this.dateRangePicker = $input.data('daterangepicker');
             };
 
             if (window.$ && window.moment && window.$.fn.daterangepicker) {
@@ -245,17 +383,26 @@ function buildShipmentsTable(config) {
                 .then(setupPicker);
         },
 
-        clearDateFilter() {
-            this.createdFrom = '';
-            this.createdTo = '';
-            if (this.dateRangePicker) {
-                this.dateRangePicker.setStartDate(window.moment());
-                this.dateRangePicker.setEndDate(window.moment());
+        clearDateFilter(key = 'created') {
+            const ranges = {
+                created: { ref: 'createdRange', from: 'createdFrom', to: 'createdTo' },
+                submitted: { ref: 'submittedRange', from: 'submittedFrom', to: 'submittedTo' },
+                assigned: { ref: 'assignedRange', from: 'assignedFrom', to: 'assignedTo' },
+                picked: { ref: 'pickedRange', from: 'pickedFrom', to: 'pickedTo' },
+                received: { ref: 'receivedRange', from: 'receivedFrom', to: 'receivedTo' },
+            };
+            const range = ranges[key];
+            if (!range) return;
+
+            this[range.from] = '';
+            this[range.to] = '';
+            if (this.dateRangePickers[key]) {
+                this.dateRangePickers[key].setStartDate(window.moment());
+                this.dateRangePickers[key].setEndDate(window.moment());
             }
-            if (this.$refs.createdRange) {
-                this.$refs.createdRange.value = '';
+            if (this.$refs[range.ref]) {
+                this.$refs[range.ref].value = '';
             }
-            this.loadData();
         },
 
         nextPage() {
@@ -289,14 +436,7 @@ function buildShipmentsTable(config) {
         async exportData(format) {
             try {
                 const params = new URLSearchParams();
-                if (this.search) params.append('search', this.search);
-                if (this.statusFilter) params.append('status', this.statusFilter);
-                if (this.pickupStatusFilter) params.append('pickup_status', this.pickupStatusFilter);
-                if (this.assignmentStateFilter) params.append('assignment_state', this.assignmentStateFilter);
-                if (this.warehouseFilter) params.append('target_warehouse_id', this.warehouseFilter);
-                if (this.driverFilter) params.append('driver_id', this.driverFilter);
-                if (this.createdFrom) params.append('date_from', this.createdFrom);
-                if (this.createdTo) params.append('date_to', this.createdTo);
+                this.appendFilters(params);
                 params.append('format', format);
 
                 if (format === 'excel' || format === 'pdf') {
@@ -327,14 +467,7 @@ function buildShipmentsTable(config) {
         async printData() {
             try {
                 const params = new URLSearchParams();
-                if (this.search) params.append('search', this.search);
-                if (this.statusFilter) params.append('status', this.statusFilter);
-                if (this.pickupStatusFilter) params.append('pickup_status', this.pickupStatusFilter);
-                if (this.assignmentStateFilter) params.append('assignment_state', this.assignmentStateFilter);
-                if (this.warehouseFilter) params.append('target_warehouse_id', this.warehouseFilter);
-                if (this.driverFilter) params.append('driver_id', this.driverFilter);
-                if (this.createdFrom) params.append('date_from', this.createdFrom);
-                if (this.createdTo) params.append('date_to', this.createdTo);
+                this.appendFilters(params);
 
                 const response = await fetch(`${this.exportEndpoint}?${params}`, {
                     headers: {
@@ -367,7 +500,7 @@ function buildShipmentsTable(config) {
             const doc = printWindow.document;
             const headers = Object.keys(data[0]);
 
-            doc.title = 'Shipments Export';
+            doc.title = 'Orders Export';
             doc.body.innerHTML = '';
 
             const style = doc.createElement('style');
@@ -382,7 +515,7 @@ function buildShipmentsTable(config) {
             doc.head.appendChild(style);
 
             const title = doc.createElement('h1');
-            title.textContent = 'Shipments List';
+            title.textContent = 'Orders List';
             doc.body.appendChild(title);
 
             const meta = doc.createElement('p');
@@ -441,7 +574,7 @@ function buildShipmentsTable(config) {
                 )
             ].join('\n');
 
-            this.downloadFile(csvContent, 'shipments.csv', 'text/csv');
+            this.downloadFile(csvContent, 'orders.csv', 'text/csv');
         },
 
         downloadFile(content, filename, type) {
@@ -518,7 +651,7 @@ function buildShipmentsTable(config) {
     };
 }
 
-function getShipmentsConfig() {
+function getOrdersConfig() {
     const container = document.querySelector('[data-shipments-config]');
     let config = window.shipmentsTableConfig || null;
 
@@ -542,7 +675,7 @@ function getShipmentsConfig() {
     return config;
 }
 
-function registerShipmentsTable() {
+function registerOrdersTable() {
     if (!window.Alpine) {
         return;
     }
@@ -551,10 +684,10 @@ function registerShipmentsTable() {
 }
 
 window.shipmentsTable = () => {
-    const config = getShipmentsConfig();
+    const config = getOrdersConfig();
 
     if (!config) {
-        return buildShipmentsTable({
+        return buildOrdersTable({
             endpoint: '',
             exportEndpoint: '',
             statuses: [],
@@ -564,11 +697,11 @@ window.shipmentsTable = () => {
         });
     }
 
-    return buildShipmentsTable(config);
+    return buildOrdersTable(config);
 };
 
 if (window.Alpine) {
-    registerShipmentsTable();
+    registerOrdersTable();
 } else {
-    document.addEventListener('alpine:init', registerShipmentsTable);
+    document.addEventListener('alpine:init', registerOrdersTable);
 }

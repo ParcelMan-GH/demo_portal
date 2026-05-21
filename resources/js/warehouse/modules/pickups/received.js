@@ -22,18 +22,18 @@ function registerReceivedPickupsPage() {
     const pageConfig = {
         endpoint: config.endpoint,
         defaultSort: 'received_at',
+        defaultPerPage: 25,
         exportFileName: 'warehouse-received-pickups',
         printTitle: 'Warehouse Received Pickups',
         statuses: config.statuses || [],
+        drivers: config.drivers || [],
         columns: [
-            { key: 'shipment_number', label: 'Shipment #', exportLabel: 'Shipment Number' },
+            { key: 'shipment_number', label: 'Order #', exportLabel: 'Order Number' },
             { key: 'driver_name', label: 'Driver', exportLabel: 'Driver Name' },
-            { key: 'driver_phone', label: 'Driver Phone' },
             { key: 'status', label: 'Status' },
             { key: 'assigned_at', label: 'Assigned At' },
             { key: 'arrived_warehouse_at', label: 'Arrived Warehouse At' },
             { key: 'received_at', label: 'Received At' },
-            { key: 'receive_notes', label: 'Receive Notes', sortable: false },
             { key: 'actions', label: 'Actions', sortable: false },
         ],
     };
@@ -43,8 +43,21 @@ function registerReceivedPickupsPage() {
 
         return {
             ...page,
+            showFilters: false,
+            drivers: pageConfig.drivers,
+            filters: {
+                driver_id: '',
+                receipt_result: '',
+                notes: '',
+                driver_qty_min: '',
+                driver_qty_max: '',
+            },
             dateFrom: '',
             dateTo: '',
+            assignedFrom: '',
+            assignedTo: '',
+            arrivedFrom: '',
+            arrivedTo: '',
             dateRangePicker: null,
 
             init() {
@@ -60,6 +73,16 @@ function registerReceivedPickupsPage() {
 
                 if (dateFrom) params.append('date_from', dateFrom);
                 if (dateTo) params.append('date_to', dateTo);
+                if (this.assignedFrom) params.append('assigned_from', this.assignedFrom);
+                if (this.assignedTo) params.append('assigned_to', this.assignedTo);
+                if (this.arrivedFrom) params.append('arrived_from', this.arrivedFrom);
+                if (this.arrivedTo) params.append('arrived_to', this.arrivedTo);
+
+                Object.entries(this.filters).forEach(([key, value]) => {
+                    if (value !== '' && value !== null && value !== undefined) {
+                        params.append(key, value);
+                    }
+                });
 
                 return params;
             },
@@ -67,10 +90,11 @@ function registerReceivedPickupsPage() {
             initDateRange() {
                 if (!this.$refs.dateRange) return;
 
-                const setupPicker = () => {
+                const bindPicker = (input, onApply, onClear) => {
+                    if (!input) return;
                     if (!window.$ || !window.moment || !window.$.fn.daterangepicker) return;
 
-                    const $input = window.$(this.$refs.dateRange);
+                    const $input = window.$(input);
 
                     $input.daterangepicker({
                         autoUpdateInput: false,
@@ -88,22 +112,44 @@ function registerReceivedPickupsPage() {
                     });
 
                     $input.on('apply.daterangepicker', (ev, picker) => {
-                        this.dateFrom = picker.startDate.format('YYYY-MM-DD');
-                        this.dateTo = picker.endDate.format('YYYY-MM-DD');
-                        $input.val(`${this.dateFrom} - ${this.dateTo}`);
-                        this.meta.current_page = 1;
-                        this.loadData();
+                        const from = picker.startDate.format('YYYY-MM-DD');
+                        const to = picker.endDate.format('YYYY-MM-DD');
+                        onApply(from, to);
+                        $input.val(`${from} - ${to}`);
                     });
 
                     $input.on('cancel.daterangepicker', () => {
-                        this.dateFrom = '';
-                        this.dateTo = '';
+                        onClear();
                         $input.val('');
-                        this.meta.current_page = 1;
-                        this.loadData();
                     });
 
                     this.dateRangePicker = $input.data('daterangepicker');
+                };
+
+                const setupPicker = () => {
+                    bindPicker(this.$refs.dateRange, (from, to) => {
+                        this.dateFrom = from;
+                        this.dateTo = to;
+                    }, () => {
+                        this.dateFrom = '';
+                        this.dateTo = '';
+                    });
+
+                    bindPicker(this.$refs.assignedDateRange, (from, to) => {
+                        this.assignedFrom = from;
+                        this.assignedTo = to;
+                    }, () => {
+                        this.assignedFrom = '';
+                        this.assignedTo = '';
+                    });
+
+                    bindPicker(this.$refs.arrivedDateRange, (from, to) => {
+                        this.arrivedFrom = from;
+                        this.arrivedTo = to;
+                    }, () => {
+                        this.arrivedFrom = '';
+                        this.arrivedTo = '';
+                    });
                 };
 
                 if (window.$ && window.moment && window.$.fn.daterangepicker) {
@@ -137,6 +183,161 @@ function registerReceivedPickupsPage() {
                         return loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js');
                     })
                     .then(setupPicker);
+            },
+
+            applyFilters() {
+                this.meta.current_page = 1;
+                this.loadData();
+            },
+
+            clearFilters() {
+                this.statusFilter = '';
+                this.statusFilterName = 'All statuses';
+                this.filters = {
+                    driver_id: '',
+                    receipt_result: '',
+                    notes: '',
+                    driver_qty_min: '',
+                    driver_qty_max: '',
+                };
+                this.dateFrom = '';
+                this.dateTo = '';
+                this.assignedFrom = '';
+                this.assignedTo = '';
+                this.arrivedFrom = '';
+                this.arrivedTo = '';
+
+                ['dateRange', 'assignedDateRange', 'arrivedDateRange'].forEach((ref) => {
+                    if (!this.$refs[ref]) return;
+                    this.$refs[ref].value = '';
+                    const picker = window.$?.(this.$refs[ref])?.data?.('daterangepicker');
+                    if (picker) {
+                        picker.setStartDate(window.moment ? window.moment() : new Date());
+                        picker.setEndDate(window.moment ? window.moment() : new Date());
+                    }
+                });
+
+                this.meta.current_page = 1;
+                this.loadData();
+            },
+
+            clearFilter(key) {
+                if (key === 'status') {
+                    this.statusFilter = '';
+                    this.statusFilterName = 'All statuses';
+                }
+
+                if (key === 'received_date') {
+                    this.dateFrom = '';
+                    this.dateTo = '';
+                    if (this.$refs.dateRange) this.$refs.dateRange.value = '';
+                }
+
+                if (key === 'assigned_date') {
+                    this.assignedFrom = '';
+                    this.assignedTo = '';
+                    if (this.$refs.assignedDateRange) this.$refs.assignedDateRange.value = '';
+                }
+
+                if (key === 'arrived_date') {
+                    this.arrivedFrom = '';
+                    this.arrivedTo = '';
+                    if (this.$refs.arrivedDateRange) this.$refs.arrivedDateRange.value = '';
+                }
+
+                if (key in this.filters) {
+                    this.filters[key] = '';
+                }
+
+                if (key === 'driver_qty_range') {
+                    this.filters.driver_qty_min = '';
+                    this.filters.driver_qty_max = '';
+                }
+
+                this.meta.current_page = 1;
+                this.loadData();
+            },
+
+            activeFilterCount() {
+                let count = 0;
+                if (this.statusFilter) count += 1;
+                if (this.dateFrom || this.dateTo) count += 1;
+                if (this.assignedFrom || this.assignedTo) count += 1;
+                if (this.arrivedFrom || this.arrivedTo) count += 1;
+                Object.values(this.filters).forEach((value) => {
+                    if (value !== '' && value !== null && value !== undefined) count += 1;
+                });
+                return count;
+            },
+
+            activeFilterChips() {
+                const chips = [];
+
+                if (this.statusFilter) {
+                    const status = this.statuses.find((item) => item.value === this.statusFilter);
+                    chips.push({ key: 'status', label: `Status: ${status?.label || this.statusFilter}` });
+                }
+
+                if (this.dateFrom || this.dateTo) {
+                    chips.push({ key: 'received_date', label: `Received: ${this.dateFrom || '...'} - ${this.dateTo || '...'}` });
+                }
+
+                if (this.assignedFrom || this.assignedTo) {
+                    chips.push({ key: 'assigned_date', label: `Assigned: ${this.assignedFrom || '...'} - ${this.assignedTo || '...'}` });
+                }
+
+                if (this.arrivedFrom || this.arrivedTo) {
+                    chips.push({ key: 'arrived_date', label: `Arrived: ${this.arrivedFrom || '...'} - ${this.arrivedTo || '...'}` });
+                }
+
+                if (this.filters.driver_id) {
+                    const driver = this.drivers.find((item) => String(item.id) === String(this.filters.driver_id));
+                    chips.push({ key: 'driver_id', label: `Driver: ${driver?.name || this.filters.driver_id}` });
+                }
+
+                if (this.filters.receipt_result) {
+                    const labels = { matched: 'Matched', discrepancy: 'Any discrepancy', shortage: 'Shortage', overage: 'Overage', damaged: 'Damaged' };
+                    chips.push({ key: 'receipt_result', label: `Result: ${labels[this.filters.receipt_result] || this.filters.receipt_result}` });
+                }
+
+                if (this.filters.notes) {
+                    chips.push({ key: 'notes', label: this.filters.notes === 'with_notes' ? 'With notes' : 'Without notes' });
+                }
+
+                if (this.filters.driver_qty_min || this.filters.driver_qty_max) {
+                    chips.push({ key: 'driver_qty_range', label: `Driver qty: ${this.filters.driver_qty_min || '0'} - ${this.filters.driver_qty_max || '...'}` });
+                }
+
+                return chips;
+            },
+
+            tableHeaderClass(key) {
+                if (key === 'status') return 'text-center';
+                if (key === 'actions') return 'text-right';
+                return 'text-left';
+            },
+
+            tableHeaderContentClass(key) {
+                if (key === 'status') return 'justify-center';
+                if (key === 'actions') return 'justify-end';
+                return '';
+            },
+
+            formatDisplayDate(value) {
+                if (!value) return '-';
+
+                const normalized = String(value).replace(' ', 'T');
+                const date = new Date(normalized);
+                if (Number.isNaN(date.getTime())) return value;
+
+                return new Intl.DateTimeFormat('en-GH', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                }).format(date);
             },
 
             statusBadgeClass(status) {

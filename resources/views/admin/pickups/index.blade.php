@@ -258,7 +258,7 @@
                     <template x-for="a in assignments" :key="a.id">
                         <tr class="hover:bg-slate-50/70">
                             <td x-show="visibleColumns.shipment" class="px-4 py-2.5 whitespace-nowrap">
-                                <a :href="`/admin/shipments/${a.shipment_id}`" class="text-xs font-semibold text-slate-900 hover:text-violet-600 transition-colors" x-text="a.shipment_number"></a>
+                                <a :href="`/admin/orders/${a.shipment_id}`" class="text-xs font-semibold text-slate-900 hover:text-violet-600 transition-colors" x-text="a.shipment_number"></a>
                             </td>
                             <td x-show="visibleColumns.vendor" class="px-4 py-2.5 whitespace-nowrap">
                                 <span class="text-xs text-slate-600" x-text="a.vendor_name"></span>
@@ -283,7 +283,7 @@
                             <td x-show="visibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center text-xs font-medium">
                                 <div class="flex items-center justify-end gap-1">
                                     <!-- View Shipment -->
-                                    <a :href="`/admin/shipments/${a.shipment_id}`"
+                                    <a :href="`/admin/orders/${a.shipment_id}`"
                                        class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                                        title="View Shipment">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

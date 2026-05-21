@@ -48,15 +48,7 @@
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Add Package
                 </button>
-                <button type="button"
-                        x-show="receiving.canAutoGroup || receiving.autoGrouping"
-                        @@click="autoGroupReceivingPackagesByPhone()"
-                        :disabled="receiving.autoGrouping"
-                        class="inline-flex h-10 items-center gap-2 rounded-xl border border-orange-100 bg-orange-50 px-4 text-sm font-black text-orange-700 shadow-sm transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50">
-                    <svg x-show="!receiving.autoGrouping" class="h-4 w-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                    <svg x-show="receiving.autoGrouping" class="h-4 w-4 animate-spin text-orange-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                    <span x-text="receiving.autoGrouping ? 'Grouping...' : 'Auto-group by Phone'"></span>
-                </button>
+                {{-- Phone grouping now runs automatically when the vendor submits an order. --}}
                 @if($showFinalize)
                     <button @@click="{{ $finalizeClick }}" :disabled="{{ $finalizeDisabled }}"
                             class="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-black text-white shadow-sm shadow-emerald-500/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">

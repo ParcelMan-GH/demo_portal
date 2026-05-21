@@ -18,10 +18,15 @@ use Illuminate\Http\Request;
 
 class ShipmentService
 {
+    private ShipmentPhoneGroupingService $phoneGroupingService;
+
     public function __construct(
         private ActivityLogService $activityLogService,
-        private StorageService $storageService
-    ) {}
+        private StorageService $storageService,
+        ?ShipmentPhoneGroupingService $phoneGroupingService = null
+    ) {
+        $this->phoneGroupingService = $phoneGroupingService ?? app(ShipmentPhoneGroupingService::class);
+    }
 
     public function list(Vendor $vendor, array $filters, Request $request): array
     {
@@ -305,6 +310,9 @@ class ShipmentService
                 'data' => null,
             ];
         }
+
+        $this->phoneGroupingService->syncFromTaggedPhotos($shipment);
+        $shipment->refresh();
 
         if ($shipment->destination_mode === ShipmentDestinationMode::SINGLE) {
             if (!$this->hasValidSingleDelivery($shipment)) {
