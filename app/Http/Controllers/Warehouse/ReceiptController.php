@@ -68,6 +68,7 @@ class ReceiptController extends AdminShipmentController
             'shipment.pickupDistrict:id,name',
             'shipment.deliveryRegion:id,name',
             'shipment.deliveryDistrict:id,name',
+            'shipment.pickupVehicleRequests.vehicleType',
             'shipment.items.images',
             'shipment.items.deliveryRegion:id,name',
             'shipment.items.deliveryDistrict:id,name',
@@ -669,6 +670,7 @@ class ReceiptController extends AdminShipmentController
             'shipment.pickupDistrict:id,name',
             'shipment.deliveryRegion:id,name',
             'shipment.deliveryDistrict:id,name',
+            'shipment.pickupVehicleRequests.vehicleType',
             'shipment.items.images',
             'shipment.items.deliveryRegion:id,name',
             'shipment.items.deliveryDistrict:id,name',
@@ -928,6 +930,7 @@ class ReceiptController extends AdminShipmentController
         $pickupAssignment->load([
             'shipment.deliveryRegion:id,name',
             'shipment.deliveryDistrict:id,name',
+            'shipment.pickupVehicleRequests.vehicleType',
             'shipment.items.images',
             'shipment.items.deliveryRegion:id,name',
             'shipment.items.deliveryDistrict:id,name',
@@ -970,6 +973,8 @@ class ReceiptController extends AdminShipmentController
             'pickup_longitude' => $shipment->pickup_longitude,
             'pickup_region' => $shipment->pickupRegion ? ['id' => $shipment->pickupRegion->id, 'name' => $shipment->pickupRegion->name] : null,
             'pickup_district' => $shipment->pickupDistrict ? ['id' => $shipment->pickupDistrict->id, 'name' => $shipment->pickupDistrict->name] : null,
+            'pickup_vehicles' => $this->serializePickupVehicleRequests($shipment),
+            'pickup_vehicle_summary' => $this->pickupVehicleSummaryForReceipt($shipment),
             'delivery_recipient_name' => $shipment->delivery_recipient_name,
             'delivery_recipient_phone' => $shipment->delivery_recipient_phone,
             'delivery_region_id' => $shipment->delivery_region_id,
@@ -980,6 +985,38 @@ class ReceiptController extends AdminShipmentController
             'delivery_region_name' => $shipment->deliveryRegion?->name,
             'delivery_district_name' => $shipment->deliveryDistrict?->name,
         ];
+    }
+
+    private function serializePickupVehicleRequests(Shipment $shipment): array
+    {
+        if (! $shipment->relationLoaded('pickupVehicleRequests')) {
+            return [];
+        }
+
+        return $shipment->pickupVehicleRequests
+            ->map(fn ($request) => [
+                'id' => $request->id,
+                'vehicle_type_id' => $request->pickup_vehicle_type_id,
+                'name' => $request->vehicleType?->name ?? $request->vehicle_name_snapshot,
+                'vehicle_name' => $request->vehicleType?->name ?? $request->vehicle_name_snapshot,
+                'vehicle_name_snapshot' => $request->vehicle_name_snapshot,
+                'quantity' => (int) $request->quantity,
+            ])
+            ->values()
+            ->toArray();
+    }
+
+    private function pickupVehicleSummaryForReceipt(Shipment $shipment): ?string
+    {
+        $vehicles = $this->serializePickupVehicleRequests($shipment);
+
+        if (empty($vehicles)) {
+            return null;
+        }
+
+        return collect($vehicles)
+            ->map(fn (array $row) => number_format((int) $row['quantity']) . ' ' . ($row['name'] ?? 'Vehicle'))
+            ->implode(', ');
     }
 
     private function serializeReceiptItems(PickupAssignment $pickupAssignment, Shipment $shipment, ?WarehouseReceipt $receipt): array

@@ -5,8 +5,12 @@
 @section('breadcrumb-current', $driver->name)
 
 @php
+$driverPhotoUrl = $driver->photo_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($driver->photo_path) : null;
 $driverConfig = [
-    'driver' => $driver,
+    'driver' => array_merge($driver->toArray(), [
+        'avatar' => strtoupper(substr($driver->name, 0, 1)),
+        'photo_url' => $driverPhotoUrl,
+    ]),
     'pickupsEndpoint' => route('admin.drivers.assignments', $driver),
     'transportManifestsEndpoint' => route('admin.drivers.transport-manifests', $driver),
     'deliveryRunsEndpoint' => route('admin.drivers.delivery-runs', $driver),
@@ -70,8 +74,13 @@ $driverConfig = [
             <div class="relative mt-5 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div class="min-w-0 lg:max-w-[640px] lg:shrink">
                     <div class="flex min-w-0 items-start gap-4">
-                        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-500 text-2xl font-black text-white shadow-lg shadow-orange-950/25">
-                                {{ strtoupper(substr($driver->name, 0, 1)) }}
+                        <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-orange-500 text-2xl font-black text-white shadow-lg shadow-orange-950/25">
+                            <template x-if="driver.photo_url">
+                                <img :src="driver.photo_url" alt="" class="h-full w-full object-cover">
+                            </template>
+                            <template x-if="!driver.photo_url">
+                                <span x-text="driver.avatar || (driver.name || 'R').charAt(0).toUpperCase()"></span>
+                            </template>
                         </div>
 
                         <div class="min-w-0">
@@ -203,7 +212,7 @@ $driverConfig = [
                     <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
                         <div class="relative w-full xl:max-w-md">
                             <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
-                            <input type="text" x-model="pickups.search" @@input.debounce.500ms="pickups.page = 1; loadPickups()" placeholder="Search pickups..." class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                            <input type="text" x-model="pickups.search" @@input.debounce.500ms="pickups.page = 1; loadPickups()" placeholder="Search pickups..." class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all">
                             <svg class="absolute left-3 bottom-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         </div>
                     </div>
@@ -360,7 +369,7 @@ $driverConfig = [
                     <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
                         <div class="relative w-full xl:max-w-md">
                             <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
-                            <input type="text" x-model="transports.search" @@input.debounce.500ms="transports.page = 1; loadTransports()" placeholder="Search transports..." class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                            <input type="text" x-model="transports.search" @@input.debounce.500ms="transports.page = 1; loadTransports()" placeholder="Search transports..." class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all">
                             <svg class="absolute left-3 bottom-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         </div>
                     </div>
@@ -494,7 +503,7 @@ $driverConfig = [
                     <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
                         <div class="relative w-full xl:max-w-md">
                             <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
-                            <input type="text" x-model="deliveries.search" @@input.debounce.500ms="deliveries.page = 1; loadDeliveries()" placeholder="Search deliveries..." class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                            <input type="text" x-model="deliveries.search" @@input.debounce.500ms="deliveries.page = 1; loadDeliveries()" placeholder="Search deliveries..." class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all">
                             <svg class="absolute left-3 bottom-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         </div>
                     </div>
@@ -598,7 +607,7 @@ $driverConfig = [
                 <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 xl:flex-row xl:items-end xl:justify-between">
                     <div class="relative w-full xl:max-w-md">
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
-                        <input type="text" x-model="activity.search" @@input.debounce.500ms="activity.page = 1; loadActivityLogs()" placeholder="Search activity..." class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                        <input type="text" x-model="activity.search" @@input.debounce.500ms="activity.page = 1; loadActivityLogs()" placeholder="Search activity..." class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all">
                         <svg class="absolute left-3 bottom-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     </div>
                     <div class="flex flex-wrap items-center justify-end gap-3">
@@ -693,7 +702,7 @@ $driverConfig = [
                     <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
                         <div class="relative w-full xl:max-w-md">
                             <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
-                            <input type="text" x-model="packages.search" @@input.debounce.500ms="packages.page = 1; loadPackages()" placeholder="Search packages..." class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                            <input type="text" x-model="packages.search" @@input.debounce.500ms="packages.page = 1; loadPackages()" placeholder="Search packages..." class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all">
                             <svg class="absolute left-3 bottom-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         </div>
                     </div>
@@ -816,10 +825,10 @@ $driverConfig = [
                 x-transition:leave-start="opacity-100 scale-100"
                 x-transition:leave-end="opacity-0 scale-95"
                 @@click.stop
-                class="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20"
+                class="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl"
             >
-                <!-- Header with Gradient -->
-                <div class="border-b border-slate-200 bg-white px-6 py-5">
+                <!-- Header -->
+                <div class="relative border-b border-slate-200 px-6 py-5">
                     <div class="flex items-start justify-between">
                         <div class="flex items-start gap-4">
                             <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
@@ -832,7 +841,7 @@ $driverConfig = [
                                 <p class="text-sm text-slate-500 mt-1">Update rider/driver information and settings</p>
                             </div>
                         </div>
-                        <button @@click="showEditModal = false" class="flex-shrink-0 rounded-xl p-2 text-slate-400 hover:bg-white hover:text-slate-700 transition-all shadow-sm">
+                        <button @@click="showEditModal = false" class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
@@ -843,6 +852,38 @@ $driverConfig = [
                 <!-- Body -->
                 <form @@submit.prevent="saveDriver()">
                     <div class="space-y-5 px-6 py-6 max-h-[calc(100vh-240px)] overflow-y-auto">
+                        <!-- Photo -->
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Driver Photo</label>
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-orange-50 text-xl font-black text-orange-700 ring-1 ring-orange-100">
+                                    <template x-if="form.photo_preview_url">
+                                        <img :src="form.photo_preview_url" alt="" class="h-full w-full object-cover">
+                                    </template>
+                                    <template x-if="!form.photo_preview_url">
+                                        <span x-text="(form.name || 'R').trim().charAt(0).toUpperCase() || 'R'"></span>
+                                    </template>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <input x-ref="driverPhotoInput"
+                                           type="file"
+                                           accept="image/*"
+                                           @@change="handleDriverPhoto($event)"
+                                           class="block w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 file:mr-4 file:rounded-xl file:border-0 file:bg-orange-50 file:px-4 file:py-2 file:text-sm file:font-black file:text-orange-700 hover:file:bg-orange-100 focus:border-orange-400 focus:outline-none focus:ring-4 focus:ring-orange-100">
+                                    <template x-if="errors.profile_photo">
+                                        <p class="mt-1.5 text-xs text-rose-600" x-text="errors.profile_photo[0]"></p>
+                                    </template>
+                                    <button type="button"
+                                            x-show="form.profile_photo"
+                                            x-cloak
+                                            @@click="clearSelectedPhoto()"
+                                            class="mt-2 text-xs font-black text-slate-500 hover:text-slate-800">
+                                        Clear selected photo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Name -->
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-2">
@@ -857,7 +898,7 @@ $driverConfig = [
                                 <input
                                     type="text"
                                     x-model="form.name"
-                                    class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm"
+                                    class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
                                     placeholder="John Doe"
                                     required
                                 >
@@ -867,32 +908,8 @@ $driverConfig = [
                             </template>
                         </div>
 
-                        <!-- Email & Phone Grid -->
+                        <!-- Phone & Email Grid -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <!-- Email -->
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                    Email <span class="text-rose-500">*</span>
-                                </label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                        </svg>
-                                    </div>
-                                    <input
-                                        type="email"
-                                        x-model="form.email"
-                                        class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm"
-                                        placeholder="driver@example.com"
-                                        required
-                                    >
-                                </div>
-                                <template x-if="errors.email">
-                                    <p class="mt-1.5 text-xs text-rose-600" x-text="errors.email[0]"></p>
-                                </template>
-                            </div>
-
                             <!-- Phone -->
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-2">
@@ -907,7 +924,7 @@ $driverConfig = [
                                     <input
                                         type="text"
                                         x-model="form.phone"
-                                        class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
                                         placeholder="0241234567"
                                         required
                                     >
@@ -916,29 +933,29 @@ $driverConfig = [
                                     <p class="mt-1.5 text-xs text-rose-600" x-text="errors.phone[0]"></p>
                                 </template>
                             </div>
-                        </div>
 
-                        <!-- Password -->
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                Password
-                            </label>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                                    </svg>
+                            <!-- Email -->
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                    Email <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                        </svg>
+                                    </div>
+                                    <input
+                                        type="email"
+                                        x-model="form.email"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
+                                        placeholder="driver@example.com"
+                                    >
                                 </div>
-                                <input
-                                    type="password"
-                                    x-model="form.password"
-                                    class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm"
-                                    placeholder="Leave blank to keep current"
-                                >
+                                <template x-if="errors.email">
+                                    <p class="mt-1.5 text-xs text-rose-600" x-text="errors.email[0]"></p>
+                                </template>
                             </div>
-                            <template x-if="errors.password">
-                                <p class="mt-1.5 text-xs text-rose-600" x-text="errors.password[0]"></p>
-                            </template>
                         </div>
 
                         <!-- Vehicle Info Grid -->
@@ -948,12 +965,19 @@ $driverConfig = [
                                 <label class="block text-sm font-semibold text-slate-700 mb-2">
                                     Vehicle Type
                                 </label>
-                                <input
-                                    type="text"
-                                    x-model="form.vehicle_type"
-                                    class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                                    placeholder="Motorcycle"
-                                >
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h8m-8 5h4m4.5 2H18l-2-7H8L6 14h.5m11 0a2.5 2.5 0 11-5 0m5 0a2.5 2.5 0 10-5 0m-4.5 0H6m0 0a2.5 2.5 0 11-5 0m5 0a2.5 2.5 0 10-5 0"/>
+                                        </svg>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        x-model="form.vehicle_type"
+                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
+                                        placeholder="Motorcycle"
+                                    >
+                                </div>
                             </div>
 
                             <!-- Vehicle Number -->
@@ -964,7 +988,7 @@ $driverConfig = [
                                 <input
                                     type="text"
                                     x-model="form.vehicle_number"
-                                    class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                    class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
                                     placeholder="GR-1234-21"
                                 >
                             </div>
@@ -977,7 +1001,7 @@ $driverConfig = [
                                 <input
                                     type="text"
                                     x-model="form.license_number"
-                                    class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                    class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
                                     placeholder="DL-123456"
                                 >
                             </div>
@@ -993,27 +1017,34 @@ $driverConfig = [
                                 <span class="text-xs font-semibold text-slate-600" x-text="(form.task_capabilities || []).length + ' selected'"></span>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
                                     <input type="checkbox"
                                            value="pickup"
                                            x-model="form.task_capabilities"
-                                           class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500">
+                                           class="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
                                     <span class="text-sm font-medium text-slate-700">Pickup</span>
                                 </label>
                                 <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
                                     <input type="checkbox"
                                            value="transport"
                                            x-model="form.task_capabilities"
-                                           class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500">
+                                           class="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
                                     <span class="text-sm font-medium text-slate-700">Transport</span>
                                 </label>
                                 <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
                                     <input type="checkbox"
                                            value="delivery"
                                            x-model="form.task_capabilities"
-                                           class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500">
+                                           class="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
                                     <span class="text-sm font-medium text-slate-700">Delivery</span>
+                                </label>
+                                <label class="flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50/40 px-3 py-2">
+                                    <input type="checkbox"
+                                           value="bus_handoff"
+                                           x-model="form.task_capabilities"
+                                           class="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500">
+                                    <span class="text-sm font-medium text-violet-700">Bus Handoff</span>
                                 </label>
                             </div>
 
@@ -1027,12 +1058,65 @@ $driverConfig = [
                             </template>
                         </div>
 
+                        <!-- Password -->
+                        <div x-data="{ showPassword: false, showPasswordConfirmation: false, changeDriverPassword: false }" x-effect="if (!showEditModal) changeDriverPassword = false">
+                            <div class="mb-4">
+                                <label class="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
+                                    <input type="checkbox" x-model="changeDriverPassword" @@change="if (!changeDriverPassword) { form.password = ''; form.password_confirmation = ''; errors.password = null; errors.password_confirmation = null; }" class="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
+                                    Change password
+                                </label>
+                            </div>
+
+                            <div x-show="changeDriverPassword" x-cloak class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                        New Password
+                                    </label>
+                                    <div class="relative">
+                                        <input
+                                            :type="showPassword ? 'text' : 'password'"
+                                            x-model="form.password"
+                                            class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-12 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                            placeholder="Minimum 8 characters"
+                                        >
+                                        <button type="button" @@click="showPassword = !showPassword" class="absolute inset-y-0 right-0 px-4 text-slate-500 transition hover:text-slate-800" :aria-label="showPassword ? 'Hide password' : 'Show password'">
+                                            <svg x-show="!showPassword" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                            <svg x-show="showPassword" x-cloak class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18M10.584 10.587a2 2 0 002.828 2.829M9.88 9.88A3 3 0 0114.12 14.12M6.228 6.228A9.956 9.956 0 002.458 12c1.274 4.057 5.064 7 9.542 7 1.732 0 3.36-.44 4.772-1.212M9.88 9.88L6.228 6.228m7.892 7.892l3.652 3.652"/></svg>
+                                        </button>
+                                    </div>
+                                    <template x-if="errors.password">
+                                        <p class="mt-1.5 text-xs text-rose-600" x-text="errors.password[0]"></p>
+                                    </template>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                        Confirm Password
+                                    </label>
+                                    <div class="relative">
+                                        <input
+                                            :type="showPasswordConfirmation ? 'text' : 'password'"
+                                            x-model="form.password_confirmation"
+                                            class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-12 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                            placeholder="Re-enter password"
+                                        >
+                                        <button type="button" @@click="showPasswordConfirmation = !showPasswordConfirmation" class="absolute inset-y-0 right-0 px-4 text-slate-500 transition hover:text-slate-800" :aria-label="showPasswordConfirmation ? 'Hide password' : 'Show password'">
+                                            <svg x-show="!showPasswordConfirmation" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                            <svg x-show="showPasswordConfirmation" x-cloak class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18M10.584 10.587a2 2 0 002.828 2.829M9.88 9.88A3 3 0 0114.12 14.12M6.228 6.228A9.956 9.956 0 002.458 12c1.274 4.057 5.064 7 9.542 7 1.732 0 3.36-.44 4.772-1.212M9.88 9.88L6.228 6.228m7.892 7.892l3.652 3.652"/></svg>
+                                        </button>
+                                    </div>
+                                    <template x-if="errors.password_confirmation">
+                                        <p class="mt-1.5 text-xs text-rose-600" x-text="errors.password_confirmation[0]"></p>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Status Toggle -->
                         <div class="bg-slate-50/50 rounded-2xl p-5 border border-slate-200">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-                                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100 flex items-center justify-center shadow-sm">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                         </svg>
                                     </div>
@@ -1044,8 +1128,8 @@ $driverConfig = [
                                 <button
                                     type="button"
                                     @@click="form.is_active = !form.is_active"
-                                    :class="form.is_active ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-slate-300'"
-                                    class="relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 shadow-sm"
+                                    :class="form.is_active ? 'bg-orange-600' : 'bg-slate-300'"
+                                    class="relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-orange-100 focus:ring-offset-2 shadow-sm"
                                 >
                                     <span
                                         :class="form.is_active ? 'translate-x-7' : 'translate-x-0'"

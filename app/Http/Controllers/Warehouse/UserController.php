@@ -6,11 +6,31 @@ use App\Exports\UsersExport;
 use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
+use App\Models\DeliveryRun;
+use App\Models\DeliveryRunStop;
+use App\Models\PackageContactAttempt;
+use App\Models\PackageContactTask;
+use App\Models\RecipientPaymentCallAttempt;
+use App\Models\RecipientPaymentSession;
+use App\Models\RecipientPaymentSessionEntry;
+use App\Models\RecipientPaymentTask;
 use App\Models\Role;
+use App\Models\Shipment;
+use App\Models\SortBatch;
+use App\Models\SortBatchItem;
+use App\Models\TransportManifest;
+use App\Models\TransportManifestReceiptLabelScan;
 use App\Models\User;
+use App\Models\VendorPayout;
 use App\Models\Warehouse;
+use App\Models\WarehouseCapability;
+use App\Models\WarehouseReceipt;
+use App\Models\WarehouseReceiptItem;
+use App\Models\WarehouseReceiptItemPhoto;
 use App\Services\Warehouse\WarehousePortalService;
 use App\Support\GenericPdfExporter;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,13 +82,20 @@ class UserController extends Controller
 
         $user->load(['roles.permissions', 'creator', 'warehouse']);
         $roles = $this->portalService->getAssignableWarehouseRoles($actor);
+        $isHqUser = $actor->isHqUser();
+        $tabCounts = $this->userActivityTabCounts($user);
 
-        // Reuse the existing rich admin profile UI with warehouse routes.
         return view('warehouse.users.show', [
             'admin' => $user,
             'canManage' => $this->canManageWarehouseUser($actor, $user),
             'roles' => $roles,
-            'canAssignRestrictedRoles' => $actor->isHqUser(),
+            'warehouses' => $isHqUser
+                ? Warehouse::query()->where('is_active', true)->orderByDesc('is_hq')->orderBy('name')->get(['id', 'name', 'code'])
+                : collect(),
+            'isHqUser' => $isHqUser,
+            'canAssignRestrictedRoles' => $isHqUser,
+            'canImpersonate' => $this->canImpersonateUser($actor, $user),
+            'tabCounts' => $tabCounts,
         ]);
     }
 
@@ -570,6 +597,810 @@ class UserController extends Controller
                 'to' => min($offset + $perPage, $total),
             ],
         ]);
+    }
+
+    public function overviewData(Request $request, User $user): JsonResponse
+    {
+        $this->authorizePermission('warehouse.users.view');
+
+        $actor = Auth::guard('admin')->user();
+        $this->assertCanAccessUser($actor, $user);
+
+        $counts = $this->userActivityTabCounts($user);
+        $recent = $this->auditRowsForModule($user, 'overview')->take(8)->values();
+
+        return response()->json([
+            'summary' => [
+                'total_activity' => array_sum($counts),
+                'orders' => $counts['orders'] ?? 0,
+                'packages' => ($counts['incoming-packages'] ?? 0) + ($counts['warehouse-packages'] ?? 0),
+                'security' => $counts['security-log'] ?? 0,
+                'last_login_at' => $user->last_login_at?->format('Y-m-d H:i:s'),
+            ],
+            'counts' => $counts,
+            'recent' => $recent,
+        ]);
+    }
+
+    public function ordersData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'orders');
+    }
+
+    public function incomingPackagesData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'incoming-packages');
+    }
+
+    public function warehousePackagesData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'warehouse-packages');
+    }
+
+    public function sortingData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'sorting');
+    }
+
+    public function recipientDeskData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'recipient-desk');
+    }
+
+    public function recipientPaymentsData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'recipient-payments');
+    }
+
+    public function transportManifestsData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'transport-manifests');
+    }
+
+    public function incomingManifestsData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'incoming-manifests');
+    }
+
+    public function deliveryRunsData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'delivery-runs');
+    }
+
+    public function pendingConfirmationsData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'pending-confirmations');
+    }
+
+    public function teamActionsData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'team-actions');
+    }
+
+    public function hqControlsData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'hq-controls');
+    }
+
+    public function securityLogData(Request $request, User $user): JsonResponse
+    {
+        return $this->moduleActivityData($request, $user, 'security-log');
+    }
+
+    private function moduleActivityData(Request $request, User $user, string $module): JsonResponse
+    {
+        $this->authorizePermission('warehouse.users.view');
+
+        $actor = Auth::guard('admin')->user();
+        $this->assertCanAccessUser($actor, $user);
+
+        $rows = collect($this->directRowsForModule($user, $module)->values()->all())
+            ->merge($this->auditRowsForModule($user, $module)->values()->all());
+
+        if ($search = trim((string) $request->input('search'))) {
+            $needle = Str::lower($search)->toString();
+            $rows = $rows->filter(fn (array $row) => str_contains(Str::lower(implode(' ', array_filter([
+                $row['module'] ?? '',
+                $row['reference'] ?? '',
+                $row['action'] ?? '',
+                $row['status'] ?? '',
+                $row['details'] ?? '',
+                $row['warehouse'] ?? '',
+            ])))->toString(), $needle));
+        }
+
+        if ($status = trim((string) $request->input('status'))) {
+            $rows = $rows->filter(fn (array $row) => strcasecmp((string) ($row['status'] ?? ''), $status) === 0);
+        }
+
+        if ($action = trim((string) $request->input('action'))) {
+            $needle = Str::lower($action)->toString();
+            $rows = $rows->filter(fn (array $row) => str_contains(Str::lower((string) ($row['action'] ?? ''))->toString(), $needle));
+        }
+
+        if ($dateFrom = $request->input('date_from')) {
+            $rows = $rows->filter(fn (array $row) => ($row['date'] ?? '') >= $dateFrom . ' 00:00:00');
+        }
+
+        if ($dateTo = $request->input('date_to')) {
+            $rows = $rows->filter(fn (array $row) => ($row['date'] ?? '') <= $dateTo . ' 23:59:59');
+        }
+
+        $sort = $request->input('sort', 'date');
+        $direction = $request->input('direction', 'desc') === 'asc' ? 'asc' : 'desc';
+        $allowedSorts = ['date', 'module', 'reference', 'action', 'status', 'warehouse'];
+        $sort = in_array($sort, $allowedSorts, true) ? $sort : 'date';
+        $rows = $rows->sortBy(fn (array $row) => $row[$sort] ?? '', SORT_REGULAR, $direction === 'desc')->values();
+
+        if ($format = $request->input('format')) {
+            $exportRows = $rows->map(fn (array $row) => [
+                'Date' => $row['date'] ?? '-',
+                'Module' => $row['module'] ?? '-',
+                'Reference' => $row['reference'] ?? '-',
+                'Action' => $row['action'] ?? '-',
+                'Status' => $row['status'] ?? '-',
+                'Warehouse' => $row['warehouse'] ?? '-',
+                'Details' => $row['details'] ?? '-',
+            ])->values()->toArray();
+
+            if ($format === 'excel') {
+                return Excel::download(new UsersExport($exportRows), 'user_' . $module . '_' . date('Y-m-d_His') . '.xlsx');
+            }
+
+            if ($format === 'pdf') {
+                return GenericPdfExporter::download($exportRows, 'user_' . $module . '_' . date('Y-m-d_His') . '.pdf', Str::of($module)->replace('-', ' ')->title()->toString());
+            }
+
+            return response()->json(['data' => $exportRows]);
+        }
+
+        $total = $rows->count();
+        $perPage = min(max((int) $request->input('per_page', 10), 1), 100);
+        $page = max((int) $request->input('page', 1), 1);
+        $offset = ($page - 1) * $perPage;
+
+        return response()->json([
+            'data' => $rows->slice($offset, $perPage)->values(),
+            'meta' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => (int) ceil($total / $perPage) ?: 1,
+                'from' => $total > 0 ? $offset + 1 : 0,
+                'to' => min($offset + $perPage, $total),
+            ],
+        ]);
+    }
+
+    private function userActivityTabCounts(User $user): array
+    {
+        $modules = [
+            'orders',
+            'incoming-packages',
+            'warehouse-packages',
+            'sorting',
+            'recipient-desk',
+            'recipient-payments',
+            'transport-manifests',
+            'incoming-manifests',
+            'delivery-runs',
+            'pending-confirmations',
+            'team-actions',
+            'hq-controls',
+            'security-log',
+        ];
+
+        $counts = [];
+        foreach ($modules as $module) {
+            $counts[$module] = collect($this->directRowsForModule($user, $module)->values()->all())->count()
+                + collect($this->auditRowsForModule($user, $module)->values()->all())->count();
+        }
+
+        return $counts;
+    }
+
+    private function directRowsForModule(User $user, string $module): Collection
+    {
+        return match ($module) {
+            'orders' => $this->orderRows($user),
+            'incoming-packages' => $this->incomingPackageRows($user),
+            'warehouse-packages' => $this->warehousePackageRows($user),
+            'sorting' => $this->sortingRows($user),
+            'recipient-desk' => $this->recipientDeskRows($user),
+            'recipient-payments' => $this->recipientPaymentRows($user),
+            'transport-manifests' => $this->transportManifestRows($user, false),
+            'incoming-manifests' => $this->transportManifestRows($user, true),
+            'delivery-runs' => $this->deliveryRunRows($user),
+            'pending-confirmations' => $this->pendingConfirmationRows($user),
+            'team-actions' => $this->teamActionRows($user),
+            'hq-controls' => $this->hqControlRows($user),
+            default => collect(),
+        };
+    }
+
+    private function auditRowsForModule(User $user, string $module): Collection
+    {
+        $query = AdminAuditLog::query()
+            ->with('warehouse:id,name')
+            ->where('user_id', $user->id);
+
+        $keywords = $this->auditKeywordsForModule($module);
+        if ($keywords !== ['*']) {
+            $query->where(function ($q) use ($keywords) {
+                foreach ($keywords as $keyword) {
+                    $q->orWhere('route_name', 'like', "%{$keyword}%")
+                        ->orWhere('action', 'like', "%{$keyword}%")
+                        ->orWhere('description', 'like', "%{$keyword}%")
+                        ->orWhere('action_type', 'like', "%{$keyword}%");
+                }
+            });
+        }
+
+        return $query->latest('created_at')->limit(250)->get()
+            ->map(fn (AdminAuditLog $log) => $this->makeActivityRow(
+                'audit-' . $log->id,
+                $module === 'overview' ? $this->labelForAuditLog($log) : $this->moduleLabel($module),
+                $log->route_name ? Str::of($log->route_name)->afterLast('.')->replace('-', ' ')->replace('_', ' ')->title()->toString() : 'Audit',
+                $log->created_at,
+                $this->humanizeAction($log->route_name, $log->action_type),
+                $this->statusFromAuditLog($log),
+                $this->humanizeDescription($log),
+                $log->warehouse?->name,
+                null
+            ));
+    }
+
+    private function auditKeywordsForModule(string $module): array
+    {
+        return match ($module) {
+            'overview' => ['*'],
+            'orders' => ['orders', 'shipments', 'walkin'],
+            'incoming-packages' => ['receipts.pending', 'pickups.received', 'received-pickups', 'receipt'],
+            'warehouse-packages' => ['packages', 'items.received', 'warehouse-packages', 'label', 'scan'],
+            'sorting' => ['sorting', 'sort-batches', 'sort_batch'],
+            'recipient-desk' => ['contacts', 'recipient desk', 'contact'],
+            'recipient-payments' => ['recipient-payments', 'payment'],
+            'transport-manifests' => ['manifests.transport', 'transport-manifests'],
+            'incoming-manifests' => ['manifests.incoming', 'incoming-manifests'],
+            'delivery-runs' => ['delivery-runs', 'deliveries.runs'],
+            'pending-confirmations' => ['pending-confirmations', 'confirm-handoff'],
+            'team-actions' => ['users', 'roles'],
+            'hq-controls' => ['vendors', 'vendor-payouts', 'drivers', 'warehouses', 'marketing', 'settings', 'capabilities'],
+            'security-log' => ['login', 'logout', 'impersonat', 'auth', 'session', 'otp'],
+            default => [$module],
+        };
+    }
+
+    private function orderRows(User $user): Collection
+    {
+        return Shipment::query()
+            ->with(['vendor:id,name,business_name', 'pickupAssignment.warehouseReceipt:id,pickup_assignment_id,warehouse_id', 'pickupAssignment.warehouseReceipt.warehouse:id,name'])
+            ->withCount('items')
+            ->where('created_by_user_id', $user->id)
+            ->latest('created_at')
+            ->limit(250)
+            ->get()
+            ->map(fn (Shipment $shipment) => $this->makeActivityRow(
+                'order-' . $shipment->id,
+                'Orders',
+                $shipment->shipment_number,
+                $shipment->created_at,
+                'Created Order',
+                $this->modelValue($shipment->status),
+                trim(collect([
+                    $shipment->vendor?->business_name ?: $shipment->vendor?->name,
+                    $shipment->items_count . ' package(s)',
+                    $shipment->source ? Str::of($this->modelValue($shipment->source))->replace('_', ' ')->title()->toString() : null,
+                ])->filter()->join(' · ')),
+                $shipment->pickupAssignment?->warehouseReceipt?->warehouse?->name ?: $user->warehouse?->name,
+                route('admin.orders.show', $shipment)
+            ));
+    }
+
+    private function incomingPackageRows(User $user): Collection
+    {
+        $receipts = WarehouseReceipt::query()
+            ->with(['warehouse:id,name', 'shipment:id,shipment_number'])
+            ->where(function ($query) use ($user) {
+                $query->where('started_by_user_id', $user->id)
+                    ->orWhere('finalized_by_user_id', $user->id)
+                    ->orWhere('approved_by_user_id', $user->id);
+            })
+            ->latest('updated_at')
+            ->limit(150)
+            ->get()
+            ->map(function (WarehouseReceipt $receipt) use ($user) {
+                $action = (int) $receipt->finalized_by_user_id === (int) $user->id
+                    ? 'Finalized Receipt'
+                    : ((int) $receipt->approved_by_user_id === (int) $user->id ? 'Approved Receipt' : 'Started Receipt');
+
+                return $this->makeActivityRow(
+                    'receipt-' . $receipt->id,
+                    'Incoming Packages',
+                    $receipt->shipment?->shipment_number ?: 'Receipt #' . $receipt->id,
+                    $receipt->finalized_at ?: $receipt->started_at ?: $receipt->updated_at,
+                    $action,
+                    $receipt->status,
+                    $receipt->notes ?: 'Package receipt activity',
+                    $receipt->warehouse?->name,
+                    null
+                );
+            });
+
+        $items = WarehouseReceiptItem::query()
+            ->with(['receipt.warehouse:id,name', 'receipt.shipment:id,shipment_number', 'shipmentItem:id,description,tracking_code'])
+            ->where('received_by_user_id', $user->id)
+            ->latest('received_at')
+            ->limit(150)
+            ->get()
+            ->map(fn (WarehouseReceiptItem $item) => $this->makeActivityRow(
+                'receipt-item-' . $item->id,
+                'Incoming Packages',
+                $item->shipmentItem?->tracking_code ?: $item->receipt?->shipment?->shipment_number ?: 'Package #' . $item->id,
+                $item->received_at ?: $item->updated_at,
+                'Received Package',
+                $item->condition_status ?: $item->discrepancy_type,
+                trim(collect([
+                    $item->shipmentItem?->description,
+                    'Received ' . (int) $item->received_quantity . ' of ' . (int) $item->expected_quantity,
+                ])->filter()->join(' · ')),
+                $item->receipt?->warehouse?->name,
+                null
+            ));
+
+        return collect($receipts->values()->all())->merge($items->values()->all());
+    }
+
+    private function warehousePackageRows(User $user): Collection
+    {
+        return WarehouseReceiptItemPhoto::query()
+            ->with(['receiptItem.receipt.warehouse:id,name', 'receiptItem.shipmentItem:id,description,tracking_code'])
+            ->where('created_by_user_id', $user->id)
+            ->latest('created_at')
+            ->limit(250)
+            ->get()
+            ->map(fn (WarehouseReceiptItemPhoto $photo) => $this->makeActivityRow(
+                'receipt-photo-' . $photo->id,
+                'Warehouse Packages',
+                $photo->receiptItem?->shipmentItem?->tracking_code ?: 'Photo #' . $photo->id,
+                $photo->created_at,
+                'Uploaded Package Photo',
+                $photo->type ?: 'photo',
+                $photo->receiptItem?->shipmentItem?->description ?: 'Receipt photo uploaded',
+                $photo->receiptItem?->receipt?->warehouse?->name,
+                null
+            ));
+    }
+
+    private function sortingRows(User $user): Collection
+    {
+        $batches = SortBatch::query()
+            ->with(['originWarehouse:id,name', 'destinationWarehouse:id,name'])
+            ->where(function ($query) use ($user) {
+                $query->where('created_by_user_id', $user->id)
+                    ->orWhere('sealed_by_user_id', $user->id);
+            })
+            ->latest('updated_at')
+            ->limit(150)
+            ->get()
+            ->map(fn (SortBatch $batch) => $this->makeActivityRow(
+                'sort-batch-' . $batch->id,
+                'Sorting',
+                $batch->batch_number,
+                $batch->sealed_at ?: $batch->created_at,
+                (int) $batch->sealed_by_user_id === (int) $user->id ? 'Sealed Sort Batch' : 'Created Sort Batch',
+                $batch->status,
+                trim(collect([
+                    Str::of($batch->dispatch_mode)->replace('_', ' ')->title()->toString(),
+                    $batch->destinationWarehouse?->name ? 'To ' . $batch->destinationWarehouse->name : null,
+                ])->filter()->join(' · ')),
+                $batch->originWarehouse?->name,
+                null
+            ));
+
+        $items = SortBatchItem::query()
+            ->with(['sortBatch:id,batch_number,origin_warehouse_id', 'sortBatch.originWarehouse:id,name', 'warehouseReceiptItem.shipmentItem:id,tracking_code,description'])
+            ->where('added_by_user_id', $user->id)
+            ->latest('created_at')
+            ->limit(150)
+            ->get()
+            ->map(fn (SortBatchItem $item) => $this->makeActivityRow(
+                'sort-batch-item-' . $item->id,
+                'Sorting',
+                $item->sortBatch?->batch_number ?: 'Batch Item #' . $item->id,
+                $item->created_at,
+                'Added Package To Batch',
+                $item->removed_at ? 'removed' : 'active',
+                $item->warehouseReceiptItem?->shipmentItem?->description ?: $item->warehouseReceiptItem?->shipmentItem?->tracking_code,
+                $item->sortBatch?->originWarehouse?->name,
+                null
+            ));
+
+        return collect($batches->values()->all())->merge($items->values()->all());
+    }
+
+    private function recipientDeskRows(User $user): Collection
+    {
+        $tasks = PackageContactTask::query()
+            ->with('warehouse:id,name')
+            ->where('assigned_to_user_id', $user->id)
+            ->latest('updated_at')
+            ->limit(150)
+            ->get()
+            ->map(fn (PackageContactTask $task) => $this->makeActivityRow(
+                'contact-task-' . $task->id,
+                'Recipient Desk',
+                $task->recipient_phone ?: 'Task #' . $task->id,
+                $task->resolved_at ?: $task->assigned_at ?: $task->updated_at,
+                'Handled Recipient Task',
+                $task->status,
+                trim(collect([$task->recipient_name, $task->delivery_town, $task->outcome])->filter()->join(' · ')),
+                $task->warehouse?->name,
+                route('warehouse.contacts.index')
+            ));
+
+        $attempts = PackageContactAttempt::query()
+            ->with('task.warehouse:id,name')
+            ->where('attempted_by_user_id', $user->id)
+            ->latest('attempted_at')
+            ->limit(150)
+            ->get()
+            ->map(fn (PackageContactAttempt $attempt) => $this->makeActivityRow(
+                'contact-attempt-' . $attempt->id,
+                'Recipient Desk',
+                $attempt->task?->recipient_phone ?: 'Call #' . $attempt->id,
+                $attempt->attempted_at,
+                'Logged Call Attempt',
+                $attempt->outcome,
+                $attempt->notes ?: $attempt->task?->recipient_name,
+                $attempt->task?->warehouse?->name,
+                route('warehouse.contacts.index')
+            ));
+
+        return collect($tasks->values()->all())->merge($attempts->values()->all());
+    }
+
+    private function recipientPaymentRows(User $user): Collection
+    {
+        $sessions = RecipientPaymentSession::query()
+            ->with(['warehouse:id,name', 'paymentWallet:id,name,phone_number'])
+            ->where(function ($query) use ($user) {
+                $query->where('user_id', $user->id)
+                    ->orWhere('reviewed_by_user_id', $user->id);
+            })
+            ->latest('started_at')
+            ->limit(120)
+            ->get()
+            ->map(fn (RecipientPaymentSession $session) => $this->makeActivityRow(
+                'payment-session-' . $session->id,
+                'Recipient Payments',
+                $session->paymentWallet?->phone_number ?: 'Session #' . $session->id,
+                $session->closed_at ?: $session->started_at ?: $session->created_at,
+                (int) $session->reviewed_by_user_id === (int) $user->id ? 'Reviewed Payment Session' : 'Managed Payment Session',
+                $session->status,
+                'Expected: GHS ' . number_format((float) $session->expected_closing_balance, 2),
+                $session->warehouse?->name,
+                route('warehouse.recipient-payments.index', ['tab' => 'sessions'])
+            ));
+
+        $entries = RecipientPaymentSessionEntry::query()
+            ->with('session.warehouse:id,name')
+            ->where('recorded_by_user_id', $user->id)
+            ->latest('created_at')
+            ->limit(120)
+            ->get()
+            ->map(fn (RecipientPaymentSessionEntry $entry) => $this->makeActivityRow(
+                'payment-entry-' . $entry->id,
+                'Recipient Payments',
+                $entry->reference ?: 'Entry #' . $entry->id,
+                $entry->created_at,
+                'Recorded Payment',
+                $entry->entry_type,
+                ($entry->currency ?: 'GHS') . ' ' . number_format((float) $entry->amount, 2),
+                $entry->session?->warehouse?->name,
+                route('warehouse.recipient-payments.index')
+            ));
+
+        $tasks = RecipientPaymentTask::query()
+            ->with('warehouse:id,name')
+            ->where(function ($query) use ($user) {
+                $query->where('assigned_to_user_id', $user->id)
+                    ->orWhere('override_by_user_id', $user->id);
+            })
+            ->latest('updated_at')
+            ->limit(120)
+            ->get()
+            ->map(fn (RecipientPaymentTask $task) => $this->makeActivityRow(
+                'payment-task-' . $task->id,
+                'Recipient Payments',
+                $task->recipient_phone ?: 'Task #' . $task->id,
+                $task->paid_at ?: $task->assigned_at ?: $task->updated_at,
+                (int) $task->override_by_user_id === (int) $user->id ? 'Overrode Payment Task' : 'Handled Payment Task',
+                $task->status,
+                trim(collect([$task->recipient_name, $task->delivery_town, $task->negotiated_amount ? 'GHS ' . number_format((float) $task->negotiated_amount, 2) : null])->filter()->join(' · ')),
+                $task->warehouse?->name,
+                route('warehouse.recipient-payments.index')
+            ));
+
+        $calls = RecipientPaymentCallAttempt::query()
+            ->with('task.warehouse:id,name')
+            ->where('attempted_by_user_id', $user->id)
+            ->latest('attempted_at')
+            ->limit(120)
+            ->get()
+            ->map(fn (RecipientPaymentCallAttempt $attempt) => $this->makeActivityRow(
+                'payment-call-' . $attempt->id,
+                'Recipient Payments',
+                $attempt->task?->recipient_phone ?: 'Call #' . $attempt->id,
+                $attempt->attempted_at,
+                'Logged Payment Call',
+                $attempt->outcome,
+                $attempt->notes ?: $attempt->task?->recipient_name,
+                $attempt->task?->warehouse?->name,
+                route('warehouse.recipient-payments.index')
+            ));
+
+        return collect($sessions->values()->all())
+            ->merge($entries->values()->all())
+            ->merge($tasks->values()->all())
+            ->merge($calls->values()->all());
+    }
+
+    private function transportManifestRows(User $user, bool $incoming): Collection
+    {
+        $manifests = TransportManifest::query()
+            ->with(['originWarehouse:id,name', 'destinationWarehouse:id,name'])
+            ->where($incoming ? 'received_by_user_id' : 'created_by_user_id', $user->id)
+            ->latest($incoming ? 'received_at' : 'created_at')
+            ->limit(180)
+            ->get()
+            ->map(fn (TransportManifest $manifest) => $this->makeActivityRow(
+                ($incoming ? 'incoming-manifest-' : 'transport-manifest-') . $manifest->id,
+                $incoming ? 'Incoming Manifests' : 'Transport Manifests',
+                $manifest->manifest_number,
+                $incoming ? ($manifest->received_at ?: $manifest->updated_at) : $manifest->created_at,
+                $incoming ? 'Received Manifest' : 'Created Manifest',
+                $manifest->status,
+                trim(collect([
+                    $manifest->originWarehouse?->name ? 'From ' . $manifest->originWarehouse->name : null,
+                    $manifest->destinationWarehouse?->name ? 'To ' . $manifest->destinationWarehouse->name : null,
+                ])->filter()->join(' · ')),
+                $incoming ? $manifest->destinationWarehouse?->name : $manifest->originWarehouse?->name,
+                $incoming
+                    ? route('warehouse.manifests.incoming.show', $manifest)
+                    : route('warehouse.manifests.transport.show', $manifest)
+            ));
+
+        if (!$incoming) {
+            return $manifests;
+        }
+
+        $scans = TransportManifestReceiptLabelScan::query()
+            ->with(['manifest:id,manifest_number,destination_warehouse_id', 'manifest.destinationWarehouse:id,name'])
+            ->where('scanned_by_user_id', $user->id)
+            ->latest('scanned_at')
+            ->limit(120)
+            ->get()
+            ->map(fn (TransportManifestReceiptLabelScan $scan) => $this->makeActivityRow(
+                'incoming-scan-' . $scan->id,
+                'Incoming Manifests',
+                $scan->barcode_value ?: $scan->manifest?->manifest_number ?: 'Scan #' . $scan->id,
+                $scan->scanned_at,
+                'Scanned Incoming Label',
+                'scanned',
+                $scan->manifest?->manifest_number,
+                $scan->manifest?->destinationWarehouse?->name,
+                $scan->manifest ? route('warehouse.manifests.incoming.show', $scan->manifest) : null
+            ));
+
+        return collect($manifests->values()->all())->merge($scans->values()->all());
+    }
+
+    private function deliveryRunRows(User $user): Collection
+    {
+        return DeliveryRun::query()
+            ->with(['warehouse:id,name', 'assignedDriver:id,name'])
+            ->withCount('stops')
+            ->where('created_by_user_id', $user->id)
+            ->latest('created_at')
+            ->limit(250)
+            ->get()
+            ->map(fn (DeliveryRun $run) => $this->makeActivityRow(
+                'delivery-run-' . $run->id,
+                'Delivery Runs',
+                $run->run_number,
+                $run->created_at,
+                'Created Delivery Run',
+                $run->status,
+                trim(collect([$run->assignedDriver?->name, $run->stops_count . ' stop(s)'])->filter()->join(' · ')),
+                $run->warehouse?->name,
+                route('warehouse.deliveries.runs.show', $run)
+            ));
+    }
+
+    private function pendingConfirmationRows(User $user): Collection
+    {
+        return DeliveryRunStop::query()
+            ->with('run.warehouse:id,name')
+            ->where('confirmed_by_admin_id', $user->id)
+            ->latest('confirmed_at')
+            ->limit(250)
+            ->get()
+            ->map(fn (DeliveryRunStop $stop) => $this->makeActivityRow(
+                'pending-confirmation-' . $stop->id,
+                'Pending Confirmations',
+                $stop->recipient_phone ?: 'Stop #' . $stop->id,
+                $stop->confirmed_at ?: $stop->updated_at,
+                'Confirmed Bus Handoff',
+                $stop->status,
+                trim(collect([$stop->recipient_name, $stop->town, $stop->confirmation_notes])->filter()->join(' · ')),
+                $stop->run?->warehouse?->name,
+                route('warehouse.deliveries.pending-confirmations')
+            ));
+    }
+
+    private function teamActionRows(User $user): Collection
+    {
+        return User::query()
+            ->with(['warehouse:id,name', 'roles:id,name'])
+            ->where('created_by_user_id', $user->id)
+            ->latest('created_at')
+            ->limit(250)
+            ->get()
+            ->map(fn (User $createdUser) => $this->makeActivityRow(
+                'created-user-' . $createdUser->id,
+                'Team Actions',
+                $createdUser->name,
+                $createdUser->created_at,
+                'Created User',
+                $createdUser->is_active ? 'active' : 'inactive',
+                $createdUser->roles->pluck('name')->join(', ') ?: 'No role assigned',
+                $createdUser->warehouse?->name,
+                route('warehouse.users.show', $createdUser)
+            ));
+    }
+
+    private function hqControlRows(User $user): Collection
+    {
+        $payouts = VendorPayout::query()
+            ->with('vendor:id,name,business_name')
+            ->where('processed_by_admin_id', $user->id)
+            ->latest('created_at')
+            ->limit(120)
+            ->get()
+            ->map(fn (VendorPayout $payout) => $this->makeActivityRow(
+                'vendor-payout-' . $payout->id,
+                'HQ Controls',
+                $payout->vendor?->business_name ?: $payout->vendor?->name ?: 'Payout #' . $payout->id,
+                $payout->confirmed_at ?: $payout->sent_at ?: $payout->created_at,
+                'Processed Commission Payout',
+                $payout->status,
+                ($payout->payment_method ? strtoupper($payout->payment_method) . ' · ' : '') . 'GHS ' . number_format((float) $payout->amount, 2),
+                $user->warehouse?->name,
+                route('admin.vendor-payouts.index')
+            ));
+
+        $capabilities = WarehouseCapability::query()
+            ->with('warehouse:id,name')
+            ->where('granted_by_user_id', $user->id)
+            ->latest('updated_at')
+            ->limit(120)
+            ->get()
+            ->map(fn (WarehouseCapability $capability) => $this->makeActivityRow(
+                'capability-' . $capability->id,
+                'HQ Controls',
+                $capability->module,
+                $capability->updated_at,
+                'Updated Warehouse Capability',
+                'active',
+                Str::of($capability->scope)->replace('_', ' ')->title()->toString(),
+                $capability->warehouse?->name,
+                $capability->warehouse ? route('admin.warehouses.show', $capability->warehouse) : null
+            ));
+
+        return collect($payouts->values()->all())->merge($capabilities->values()->all());
+    }
+
+    private function makeActivityRow(
+        string $id,
+        string $module,
+        ?string $reference,
+        mixed $date,
+        string $action,
+        ?string $status,
+        ?string $details,
+        ?string $warehouse = null,
+        ?string $viewUrl = null
+    ): array {
+        return [
+            'id' => $id,
+            'module' => $module,
+            'reference' => $reference ?: '-',
+            'date' => $this->formatActivityDate($date),
+            'action' => $action,
+            'status' => $status ? Str::of($status)->replace('_', ' ')->title()->toString() : '-',
+            'details' => $details ?: '-',
+            'warehouse' => $warehouse ?: '-',
+            'view_url' => $viewUrl,
+        ];
+    }
+
+    private function formatActivityDate(mixed $date): string
+    {
+        if (!$date) {
+            return '';
+        }
+
+        if ($date instanceof \DateTimeInterface) {
+            return $date->format('Y-m-d H:i:s');
+        }
+
+        return (string) $date;
+    }
+
+    private function modelValue(mixed $value): ?string
+    {
+        if ($value instanceof \BackedEnum) {
+            return (string) $value->value;
+        }
+
+        return $value !== null ? (string) $value : null;
+    }
+
+    private function moduleLabel(string $module): string
+    {
+        return match ($module) {
+            'incoming-packages' => 'Incoming Packages',
+            'warehouse-packages' => 'Warehouse Packages',
+            'recipient-desk' => 'Recipient Desk',
+            'recipient-payments' => 'Recipient Payments',
+            'transport-manifests' => 'Transport Manifests',
+            'incoming-manifests' => 'Incoming Manifests',
+            'delivery-runs' => 'Delivery Runs',
+            'pending-confirmations' => 'Pending Confirmations',
+            'team-actions' => 'Team Actions',
+            'hq-controls' => 'HQ Controls',
+            'security-log' => 'Security Log',
+            default => Str::of($module)->replace('-', ' ')->title()->toString(),
+        };
+    }
+
+    private function labelForAuditLog(AdminAuditLog $log): string
+    {
+        $route = (string) $log->route_name;
+
+        foreach ([
+            'orders' => 'Orders',
+            'walkin' => 'Orders',
+            'receipts' => 'Incoming Packages',
+            'packages' => 'Warehouse Packages',
+            'sorting' => 'Sorting',
+            'contacts' => 'Recipient Desk',
+            'recipient-payments' => 'Recipient Payments',
+            'manifests.transport' => 'Transport Manifests',
+            'manifests.incoming' => 'Incoming Manifests',
+            'delivery-runs' => 'Delivery Runs',
+            'pending-confirmations' => 'Pending Confirmations',
+            'users' => 'Team Actions',
+            'roles' => 'Team Actions',
+            'vendors' => 'HQ Controls',
+            'settings' => 'HQ Controls',
+        ] as $needle => $label) {
+            if (str_contains($route, $needle)) {
+                return $label;
+            }
+        }
+
+        return 'Activity';
+    }
+
+    private function statusFromAuditLog(AdminAuditLog $log): string
+    {
+        if ($log->status_code) {
+            return (int) $log->status_code >= 400 ? 'Failed' : 'Successful';
+        }
+
+        return $log->action_type ? Str::of($log->action_type)->replace('_', ' ')->title()->toString() : 'Recorded';
     }
 
     private function resolveAssignableWarehouseRole(int $roleId, ?User $actor = null): Role

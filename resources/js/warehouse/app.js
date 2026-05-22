@@ -5,6 +5,7 @@ import { initWarehouseLayout } from './modules/layout/index.js';
 
 import './modules/dashboard/index.js';
 import '../admin/modules/users/index.js';
+import '../admin/modules/users/show.js';
 import '../admin/modules/users/audit-logs-table.js';
 import './modules/receipts/pending.js';
 import './modules/receipts/show.js';

@@ -369,6 +369,10 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                         <span class="text-slate-400 w-16 flex-shrink-0 mt-0.5">Location</span>
                                         <span class="font-semibold text-slate-800" x-text="pickupLocationSummary()"></span>
                                     </div>
+                                    <div x-show="pickupVehicleSummary() !== '-'" class="flex items-start gap-2 text-xs" style="display:none">
+                                        <span class="text-slate-400 w-16 flex-shrink-0 mt-0.5">Vehicle</span>
+                                        <span class="font-semibold text-slate-800" x-text="pickupVehicleSummary()"></span>
+                                    </div>
                                     <div class="flex items-start gap-2 text-xs">
                                         <span class="text-slate-400 w-16 flex-shrink-0 mt-0.5">Notes</span>
                                         <span class="text-slate-600" x-text="shipment.pickup_instructions || '—'"></span>
@@ -1873,6 +1877,10 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                         <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
                             <p class="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400 sm:w-36">Instructions:</p>
                             <p class="min-w-0 font-medium text-slate-700" x-text="shipment.pickup_instructions || '-'"></p>
+                        </div>
+                        <div x-show="pickupVehicleSummary() !== '-'" class="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3" style="display:none">
+                            <p class="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400 sm:w-36">Pickup Vehicle:</p>
+                            <p class="min-w-0 font-semibold text-slate-900" x-text="pickupVehicleSummary()"></p>
                         </div>
                         <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
                             <p class="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400 sm:w-36">Pickup Driver:</p>

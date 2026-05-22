@@ -186,6 +186,27 @@ function shipmentShow() {
             return '-';
         },
 
+        pickupVehicleSummary() {
+            if (this.shipment?.pickup_vehicle_summary) {
+                return this.shipment.pickup_vehicle_summary;
+            }
+
+            const rows = Array.isArray(this.shipment?.pickup_vehicles)
+                ? this.shipment.pickup_vehicles
+                : (Array.isArray(this.shipment?.pickup_vehicle_requests) ? this.shipment.pickup_vehicle_requests : []);
+
+            const labels = rows
+                .map((row) => {
+                    const quantity = Number(row?.quantity || 0);
+                    const name = row?.name || row?.vehicle_name || row?.vehicle_name_snapshot || row?.vehicle_type?.name || 'Vehicle';
+                    if (!quantity || !name) return null;
+                    return `${quantity} ${name}`;
+                })
+                .filter(Boolean);
+
+            return labels.length ? labels.join(', ') : '-';
+        },
+
         deliveryLocationSummary() {
             if (this.shipment?.delivery_region_id && this.shipment?.delivery_district_id) {
                 const parts = [

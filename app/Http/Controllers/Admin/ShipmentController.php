@@ -184,6 +184,7 @@ class ShipmentController extends Controller
             'pickupAssignment.targetWarehouse',
             'pickupAssignment.receivedWarehouse',
             'pickupAssignment.warehouseReceipt.items',
+            'pickupVehicleRequests.vehicleType',
             'pickupAssignments.driver',
             'pickupAssignments.assignedBy',
             'pickupAssignments.targetWarehouse',

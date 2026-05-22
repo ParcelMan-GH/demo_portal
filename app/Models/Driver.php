@@ -27,6 +27,7 @@ class Driver extends Authenticatable
         'name',
         'email',
         'phone',
+        'photo_path',
         'password',
         'vehicle_type',
         'vehicle_number',

@@ -69,6 +69,27 @@ export function createReceivingWorkspaceState() {
             return items.every((item) => this.receivingPackageHasReceipt(item));
         },
 
+        pickupVehicleSummary() {
+            if (this.shipment?.pickup_vehicle_summary) {
+                return this.shipment.pickup_vehicle_summary;
+            }
+
+            const rows = Array.isArray(this.shipment?.pickup_vehicles)
+                ? this.shipment.pickup_vehicles
+                : (Array.isArray(this.shipment?.pickup_vehicle_requests) ? this.shipment.pickup_vehicle_requests : []);
+
+            const labels = rows
+                .map((row) => {
+                    const quantity = Number(row?.quantity || 0);
+                    const name = row?.name || row?.vehicle_name || row?.vehicle_name_snapshot || row?.vehicle_type?.name || 'Vehicle';
+                    if (!quantity || !name) return null;
+                    return `${quantity} ${name}`;
+                })
+                .filter(Boolean);
+
+            return labels.length ? labels.join(', ') : '';
+        },
+
         discrepancyCount() {
             return this.receivingItems().filter((item) => (item.discrepancy_type || 'none') !== 'none').length;
         },

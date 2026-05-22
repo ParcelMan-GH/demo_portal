@@ -69,7 +69,10 @@ function buildDriversTable(config) {
             name: '',
             email: '',
             phone: '',
+            profile_photo: null,
+            photo_preview_url: '',
             password: '',
+            password_confirmation: '',
             vehicle_type: '',
             vehicle_number: '',
             license_number: '',
@@ -451,7 +454,10 @@ function buildDriversTable(config) {
                 name: '',
                 email: '',
                 phone: '',
+                profile_photo: null,
+                photo_preview_url: '',
                 password: '',
+                password_confirmation: '',
                 vehicle_type: '',
                 vehicle_number: '',
                 license_number: '',
@@ -459,6 +465,9 @@ function buildDriversTable(config) {
                 is_active: true,
             };
             this.showModal = true;
+            this.$nextTick(() => {
+                if (this.$refs.driverPhotoInput) this.$refs.driverPhotoInput.value = '';
+            });
         },
 
         openEditModal(driver) {
@@ -469,7 +478,10 @@ function buildDriversTable(config) {
                 name: driver.name,
                 email: driver.email,
                 phone: driver.phone,
+                profile_photo: null,
+                photo_preview_url: driver.photo_url || '',
                 password: '',
+                password_confirmation: '',
                 vehicle_type: driver.vehicle_type || '',
                 vehicle_number: driver.vehicle_number || '',
                 license_number: driver.license_number || '',
@@ -479,6 +491,9 @@ function buildDriversTable(config) {
                 is_active: driver.is_active,
             };
             this.showModal = true;
+            this.$nextTick(() => {
+                if (this.$refs.driverPhotoInput) this.$refs.driverPhotoInput.value = '';
+            });
         },
 
         viewDriver(driver) {
@@ -489,7 +504,10 @@ function buildDriversTable(config) {
                 name: driver.name,
                 email: driver.email,
                 phone: driver.phone,
+                profile_photo: null,
+                photo_preview_url: driver.photo_url || '',
                 password: '',
+                password_confirmation: '',
                 vehicle_type: driver.vehicle_type || '',
                 vehicle_number: driver.vehicle_number || '',
                 license_number: driver.license_number || '',
@@ -504,6 +522,30 @@ function buildDriversTable(config) {
         closeModal() {
             this.showModal = false;
             this.errors = {};
+            if (this.form.photo_preview_url?.startsWith('blob:')) {
+                URL.revokeObjectURL(this.form.photo_preview_url);
+            }
+        },
+
+        handleDriverPhoto(event) {
+            const file = event.target.files?.[0] || null;
+            this.form.profile_photo = file;
+            if (this.form.photo_preview_url?.startsWith('blob:')) {
+                URL.revokeObjectURL(this.form.photo_preview_url);
+            }
+            this.form.photo_preview_url = file ? URL.createObjectURL(file) : '';
+        },
+
+        clearSelectedPhoto() {
+            this.form.profile_photo = null;
+            if (this.form.photo_preview_url?.startsWith('blob:')) {
+                URL.revokeObjectURL(this.form.photo_preview_url);
+            }
+            const driver = this.drivers.find((row) => Number(row.id) === Number(this.editingDriverId));
+            this.form.photo_preview_url = driver?.photo_url || '';
+            if (this.$refs.driverPhotoInput) {
+                this.$refs.driverPhotoInput.value = '';
+            }
         },
 
         async saveDriver() {
@@ -515,17 +557,36 @@ function buildDriversTable(config) {
                     ? this.storeEndpoint
                     : `${this.baseEndpoint}/${this.editingDriverId}`;
 
-                const method = this.modalMode === 'add' ? 'POST' : 'PUT';
+                const body = new FormData();
+                if (this.modalMode === 'edit') {
+                    body.append('_method', 'PUT');
+                }
+                body.append('name', this.form.name || '');
+                body.append('email', this.form.email || '');
+                body.append('phone', this.form.phone || '');
+                body.append('vehicle_type', this.form.vehicle_type || '');
+                body.append('vehicle_number', this.form.vehicle_number || '');
+                body.append('license_number', this.form.license_number || '');
+                body.append('is_active', this.form.is_active ? '1' : '0');
+                (this.form.task_capabilities || []).forEach((capability) => {
+                    body.append('task_capabilities[]', capability);
+                });
+                if (this.modalMode === 'add' || this.form.password) {
+                    body.append('password', this.form.password || '');
+                    body.append('password_confirmation', this.form.password_confirmation || '');
+                }
+                if (this.form.profile_photo) {
+                    body.append('profile_photo', this.form.profile_photo);
+                }
 
                 const response = await fetch(url, {
-                    method: method,
+                    method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': this.csrfToken,
                         'X-Requested-With': 'XMLHttpRequest',
                     },
-                    body: JSON.stringify(this.form),
+                    body,
                 });
 
                 const result = await response.json();

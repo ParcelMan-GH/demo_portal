@@ -246,11 +246,15 @@
                             <span class="block h-[1.5px] rounded-full bg-current w-1/2"></span>
                         </div>
                     </button>
+                    @php
+                        $breadcrumbParent = html_entity_decode(trim($__env->yieldContent('breadcrumb-parent')) ?: 'Back Office', ENT_QUOTES, 'UTF-8');
+                        $breadcrumbTitle = html_entity_decode(trim($__env->yieldContent('page-title')) ?: (trim($__env->yieldContent('breadcrumb-current')) ?: 'Dashboard'), ENT_QUOTES, 'UTF-8');
+                    @endphp
                     <nav class="hidden sm:flex items-center text-[13px] min-w-0">
-                        <span class="text-slate-400 font-medium">@yield('breadcrumb-parent', 'Back Office')</span>
+                        <span class="text-slate-400 font-medium">{{ $breadcrumbParent }}</span>
                         @if(View::hasSection('page-title') || View::hasSection('breadcrumb-current'))
                             <svg class="w-3.5 h-3.5 mx-2 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                            <span class="text-slate-800 font-semibold truncate">@yield('page-title', trim($__env->yieldContent('breadcrumb-current')) ?: 'Dashboard')</span>
+                            <span class="text-slate-800 font-semibold truncate">{{ $breadcrumbTitle }}</span>
                         @endif
                     </nav>
                 </div>

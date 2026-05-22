@@ -10,6 +10,7 @@ use App\Support\GenericPdfExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -103,6 +104,8 @@ class DriverController extends Controller
                 return [
                     'id' => $driver->id,
                     'name' => $driver->name,
+                    'avatar' => strtoupper(substr($driver->name, 0, 1)),
+                    'photo_url' => $driver->photo_path ? Storage::disk('public')->url($driver->photo_path) : null,
                     'email' => $driver->email,
                     'phone' => $driver->phone,
                     'vehicle_type' => $driver->vehicle_type,
@@ -180,13 +183,14 @@ class DriverController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:drivers,email'],
+            'email' => ['nullable', 'email', 'max:255', 'unique:drivers,email'],
             'phone' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
                 if (!PhoneHelper::isValid($value)) {
                     $fail('Please enter a valid Ghana phone number.');
                 }
             }, 'unique:drivers,phone'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'profile_photo' => ['nullable', 'image', 'max:5120'],
             'vehicle_type' => ['nullable', Rule::in(['motorcycle', 'car', 'van', 'truck'])],
             'vehicle_number' => ['nullable', 'string', 'max:255'],
             'license_number' => ['nullable', 'string', 'max:255'],
@@ -200,8 +204,9 @@ class DriverController extends Controller
 
         $driver = new Driver();
         $driver->name = $validated['name'];
-        $driver->email = $validated['email'];
+        $driver->email = $validated['email'] ?? null;
         $driver->phone = $phone;
+        $driver->photo_path = $request->file('profile_photo')?->store('driver-photos', 'public');
         $driver->password = Hash::make($validated['password']);
         $driver->vehicle_type = $validated['vehicle_type'] ?? 'motorcycle';
         $driver->vehicle_number = $validated['vehicle_number'] ?? null;
@@ -213,7 +218,7 @@ class DriverController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Rider/driver created successfully.',
-            'driver' => $driver,
+            'driver' => $this->driverPayload($driver->fresh()),
         ]);
     }
 
@@ -226,13 +231,14 @@ class DriverController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('drivers')->ignore($driver->id)],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('drivers')->ignore($driver->id)],
             'phone' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
                 if (!PhoneHelper::isValid($value)) {
                     $fail('Please enter a valid Ghana phone number.');
                 }
             }, Rule::unique('drivers')->ignore($driver->id)],
-            'password' => ['nullable', 'string', 'min:8'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+            'profile_photo' => ['nullable', 'image', 'max:5120'],
             'vehicle_type' => ['nullable', Rule::in(['motorcycle', 'car', 'van', 'truck'])],
             'vehicle_number' => ['nullable', 'string', 'max:255'],
             'license_number' => ['nullable', 'string', 'max:255'],
@@ -244,7 +250,7 @@ class DriverController extends Controller
         $phone = PhoneHelper::format($validated['phone']);
 
         $driver->name = $validated['name'];
-        $driver->email = $validated['email'];
+        $driver->email = $validated['email'] ?? null;
         $driver->phone = $phone;
         $driver->vehicle_type = $validated['vehicle_type'] ?? $driver->vehicle_type;
         $driver->vehicle_number = $validated['vehicle_number'] ?? null;
@@ -258,12 +264,20 @@ class DriverController extends Controller
             $driver->password = Hash::make($validated['password']);
         }
 
+        if ($request->hasFile('profile_photo')) {
+            if ($driver->photo_path) {
+                Storage::disk('public')->delete($driver->photo_path);
+            }
+
+            $driver->photo_path = $request->file('profile_photo')->store('driver-photos', 'public');
+        }
+
         $driver->save();
 
         return response()->json([
             'success' => true,
             'message' => 'Rider/driver updated successfully.',
-            'driver' => $driver,
+            'driver' => $this->driverPayload($driver->fresh()),
         ]);
     }
 
@@ -761,6 +775,24 @@ class DriverController extends Controller
         return !empty($normalized)
             ? $normalized
             : [Driver::CAPABILITY_PICKUP];
+    }
+
+    protected function driverPayload(Driver $driver): array
+    {
+        return [
+            'id' => $driver->id,
+            'name' => $driver->name,
+            'avatar' => strtoupper(substr($driver->name, 0, 1)),
+            'photo_url' => $driver->photo_path ? Storage::disk('public')->url($driver->photo_path) : null,
+            'email' => $driver->email,
+            'phone' => $driver->phone,
+            'vehicle_type' => $driver->vehicle_type,
+            'vehicle_number' => $driver->vehicle_number,
+            'license_number' => $driver->license_number,
+            'status' => $driver->status,
+            'is_active' => $driver->is_active,
+            'task_capabilities' => $driver->getCapabilities(),
+        ];
     }
 
     public function packagesData(Request $request, Driver $driver): \Illuminate\Http\JsonResponse

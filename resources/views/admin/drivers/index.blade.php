@@ -260,7 +260,17 @@
                     <template x-for="driver in drivers" :key="driver.id">
                         <tr class="hover:bg-slate-50/70">
                             <td x-show="visibleColumns.name" class="px-4 py-3 align-top">
-                                <a :href="'{{ route('admin.drivers.index') }}/' + driver.id" class="block break-words font-bold leading-5 text-slate-900 hover:text-orange-700 hover:underline" x-text="driver.name"></a>
+                                <div class="flex min-w-0 items-center gap-3">
+                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-orange-50 text-sm font-black text-orange-700 ring-1 ring-orange-100">
+                                        <template x-if="driver.photo_url">
+                                            <img :src="driver.photo_url" alt="" class="h-full w-full object-cover">
+                                        </template>
+                                        <template x-if="!driver.photo_url">
+                                            <span x-text="driver.avatar || (driver.name || 'R').charAt(0).toUpperCase()"></span>
+                                        </template>
+                                    </div>
+                                    <a :href="'{{ route('admin.drivers.index') }}/' + driver.id" class="block min-w-0 break-words font-bold leading-5 text-slate-900 hover:text-orange-700 hover:underline" x-text="driver.name"></a>
+                                </div>
                             </td>
                             <td x-show="visibleColumns.email" class="break-all px-4 py-3 align-top text-slate-600" x-text="driver.email"></td>
                             <td x-show="visibleColumns.phone" class="whitespace-nowrap px-4 py-3 align-top text-slate-600" x-text="driver.phone"></td>
@@ -373,8 +383,16 @@
                 <template x-for="driver in drivers" :key="driver.id">
                     <div class="p-4">
                         <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <a :href="'{{ route('admin.drivers.index') }}/' + driver.id" class="break-words text-sm font-extrabold text-slate-900 hover:text-orange-700" x-text="driver.name"></a>
+                            <div class="flex min-w-0 items-center gap-3">
+                                <div class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-orange-50 text-sm font-black text-orange-700 ring-1 ring-orange-100">
+                                    <template x-if="driver.photo_url">
+                                        <img :src="driver.photo_url" alt="" class="h-full w-full object-cover">
+                                    </template>
+                                    <template x-if="!driver.photo_url">
+                                        <span x-text="driver.avatar || (driver.name || 'R').charAt(0).toUpperCase()"></span>
+                                    </template>
+                                </div>
+                                <a :href="'{{ route('admin.drivers.index') }}/' + driver.id" class="min-w-0 break-words text-sm font-extrabold text-slate-900 hover:text-orange-700" x-text="driver.name"></a>
                             </div>
                             <span class="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold" :class="activeBadgeClass(driver)" x-text="driver.is_active ? 'Active' : 'Inactive'"></span>
                         </div>
@@ -470,6 +488,44 @@
                 <!-- Body -->
                 <form @submit.prevent="saveDriver()">
                     <div class="space-y-5 px-6 py-6 max-h-[calc(100vh-240px)] overflow-y-auto">
+                            <!-- Photo -->
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Driver Photo</label>
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                    <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-orange-50 text-xl font-black text-orange-700 ring-1 ring-orange-100">
+                                        <template x-if="form.photo_preview_url">
+                                            <img :src="form.photo_preview_url" alt="" class="h-full w-full object-cover">
+                                        </template>
+                                        <template x-if="!form.photo_preview_url">
+                                            <span x-text="(form.name || 'R').trim().charAt(0).toUpperCase() || 'R'"></span>
+                                        </template>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <input x-ref="driverPhotoInput"
+                                               type="file"
+                                               accept="image/*"
+                                               :disabled="modalMode === 'view'"
+                                               @@change="handleDriverPhoto($event)"
+                                               class="block w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 file:mr-4 file:rounded-xl file:border-0 file:bg-orange-50 file:px-4 file:py-2 file:text-sm file:font-black file:text-orange-700 hover:file:bg-orange-100 focus:border-orange-400 focus:outline-none focus:ring-4 focus:ring-orange-100 disabled:bg-slate-50 disabled:text-slate-500">
+                                        <template x-if="errors.profile_photo">
+                                            <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                                </svg>
+                                                <span x-text="errors.profile_photo[0]"></span>
+                                            </p>
+                                        </template>
+                                        <button type="button"
+                                                x-show="form.profile_photo && modalMode !== 'view'"
+                                                x-cloak
+                                                @@click="clearSelectedPhoto()"
+                                                class="mt-2 text-xs font-black text-slate-500 hover:text-slate-800">
+                                            Clear selected photo
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Name -->
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-2">
@@ -500,38 +556,8 @@
                                 </template>
                             </div>
 
-                            <!-- Email & Phone Grid -->
+                            <!-- Phone & Email Grid -->
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <!-- Email -->
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                        Email <span class="text-rose-500">*</span>
-                                    </label>
-                                    <div class="relative">
-                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                            </svg>
-                                        </div>
-                                        <input
-                                            type="email"
-                                            x-model="form.email"
-                                            :disabled="modalMode === 'view'"
-                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
-                                            placeholder="driver@example.com"
-                                            required
-                                        >
-                                    </div>
-                                    <template x-if="errors.email">
-                                        <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
-                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                                            </svg>
-                                            <span x-text="errors.email[0]"></span>
-                                        </p>
-                                    </template>
-                                </div>
-
                                 <!-- Phone -->
                                 <div>
                                     <label class="block text-sm font-semibold text-slate-700 mb-2">
@@ -561,37 +587,35 @@
                                         </p>
                                     </template>
                                 </div>
-                            </div>
 
-                            <!-- Password -->
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                    Password <span x-show="modalMode === 'add'" class="text-rose-500">*</span>
-                                    <span x-show="modalMode === 'edit'" class="text-slate-400 text-xs font-normal">(Optional)</span>
-                                </label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                                        </svg>
+                                <!-- Email -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                        Email <span class="text-slate-400 text-xs font-normal">(Optional)</span>
+                                    </label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                            </svg>
+                                        </div>
+                                        <input
+                                            type="email"
+                                            x-model="form.email"
+                                            :disabled="modalMode === 'view'"
+                                            class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                                            placeholder="driver@example.com"
+                                        >
                                     </div>
-                                    <input
-                                        type="password"
-                                        x-model="form.password"
-                                        :disabled="modalMode === 'view'"
-                                        class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
-                                        :placeholder="modalMode === 'edit' ? 'Leave blank to keep current' : 'Enter password'"
-                                        :required="modalMode === 'add'"
-                                    >
+                                    <template x-if="errors.email">
+                                        <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                            </svg>
+                                            <span x-text="errors.email[0]"></span>
+                                        </p>
+                                    </template>
                                 </div>
-                                <template x-if="errors.password">
-                                    <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
-                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                                        </svg>
-                                        <span x-text="errors.password[0]"></span>
-                                    </p>
-                                </template>
                             </div>
 
                             <!-- Vehicle Info Grid -->
@@ -723,6 +747,68 @@
                                         <span x-text="errors.task_capabilities[0]"></span>
                                     </p>
                                 </template>
+                            </div>
+
+                            <!-- Password -->
+                            <div x-show="modalMode !== 'view'" x-cloak x-data="{ showPassword: false, showPasswordConfirmation: false, changeDriverPassword: false }" x-effect="changeDriverPassword = modalMode === 'add'">
+                                <div x-show="modalMode === 'edit'" x-cloak class="mb-4">
+                                    <label class="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
+                                        <input type="checkbox" x-model="changeDriverPassword" @@change="if (!changeDriverPassword) { form.password = ''; form.password_confirmation = ''; errors.password = null; errors.password_confirmation = null; }" class="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
+                                        Change password
+                                    </label>
+                                </div>
+
+                                <div x-show="modalMode === 'add' || changeDriverPassword" x-cloak class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                            <span x-text="modalMode === 'add' ? 'Password' : 'New Password'"></span>
+                                            <span x-show="modalMode === 'add'" class="text-rose-500">*</span>
+                                        </label>
+                                        <div class="relative">
+                                            <input
+                                                :type="showPassword ? 'text' : 'password'"
+                                                x-model="form.password"
+                                                :disabled="modalMode === 'view'"
+                                                class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-12 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100 disabled:bg-slate-50 disabled:text-slate-500"
+                                                :placeholder="modalMode === 'edit' ? 'Leave blank to keep current' : 'Minimum 8 characters'"
+                                                :required="modalMode === 'add'"
+                                            >
+                                            <button type="button" @@click="showPassword = !showPassword" class="absolute inset-y-0 right-0 px-4 text-slate-500 transition hover:text-slate-800" :aria-label="showPassword ? 'Hide password' : 'Show password'">
+                                                <svg x-show="!showPassword" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                <svg x-show="showPassword" x-cloak class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18M10.584 10.587a2 2 0 002.828 2.829M9.88 9.88A3 3 0 0114.12 14.12M6.228 6.228A9.956 9.956 0 002.458 12c1.274 4.057 5.064 7 9.542 7 1.732 0 3.36-.44 4.772-1.212M9.88 9.88L6.228 6.228m7.892 7.892l3.652 3.652"/></svg>
+                                            </button>
+                                        </div>
+                                        <template x-if="errors.password">
+                                            <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                                <span x-text="errors.password[0]"></span>
+                                            </p>
+                                        </template>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                            Confirm Password <span x-show="modalMode === 'add'" class="text-rose-500">*</span>
+                                        </label>
+                                        <div class="relative">
+                                            <input
+                                                :type="showPasswordConfirmation ? 'text' : 'password'"
+                                                x-model="form.password_confirmation"
+                                                :disabled="modalMode === 'view'"
+                                                class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-12 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100 disabled:bg-slate-50 disabled:text-slate-500"
+                                                placeholder="Re-enter password"
+                                                :required="modalMode === 'add'"
+                                            >
+                                            <button type="button" @@click="showPasswordConfirmation = !showPasswordConfirmation" class="absolute inset-y-0 right-0 px-4 text-slate-500 transition hover:text-slate-800" :aria-label="showPasswordConfirmation ? 'Hide password' : 'Show password'">
+                                                <svg x-show="!showPasswordConfirmation" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                <svg x-show="showPasswordConfirmation" x-cloak class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18M10.584 10.587a2 2 0 002.828 2.829M9.88 9.88A3 3 0 0114.12 14.12M6.228 6.228A9.956 9.956 0 002.458 12c1.274 4.057 5.064 7 9.542 7 1.732 0 3.36-.44 4.772-1.212M9.88 9.88L6.228 6.228m7.892 7.892l3.652 3.652"/></svg>
+                                            </button>
+                                        </div>
+                                        <template x-if="errors.password_confirmation">
+                                            <p class="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                                                <span x-text="errors.password_confirmation[0]"></span>
+                                            </p>
+                                        </template>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Status Toggle -->

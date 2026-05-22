@@ -11,6 +11,7 @@ import { initAdminLayout } from './modules/layout/index.js';
 
 // Page-level modules
 import './modules/users/index.js';
+import './modules/users/show.js';
 import './modules/users/audit-logs-table.js';
 import './modules/vendors/index.js';
 import './modules/shipments/index.js';

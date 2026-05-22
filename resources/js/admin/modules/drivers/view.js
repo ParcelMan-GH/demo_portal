@@ -181,7 +181,10 @@ function driverShow() {
             name: '',
             email: '',
             phone: '',
+            profile_photo: null,
+            photo_preview_url: '',
             password: '',
+            password_confirmation: '',
             vehicle_type: '',
             vehicle_number: '',
             license_number: '',
@@ -771,7 +774,10 @@ function driverShow() {
                 name: this.driver.name,
                 email: this.driver.email,
                 phone: this.driver.phone,
+                profile_photo: null,
+                photo_preview_url: this.driver.photo_url || '',
                 password: '',
+                password_confirmation: '',
                 vehicle_type: this.driver.vehicle_type || '',
                 vehicle_number: this.driver.vehicle_number || '',
                 license_number: this.driver.license_number || '',
@@ -780,6 +786,29 @@ function driverShow() {
             };
             this.errors = {};
             this.showEditModal = true;
+            this.$nextTick(() => {
+                if (this.$refs.driverPhotoInput) this.$refs.driverPhotoInput.value = '';
+            });
+        },
+
+        handleDriverPhoto(event) {
+            const file = event.target.files?.[0] || null;
+            this.form.profile_photo = file;
+            if (this.form.photo_preview_url?.startsWith('blob:')) {
+                URL.revokeObjectURL(this.form.photo_preview_url);
+            }
+            this.form.photo_preview_url = file ? URL.createObjectURL(file) : (this.driver.photo_url || '');
+        },
+
+        clearSelectedPhoto() {
+            this.form.profile_photo = null;
+            if (this.form.photo_preview_url?.startsWith('blob:')) {
+                URL.revokeObjectURL(this.form.photo_preview_url);
+            }
+            this.form.photo_preview_url = this.driver.photo_url || '';
+            if (this.$refs.driverPhotoInput) {
+                this.$refs.driverPhotoInput.value = '';
+            }
         },
 
         async saveDriver() {
@@ -787,19 +816,33 @@ function driverShow() {
             this.errors = {};
 
             try {
-                const payload = { ...this.form };
-                if (!payload.password) {
-                    delete payload.password;
+                const body = new FormData();
+                body.append('_method', 'PUT');
+                body.append('name', this.form.name || '');
+                body.append('email', this.form.email || '');
+                body.append('phone', this.form.phone || '');
+                body.append('vehicle_type', this.form.vehicle_type || '');
+                body.append('vehicle_number', this.form.vehicle_number || '');
+                body.append('license_number', this.form.license_number || '');
+                body.append('is_active', this.form.is_active ? '1' : '0');
+                (this.form.task_capabilities || []).forEach((capability) => {
+                    body.append('task_capabilities[]', capability);
+                });
+                if (this.form.password) {
+                    body.append('password', this.form.password);
+                    body.append('password_confirmation', this.form.password_confirmation || '');
+                }
+                if (this.form.profile_photo) {
+                    body.append('profile_photo', this.form.profile_photo);
                 }
 
                 const response = await fetch(this.config.updateEndpoint, {
-                    method: 'PUT',
+                    method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     },
-                    body: JSON.stringify(payload)
+                    body
                 });
 
                 const data = await response.json();
@@ -819,6 +862,8 @@ function driverShow() {
                 this.driver.name = updatedDriver.name || this.form.name;
                 this.driver.email = updatedDriver.email || this.form.email;
                 this.driver.phone = updatedDriver.phone || this.form.phone;
+                this.driver.photo_url = updatedDriver.photo_url ?? this.driver.photo_url;
+                this.driver.avatar = updatedDriver.avatar || this.driver.avatar;
                 this.driver.vehicle_type = updatedDriver.vehicle_type ?? this.form.vehicle_type;
                 this.driver.vehicle_number = updatedDriver.vehicle_number ?? this.form.vehicle_number;
                 this.driver.license_number = updatedDriver.license_number ?? this.form.license_number;

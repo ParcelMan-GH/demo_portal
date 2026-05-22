@@ -67,6 +67,10 @@
                                         <span x-show="assignmentDriverPhone()" x-text="assignmentDriverPhone()"></span>
                                         <span x-show="shipment.pickup_instructions" class="hidden h-1 w-1 rounded-full bg-slate-300 sm:inline-flex"></span>
                                         <span x-show="shipment.pickup_instructions" class="min-w-0 truncate" x-text="shipment.pickup_instructions"></span>
+                                        <span x-show="pickupVehicleSummary()" class="hidden h-1 w-1 rounded-full bg-slate-300 sm:inline-flex"></span>
+                                        <span x-show="pickupVehicleSummary()" class="min-w-0 truncate">
+                                            Vehicle: <strong class="font-black text-slate-800" x-text="pickupVehicleSummary()"></strong>
+                                        </span>
                                     </div>
                                 </div>
                             </div>
