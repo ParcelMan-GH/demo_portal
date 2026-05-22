@@ -18,7 +18,7 @@ return [
         'warehouse' => 'Warehouse Operations',
         'warehouses' => 'Warehouse Management',
         'vendors' => 'Vendors',
-        'shipments' => 'Shipments',
+        'shipments' => 'Orders',
         'drivers' => 'Drivers',
         'reports' => 'Reports',
         'recipient_payments' => 'Recipient Payments',

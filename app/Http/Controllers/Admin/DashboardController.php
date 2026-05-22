@@ -12,14 +12,32 @@ use App\Models\TransportManifest;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\WarehouseReceiptItemLabel;
+use App\Services\BackOfficeAccess;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function index(): View
+    public function index(BackOfficeAccess $access): View|RedirectResponse
     {
         $admin = Auth::guard('admin')->user();
+
+        $canUseHqDashboard = collect([
+            'shipments.view',
+            'vendors.view',
+            'drivers.view',
+            'warehouses.view',
+            'settings.view',
+        ])->contains(fn (string $permission) => $access->canUsePermission($admin, $permission));
+
+        if (!$canUseHqDashboard) {
+            if ($admin->hasPermission('warehouse.recipient_payments.view')) {
+                return redirect()->route('warehouse.recipient-payments.index');
+            }
+
+            return redirect()->route('warehouse.dashboard');
+        }
 
         $today = now()->toDateString();
         $monthStart = now()->startOfMonth();

@@ -12,6 +12,7 @@
          data-endpoint="{{ route('warehouse.users.data') }}"
          data-export-endpoint="{{ route('warehouse.users.export') }}"
          data-store-endpoint="{{ route('warehouse.users.store') }}"
+         data-is-hq="{{ $isHqUser ? '1' : '0' }}"
          data-csrf-token="{{ csrf_token() }}">
         <div class="border-b border-slate-200/60 px-5 py-4">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -23,7 +24,13 @@
                     </div>
                     <div class="min-w-0">
                         <h2 class="text-lg font-extrabold text-slate-900">Users</h2>
-                        <p class="truncate text-sm text-slate-500">Manage staff access, roles, and account status for {{ $warehouse->name ?? 'this warehouse' }}.</p>
+                        <p class="truncate text-sm text-slate-500">
+                            @if($isHqUser)
+                                Manage staff access, roles, and account status across all warehouses.
+                            @else
+                                Manage staff access, roles, and account status for {{ $warehouse->name ?? 'this warehouse' }}.
+                            @endif
+                        </p>
                     </div>
                 </div>
                 <span class="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-700" x-text="meta.total + ' users'"></span>
@@ -159,6 +166,17 @@
                             <option value="never">Never logged in</option>
                         </select>
                     </div>
+                    @if($isHqUser)
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Warehouse</label>
+                        <select x-model="warehouseFilter" @@change="warehouseFilterName = $event.target.selectedOptions[0].text" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All warehouses</option>
+                            @foreach($warehouses as $warehouseOption)
+                                <option value="{{ $warehouseOption->id }}">{{ $warehouseOption->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
                     <div>
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Created Date</label>
                         <input type="text" x-ref="createdRange" placeholder="Select date range" readonly class="w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
@@ -201,7 +219,7 @@
             <div x-show="loading" x-transition.opacity.duration.150ms class="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px]" style="display: none;"></div>
 
             <div class="overflow-x-auto">
-            <table class="min-w-[1120px] w-full divide-y divide-slate-200 text-sm">
+            <table class="min-w-[1280px] w-full divide-y divide-slate-200 text-sm">
                 <thead class="bg-slate-50">
                     <tr>
                         <th x-show="visibleColumns.name" @@click="sort('name')" class="cursor-pointer px-5 py-3 text-left text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
@@ -234,6 +252,11 @@
                                 </svg>
                             </div>
                         </th>
+                        @if($isHqUser)
+                        <th x-show="visibleColumns.warehouse" class="px-5 py-3 text-left text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
+                            WAREHOUSE
+                        </th>
+                        @endif
                         <th x-show="visibleColumns.status" class="px-5 py-3 text-left text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
                             STATUS
                         </th>
@@ -267,7 +290,14 @@
                         <tr class="transition hover:bg-orange-50/30">
                             <td x-show="visibleColumns.name" class="whitespace-nowrap px-5 py-4">
                                 <div class="flex items-center gap-3">
-                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-sm font-black text-orange-700 ring-1 ring-orange-100" x-text="user.avatar"></div>
+                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-orange-50 text-sm font-black text-orange-700 ring-1 ring-orange-100">
+                                        <template x-if="user.photo_url">
+                                            <img :src="user.photo_url" alt="" class="h-full w-full object-cover">
+                                        </template>
+                                        <template x-if="!user.photo_url">
+                                            <span x-text="user.avatar"></span>
+                                        </template>
+                                    </div>
                                     <div>
                                         <p class="text-sm font-black text-slate-900" x-text="user.name"></p>
                                         <p class="text-xs font-semibold text-slate-500" x-text="user.creator ? 'Created by ' + user.creator : ''"></p>
@@ -287,8 +317,14 @@
                                     <span>-</span>
                                 </template>
                             </td>
-                            <td x-show="visibleColumns.email" class="whitespace-nowrap px-5 py-4 text-sm font-semibold text-slate-600" x-text="user.email"></td>
+                            <td x-show="visibleColumns.email" class="whitespace-nowrap px-5 py-4 text-sm font-semibold text-slate-600" x-text="user.email || '-'"></td>
                             <td x-show="visibleColumns.phone" class="whitespace-nowrap px-5 py-4 font-mono text-sm font-bold text-slate-600" x-text="user.phone || '-'"></td>
+                            @if($isHqUser)
+                            <td x-show="visibleColumns.warehouse" class="whitespace-nowrap px-5 py-4">
+                                <p class="text-sm font-black text-slate-800" x-text="user.warehouse?.name || '-'"></p>
+                                <p class="mt-0.5 font-mono text-[11px] font-bold text-slate-400" x-text="user.warehouse?.code || ''"></p>
+                            </td>
+                            @endif
                             <td x-show="visibleColumns.status" class="whitespace-nowrap px-5 py-4">
                                 <span class="inline-flex rounded-full px-3 py-1 text-xs font-black" :class="user.is_active ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'" x-text="user.is_active ? 'Active' : 'Inactive'"></span>
                             </td>
@@ -311,6 +347,11 @@
                                             :class="user.is_active ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'"
                                             x-text="user.is_active ? 'Deactivate' : 'Activate'">
                                     </button>
+                                    <button x-show="user.can_impersonate"
+                                            @@click="openImpersonationModal(user)"
+                                            class="inline-flex items-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100">
+                                        Login as
+                                    </button>
                                     <button x-show="user.can_delete && !user.is_self"
                                             @@click="openDeleteModal(user)"
                                             class="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700 hover:bg-red-100">
@@ -322,8 +363,8 @@
                     </template>
                 </tbody>
             </table>
+            </div>
 
-            <!-- Pagination -->
             <div class="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div class="text-xs font-semibold text-slate-600">
@@ -361,10 +402,59 @@
                     </div>
                 </div>
             </div>
-            </div>
         </div>
 
         @include('warehouse.users.partials.user-modal')
+
+        <!-- Impersonation Confirmation Modal -->
+        <template x-teleport="body">
+        <div x-show="showImpersonationModal"
+             x-cloak
+             class="fixed inset-0 z-[110] overflow-y-auto"
+             @@keydown.escape.window="closeImpersonationModal()">
+            <div x-show="showImpersonationModal"
+                 x-transition.opacity
+                 class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm"
+                 @@click="closeImpersonationModal()"></div>
+
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div x-show="showImpersonationModal"
+                     x-transition
+                     @@click.stop
+                     class="relative w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                    <div class="flex items-start gap-4 border-b border-slate-100 p-6">
+                        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-xl font-black text-white shadow-lg shadow-orange-600/25">
+                            <span x-text="impersonatingUser?.avatar || 'U'"></span>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <h3 class="text-xl font-black text-slate-950">Login as user</h3>
+                            <p class="mt-1 text-sm font-semibold leading-6 text-slate-500">You will temporarily act as this user. All actions remain logged.</p>
+                        </div>
+                        <button type="button" @@click="closeImpersonationModal()" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <div class="space-y-4 p-6">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p class="text-base font-black text-slate-900" x-text="impersonatingUser?.name || '-'"></p>
+                            <p class="mt-1 text-sm font-semibold text-slate-600" x-text="[impersonatingUser?.email, impersonatingUser?.phone].filter(Boolean).join(' / ') || '-'"></p>
+                            <p class="mt-2 text-xs font-black uppercase tracking-wide text-slate-400" x-text="impersonatingUser?.warehouse?.name || 'No warehouse'"></p>
+                        </div>
+                        <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+                            Your current account will be saved so you can return from the banner after testing.
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                        <button type="button" @@click="closeImpersonationModal()" :disabled="impersonating" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+                        <button type="button" @@click="startImpersonation()" :disabled="impersonating" class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 hover:bg-orange-700 disabled:opacity-50">
+                            <span x-show="!impersonating">Login as user</span>
+                            <span x-show="impersonating">Switching...</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </template>
 
         <!-- Delete Confirmation Modal -->
         <template x-teleport="body">

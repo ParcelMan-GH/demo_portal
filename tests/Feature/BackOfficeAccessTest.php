@@ -7,12 +7,15 @@ use App\Models\Warehouse;
 use App\Models\WarehouseCapability;
 use App\Services\BackOfficeAccess;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->withoutMiddleware(\App\Http\Middleware\LogAdminAuditActivity::class);
 
     Schema::dropIfExists('warehouse_capabilities');
+    Schema::dropIfExists('admin_audit_logs');
     Schema::dropIfExists('user_roles');
     Schema::dropIfExists('role_permissions');
     Schema::dropIfExists('permissions');
@@ -34,8 +37,9 @@ beforeEach(function () {
     Schema::create('users', function (Blueprint $table) {
         $table->id();
         $table->string('name');
-        $table->string('email')->unique();
+        $table->string('email')->nullable()->unique();
         $table->string('phone', 20)->nullable()->unique();
+        $table->string('photo_path')->nullable();
         $table->timestamp('email_verified_at')->nullable();
         $table->string('password');
         $table->boolean('is_active')->default(true);
@@ -93,6 +97,25 @@ beforeEach(function () {
         $table->foreignId('granted_by_user_id')->nullable();
         $table->timestamps();
     });
+
+    Schema::create('admin_audit_logs', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('user_id')->nullable();
+        $table->foreignId('warehouse_id')->nullable();
+        $table->string('scope', 20)->nullable();
+        $table->string('action_type', 40);
+        $table->string('action', 180);
+        $table->string('description', 255)->nullable();
+        $table->string('method', 12)->nullable();
+        $table->string('route_name', 180)->nullable();
+        $table->string('url', 2048)->nullable();
+        $table->unsignedSmallInteger('status_code')->nullable();
+        $table->string('ip_address', 45)->nullable();
+        $table->text('user_agent')->nullable();
+        $table->unsignedInteger('duration_ms')->nullable();
+        $table->json('metadata')->nullable();
+        $table->timestamp('created_at')->useCurrent();
+    });
 });
 
 function makeBackOfficeUser(Warehouse $warehouse, array $permissions = []): User
@@ -107,12 +130,14 @@ function makeBackOfficeUser(Warehouse $warehouse, array $permissions = []): User
     ]);
 
     foreach ($permissions as $permission) {
-        $model = Permission::create([
-            'module' => str($permission)->before('.')->toString(),
-            'action' => str($permission)->after('.')->toString(),
-            'name' => $permission,
-            'description' => $permission,
-        ]);
+        $model = Permission::firstOrCreate(
+            ['name' => $permission],
+            [
+                'module' => str($permission)->before('.')->toString(),
+                'action' => str($permission)->after('.')->toString(),
+                'description' => $permission,
+            ]
+        );
 
         $role->permissions()->attach($model);
     }
@@ -296,4 +321,285 @@ test('old warehouse URL family redirects to unified operation routes during migr
     $this->get('/warehouse/walkin')
         ->assertRedirect('/admin/operations/walkin')
         ->assertStatus(308);
+});
+
+test('hq users page lists users across warehouses and filters by warehouse', function () {
+    $hq = Warehouse::create([
+        'name' => 'HQ',
+        'code' => 'HQ-USERS',
+        'is_active' => true,
+        'is_hq' => true,
+        'can_administer_system' => true,
+    ]);
+
+    $branch = Warehouse::create([
+        'name' => 'Branch',
+        'code' => 'BR-USERS',
+        'is_active' => true,
+    ]);
+
+    $hqUser = makeBackOfficeUser($hq, ['warehouse.users.view']);
+    $branchUser = makeBackOfficeUser($branch, ['warehouse.users.view']);
+
+    $this->actingAs($hqUser, 'admin')
+        ->getJson(route('warehouse.users.data'))
+        ->assertOk()
+        ->assertJsonFragment(['id' => $hqUser->id])
+        ->assertJsonFragment(['id' => $branchUser->id]);
+
+    $response = $this->actingAs($hqUser, 'admin')
+        ->getJson(route('warehouse.users.data', ['warehouse_id' => $branch->id]))
+        ->assertOk();
+
+    expect(collect($response->json('data'))->pluck('id')->all())->toBe([$branchUser->id]);
+});
+
+test('branch users page remains scoped to its own warehouse', function () {
+    $branch = Warehouse::create([
+        'name' => 'Branch',
+        'code' => 'BR-SCOPED',
+        'is_active' => true,
+    ]);
+
+    $other = Warehouse::create([
+        'name' => 'Other',
+        'code' => 'BR-SCOPED-2',
+        'is_active' => true,
+    ]);
+
+    $branchUser = makeBackOfficeUser($branch, ['warehouse.users.view']);
+    $otherUser = makeBackOfficeUser($other, ['warehouse.users.view']);
+
+    $this->actingAs($branchUser, 'admin')
+        ->getJson(route('warehouse.users.data', ['warehouse_id' => $other->id]))
+        ->assertOk()
+        ->assertJsonMissing(['id' => $otherUser->id])
+        ->assertJsonFragment(['id' => $branchUser->id]);
+});
+
+test('hq user can create a phone-only user for a selected warehouse', function () {
+    Storage::fake('public');
+
+    $hq = Warehouse::create([
+        'name' => 'HQ',
+        'code' => 'HQ-CREATE-USER',
+        'is_active' => true,
+        'is_hq' => true,
+        'can_administer_system' => true,
+    ]);
+
+    $branch = Warehouse::create([
+        'name' => 'Branch',
+        'code' => 'BR-CREATE-USER',
+        'is_active' => true,
+    ]);
+
+    $actor = makeBackOfficeUser($hq, ['warehouse.users.create']);
+    $role = Role::create([
+        'name' => 'Assignable User',
+        'slug' => 'assignable-user',
+        'is_system_role' => true,
+        'is_warehouse_role' => true,
+        'is_assignable_by_warehouse_manager' => true,
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($actor, 'admin')
+        ->withHeaders(['Accept' => 'application/json'])
+        ->post(route('warehouse.users.store'), [
+            'name' => 'Phone Only User',
+            'phone' => '0241234501',
+            'email' => null,
+            'warehouse_id' => $branch->id,
+            'role_id' => $role->id,
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'profile_photo' => UploadedFile::fake()->image('user.jpg', 320, 320),
+        ])
+        ->assertOk();
+
+    $created = User::where('phone', '+233241234501')->first();
+
+    expect($created)->not->toBeNull()
+        ->and($created->email)->toBeNull()
+        ->and($created->warehouse_id)->toBe($branch->id)
+        ->and($created->photo_path)->not->toBeNull();
+
+    Storage::disk('public')->assertExists($created->photo_path);
+});
+
+test('branch user creation stays scoped to own warehouse even if warehouse id is submitted', function () {
+    $branch = Warehouse::create([
+        'name' => 'Branch',
+        'code' => 'BR-LOCAL-CREATE',
+        'is_active' => true,
+    ]);
+
+    $other = Warehouse::create([
+        'name' => 'Other',
+        'code' => 'BR-LOCAL-CREATE-2',
+        'is_active' => true,
+    ]);
+
+    $actor = makeBackOfficeUser($branch, ['warehouse.users.create']);
+    $role = Role::create([
+        'name' => 'Local Assignable User',
+        'slug' => 'local-assignable-user',
+        'is_system_role' => true,
+        'is_warehouse_role' => true,
+        'is_assignable_by_warehouse_manager' => true,
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($actor, 'admin')
+        ->postJson(route('warehouse.users.store'), [
+            'name' => 'Local User',
+            'phone' => '0241234502',
+            'email' => null,
+            'warehouse_id' => $other->id,
+            'role_id' => $role->id,
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])
+        ->assertOk();
+
+    $created = User::where('phone', '+233241234502')->first();
+
+    expect($created)->not->toBeNull()
+        ->and($created->warehouse_id)->toBe($branch->id);
+});
+
+test('user phone validation requires an exact valid 10 digit Ghana number', function () {
+    $hq = Warehouse::create([
+        'name' => 'HQ',
+        'code' => 'HQ-PHONE-VALIDATION',
+        'is_active' => true,
+        'is_hq' => true,
+        'can_administer_system' => true,
+    ]);
+
+    $actor = makeBackOfficeUser($hq, ['warehouse.users.create']);
+    $role = Role::create([
+        'name' => 'Phone Validation Role',
+        'slug' => 'phone-validation-role',
+        'is_system_role' => true,
+        'is_warehouse_role' => true,
+        'is_assignable_by_warehouse_manager' => true,
+        'is_active' => true,
+    ]);
+
+    $payload = [
+        'name' => 'Invalid Phone User',
+        'email' => null,
+        'warehouse_id' => $hq->id,
+        'role_id' => $role->id,
+        'password' => 'password123',
+        'password_confirmation' => 'password123',
+    ];
+
+    $this->actingAs($actor, 'admin')
+        ->postJson(route('warehouse.users.store'), $payload + ['phone' => '024123450'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('phone');
+
+    $this->actingAs($actor, 'admin')
+        ->postJson(route('warehouse.users.store'), $payload + ['phone' => '0301234501'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('phone');
+});
+
+test('hq user can move another user to a different warehouse while keeping email optional', function () {
+    $hq = Warehouse::create([
+        'name' => 'HQ',
+        'code' => 'HQ-MOVE-USER',
+        'is_active' => true,
+        'is_hq' => true,
+        'can_administer_system' => true,
+    ]);
+
+    $branch = Warehouse::create([
+        'name' => 'Branch',
+        'code' => 'BR-MOVE-USER',
+        'is_active' => true,
+    ]);
+
+    $other = Warehouse::create([
+        'name' => 'Other',
+        'code' => 'BR-MOVE-USER-2',
+        'is_active' => true,
+    ]);
+
+    $actor = makeBackOfficeUser($hq, ['warehouse.users.edit', 'warehouse.users.assign_roles']);
+    $target = makeBackOfficeUser($branch);
+    $role = Role::create([
+        'name' => 'Moved User Role',
+        'slug' => 'moved-user-role',
+        'is_system_role' => true,
+        'is_warehouse_role' => true,
+        'is_assignable_by_warehouse_manager' => true,
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($actor, 'admin')
+        ->putJson(route('warehouse.users.update', $target), [
+            'name' => 'Moved User',
+            'phone' => '0241234503',
+            'email' => null,
+            'warehouse_id' => $other->id,
+            'role_id' => $role->id,
+            'is_active' => true,
+        ])
+        ->assertOk();
+
+    expect($target->fresh()->warehouse_id)->toBe($other->id)
+        ->and($target->fresh()->email)->toBeNull()
+        ->and($target->fresh()->roles()->first()->id)->toBe($role->id);
+});
+
+test('hq user with impersonation permission can login as another active user and return', function () {
+    $hq = Warehouse::create([
+        'name' => 'HQ',
+        'code' => 'HQ-IMP',
+        'is_active' => true,
+        'is_hq' => true,
+        'can_administer_system' => true,
+    ]);
+
+    $branch = Warehouse::create([
+        'name' => 'Branch',
+        'code' => 'BR-IMP',
+        'is_active' => true,
+    ]);
+
+    $hqUser = makeBackOfficeUser($hq, ['warehouse.users.view', 'warehouse.users.impersonate', 'warehouse.dashboard.view']);
+    $target = makeBackOfficeUser($branch, ['warehouse.dashboard.view']);
+
+    $this->actingAs($hqUser, 'admin')
+        ->postJson(route('warehouse.users.impersonate', $target))
+        ->assertOk()
+        ->assertJsonPath('success', true);
+
+    $this->assertAuthenticatedAs($target, 'admin');
+    expect(session('impersonation.impersonator_id'))->toBe($hqUser->id);
+
+    $this->post(route('admin.impersonation.stop'))
+        ->assertRedirect();
+
+    $this->assertAuthenticatedAs($hqUser, 'admin');
+    expect(session()->has('impersonation.impersonator_id'))->toBeFalse();
+});
+
+test('non hq users cannot impersonate even with the permission', function () {
+    $branch = Warehouse::create([
+        'name' => 'Branch',
+        'code' => 'BR-NOIMP',
+        'is_active' => true,
+    ]);
+
+    $actor = makeBackOfficeUser($branch, ['warehouse.users.view', 'warehouse.users.impersonate']);
+    $target = makeBackOfficeUser($branch, ['warehouse.dashboard.view']);
+
+    $this->actingAs($actor, 'admin')
+        ->postJson(route('warehouse.users.impersonate', $target))
+        ->assertForbidden();
 });

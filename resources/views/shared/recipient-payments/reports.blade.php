@@ -152,7 +152,7 @@
                 <div>
                     <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Call Result</label>
                     <select x-model="callResult" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
-                        <option value="">All call results</option><option value="not_called">Not called</option><option value="answered">Answered</option><option value="no_answer">No answer</option><option value="busy">Busy</option><option value="wrong_number">Wrong number</option><option value="callback">Call back</option><option value="payment_promised">Payment promised</option>
+                        <option value="">All call results</option><option value="not_called">Not called</option><option value="answered">Answered</option><option value="no_answer">No answer</option><option value="busy">Busy</option><option value="wrong_number">Wrong number</option><option value="callback">Call back</option><option value="payment_promised">Pay later</option>
                     </select>
                 </div>
                 <div>

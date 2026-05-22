@@ -30,13 +30,13 @@ class PermissionSeeder extends Seeder
             ['module' => 'roles', 'action' => 'delete', 'name' => 'roles.delete', 'description' => 'Delete roles', 'sort_order' => 33],
             ['module' => 'roles', 'action' => 'assign', 'name' => 'roles.assign', 'description' => 'Assign roles to users', 'sort_order' => 34],
 
-            // Shipments (6)
-            ['module' => 'shipments', 'action' => 'view', 'name' => 'shipments.view', 'description' => 'View shipments', 'sort_order' => 40],
-            ['module' => 'shipments', 'action' => 'create', 'name' => 'shipments.create', 'description' => 'Create shipments', 'sort_order' => 41],
-            ['module' => 'shipments', 'action' => 'edit', 'name' => 'shipments.edit', 'description' => 'Edit shipments', 'sort_order' => 42],
-            ['module' => 'shipments', 'action' => 'delete', 'name' => 'shipments.delete', 'description' => 'Delete shipments', 'sort_order' => 43],
-            ['module' => 'shipments', 'action' => 'assign_driver', 'name' => 'shipments.assign_driver', 'description' => 'Assign drivers to shipments', 'sort_order' => 44],
-            ['module' => 'shipments', 'action' => 'update_status', 'name' => 'shipments.update_status', 'description' => 'Update shipment status', 'sort_order' => 45],
+            // Orders (6)
+            ['module' => 'shipments', 'action' => 'view', 'name' => 'shipments.view', 'description' => 'View orders', 'sort_order' => 40],
+            ['module' => 'shipments', 'action' => 'create', 'name' => 'shipments.create', 'description' => 'Create orders', 'sort_order' => 41],
+            ['module' => 'shipments', 'action' => 'edit', 'name' => 'shipments.edit', 'description' => 'Edit orders', 'sort_order' => 42],
+            ['module' => 'shipments', 'action' => 'delete', 'name' => 'shipments.delete', 'description' => 'Delete orders', 'sort_order' => 43],
+            ['module' => 'shipments', 'action' => 'assign_driver', 'name' => 'shipments.assign_driver', 'description' => 'Assign drivers to orders', 'sort_order' => 44],
+            ['module' => 'shipments', 'action' => 'update_status', 'name' => 'shipments.update_status', 'description' => 'Update order status', 'sort_order' => 45],
 
             // Vendors (5)
             ['module' => 'vendors', 'action' => 'view', 'name' => 'vendors.view', 'description' => 'View vendors list', 'sort_order' => 50],
@@ -70,6 +70,7 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouse', 'action' => 'users_edit', 'name' => 'warehouse.users.edit', 'description' => 'Edit warehouse users', 'sort_order' => 123],
             ['module' => 'warehouse', 'action' => 'users_deactivate', 'name' => 'warehouse.users.deactivate', 'description' => 'Deactivate warehouse users', 'sort_order' => 124],
             ['module' => 'warehouse', 'action' => 'users_assign_roles', 'name' => 'warehouse.users.assign_roles', 'description' => 'Assign roles to warehouse users', 'sort_order' => 125],
+            ['module' => 'warehouse', 'action' => 'users_impersonate', 'name' => 'warehouse.users.impersonate', 'description' => 'Login as warehouse users for support and testing', 'sort_order' => 1251],
             ['module' => 'warehouse', 'action' => 'receiving_manage', 'name' => 'warehouse.receiving.manage', 'description' => 'Manage warehouse receiving', 'sort_order' => 126],
             ['module' => 'warehouse', 'action' => 'receiving_approve_discrepancy', 'name' => 'warehouse.receiving.approve_discrepancy', 'description' => 'Approve warehouse receiving discrepancies', 'sort_order' => 1261],
             ['module' => 'warehouse', 'action' => 'sorting_manage', 'name' => 'warehouse.sorting.manage', 'description' => 'Manage warehouse sorting', 'sort_order' => 127],

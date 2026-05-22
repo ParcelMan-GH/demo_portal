@@ -1089,7 +1089,7 @@ class RecipientPaymentController extends Controller
             'busy' => 'Busy',
             'wrong_number' => 'Wrong number',
             'callback' => 'Call back',
-            'payment_promised' => 'Payment promised',
+            'payment_promised' => 'Pay later',
             default => 'Not called',
         };
     }

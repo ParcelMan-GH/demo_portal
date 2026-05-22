@@ -60,6 +60,7 @@ class Permission extends Model
             return match ($this->module) {
                 'platform_settings' => 'Platform',
                 'recipient_payments' => 'Recipient Payments',
+                'shipments' => 'Orders',
                 default => str($this->module)->replace('_', ' ')->title()->toString(),
             };
         }

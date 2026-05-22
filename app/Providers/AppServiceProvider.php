@@ -127,6 +127,9 @@ class AppServiceProvider extends ServiceProvider
                     'backOfficeWarehouses' => $warehouses,
                     'backOfficeCurrentWarehouse' => $currentWarehouse,
                     'backOfficeSelectedWarehouse' => $selectedWarehouse,
+                    'backOfficeImpersonator' => session()->has('impersonation.impersonator_id')
+                        ? \App\Models\User::query()->find(session('impersonation.impersonator_id'))
+                        : null,
                     'backOfficeCanSwitchWarehouse' => $warehouses->count() > 1 && ($isHq || $warehouses->count() > 1),
                     'backOfficeScopeLabel' => $selectedWarehouse?->name
                         ?? ($isHq ? 'All warehouses' : ($currentWarehouse?->name ?? 'Warehouse')),
@@ -138,6 +141,7 @@ class AppServiceProvider extends ServiceProvider
                     'backOfficeWarehouses' => collect(),
                     'backOfficeCurrentWarehouse' => null,
                     'backOfficeSelectedWarehouse' => null,
+                    'backOfficeImpersonator' => null,
                     'backOfficeCanSwitchWarehouse' => false,
                     'backOfficeScopeLabel' => 'Warehouse',
                 ]);

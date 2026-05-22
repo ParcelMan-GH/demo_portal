@@ -41,6 +41,7 @@ document.addEventListener('alpine:init', () => {
         exportEndpoint: '',
         storeEndpoint: '',
         csrfToken: '',
+        isHq: false,
         users: [],
         meta: {
             current_page: 1,
@@ -59,6 +60,8 @@ document.addEventListener('alpine:init', () => {
         loginStateFilterName: 'All login states',
         emailFilter: '',
         phoneFilter: '',
+        warehouseFilter: '',
+        warehouseFilterName: 'All warehouses',
         createdByFilter: '',
         showFilters: false,
         createdFrom: '',
@@ -75,6 +78,7 @@ document.addEventListener('alpine:init', () => {
             { key: 'role', label: 'Role' },
             { key: 'email', label: 'Email' },
             { key: 'phone', label: 'Phone' },
+            { key: 'warehouse', label: 'Warehouse' },
             { key: 'status', label: 'Status' },
             { key: 'created_at', label: 'Created At' },
             { key: 'last_login_at', label: 'Last Login' },
@@ -85,6 +89,7 @@ document.addEventListener('alpine:init', () => {
             role: true,
             email: true,
             phone: true,
+            warehouse: false,
             status: true,
             created_at: true,
             last_login_at: true,
@@ -99,12 +104,18 @@ document.addEventListener('alpine:init', () => {
         deletingUser: null,
         submitting: false,
         deleting: false,
+        showImpersonationModal: false,
+        impersonatingUser: null,
+        impersonating: false,
         changePassword: false,
         exporting: false,
         formData: {
             name: '',
             email: '',
             phone: '',
+            photo: null,
+            photo_preview_url: '',
+            warehouse_id: '',
             role_id: '',
             is_active: '1',
             password: '',
@@ -118,6 +129,11 @@ document.addEventListener('alpine:init', () => {
             this.exportEndpoint = dataset.exportEndpoint || '';
             this.storeEndpoint = dataset.storeEndpoint || '';
             this.csrfToken = dataset.csrfToken || '';
+            this.isHq = dataset.isHq === '1';
+            this.visibleColumns.warehouse = this.isHq;
+            if (!this.isHq) {
+                this.columns = this.columns.filter((column) => column.key !== 'warehouse');
+            }
 
             if (!this.endpoint || !this.exportEndpoint || !this.storeEndpoint || !this.csrfToken) {
                 console.error('Users table config missing on root element data attributes.');
@@ -140,6 +156,9 @@ document.addEventListener('alpine:init', () => {
                 name: '',
                 email: '',
                 phone: '',
+                photo: null,
+                photo_preview_url: '',
+                warehouse_id: '',
                 role_id: '',
                 is_active: '1',
                 password: '',
@@ -155,8 +174,11 @@ document.addEventListener('alpine:init', () => {
             this.changePassword = false;
             this.formData = {
                 name: user.name,
-                email: user.email,
-                phone: user.phone || '',
+                email: user.email || '',
+                phone: user.phone_input || user.phone || '',
+                photo: null,
+                photo_preview_url: user.photo_url || '',
+                warehouse_id: user.warehouse?.id ? String(user.warehouse.id) : '',
                 role_id: (user.roles && user.roles.length) ? String(user.roles[0].id) : '',
                 is_active: user.is_active ? '1' : '0',
                 password: '',
@@ -172,6 +194,62 @@ document.addEventListener('alpine:init', () => {
             this.formErrors = {};
         },
 
+        handleUserPhoto(event) {
+            const file = event.target.files?.[0] || null;
+            this.formData.photo = file;
+
+            if (this.formData.photo_preview_url?.startsWith('blob:')) {
+                URL.revokeObjectURL(this.formData.photo_preview_url);
+            }
+
+            this.formData.photo_preview_url = file
+                ? URL.createObjectURL(file)
+                : (this.modalMode === 'edit' ? (this.editingUser?.photo_url || '') : '');
+        },
+
+        normalizePhoneInput() {
+            this.formData.phone = String(this.formData.phone || '').replace(/\D/g, '').slice(0, 10);
+            this.validatePhoneInput(this.formData.phone.length === 10);
+        },
+
+        validatePhoneInput(showIncomplete = true) {
+            const phone = String(this.formData.phone || '');
+            const validPrefixes = ['020', '024', '025', '026', '027', '050', '054', '055', '056', '057', '059'];
+
+            if (!phone) {
+                delete this.formErrors.phone;
+                return true;
+            }
+
+            if (phone.length !== 10) {
+                if (showIncomplete) {
+                    this.formErrors.phone = 'Phone number must be exactly 10 digits.';
+                } else {
+                    delete this.formErrors.phone;
+                }
+                return false;
+            }
+
+            if (!phone.startsWith('0') || !validPrefixes.includes(phone.slice(0, 3))) {
+                this.formErrors.phone = 'Please enter a valid Ghana phone number.';
+                return false;
+            }
+
+            delete this.formErrors.phone;
+            return true;
+        },
+
+        clearSelectedPhoto() {
+            this.formData.photo = null;
+            if (this.formData.photo_preview_url?.startsWith('blob:')) {
+                URL.revokeObjectURL(this.formData.photo_preview_url);
+            }
+            this.formData.photo_preview_url = this.modalMode === 'edit' ? (this.editingUser?.photo_url || '') : '';
+            if (this.$refs.userPhotoInput) {
+                this.$refs.userPhotoInput.value = '';
+            }
+        },
+
         openDeleteModal(user) {
             if (!user || !user.can_delete || user.is_self) return;
             this.deletingUser = user;
@@ -182,6 +260,48 @@ document.addEventListener('alpine:init', () => {
             if (this.deleting && !force) return;
             this.showDeleteModal = false;
             this.deletingUser = null;
+        },
+
+        openImpersonationModal(user) {
+            if (!user || !user.can_impersonate) return;
+            this.impersonatingUser = user;
+            this.showImpersonationModal = true;
+        },
+
+        closeImpersonationModal(force = false) {
+            if (this.impersonating && !force) return;
+            this.showImpersonationModal = false;
+            this.impersonatingUser = null;
+        },
+
+        async startImpersonation() {
+            if (!this.impersonatingUser?.impersonate_url) return;
+
+            this.impersonating = true;
+            try {
+                const response = await fetch(this.impersonatingUser.impersonate_url, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': this.csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(result.message || 'Failed to login as this user.');
+                }
+
+                window.location.href = result.redirect_url || '/admin/operations';
+            } catch (error) {
+                console.error('Impersonation failed:', error);
+                if (window.showToast) {
+                    window.showToast(error.message || 'Failed to login as this user.', 'error');
+                }
+            } finally {
+                this.impersonating = false;
+            }
         },
 
         async deleteUser() {
@@ -223,37 +343,52 @@ document.addEventListener('alpine:init', () => {
             this.formErrors = {};
 
             try {
+                if (!this.validatePhoneInput(true)) {
+                    this.submitting = false;
+                    return;
+                }
+
                 const url = this.modalMode === 'create'
                     ? this.storeEndpoint
                     : this.editingUser.edit_url.replace('/edit', '');
 
-                const method = this.modalMode === 'create' ? 'POST' : 'PUT';
+                const method = 'POST';
+                const body = new FormData();
 
-                const body = {
-                    name: this.formData.name,
-                    email: this.formData.email,
-                    phone: this.formData.phone,
-                    role_id: this.formData.role_id || null,
-                };
+                if (this.modalMode === 'edit') {
+                    body.append('_method', 'PUT');
+                }
+
+                body.append('name', this.formData.name || '');
+                body.append('email', this.formData.email || '');
+                body.append('phone', this.formData.phone || '');
+                body.append('role_id', this.formData.role_id || '');
+
+                if (this.isHq) {
+                    body.append('warehouse_id', this.formData.warehouse_id || '');
+                }
 
                 if (this.modalMode === 'edit' && !this.editingUser?.is_self) {
-                    body.is_active = this.formData.is_active;
+                    body.append('is_active', this.formData.is_active);
                 }
 
                 if (this.modalMode === 'create' || this.changePassword) {
-                    body.password = this.formData.password;
-                    body.password_confirmation = this.formData.password_confirmation;
+                    body.append('password', this.formData.password || '');
+                    body.append('password_confirmation', this.formData.password_confirmation || '');
+                }
+
+                if (this.formData.photo) {
+                    body.append('profile_photo', this.formData.photo);
                 }
 
                 const response = await fetch(url, {
                     method,
                     headers: {
-                        'Content-Type': 'application/json',
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': this.csrfToken,
                         'X-Requested-With': 'XMLHttpRequest',
                     },
-                    body: JSON.stringify(body),
+                    body,
                 });
 
                 const result = await response.json();
@@ -305,6 +440,7 @@ document.addEventListener('alpine:init', () => {
                 if (this.loginStateFilter) params.append('login_state', this.loginStateFilter);
                 if (this.emailFilter) params.append('email', this.emailFilter);
                 if (this.phoneFilter) params.append('phone', this.phoneFilter);
+                if (this.warehouseFilter) params.append('warehouse_id', this.warehouseFilter);
                 if (this.createdByFilter) params.append('created_by', this.createdByFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
@@ -444,6 +580,8 @@ document.addEventListener('alpine:init', () => {
             this.loginStateFilterName = 'All login states';
             this.emailFilter = '';
             this.phoneFilter = '';
+            this.warehouseFilter = '';
+            this.warehouseFilterName = 'All warehouses';
             this.createdByFilter = '';
             this.createdFrom = '';
             this.createdTo = '';
@@ -466,6 +604,7 @@ document.addEventListener('alpine:init', () => {
             if (this.loginStateFilter) chips.push({ key: 'login_state', label: this.loginStateFilterName });
             if (this.emailFilter) chips.push({ key: 'email', label: `Email: ${this.emailFilter}` });
             if (this.phoneFilter) chips.push({ key: 'phone', label: `Phone: ${this.phoneFilter}` });
+            if (this.warehouseFilter) chips.push({ key: 'warehouse', label: this.warehouseFilterName });
             if (this.createdByFilter) chips.push({ key: 'created_by', label: `Created by: ${this.createdByFilter}` });
             if (this.createdFrom && this.createdTo) chips.push({ key: 'date', label: `Created: ${this.createdFrom} - ${this.createdTo}` });
             if (this.lastLoginFrom && this.lastLoginTo) chips.push({ key: 'last_login', label: `Last login: ${this.lastLoginFrom} - ${this.lastLoginTo}` });
@@ -487,6 +626,10 @@ document.addEventListener('alpine:init', () => {
             }
             if (key === 'email') this.emailFilter = '';
             if (key === 'phone') this.phoneFilter = '';
+            if (key === 'warehouse') {
+                this.warehouseFilter = '';
+                this.warehouseFilterName = 'All warehouses';
+            }
             if (key === 'created_by') this.createdByFilter = '';
             if (key === 'date') {
                 this.createdFrom = '';
@@ -576,6 +719,7 @@ document.addEventListener('alpine:init', () => {
                 if (this.loginStateFilter) params.append('login_state', this.loginStateFilter);
                 if (this.emailFilter) params.append('email', this.emailFilter);
                 if (this.phoneFilter) params.append('phone', this.phoneFilter);
+                if (this.warehouseFilter) params.append('warehouse_id', this.warehouseFilter);
                 if (this.createdByFilter) params.append('created_by', this.createdByFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);
@@ -627,6 +771,7 @@ document.addEventListener('alpine:init', () => {
                 if (this.loginStateFilter) params.append('login_state', this.loginStateFilter);
                 if (this.emailFilter) params.append('email', this.emailFilter);
                 if (this.phoneFilter) params.append('phone', this.phoneFilter);
+                if (this.warehouseFilter) params.append('warehouse_id', this.warehouseFilter);
                 if (this.createdByFilter) params.append('created_by', this.createdByFilter);
                 if (this.createdFrom) params.append('date_from', this.createdFrom);
                 if (this.createdTo) params.append('date_to', this.createdTo);

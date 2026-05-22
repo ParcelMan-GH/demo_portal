@@ -401,7 +401,7 @@
                                     <option value="busy">Busy</option>
                                     <option value="callback">Call back later</option>
                                     <option value="wrong_number">Wrong number</option>
-                                    <option value="payment_promised">Payment promised</option>
+                                    <option value="payment_promised">Pay later</option>
                                 </select>
                             </div>
                         </div>

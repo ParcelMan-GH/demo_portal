@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\AdminTransportManifestController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DriverController;
+use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PickupAssignmentController;
 use App\Http\Controllers\Admin\RoleController;
@@ -160,6 +161,8 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::post('context/warehouse', [BackOfficeContextController::class, 'updateWarehouse'])
             ->name('context.warehouse.update');
+        Route::post('impersonation/stop', [ImpersonationController::class, 'stop'])
+            ->name('impersonation.stop');
 
         // Admin Self-Profile
         Route::get('profile', [AdminProfileController::class, 'edit'])->name('profile.edit');
@@ -600,6 +603,7 @@ Route::prefix(config('backoffice.prefix', 'admin') . '/operations')
         Route::post('users', [WarehouseUserController::class, 'store'])->name('users.store');
         Route::put('users/{user}', [WarehouseUserController::class, 'update'])->name('users.update');
         Route::patch('users/{user}/toggle-active', [WarehouseUserController::class, 'toggleActive'])->name('users.toggle-active');
+        Route::post('users/{user}/impersonate', [ImpersonationController::class, 'start'])->name('users.impersonate');
 
         // Receipts / Pickups / Items
         Route::get('receipts/pending', [WarehouseReceiptController::class, 'pendingIndex'])->name('receipts.pending.index');

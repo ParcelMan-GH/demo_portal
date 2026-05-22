@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Services\Warehouse\WarehousePortalService;
 use App\Support\GenericPdfExporter;
 use Illuminate\Http\RedirectResponse;
@@ -15,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -33,14 +35,20 @@ class UserController extends Controller
         $user = Auth::guard('admin')->user();
         $warehouse = $this->portalService->resolveWarehouse($user);
         $roles = $this->portalService->getAssignableWarehouseRoles($user);
+        $isHqUser = $user->isHqUser();
 
         return view('warehouse.users.index', [
             'warehouse' => $warehouse,
             'roles' => $roles,
+            'warehouses' => $isHqUser
+                ? Warehouse::query()->where('is_active', true)->orderByDesc('is_hq')->orderBy('name')->get(['id', 'name', 'code'])
+                : collect(),
+            'isHqUser' => $isHqUser,
             'canCreateUsers' => $user->hasPermission('warehouse.users.create'),
             'canEditUsers' => $user->hasPermission('warehouse.users.edit'),
             'canDeactivateUsers' => $user->hasPermission('warehouse.users.deactivate'),
             'canAssignRoles' => $user->hasPermission('warehouse.users.assign_roles'),
+            'canImpersonateUsers' => $isHqUser && $user->hasPermission('warehouse.users.impersonate'),
             'canAssignRestrictedRoles' => $user->isHqUser(),
         ]);
     }
@@ -50,8 +58,7 @@ class UserController extends Controller
         $this->authorizePermission('warehouse.users.view');
 
         $actor = Auth::guard('admin')->user();
-        $warehouse = $this->portalService->resolveWarehouse($actor);
-        $this->assertWarehouseScopedUser($user, $warehouse);
+        $this->assertCanAccessUser($actor, $user);
 
         $user->load(['roles.permissions', 'creator', 'warehouse']);
         $roles = $this->portalService->getAssignableWarehouseRoles($actor);
@@ -70,14 +77,17 @@ class UserController extends Controller
         $this->authorizePermission('warehouse.users.view');
 
         $actor = Auth::guard('admin')->user();
-        $warehouse = $this->portalService->resolveWarehouse($actor);
-        $query = $this->portalService->warehouseUsersQuery($warehouse);
+        $query = $this->usersQueryForActor($actor);
 
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhereHas('warehouse', function ($warehouseQuery) use ($search) {
+                        $warehouseQuery->where('warehouses.name', 'like', "%{$search}%")
+                            ->orWhere('warehouses.code', 'like', "%{$search}%");
+                    })
                     ->orWhereHas('roles', function ($roleQuery) use ($search) {
                         $roleQuery->where('roles.name', 'like', "%{$search}%");
                     });
@@ -98,6 +108,10 @@ class UserController extends Controller
 
         if ($roleId = $request->integer('role')) {
             $query->whereHas('roles', fn ($q) => $q->where('roles.id', $roleId));
+        }
+
+        if ($actor->isHqUser() && $warehouseId = $request->integer('warehouse_id')) {
+            $query->where('warehouse_id', $warehouseId);
         }
 
         if ($request->has('status') && $request->input('status') !== '') {
@@ -146,18 +160,27 @@ class UserController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'phone' => $user->phone,
+                'phone_input' => PhoneHelper::toLocal((string) $user->phone) ?: $user->phone,
                 'avatar' => strtoupper(substr($user->name, 0, 1)),
+                'photo_url' => $user->photo_path ? Storage::disk('public')->url($user->photo_path) : null,
                 'roles' => $user->roles->map(fn ($role) => ['id' => $role->id, 'name' => $role->name])->values(),
+                'warehouse' => $user->warehouse ? [
+                    'id' => $user->warehouse->id,
+                    'name' => $user->warehouse->name,
+                    'code' => $user->warehouse->code,
+                ] : null,
                 'is_active' => $user->is_active,
                 'creator' => $user->creator?->name ?? 'System',
                 'created_at' => $user->created_at?->format('d/m/Y, H:i:s'),
                 'last_login_at' => $user->last_login_at?->diffForHumans() ?? 'Never',
                 'can_manage' => $this->canManageWarehouseUser($actor, $user),
                 'can_delete' => false,
+                'can_impersonate' => $this->canImpersonateUser($actor, $user),
                 'is_self' => $actor->id === $user->id,
                 'view_url' => route('warehouse.users.show', $user),
                 'edit_url' => route('warehouse.users.update', $user) . '/edit',
                 'toggle_url' => route('warehouse.users.toggle-active', $user),
+                'impersonate_url' => route('warehouse.users.impersonate', $user),
                 'delete_url' => null,
             ];
         })->values();
@@ -180,31 +203,43 @@ class UserController extends Controller
         $this->authorizePermission('warehouse.users.create');
 
         $actor = Auth::guard('admin')->user();
-        $warehouse = $this->portalService->resolveWarehouse($actor);
 
-        $request->merge([
-            'phone' => PhoneHelper::format((string) $request->input('phone')) ?? $request->input('phone'),
-        ]);
+        $request->merge(['phone' => preg_replace('/\D/', '', (string) $request->input('phone'))]);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'phone' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
-                if (!PhoneHelper::isValid((string) $value)) {
-                    $fail('Please enter a valid Ghana phone number.');
+            'email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
+            'phone' => ['required', 'digits:10', function ($attribute, $value, $fail) {
+                $phone = PhoneHelper::format((string) $value);
+
+                if (!str_starts_with((string) $value, '0') || !$phone || !PhoneHelper::hasValidPrefix((string) $value)) {
+                    $fail('Please enter a valid 10-digit Ghana phone number.');
+                    return;
                 }
-            }, 'unique:users,phone'],
+
+                if (User::query()->where('phone', $phone)->exists()) {
+                    $fail('This phone number has already been taken.');
+                }
+            }],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role_id' => ['required', 'integer', Rule::exists('roles', 'id')],
+            'profile_photo' => ['nullable', 'image', 'max:5120'],
+            'warehouse_id' => $actor->isHqUser()
+                ? ['required', 'integer', Rule::exists('warehouses', 'id')->where(fn ($query) => $query->where('is_active', true))]
+                : ['nullable'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $role = $this->resolveAssignableWarehouseRole((int) $validated['role_id'], $actor);
+        $warehouse = $actor->isHqUser()
+            ? Warehouse::query()->whereKey($validated['warehouse_id'])->firstOrFail()
+            : $this->portalService->resolveWarehouse($actor);
 
         $user = User::create([
             'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'],
+            'email' => $validated['email'] ?? null,
+            'phone' => PhoneHelper::format($validated['phone']),
+            'photo_path' => $request->file('profile_photo')?->store('user-photos', 'public'),
             'password' => Hash::make($validated['password']),
             'warehouse_id' => $warehouse->id,
             'created_by_user_id' => $actor->id,
@@ -225,31 +260,49 @@ class UserController extends Controller
         $this->authorizePermission('warehouse.users.edit');
 
         $actor = Auth::guard('admin')->user();
-        $warehouse = $this->portalService->resolveWarehouse($actor);
-        $this->assertWarehouseScopedUser($user, $warehouse);
+        $this->assertCanAccessUser($actor, $user);
 
-        $request->merge([
-            'phone' => PhoneHelper::format((string) $request->input('phone')) ?? $request->input('phone'),
-        ]);
+        $request->merge(['phone' => preg_replace('/\D/', '', (string) $request->input('phone'))]);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'phone' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
-                if (!PhoneHelper::isValid((string) $value)) {
-                    $fail('Please enter a valid Ghana phone number.');
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'phone' => ['required', 'digits:10', function ($attribute, $value, $fail) use ($user) {
+                $phone = PhoneHelper::format((string) $value);
+
+                if (!str_starts_with((string) $value, '0') || !$phone || !PhoneHelper::hasValidPrefix((string) $value)) {
+                    $fail('Please enter a valid 10-digit Ghana phone number.');
+                    return;
                 }
-            }, Rule::unique('users', 'phone')->ignore($user->id)],
+
+                if (User::query()->where('phone', $phone)->whereKeyNot($user->id)->exists()) {
+                    $fail('This phone number has already been taken.');
+                }
+            }],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'role_id' => ['nullable', 'integer', Rule::exists('roles', 'id')],
+            'profile_photo' => ['nullable', 'image', 'max:5120'],
+            'warehouse_id' => $actor->isHqUser()
+                ? ['nullable', 'integer', Rule::exists('warehouses', 'id')->where(fn ($query) => $query->where('is_active', true))]
+                : ['nullable'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $payload = [
             'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'],
+            'email' => $validated['email'] ?? null,
+            'phone' => PhoneHelper::format($validated['phone']),
         ];
+
+        if ($actor->isHqUser() && !empty($validated['warehouse_id'])) {
+            if ($actor->id === $user->id && (int) $validated['warehouse_id'] !== (int) $user->warehouse_id) {
+                return response()->json([
+                    'message' => 'You cannot move your own account to another warehouse.',
+                ], 422);
+            }
+
+            $payload['warehouse_id'] = (int) $validated['warehouse_id'];
+        }
 
         if (array_key_exists('is_active', $validated)) {
             if ($actor->id === $user->id && !$validated['is_active']) {
@@ -262,6 +315,14 @@ class UserController extends Controller
 
         if (!empty($validated['password'])) {
             $payload['password'] = Hash::make($validated['password']);
+        }
+
+        if ($request->hasFile('profile_photo')) {
+            if ($user->photo_path) {
+                Storage::disk('public')->delete($user->photo_path);
+            }
+
+            $payload['photo_path'] = $request->file('profile_photo')->store('user-photos', 'public');
         }
 
         $user->update($payload);
@@ -287,8 +348,7 @@ class UserController extends Controller
         $this->authorizePermission('warehouse.users.deactivate');
 
         $actor = Auth::guard('admin')->user();
-        $warehouse = $this->portalService->resolveWarehouse($actor);
-        $this->assertWarehouseScopedUser($user, $warehouse);
+        $this->assertCanAccessUser($actor, $user);
 
         if ($actor->id === $user->id) {
             $message = 'You cannot change your own status.';
@@ -319,13 +379,17 @@ class UserController extends Controller
         $this->authorizePermission('warehouse.users.view');
 
         $actor = Auth::guard('admin')->user();
-        $warehouse = $this->portalService->resolveWarehouse($actor);
-        $query = $this->portalService->warehouseUsersQuery($warehouse);
+        $query = $this->usersQueryForActor($actor);
 
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhereHas('warehouse', function ($warehouseQuery) use ($search) {
+                        $warehouseQuery->where('warehouses.name', 'like', "%{$search}%")
+                            ->orWhere('warehouses.code', 'like', "%{$search}%");
+                    })
                     ->orWhereHas('roles', function ($roleQuery) use ($search) {
                         $roleQuery->where('roles.name', 'like', "%{$search}%");
                     });
@@ -346,6 +410,10 @@ class UserController extends Controller
 
         if ($roleId = $request->integer('role')) {
             $query->whereHas('roles', fn ($q) => $q->where('roles.id', $roleId));
+        }
+
+        if ($actor->isHqUser() && $warehouseId = $request->integer('warehouse_id')) {
+            $query->where('warehouse_id', $warehouseId);
         }
 
         if ($request->has('status') && $request->input('status') !== '') {
@@ -379,6 +447,7 @@ class UserController extends Controller
                 'Name' => $user->name,
                 'Email' => $user->email,
                 'Role' => $user->roles->first()?->name ?? '-',
+                'Warehouse' => $user->warehouse?->name ?? '-',
                 'Status' => $user->is_active ? 'Active' : 'Inactive',
                 'Created At' => $user->created_at?->format('Y-m-d H:i:s'),
                 'Last Login' => $user->last_login_at?->format('Y-m-d H:i:s') ?? 'Never',
@@ -405,8 +474,7 @@ class UserController extends Controller
         $this->authorizePermission('warehouse.users.view');
 
         $actor = Auth::guard('admin')->user();
-        $warehouse = $this->portalService->resolveWarehouse($actor);
-        $this->assertWarehouseScopedUser($user, $warehouse);
+        $this->assertCanAccessUser($actor, $user);
 
         $query = AdminAuditLog::query()
             ->with(['warehouse:id,name'])
@@ -518,7 +586,29 @@ class UserController extends Controller
         return $query->firstOrFail();
     }
 
-    private function assertWarehouseScopedUser(User $target, \App\Models\Warehouse $warehouse): void
+    private function usersQueryForActor(User $actor): \Illuminate\Database\Eloquent\Builder
+    {
+        if ($actor->isHqUser()) {
+            return User::query()
+                ->with(['roles:id,name,slug,is_warehouse_role', 'creator:id,name', 'warehouse:id,name,code']);
+        }
+
+        $warehouse = $this->portalService->resolveWarehouse($actor);
+
+        return $this->portalService->warehouseUsersQuery($warehouse);
+    }
+
+    private function assertCanAccessUser(User $actor, User $target): void
+    {
+        if ($actor->isHqUser()) {
+            return;
+        }
+
+        $warehouse = $this->portalService->resolveWarehouse($actor);
+        $this->assertWarehouseScopedUser($target, $warehouse);
+    }
+
+    private function assertWarehouseScopedUser(User $target, Warehouse $warehouse): void
     {
         if ((int) $target->warehouse_id !== (int) $warehouse->id) {
             abort(404);
@@ -535,10 +625,6 @@ class UserController extends Controller
 
     private function canManageWarehouseUser(User $actor, User $target): bool
     {
-        if ((int) $actor->warehouse_id !== (int) $target->warehouse_id) {
-            return false;
-        }
-
         $hasManagePermission = $actor->hasAnyPermission([
             'warehouse.users.edit',
             'warehouse.users.deactivate',
@@ -549,11 +635,28 @@ class UserController extends Controller
             return false;
         }
 
+        if ($actor->isHqUser()) {
+            return true;
+        }
+
+        if ((int) $actor->warehouse_id !== (int) $target->warehouse_id) {
+            return false;
+        }
+
         if ($actor->id === $target->id) {
             return $actor->hasPermission('warehouse.users.edit');
         }
 
         return true;
+    }
+
+    private function canImpersonateUser(User $actor, User $target): bool
+    {
+        return $actor->isHqUser()
+            && $actor->hasPermission('warehouse.users.impersonate')
+            && $actor->id !== $target->id
+            && (bool) $target->is_active
+            && (int) ($target->warehouse_id ?? 0) > 0;
     }
 
     private function humanizeAction(?string $routeName, ?string $actionType): string

@@ -272,7 +272,7 @@
                                 'users' => 'Users',
                                 'roles' => 'Roles',
                                 'vendors' => 'Vendors',
-                                'shipments' => 'Shipments',
+                                'shipments' => 'Orders',
                                 'drivers' => 'Drivers',
                                 'warehouses' => 'Warehouses',
                                 'warehouse' => 'Warehouse Ops',
