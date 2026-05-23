@@ -31,7 +31,7 @@ it('seeds system templates with expected default enabled states', function () {
     expect(EmailTemplate::query()->count())->toBe(10)
         ->and((bool) EmailTemplate::query()->where('key', EmailTemplate::VENDOR_WELCOME)->value('is_enabled'))->toBeTrue()
         ->and((bool) EmailTemplate::query()->where('key', EmailTemplate::SHIPMENT_SUBMITTED)->value('is_enabled'))->toBeFalse()
-        ->and(EmailTemplate::query()->whereIn('key', ['invoice_ready', 'shipment_received'])->exists())->toBeFalse();
+        ->and(EmailTemplate::query()->where('key', 'shipment_received')->exists())->toBeFalse();
 });
 
 it('sends and logs an enabled template', function () {
@@ -346,7 +346,6 @@ function emailTemplateBuildSchema(): void
         $table->string('fulfillment_type')->default('warehouse');
         $table->unsignedBigInteger('created_by_user_id')->nullable();
         $table->string('destination_mode')->default('single');
-        $table->unsignedBigInteger('current_invoice_id')->nullable();
         $table->string('delivery_recipient_name')->nullable();
         $table->string('delivery_recipient_phone')->nullable();
         $table->string('delivery_town')->nullable();

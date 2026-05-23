@@ -18,7 +18,7 @@ Cold-start briefing for AI agents working in the **Parcelman Express** codebase.
 | Storage | Local + AWS S3 (`league/flysystem-aws-s3-v3`) |
 | Frontend | **Blade + Tailwind 4 + Alpine.js 3 + vanilla JS** (no Vue/React/Livewire/Inertia) |
 | Build | **Vite 7** (`laravel-vite-plugin`) |
-| PDFs | `barryvdh/laravel-dompdf` (invoices, labels) |
+| PDFs | `barryvdh/laravel-dompdf` (labels, receipts) |
 | Excel | `maatwebsite/excel` (exports) |
 | Tests | **Pest 4** + PHPUnit |
 | Lint | Laravel **Pint** |
@@ -75,7 +75,7 @@ resources/
 │   ├── admin/             Admin portal Blade templates
 │   ├── warehouse/         Warehouse portal Blade templates
 │   ├── web/{vendor,driver}/   Public-facing portals
-│   └── pdf/               Invoice + label PDFs
+│   └── pdf/               Label and receipt PDFs
 ├── js/{admin,warehouse,web}/  Per-portal JS modules
 └── css/
 
@@ -84,12 +84,11 @@ database/
 ├── factories/
 └── seeders/
 
-docs/                      BUSINESS_FLOW.md, PLAN.md, TIMELINE.md,
-                           mobile-api-changelog-fulfillment-type.md
+docs/                      Historical implementation notes
 tests/{Feature,Unit}/      Pest tests (RefreshDatabase available)
 ```
 
-**Non-standard:** `/docs` holds authoritative business-flow docs — read [docs/BUSINESS_FLOW.md](docs/BUSINESS_FLOW.md) before making domain changes.
+**Non-standard:** `/docs` may contain historical implementation notes; confirm current behavior from code and tests.
 
 ---
 
@@ -111,13 +110,12 @@ Middleware enforces scoping: `system.user` (super admin only), `warehouse.user` 
 
 The shipment is the spine. Everything else attaches to it.
 
-**Pipeline:** `Shipment → Invoice → PickupAssignment → WarehouseReceipt → (SortBatch → TransportManifest)* → DeliveryRun → delivered`
+**Pipeline:** `Shipment → PickupAssignment → WarehouseReceipt → (SortBatch → TransportManifest)* → DeliveryRun → delivered`
 
 | Model | Purpose |
 |---|---|
 | `Shipment` | Vendor's delivery request. 13-state lifecycle (see `ShipmentStatus` enum). |
 | `ShipmentItem` | Individual parcel; has images, tracking history, `fulfillment_type` |
-| `Invoice` | Admin-priced quote; vendor accepts/rejects (`InvoiceStatus` enum) |
 | `PickupAssignment` | Driver assignment to pick up from vendor (GPS + photos + OTP) |
 | `WarehouseReceipt` + `...Item` + `...ItemLabel` | Goods-in; barcode labels generated here |
 | `SortBatch` + `SortBatchItem` | Group items by destination before transport |
@@ -139,13 +137,13 @@ All status fields are **backed string enums** in [app/Enums/](app/Enums/). Treat
 
 ## 6. Architectural conventions
 
-- **Services own business logic.** Controllers orchestrate HTTP + validation + call services. When adding a feature, check [app/Services/](app/Services/) first — there's probably already a service to extend (e.g. `ShipmentService`, `InvoiceService`, `PickupAssignmentService`, `WarehouseReceivingService`).
-- **Events + Listeners handle side effects.** Status changes fire events (`ShipmentStatusChanged`, `InvoiceAcceptedByVendor`, `PickupAssignmentStatusChanged`, etc.); listeners send SMS/push/email and write to audit logs. Don't trigger notifications inline from controllers.
+- **Services own business logic.** Controllers orchestrate HTTP + validation + call services. When adding a feature, check [app/Services/](app/Services/) first — there's probably already a service to extend (e.g. `ShipmentService`, `PickupAssignmentService`, `WarehouseReceivingService`).
+- **Events + Listeners handle side effects.** Status changes fire events (`ShipmentStatusChanged`, `PickupAssignmentStatusChanged`, etc.); listeners send SMS/push/email and write to audit logs. Don't trigger notifications inline from controllers.
 - **Observers** wire model lifecycle → events.
 - **FormRequest** classes validate inbound payloads — don't validate inline in controllers.
 - **Enums everywhere** for status/type. Use `->value` for persistence, enum instance in code.
-- **Soft deletes** are used on `Shipment`, `Vendor`, `Warehouse`, `Invoice`, and more — check the model before assuming hard delete.
-- **Auto-generated codes:** `invoice_number`, `shipment_number`, `warehouse_code`, barcodes. Don't set these manually in new code.
+- **Soft deletes** are used on `Shipment`, `Vendor`, `Warehouse`, and more — check the model before assuming hard delete.
+- **Auto-generated codes:** `shipment_number`, `warehouse_code`, barcodes. Don't set these manually in new code.
 - **API versioning:** all mobile endpoints live under `/api/v1/`. New endpoints go there unless explicitly starting v2.
 - **Warehouse scoping is security-critical.** Any query reachable from `/warehouse/*` must filter by the authenticated user's `warehouse_id`. Super admin queries in `/admin/*` are unscoped.
 
@@ -174,11 +172,11 @@ All status fields are **backed string enums** in [app/Enums/](app/Enums/). Treat
 
 ## 9. Working in this repo — defaults for agents
 
-- **Read [docs/BUSINESS_FLOW.md](docs/BUSINESS_FLOW.md)** before touching shipment, pickup, receiving, sorting, transport, or delivery logic. The state machine has many branches; the doc is the spec.
+- Read existing services, enums, and tests before touching shipment, pickup, receiving, sorting, transport, or delivery logic. The state machine has many branches.
 - **Don't invent status strings** — add/use values in the corresponding `Enum` in [app/Enums/](app/Enums/).
 - **Put business logic in a Service**, not a controller. If the logic crosses two models, that's a service.
 - **Fire an Event for cross-cutting side effects** (notifications, audit) instead of calling them directly.
 - **Respect warehouse scoping** in every query behind warehouse-auth middleware.
 - **Run `./vendor/bin/pint`** before finishing a change set. Run `composer test` if you touched non-trivial logic.
-- **Mobile API changes:** bump or document in [docs/mobile-api-changelog-fulfillment-type.md](docs/mobile-api-changelog-fulfillment-type.md) — there is an established changelog pattern.
+- **Mobile API changes:** update the relevant endpoint tests and any current API notes.
 - **.env** is local-only. Don't commit secrets. `config/*.php` reads via `env()` only during cache-building; prefer `config()` in app code.

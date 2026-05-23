@@ -34,6 +34,8 @@
         $backOfficeAccess = app(\App\Services\BackOfficeAccess::class);
         $canRoles = $authUser ? $backOfficeAccess->canUsePermission($authUser, 'roles.view') : false;
         $canOrders = $authUser ? $backOfficeAccess->canUsePermission($authUser, 'shipments.view') : false;
+        $canRiderTeams = $authUser && collect(['drivers.view', 'warehouse.delivery.assign', 'warehouse.manifest.manage'])
+                ->contains(fn (string $permission) => $backOfficeAccess->canUsePermission($authUser, $permission));
         $canHqControls = $authUser && collect(['shipments.view', 'vendors.view', 'vendors.manage', 'drivers.view', 'warehouses.view', 'settings.view'])
                 ->contains(fn (string $permission) => $backOfficeAccess->canUsePermission($authUser, $permission));
     @endphp
@@ -116,7 +118,7 @@
                     @endif
                 @endif
 
-                @if($canManifest || $canDeliveryAssign)
+                @if($canManifest || $canDeliveryAssign || $canRiderTeams)
                     <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">Transport</div>
                     <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
 
@@ -142,6 +144,13 @@
                             <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></div>
                             <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Pending Confirmations</span>
                             <template x-if="sidebarCollapsed"><span class="wh-tooltip">Pending Confirmations</span></template>
+                        </a>
+                    @endif
+                    @if($canRiderTeams)
+                        <a href="{{ route('admin.rider-teams.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.rider-teams.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m6-6a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm6 2a3 3 0 1 1-5.196-2.052"/></svg></div>
+                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Rider Teams</span>
+                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Rider Teams</span></template>
                         </a>
                     @endif
                 @endif
@@ -273,7 +282,7 @@
                             <span class="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded-md border border-slate-200/60 font-medium tracking-wide">⌘K</span>
                         </div>
                         <div x-show="open" x-cloak x-transition class="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-xl rounded-xl shadow-xl shadow-slate-200/60 border border-slate-100/80 z-50 max-h-[420px] overflow-y-auto">
-                            <template x-for="group in ['shipments', 'vendors', 'drivers', 'invoices']" :key="group">
+                            <template x-for="group in ['shipments', 'vendors', 'drivers']" :key="group">
                                 <template x-if="results[group] && results[group].length">
                                     <div>
                                         <div class="px-3 pt-2 pb-1"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider" x-text="group"></span></div>
@@ -291,7 +300,7 @@
                                     </div>
                                 </template>
                             </template>
-                            <template x-if="open && !searching && !results.shipments?.length && !results.vendors?.length && !results.drivers?.length && !results.invoices?.length">
+                            <template x-if="open && !searching && !results.shipments?.length && !results.vendors?.length && !results.drivers?.length">
                                 <div class="px-4 py-6 text-center"><p class="text-[12px] text-slate-400">No results for "<span x-text="query"></span>"</p></div>
                             </template>
                         </div>

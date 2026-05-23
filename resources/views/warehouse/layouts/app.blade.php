@@ -33,6 +33,8 @@
         $canContacts = $authUser?->hasPermission('warehouse.contacts.manage');
         $canRecipientPayments = $authUser?->hasPermission('warehouse.recipient_payments.view');
         $canOrders = $authUser ? $backOfficeAccess->canUsePermission($authUser, 'shipments.view') : false;
+        $canRiderTeams = $authUser && collect(['drivers.view', 'warehouse.delivery.assign', 'warehouse.manifest.manage'])
+                ->contains(fn (string $permission) => $backOfficeAccess->canUsePermission($authUser, $permission));
         $canHqControls = $authUser && collect(['shipments.view', 'vendors.view', 'vendors.manage', 'drivers.view', 'warehouses.view', 'settings.view'])
                 ->contains(fn (string $permission) => $backOfficeAccess->canUsePermission($authUser, $permission));
     @endphp
@@ -147,7 +149,7 @@
                 @endif
 
                 {{-- ═══════════ DELIVERY ═══════════ --}}
-                @if($canDeliveryAssign || $canReceiving)
+                @if($canDeliveryAssign || $canReceiving || $canRiderTeams)
                 <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">Delivery</div>
                 <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
 
@@ -161,6 +163,13 @@
                     <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></div>
                     <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Pending Confirmations</span>
                     <template x-if="sidebarCollapsed"><span class="wh-tooltip">Pending Confirmations</span></template>
+                </a>
+                @endif
+                @if($canRiderTeams)
+                <a href="{{ route('admin.rider-teams.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.rider-teams.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m6-6a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm6 2a3 3 0 1 1-5.196-2.052"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Rider Teams</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Rider Teams</span></template>
                 </a>
                 @endif
                 @endif

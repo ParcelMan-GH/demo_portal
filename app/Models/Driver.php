@@ -112,4 +112,22 @@ class Driver extends Authenticatable
     {
         return $this->hasMany(DeliveryRun::class, 'assigned_driver_id');
     }
+
+    public function riderTeamMemberships(): HasMany
+    {
+        return $this->hasMany(RiderTeamMembership::class);
+    }
+
+    public function ledRiderTeams(): HasMany
+    {
+        return $this->riderTeamMemberships()
+            ->where('role', RiderTeamMembership::ROLE_LEADER)
+            ->where('is_active', true)
+            ->whereNull('removed_at');
+    }
+
+    public function riderTeamHandovers(): HasMany
+    {
+        return $this->hasMany(RiderTeamHandover::class, 'leader_driver_id');
+    }
 }

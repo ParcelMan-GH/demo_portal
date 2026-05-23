@@ -46,10 +46,6 @@
                         <span><strong x-text="stats.shipments.total"></strong> Shipments</span>
                     </div>
                     <div class="dash-hero-meta-item">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                        <span><strong x-text="stats.invoices.total"></strong> Invoices</span>
-                    </div>
-                    <div class="dash-hero-meta-item">
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span><strong x-text="stats.shipments.delivered"></strong> Delivered</span>
                     </div>
@@ -62,13 +58,11 @@
                 {{-- Status summary --}}
                 <div class="dash-hero-summary">
                     <div class="dash-hero-summary-icon">
-                        <svg x-show="stats.invoices.pending > 0" width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <svg x-show="stats.invoices.pending === 0" width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                     <div class="dash-hero-summary-text">
-                        <h3 x-show="stats.invoices.pending > 0" x-text="`You have ${stats.invoices.pending} pending invoice${stats.invoices.pending !== 1 ? 's' : ''} to review`"></h3>
-                        <h3 x-show="stats.invoices.pending === 0 && stats.shipments.draft > 0" x-text="`You have ${stats.shipments.draft} draft shipment${stats.shipments.draft !== 1 ? 's' : ''} ready to submit`"></h3>
-                        <h3 x-show="stats.invoices.pending === 0 && stats.shipments.draft === 0">All caught up! No pending actions.</h3>
+                        <h3 x-show="stats.shipments.draft > 0" x-text="`You have ${stats.shipments.draft} draft shipment${stats.shipments.draft !== 1 ? 's' : ''} ready to submit`"></h3>
+                        <h3 x-show="stats.shipments.draft === 0">All caught up! No pending actions.</h3>
                         <p x-show="stats.shipments.in_progress > 0" x-text="`${stats.shipments.in_progress} shipment${stats.shipments.in_progress !== 1 ? 's' : ''} currently being processed`"></p>
                         <p x-show="stats.shipments.in_progress === 0 && stats.shipments.total > 0">All your shipments have been processed.</p>
                         <p x-show="stats.shipments.total === 0">Create your first shipment to get started.</p>
@@ -123,30 +117,6 @@
                 </div>
             </div>
 
-            {{-- Pending Invoices --}}
-            <div class="dash-stat-card">
-                <div class="dash-stat-accent amber"></div>
-                <div class="dash-stat-top">
-                    <div class="dash-stat-icon amber">
-                        <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                    </div>
-                    <div class="dash-stat-data">
-                        <span class="dash-stat-value" x-text="stats.invoices.pending"></span>
-                        <span class="dash-stat-label">Pending Invoices</span>
-                    </div>
-                </div>
-                <div class="dash-stat-footer">
-                    <span class="dash-stat-pill green">
-                        <span class="dash-stat-pill-dot green"></span>
-                        <span x-text="stats.invoices.accepted + ' accepted'"></span>
-                    </span>
-                    <span class="dash-stat-pill red" x-show="stats.invoices.rejected > 0">
-                        <span class="dash-stat-pill-dot red"></span>
-                        <span x-text="stats.invoices.rejected + ' rejected'"></span>
-                    </span>
-                </div>
-            </div>
-
             {{-- Delivered --}}
             <div class="dash-stat-card">
                 <div class="dash-stat-accent green"></div>
@@ -162,7 +132,7 @@
                 <div class="dash-stat-footer">
                     <span class="dash-stat-pill blue">
                         <span class="dash-stat-pill-dot blue"></span>
-                        <span x-text="stats.invoices.total + ' total invoices'"></span>
+                        <span x-text="stats.shipments.total + ' total shipments'"></span>
                     </span>
                 </div>
             </div>
@@ -186,12 +156,6 @@
                         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                     </div>
                     <span>All Shipments</span>
-                </a>
-                <a href="{{ route('web.vendor.invoices.index') }}" class="dash-action-btn">
-                    <div class="dash-action-icon">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                    </div>
-                    <span>All Invoices</span>
                 </a>
             </div>
         </div>
@@ -258,63 +222,6 @@
                 </div>
             </div>
 
-            {{-- Recent Invoices --}}
-            <div class="dash-panel">
-                <div class="dash-panel-header">
-                    <div class="dash-panel-title">
-                        <div class="dash-panel-icon amber">
-                            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                        </div>
-                        Recent Invoices
-                    </div>
-                    <a href="{{ route('web.vendor.invoices.index') }}" class="dash-panel-link">
-                        View All
-                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    </a>
-                </div>
-                <div class="dash-panel-body">
-                    <template x-for="inv in recentInvoices" :key="inv.id">
-                        <a :href="`/vendor/invoices/${inv.id}`" class="dash-list-item" :class="invoiceStatusColor(inv.status)">
-                            {{-- Status avatar --}}
-                            <div class="dash-list-avatar" :class="invoiceStatusColor(inv.status)">
-                                <svg x-show="inv.status === 'pending' || inv.status === 'sent'" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                <svg x-show="inv.status === 'accepted'" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                <svg x-show="inv.status === 'rejected'" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                <svg x-show="inv.status === 'cancelled'" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
-                            </div>
-                            {{-- Details --}}
-                            <div class="dash-list-details">
-                                <div class="dash-list-header">
-                                    <span class="dash-list-title" x-text="inv.invoice_number"></span>
-                                    <span class="dash-list-badge" :class="invoiceStatusColor(inv.status)" x-text="statusLabel(inv.status)"></span>
-                                </div>
-                                <div class="dash-list-sub">
-                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                    <span x-text="formatMoney(inv.total_amount, inv.currency)"></span>
-                                </div>
-                            </div>
-                            {{-- Meta --}}
-                            <div class="dash-list-meta">
-                                <div class="dash-list-date">
-                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M4 11h16M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                    <span x-text="formatDate(inv.created_at)"></span>
-                                </div>
-                            </div>
-                            {{-- Arrow --}}
-                            <div class="dash-list-arrow">
-                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                            </div>
-                        </a>
-                    </template>
-                    <div x-show="recentInvoices.length === 0" class="dash-empty-mini">
-                        <div class="dash-empty-icon">
-                            <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                        </div>
-                        <div class="dash-empty-title">No Invoices Yet</div>
-                        <div class="dash-empty-text">Your recent invoices will appear here</div>
-                    </div>
-                </div>
-            </div>
         </div>
 
     </div>

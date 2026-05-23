@@ -5,7 +5,6 @@ import {
     setToken,
 } from './auth-client';
 import './vendor-shipments';
-import './vendor-invoices';
 import './driver-pickups';
 import './driver-transports';
 import './driver-deliveries';
@@ -597,10 +596,8 @@ function registerVendorHomePage() {
         profile: null,
         stats: {
             shipments: { total: 0, draft: 0, in_progress: 0, delivered: 0, cancelled: 0 },
-            invoices: { total: 0, pending: 0, accepted: 0, rejected: 0 },
         },
         recentShipments: [],
-        recentInvoices: [],
 
         init() {
             this.bootstrap();
@@ -618,20 +615,11 @@ function registerVendorHomePage() {
         statusColor(status) {
             const map = {
                 draft: 'gray', submitted: 'blue',
-                invoice_sent: 'orange', invoice_accepted: 'orange',
                 pickup_assigned: 'cyan', picked_up: 'cyan',
                 at_warehouse: 'cyan', sorted: 'cyan',
                 in_transit: 'cyan', at_destination: 'cyan',
                 out_for_delivery: 'cyan',
                 delivered: 'green', cancelled: 'red',
-            };
-            return map[status] || 'gray';
-        },
-
-        invoiceStatusColor(status) {
-            const map = {
-                pending: 'amber', sent: 'amber',
-                accepted: 'green', rejected: 'red', cancelled: 'gray',
             };
             return map[status] || 'gray';
         },
@@ -665,7 +653,7 @@ function registerVendorHomePage() {
                 return;
             }
 
-            const inProgressStatuses = 'status[]=submitted&status[]=invoice_sent&status[]=invoice_accepted&status[]=pickup_assigned&status[]=picked_up&status[]=at_warehouse&status[]=sorted&status[]=in_transit&status[]=at_destination&status[]=out_for_delivery';
+            const inProgressStatuses = 'status[]=submitted&status[]=processing&status[]=pickup_assigned&status[]=picked_up&status[]=at_warehouse&status[]=sorted&status[]=in_transit&status[]=at_destination&status[]=out_for_delivery';
 
             const [profileResult, ...rest] = await Promise.all([
                 apiRequest('/api/v1/vendor/profile', { role: 'vendor' }),
@@ -675,14 +663,8 @@ function registerVendorHomePage() {
                 apiRequest(`/api/v1/vendor/shipments?limit=1&offset=0&${inProgressStatuses}`, { role: 'vendor' }),
                 apiRequest('/api/v1/vendor/shipments?limit=1&offset=0&status[]=delivered', { role: 'vendor' }),
                 apiRequest('/api/v1/vendor/shipments?limit=1&offset=0&status[]=cancelled', { role: 'vendor' }),
-                // Invoice counts: total, pending, accepted, rejected
-                apiRequest('/api/v1/vendor/invoices?limit=1&offset=0', { role: 'vendor' }),
-                apiRequest('/api/v1/vendor/invoices?limit=1&offset=0&status[]=pending&status[]=sent', { role: 'vendor' }),
-                apiRequest('/api/v1/vendor/invoices?limit=1&offset=0&status[]=accepted', { role: 'vendor' }),
-                apiRequest('/api/v1/vendor/invoices?limit=1&offset=0&status[]=rejected', { role: 'vendor' }),
                 // Recent lists
                 apiRequest('/api/v1/vendor/shipments?limit=5&offset=0&sort_by=created_at&sort_dir=desc', { role: 'vendor' }),
-                apiRequest('/api/v1/vendor/invoices?limit=5&offset=0&sort_by=created_at&sort_dir=desc', { role: 'vendor' }),
             ]);
 
             if (profileResult.unauthorized || rest.some(r => r.unauthorized)) {
@@ -705,16 +687,9 @@ function registerVendorHomePage() {
             this.stats.shipments.in_progress = ct(rest[2]);
             this.stats.shipments.delivered = ct(rest[3]);
             this.stats.shipments.cancelled = ct(rest[4]);
-            this.stats.invoices.total = ct(rest[5]);
-            this.stats.invoices.pending = ct(rest[6]);
-            this.stats.invoices.accepted = ct(rest[7]);
-            this.stats.invoices.rejected = ct(rest[8]);
 
-            if (rest[9].success) {
-                this.recentShipments = rest[9].payload?.data?.shipments || [];
-            }
-            if (rest[10].success) {
-                this.recentInvoices = rest[10].payload?.data?.invoices || [];
+            if (rest[5].success) {
+                this.recentShipments = rest[5].payload?.data?.shipments || [];
             }
 
             this.loading = false;

@@ -465,8 +465,6 @@ class RoleController extends Controller implements HasMiddleware
     private function getPermissionsForScope(string $scope): Collection
     {
         return Permission::query()
-            ->where('module', '!=', 'invoices')
-            ->where('name', 'not like', 'warehouse.invoices.%')
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()
@@ -486,8 +484,6 @@ class RoleController extends Controller implements HasMiddleware
 
         return Permission::query()
             ->whereIn('id', $permissionIds)
-            ->where('module', '!=', 'invoices')
-            ->where('name', 'not like', 'warehouse.invoices.%')
             ->pluck('id')
             ->map(static fn ($id) => (int) $id)
             ->all();

@@ -45,10 +45,6 @@
                            class="vendor-topnav-item {{ request()->routeIs('web.vendor.shipments.create') ? 'active' : '' }}">
                             New Shipment
                         </a>
-                        <a href="{{ route('web.vendor.invoices.index') }}"
-                           class="vendor-topnav-item {{ request()->routeIs('web.vendor.invoices.*') ? 'active' : '' }}">
-                            Invoices
-                        </a>
                     </nav>
                 </div>
 
@@ -100,10 +96,6 @@
                                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                     My Shipments
                                 </a>
-                                <a href="{{ route('web.vendor.invoices.index') }}" class="vendor-profile-dropdown-link">
-                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                                    My Invoices
-                                </a>
                             </div>
                             {{-- Logout --}}
                             <div class="vendor-profile-dropdown-footer">
@@ -150,11 +142,6 @@
                    class="vendor-mobilenav-item {{ request()->routeIs('web.vendor.shipments.create') ? 'active' : '' }}">
                     <svg class="h-[18px] w-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     New Shipment
-                </a>
-                <a href="{{ route('web.vendor.invoices.index') }}"
-                   class="vendor-mobilenav-item {{ request()->routeIs('web.vendor.invoices.*') ? 'active' : '' }}">
-                    <svg class="h-[18px] w-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                    Invoices
                 </a>
                 <a href="{{ route('web.landing') }}"
                    class="vendor-mobilenav-item">
@@ -214,12 +201,6 @@
                         <a href="{{ route('web.vendor.shipments.create') }}">
                             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                             New Shipment
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('web.vendor.invoices.index') }}">
-                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                            Invoices
                         </a>
                     </li>
                 </ul>

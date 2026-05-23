@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryRun;
 use App\Models\Driver;
-use App\Models\Invoice;
 use App\Models\LabelCustodyEvent;
 use App\Models\Shipment;
 use App\Models\TransportManifest;
@@ -50,8 +49,6 @@ class DashboardController extends Controller
         $deliveredToday       = Shipment::where('status', 'delivered')
                                     ->whereDate('updated_at', $today)
                                     ->count();
-        $pendingInvoices      = Invoice::where('status', 'sent')->count();
-
         // ── Pipeline counts ───────────────────────────────────────────────
         $submitted            = Shipment::where('status', 'submitted')->count();
         $pickedUp             = Shipment::where('status', 'picked_up')->count();
@@ -80,9 +77,6 @@ class DashboardController extends Controller
                                     ->count('driver_id');
 
         // ── Financial Summary (this month) ────────────────────────────────
-        $totalInvoicedMonth   = Invoice::where('status', 'accepted')
-                                    ->where('created_at', '>=', $monthStart)
-                                    ->sum('total_amount');
         $activeVendorsMonth   = Vendor::whereHas('shipments', function ($q) use ($monthStart) {
                                     $q->where('created_at', '>=', $monthStart);
                                 })->count();
@@ -140,7 +134,6 @@ class DashboardController extends Controller
             'atWarehouse',
             'outForDelivery',
             'deliveredToday',
-            'pendingInvoices',
             'submitted',
             'pickedUp',
             'sorted',
@@ -149,7 +142,6 @@ class DashboardController extends Controller
             'claimedLabels',
             'totalDrivers',
             'driversWithPackages',
-            'totalInvoicedMonth',
             'activeVendorsMonth',
             'totalShipmentsMonth',
             'totalVendors',

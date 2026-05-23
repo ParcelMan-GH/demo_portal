@@ -124,6 +124,8 @@ function shipmentShow() {
         assignDriverModalOpen: false,
         showUnassignModal: false,
         unassignReason: '',
+        rejectModal: { open: false, reason: '', saving: false },
+        reopeningRejected: false,
 
         // Edit assignment form state
         editAssignmentOpen: false,
@@ -142,6 +144,105 @@ function shipmentShow() {
             items: [],
             loading: false,
             itemsExpanded: {},
+        },
+
+        shipmentStatusValue() {
+            const status = this.shipment?.status;
+            if (!status) return '';
+            if (typeof status === 'string') return status;
+            if (typeof status === 'object' && status.value) return status.value;
+            return String(status);
+        },
+
+        canRejectShipment() {
+            if (!this.canManage || !this.config.rejectEndpoint) {
+                return false;
+            }
+
+            return ['submitted', 'processing'].includes(this.shipmentStatusValue()) && !this.assignment;
+        },
+
+        canReopenShipment() {
+            return this.canManage && !!this.config.reopenEndpoint && this.shipmentStatusValue() === 'rejected';
+        },
+
+        openRejectShipmentModal() {
+            if (!this.canRejectShipment()) return;
+            this.rejectModal = { open: true, reason: '', saving: false };
+        },
+
+        closeRejectShipmentModal() {
+            if (this.rejectModal.saving) return;
+            this.rejectModal.open = false;
+            this.rejectModal.reason = '';
+        },
+
+        async submitRejectShipment() {
+            const reason = (this.rejectModal.reason || '').trim();
+            if (this.rejectModal.saving || !this.config.rejectEndpoint || reason.length < 3) return;
+
+            this.rejectModal.saving = true;
+            try {
+                const response = await fetch(this.config.rejectEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ rejection_reason: reason }),
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    const next = result.data?.shipment || {};
+                    this.shipment.status = next.status || 'rejected';
+                    this.shipment.rejected_at = next.rejected_at || null;
+                    this.shipment.rejection_reason = next.rejection_reason || reason;
+                    this.rejectModal.open = false;
+                    this.rejectModal.reason = '';
+                    window.showToast?.(result.message || 'Order rejected.', 'success');
+                    window.setTimeout(() => window.location.reload(), 600);
+                    return;
+                }
+
+                window.showToast?.(result.message || 'Failed to reject order.', 'error');
+            } catch (e) {
+                window.showToast?.('Error rejecting order.', 'error');
+            } finally {
+                this.rejectModal.saving = false;
+            }
+        },
+
+        async reopenRejectedShipment() {
+            if (this.reopeningRejected || !this.canReopenShipment()) return;
+
+            this.reopeningRejected = true;
+            try {
+                const response = await fetch(this.config.reopenEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    const next = result.data?.shipment || {};
+                    this.shipment.status = next.status || 'submitted';
+                    window.showToast?.(result.message || 'Order reopened.', 'success');
+                    window.setTimeout(() => window.location.reload(), 600);
+                    return;
+                }
+
+                window.showToast?.(result.message || 'Failed to reopen order.', 'error');
+            } catch (e) {
+                window.showToast?.('Error reopening order.', 'error');
+            } finally {
+                this.reopeningRejected = false;
+            }
         },
 
         shipmentDestinationMode() {
@@ -2975,7 +3076,7 @@ function shipmentShow() {
                 return false;
             }
 
-            if (['cancelled', 'delivered'].includes(this.shipment?.status)) {
+            if (['cancelled', 'delivered', 'rejected'].includes(this.shipmentStatusValue())) {
                 return false;
             }
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Shipment;
 use App\Models\ShipmentPayment;
+use App\Services\ChargesService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,13 +19,12 @@ class ShipmentPaymentController extends Controller
     public function data(Shipment $shipment): JsonResponse
     {
         $payments = $shipment->payments()
-            ->with(['recordedBy:id,name', 'invoice:id,invoice_number'])
+            ->with(['recordedBy:id,name'])
             ->latest()
             ->get();
 
-        $totalInvoiced = $shipment->invoices()
-            ->where('status', 'accepted')
-            ->sum('total_amount');
+        $chargeSummary = app(ChargesService::class)->summariseShipment($shipment);
+        $totalDue = (float) ($chargeSummary['revenue_total'] ?? 0);
 
         $totalPaid = $payments->sum('amount');
 
@@ -39,13 +39,12 @@ class ShipmentPaymentController extends Controller
                 'notes'            => $p->notes,
                 'payment_date'     => $p->payment_date?->format('Y-m-d H:i'),
                 'recorded_by'      => $p->recordedBy?->name,
-                'invoice_number'   => $p->invoice?->invoice_number,
                 'created_at'       => $p->created_at?->format('Y-m-d H:i'),
             ]),
             'summary' => [
-                'total_invoiced' => (float) $totalInvoiced,
+                'total_due'      => $totalDue,
                 'total_paid'     => (float) $totalPaid,
-                'balance_due'    => max(0, (float) $totalInvoiced - (float) $totalPaid),
+                'balance_due'    => max(0, $totalDue - (float) $totalPaid),
             ],
         ]);
     }
@@ -55,15 +54,6 @@ class ShipmentPaymentController extends Controller
      */
     public function store(Request $request, Shipment $shipment): JsonResponse
     {
-        $activeInvoice = $shipment->invoice;
-
-        if (!$activeInvoice) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cannot record a payment — this shipment has no active invoice.',
-            ], 422);
-        }
-
         $validated = $request->validate([
             'amount'           => ['required', 'numeric', 'min:0.01'],
             'payment_method'   => ['required', 'string', 'in:cash,bank_transfer,mobile_money,cheque'],
@@ -76,7 +66,6 @@ class ShipmentPaymentController extends Controller
 
         $payment = ShipmentPayment::create([
             'shipment_id'        => $shipment->id,
-            'invoice_id'         => $activeInvoice->id,
             'amount'             => $validated['amount'],
             'payment_method'     => $validated['payment_method'],
             'reference_number'   => $validated['reference_number'] ?? null,
@@ -88,7 +77,7 @@ class ShipmentPaymentController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Payment recorded successfully.',
-            'data'    => ['payment' => $payment->load('recordedBy:id,name', 'invoice:id,invoice_number')],
+            'data'    => ['payment' => $payment->load('recordedBy:id,name')],
         ]);
     }
 
@@ -97,7 +86,7 @@ class ShipmentPaymentController extends Controller
      */
     public function download(ShipmentPayment $payment)
     {
-        $payment->load(['shipment.vendor', 'invoice', 'recordedBy']);
+        $payment->load(['shipment.vendor', 'recordedBy']);
 
         $logoPath = public_path('logo.png');
         $logoBase64 = '';
@@ -120,7 +109,7 @@ class ShipmentPaymentController extends Controller
      */
     public function print(ShipmentPayment $payment)
     {
-        $payment->load(['shipment.vendor', 'invoice', 'recordedBy']);
+        $payment->load(['shipment.vendor', 'recordedBy']);
 
         $logoPath = public_path('logo.png');
         $logoBase64 = '';

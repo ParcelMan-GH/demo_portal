@@ -74,7 +74,7 @@ class CreateShipmentRequest extends FormRequest
             ],
             'pickup_vehicles.*.quantity' => ['required_with:pickup_vehicles', 'integer', 'min:1', 'max:99'],
 
-            // Inline items — at least one item with at least one image
+            // Inline items — at least one item with at least one uploaded or reused image
             'items' => ['required', 'array', 'min:1'],
             'items.*.description' => ['nullable', 'string', 'max:500'],
             'items.*.quantity' => ['nullable', 'integer', 'min:1'],
@@ -86,8 +86,12 @@ class CreateShipmentRequest extends FormRequest
             'items.*.delivery_district_id' => ['nullable', 'exists:districts,id'],
             'items.*.delivery_landmark' => ['nullable', 'string', 'max:255'],
             'items.*.delivery_instructions' => ['nullable', 'string', 'max:1000'],
-            'items.*.images' => ['required', 'array', 'min:1'],
+            'items.*.images' => ['nullable', 'array'],
             'items.*.images.*' => ['required', 'file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+            'items.*.reused_image_ids' => ['nullable', 'array'],
+            'items.*.reused_image_ids.*' => ['integer', 'exists:shipment_item_images,id'],
+            'items.*.reused_image_phones' => ['nullable', 'array'],
+            'items.*.reused_image_phones.*' => ['nullable', 'string', 'max:20'],
             'items.*.phones' => ['nullable', 'array'],
             'items.*.phones.*' => ['nullable', 'string', 'max:20'],
         ];
@@ -98,13 +102,21 @@ class CreateShipmentRequest extends FormRequest
         $validator->after(function (Validator $validator) {
             // Validate total images across all items (max 500)
             $totalImages = 0;
-            $items = $this->file('items', []);
-            if (is_array($items)) {
-                foreach ($items as $item) {
-                    if (isset($item['images']) && is_array($item['images'])) {
-                        $totalImages += count($item['images']);
-                    }
+            $fileItems = $this->file('items', []);
+            $inputItems = $this->input('items', []);
+            foreach ($inputItems as $index => $itemInput) {
+                $uploadedCount = isset($fileItems[$index]['images']) && is_array($fileItems[$index]['images'])
+                    ? count($fileItems[$index]['images'])
+                    : 0;
+                $reusedCount = isset($itemInput['reused_image_ids']) && is_array($itemInput['reused_image_ids'])
+                    ? count(array_filter($itemInput['reused_image_ids']))
+                    : 0;
+
+                if ($uploadedCount + $reusedCount < 1) {
+                    $validator->errors()->add("items.{$index}.images", 'Each item must have at least one image.');
                 }
+
+                $totalImages += $uploadedCount + $reusedCount;
             }
             if ($totalImages > 500) {
                 $validator->errors()->add('items', 'Maximum 500 images allowed across all items. You uploaded ' . $totalImages . '.');
@@ -151,8 +163,6 @@ class CreateShipmentRequest extends FormRequest
             'delivery_recipient_phone_confirm.same' => 'Delivery phone numbers do not match.',
             'items.required' => 'At least one item with images is required.',
             'items.min' => 'At least one item with images is required.',
-            'items.*.images.required' => 'Each item must have at least one image.',
-            'items.*.images.min' => 'Each item must have at least one image.',
             'items.*.images.*.max' => 'Each image must be under 2MB.',
             'items.*.images.*.mimes' => 'Images must be JPEG, PNG, or WebP.',
         ];

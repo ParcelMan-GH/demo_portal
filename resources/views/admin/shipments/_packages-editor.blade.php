@@ -690,7 +690,7 @@
 
                 {{-- ─── Assignment / Driver Card ───────────────────── --}}
                 <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100 overflow-hidden"
-                     x-show="['submitted', 'invoice_accepted', 'pickup_assigned'].includes(shipment.status)"
+                     x-show="['submitted', 'processing', 'pickup_assigned'].includes(shipment.status)"
                      style="animation: fadeSlideUp 0.35s ease both; animation-delay: 0.16s">
                     <div class="flex items-center gap-0 border-b border-slate-100/80">
                         <div class="w-1.5 self-stretch bg-indigo-500 rounded-l-3xl flex-shrink-0"></div>

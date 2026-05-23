@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\FulfillmentType;
-use App\Enums\InvoiceStatus;
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentSource;
 use App\Enums\ShipmentStatus;
@@ -32,7 +31,6 @@ class Shipment extends Model
         'fulfillment_type',
         'created_by_user_id',
         'destination_mode',
-        'current_invoice_id',
         'pickup_contact_name',
         'pickup_contact_phone',
         'pickup_region_id',
@@ -59,6 +57,10 @@ class Shipment extends Model
         'submitted_at',
         'cancelled_at',
         'cancellation_reason',
+        'rejected_at',
+        'rejected_by_admin_id',
+        'rejection_reason',
+        'rejected_from_status',
     ];
 
     /**
@@ -78,6 +80,7 @@ class Shipment extends Model
         'vendor_declared_quantity' => 'integer',
         'submitted_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     /**
@@ -205,30 +208,6 @@ class Shipment extends Model
     }
 
     /**
-     * Get the invoice for this shipment.
-     */
-    public function invoice(): BelongsTo
-    {
-        return $this->belongsTo(Invoice::class, 'current_invoice_id');
-    }
-
-    /**
-     * Get the current active invoice for this shipment.
-     */
-    public function currentInvoice(): BelongsTo
-    {
-        return $this->belongsTo(Invoice::class, 'current_invoice_id');
-    }
-
-    /**
-     * Get invoice history for this shipment.
-     */
-    public function invoices(): HasMany
-    {
-        return $this->hasMany(Invoice::class)->latest('id');
-    }
-
-    /**
      * Get all recorded payments for this shipment.
      */
     public function payments(): HasMany
@@ -271,24 +250,11 @@ class Shipment extends Model
     }
 
     /**
-     * Check if shipment can be invoiced.
-     * Phase 3: Invoice can be created when submitted (old flow) OR at_warehouse (new flow).
-     */
-    public function canBeInvoiced(): bool
-    {
-        return in_array($this->status, [ShipmentStatus::SUBMITTED, ShipmentStatus::AT_WAREHOUSE])
-            && !$this->invoices()
-                ->whereIn('status', InvoiceStatus::activeValues())
-                ->exists();
-    }
-
-    /**
      * Check if shipment can have a driver assigned.
-     * Phase 3: Assignment allowed immediately on SUBMITTED (no invoice required first).
      */
     public function canBeAssigned(): bool
     {
-        return in_array($this->status, [ShipmentStatus::SUBMITTED, ShipmentStatus::INVOICE_ACCEPTED]);
+        return in_array($this->status, [ShipmentStatus::SUBMITTED, ShipmentStatus::PROCESSING]);
     }
 
     /**
@@ -303,11 +269,12 @@ class Shipment extends Model
         // Submitted + unprocessed (no admin processing yet)
         if ($this->status === ShipmentStatus::SUBMITTED) {
             $hasAssignment = $this->pickupAssignment()->exists();
-            $hasInvoice = $this->invoices()->exists();
-            $isProcessed = $this->items()->count() > 1
-                || $this->items()->whereNotNull('description')->exists();
+            $isProcessed = $this->items()
+                ->whereNotNull('description')
+                ->where('description', '!=', '')
+                ->exists();
 
-            return !$hasAssignment && !$hasInvoice && !$isProcessed;
+            return !$hasAssignment && !$isProcessed;
         }
 
         return false;
@@ -326,12 +293,20 @@ class Shipment extends Model
         // Submitted can be deleted if no processing has started
         if ($this->status === ShipmentStatus::SUBMITTED) {
             $hasAssignment = $this->pickupAssignment()->exists();
-            $hasInvoice = $this->invoices()->exists();
 
-            return !$hasAssignment && !$hasInvoice;
+            return !$hasAssignment;
         }
 
         return false;
+    }
+
+    public function canBeRejected(): bool
+    {
+        if (! in_array($this->status, [ShipmentStatus::SUBMITTED, ShipmentStatus::PROCESSING], true)) {
+            return false;
+        }
+
+        return ! $this->pickupAssignment()->exists();
     }
 
     /**

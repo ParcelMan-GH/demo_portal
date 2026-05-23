@@ -122,7 +122,7 @@
             $features = [
                 ['#ea580c','#fff7ed','#fed7aa','M12 4v16m8-8H4','Instant Shipment Booking','Vendors create and submit shipments in seconds. Specify items, dimensions, destination and get a pickup scheduled.'],
                 ['#0ea5e9','#f0f9ff','#bae6fd','M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7','Real-Time Tracking','Follow every parcel at every stage — from pickup through warehouse sorting to last-mile delivery.'],
-                ['#8b5cf6','#f5f3ff','#ddd6fe','M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z','Smart Invoicing','Automated invoice generation with vendor acceptance flow, admin override, and full payment tracking.'],
+                ['#8b5cf6','#f5f3ff','#ddd6fe','M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z','Payment Tracking','Track parcel charges, payouts, and payment status without slowing down operations.'],
                 ['#10b981','#f0fdf4','#bbf7d0','M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0','Driver Management','Assign drivers to pickups and transport runs, track their status, and notify them instantly via push.'],
                 ['#f59e0b','#fffbeb','#fde68a','M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9','Push Notifications','Vendors and drivers get instant push notifications for every status change — no delays, fully real-time.'],
                 ['#ec4899','#fdf2f8','#fbcfe8','M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z','Operations Dashboard','Admins get a powerful dashboard with delivery runs, transport manifests, sort batches, and live ops visibility.'],
@@ -196,9 +196,9 @@
                 </div>
                 <p style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c2410c;margin:0 0 0.4rem;">Vendor Portal</p>
                 <h3 style="font-size:1.375rem;font-weight:800;color:#0f172a;margin:0 0 0.75rem;">I'm sending parcels</h3>
-                <p style="font-size:0.9rem;color:#64748b;line-height:1.75;margin:0 0 1.5rem;">Register or sign in with your phone number. Create shipments, track them live, review invoices, and manage your business.</p>
+                <p style="font-size:0.9rem;color:#64748b;line-height:1.75;margin:0 0 1.5rem;">Register or sign in with your phone number. Create shipments, track them live, and manage your business.</p>
                 <ul style="list-style:none;padding:0;margin:0 0 1.75rem;display:flex;flex-direction:column;gap:0.5rem;">
-                    @foreach(['OTP phone verification','Create & track shipments','Invoice management','Real-time push notifications'] as $b)
+                    @foreach(['OTP phone verification','Create & track shipments','Payment tracking','Real-time push notifications'] as $b)
                     <li style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:#475569;">
                         <svg width="16" height="16" fill="none" stroke="#ea580c" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                         {{ $b }}

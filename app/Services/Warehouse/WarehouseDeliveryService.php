@@ -11,6 +11,7 @@ use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
 use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
+use App\Models\RiderTeamHandoverItem;
 use App\Models\WarehouseReceiptItemLabel;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
@@ -26,6 +27,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class WarehouseDeliveryService
 {
@@ -473,6 +475,29 @@ class WarehouseDeliveryService
             Shipment::whereIn('id', $shipmentIds)
                 ->whereNotIn('status', ['out_for_delivery', 'delivered', 'cancelled'])
                 ->update(['status' => ShipmentStatus::OUT_FOR_DELIVERY]);
+
+            if (Schema::hasTable('rider_team_handover_items')) {
+                $handoverIds = RiderTeamHandoverItem::query()
+                    ->whereIn('warehouse_receipt_item_label_id', $claimedLabelIds)
+                    ->whereNotIn('status', [
+                        RiderTeamHandoverItem::STATUS_DELIVERED,
+                        RiderTeamHandoverItem::STATUS_RETURNED,
+                        RiderTeamHandoverItem::STATUS_RECALLED,
+                    ])
+                    ->pluck('rider_team_handover_id')
+                    ->unique();
+
+                RiderTeamHandoverItem::query()
+                    ->whereIn('warehouse_receipt_item_label_id', $claimedLabelIds)
+                    ->update(['status' => RiderTeamHandoverItem::STATUS_IN_DELIVERY]);
+
+                $handoverIds->each(function ($handoverId) {
+                    $handover = \App\Models\RiderTeamHandover::find($handoverId);
+                    if ($handover) {
+                        app(\App\Services\RiderTeamHandoverService::class)->refreshHandoverCounts($handover);
+                    }
+                });
+            }
 
             return [
                 'success' => true,

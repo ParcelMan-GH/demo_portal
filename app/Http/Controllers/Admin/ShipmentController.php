@@ -13,6 +13,7 @@ use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Location;
 use App\Models\LabelCustodyEvent;
+use App\Models\NotificationLog;
 use App\Models\PickupItemConfirmation;
 use App\Models\PickupPhoto;
 use App\Models\Region;
@@ -27,6 +28,7 @@ use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
 use App\Services\StorageService;
+use App\Services\PushNotificationService;
 use App\Services\WalkinShipmentService;
 use App\Services\Warehouse\WarehouseReceivingService;
 use App\Services\BackOfficeAccess;
@@ -361,6 +363,19 @@ class ShipmentController extends Controller
                 'status_label' => 'Submitted',
                 'timestamp' => $submittedAt,
                 'created_at' => $submittedAt,
+            ];
+        }
+
+        // --- Rejected ---
+        if ($shipment->rejected_at) {
+            $rejectedAt = $shipment->rejected_at->format('Y-m-d H:i:s');
+            $timeline[] = [
+                'status' => 'rejected',
+                'label' => 'Order Rejected',
+                'status_label' => 'Rejected',
+                'timestamp' => $rejectedAt,
+                'created_at' => $rejectedAt,
+                'description' => $shipment->rejection_reason ? 'Reason: '.$shipment->rejection_reason : null,
             ];
         }
 
@@ -1266,6 +1281,7 @@ class ShipmentController extends Controller
         }
 
         $shipment->update($validated);
+        $this->markShipmentProcessingIfSubmitted($shipment);
         $shipment->load(['pickupRegion', 'pickupDistrict', 'deliveryRegion', 'deliveryDistrict']);
 
         return response()->json([
@@ -1284,6 +1300,134 @@ class ShipmentController extends Controller
                     'town' => $shipment->pickup_town,
                     'landmark' => $shipment->pickup_landmark,
                     'instructions' => $shipment->pickup_instructions,
+                ],
+            ],
+        ]);
+    }
+
+    public function reject(Request $request, Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        $validated = $request->validate([
+            'rejection_reason' => ['required', 'string', 'min:3', 'max:2000'],
+        ]);
+
+        $shipment->loadMissing('vendor');
+
+        if (! $shipment->canBeRejected()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only submitted or processing orders without pickup assignment can be rejected.',
+            ], 422);
+        }
+
+        $reason = trim($validated['rejection_reason']);
+        $adminId = Auth::guard('admin')->id();
+
+        $updates = [
+            'status' => ShipmentStatus::REJECTED,
+            'rejected_at' => now(),
+            'rejected_by_admin_id' => $adminId,
+            'rejection_reason' => $reason,
+        ];
+
+        if (Schema::hasColumn('shipments', 'rejected_from_status')) {
+            $updates['rejected_from_status'] = $shipment->status?->value ?? ShipmentStatus::SUBMITTED->value;
+        }
+
+        $shipment->forceFill($updates)->save();
+
+        $title = 'Shipment request rejected';
+        $body = "{$shipment->shipment_number} was rejected: {$reason}";
+        $data = [
+            'shipment_id' => (string) $shipment->id,
+            'shipment_number' => $shipment->shipment_number,
+            'status' => ShipmentStatus::REJECTED->value,
+            'reason' => $reason,
+        ];
+
+        if ($shipment->vendor) {
+            $sent = app(PushNotificationService::class)->sendToVendor(
+                $shipment->vendor,
+                $title,
+                $body,
+                $data,
+                'shipment_rejected'
+            );
+
+            if (! $sent && ! $shipment->vendor->fcm_token) {
+                NotificationLog::create([
+                    'notifiable_type' => 'App\Models\Vendor',
+                    'notifiable_id' => $shipment->vendor->id,
+                    'type' => 'shipment_rejected',
+                    'channel' => 'push',
+                    'title' => $title,
+                    'body' => $body,
+                    'data' => $data,
+                    'status' => 'logged',
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order rejected and vendor notified.',
+            'data' => [
+                'shipment' => [
+                    'id' => $shipment->id,
+                    'status' => $shipment->status->value,
+                    'status_label' => $shipment->status->label(),
+                    'rejected_at' => $shipment->rejected_at?->toIso8601String(),
+                    'rejection_reason' => $shipment->rejection_reason,
+                    'can_reject' => false,
+                ],
+            ],
+        ]);
+    }
+
+    public function reopenRejected(Request $request, Shipment $shipment): JsonResponse
+    {
+        $this->authorizePermission('shipments.edit');
+
+        if ($shipment->status !== ShipmentStatus::REJECTED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only rejected orders can be reopened.',
+            ], 422);
+        }
+
+        if ($shipment->pickupAssignment()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This order already has a pickup assignment and cannot be reopened here.',
+            ], 422);
+        }
+
+        $restoreStatus = Schema::hasColumn('shipments', 'rejected_from_status')
+            ? ShipmentStatus::tryFrom((string) $shipment->rejected_from_status)
+            : null;
+        $restoreStatus ??= ShipmentStatus::SUBMITTED;
+
+        if (! in_array($restoreStatus, [ShipmentStatus::SUBMITTED, ShipmentStatus::PROCESSING], true)) {
+            $restoreStatus = ShipmentStatus::SUBMITTED;
+        }
+
+        $shipment->forceFill([
+            'status' => $restoreStatus,
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order reopened for review.',
+            'data' => [
+                'shipment' => [
+                    'id' => $shipment->id,
+                    'status' => $shipment->status->value,
+                    'status_label' => $shipment->status->label(),
+                    'rejected_at' => $shipment->rejected_at?->toIso8601String(),
+                    'rejection_reason' => $shipment->rejection_reason,
+                    'can_reject' => $shipment->canBeRejected(),
                 ],
             ],
         ]);
@@ -1389,6 +1533,7 @@ class ShipmentController extends Controller
         $shipment = $this->reloadReceivingShipment($shipment);
         $item = $shipment->items->firstWhere('id', $item->id) ?? $item->fresh(['images', 'deliveryRegion', 'deliveryDistrict']);
         $assignment = $shipment->pickupAssignment;
+        $this->markShipmentProcessingIfSubmitted($shipment);
 
         return response()->json([
             'success' => true,
@@ -1408,6 +1553,15 @@ class ShipmentController extends Controller
                     : null,
             ],
         ]);
+    }
+
+    private function markShipmentProcessingIfSubmitted(Shipment $shipment): void
+    {
+        $shipment->refresh();
+
+        if ($shipment->status === ShipmentStatus::SUBMITTED) {
+            $shipment->forceFill(['status' => ShipmentStatus::PROCESSING])->save();
+        }
     }
 
     protected function routeReceivingPackageToForwardWarehouse(
@@ -1455,6 +1609,7 @@ class ShipmentController extends Controller
         ]);
 
         $item->update($validated);
+        $this->markShipmentProcessingIfSubmitted($shipment);
 
         return response()->json(['success' => true, 'message' => 'Package updated.']);
     }
@@ -1507,7 +1662,6 @@ class ShipmentController extends Controller
 
             $item->loadMissing('images');
             foreach ($item->images as $image) {
-                $storageService->delete($image->path);
                 $image->delete();
             }
 
@@ -1520,6 +1674,7 @@ class ShipmentController extends Controller
             $shipment = $this->reloadReceivingShipment($shipment->fresh());
         }
         $assignment = $shipment->pickupAssignment;
+        $this->markShipmentProcessingIfSubmitted($shipment);
 
         return response()->json([
             'success' => true,
@@ -1623,6 +1778,7 @@ class ShipmentController extends Controller
 
         $sourceItem = $shipment->items->firstWhere('id', $item->id) ?? $item->fresh(['images', 'deliveryRegion', 'deliveryDistrict']);
         $newItem = $shipment->items->firstWhere('id', $newItem->id) ?? $newItem->fresh(['images', 'deliveryRegion', 'deliveryDistrict']);
+        $this->markShipmentProcessingIfSubmitted($shipment);
 
         return response()->json([
             'success' => true,
@@ -1683,6 +1839,7 @@ class ShipmentController extends Controller
                 ];
             }
         }
+        $this->markShipmentProcessingIfSubmitted($shipment);
 
         return response()->json([
             'success' => true,
@@ -1709,6 +1866,7 @@ class ShipmentController extends Controller
         }
 
         $image->update(['shipment_item_id' => $targetItem->id]);
+        $this->markShipmentProcessingIfSubmitted($shipment);
 
         return response()->json(['success' => true, 'message' => 'Photo moved.']);
     }
@@ -1717,9 +1875,11 @@ class ShipmentController extends Controller
     {
         $this->authorizePermission('shipments.edit');
 
-        $storageService = app(StorageService::class);
-        $storageService->delete($image->path);
+        $shipment = $image->item?->shipment;
         $image->delete();
+        if ($shipment) {
+            $this->markShipmentProcessingIfSubmitted($shipment);
+        }
 
         return response()->json(['success' => true, 'message' => 'Photo deleted.']);
     }
@@ -1739,13 +1899,16 @@ class ShipmentController extends Controller
         // Clone shipment
         $newShipment = $shipment->replicate([
             'shipment_number', 'status', 'submitted_at', 'cancelled_at', 'cancellation_reason',
-            'current_invoice_id', 'created_at', 'updated_at', 'deleted_at',
+            'rejected_at', 'rejected_by_admin_id', 'rejection_reason',
+            'created_at', 'updated_at', 'deleted_at',
         ]);
         $newShipment->status = ShipmentStatus::DRAFT;
         $newShipment->submitted_at = null;
         $newShipment->cancelled_at = null;
         $newShipment->cancellation_reason = null;
-        $newShipment->current_invoice_id = null;
+        $newShipment->rejected_at = null;
+        $newShipment->rejected_by_admin_id = null;
+        $newShipment->rejection_reason = null;
         $newShipment->save(); // shipment_number auto-generated via model boot
 
         // Clone packages and photo references

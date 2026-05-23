@@ -990,7 +990,6 @@ function warehouseShow() {
                 drivers: 'Rider and driver management.',
                 reports: 'Operational and finance reports.',
                 recipient_payments: 'Recipient payment recording and reporting.',
-                invoices: 'Invoice access and controls.',
                 users: 'Local user management for this warehouse.',
                 roles: 'Role visibility. HQ still owns role definitions in this phase.',
                 settings: 'System settings access.',

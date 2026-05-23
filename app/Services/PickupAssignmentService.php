@@ -740,17 +740,8 @@ class PickupAssignmentService
             'cancellation_reason' => $reason,
         ]);
 
-        // Phase 3: If shipment had an accepted invoice, restore to INVOICE_ACCEPTED.
-        // Otherwise (new flow: SUBMITTED → PICKUP_ASSIGNED), restore to SUBMITTED.
         $shipment = $assignment->shipment;
-        $hasAcceptedInvoice = $shipment->invoices()
-            ->where('status', \App\Enums\InvoiceStatus::ACCEPTED->value)
-            ->exists();
-        $revertStatus = $hasAcceptedInvoice
-            ? ShipmentStatus::INVOICE_ACCEPTED
-            : ShipmentStatus::SUBMITTED;
-
-        $shipment->update(['status' => $revertStatus]);
+        $shipment->update(['status' => ShipmentStatus::SUBMITTED]);
         $assignment->driver->update(['status' => 'available']);
 
         // Fire unassignment event so driver receives a push notification

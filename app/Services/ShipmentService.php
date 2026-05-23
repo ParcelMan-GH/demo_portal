@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentStatus;
-use App\Models\Invoice;
 use App\Models\OtpCode;
 use App\Models\PickupAssignment;
 use App\Models\PickupVehicleType;
@@ -41,8 +40,6 @@ class ShipmentService
             'pickupRegion',
             'pickupDistrict',
             'items.images',
-            'invoice',
-            'invoices',
             'pickupAssignment.driver',
             'pickupAssignment.targetWarehouse',
             'pickupAssignment.receivedWarehouse',
@@ -192,8 +189,6 @@ class ShipmentService
             'items.deliveryRegion',
             'items.deliveryDistrict',
             'items.deliveryRunItems',
-            'invoice',
-            'invoices',
             'pickupAssignment.driver',
             'pickupAssignment.targetWarehouse',
             'pickupAssignment.receivedWarehouse',
@@ -231,8 +226,10 @@ class ShipmentService
             && $shipment->items()->exists()
         ) {
             // Allow switch for unprocessed shipments (photo-only, no descriptions)
-            $isProcessed = $shipment->items()->count() > 1
-                || $shipment->items()->whereNotNull('description')->exists();
+            $isProcessed = $shipment->items()
+                ->whereNotNull('description')
+                ->where('description', '!=', '')
+                ->exists();
 
             if ($isProcessed) {
                 return [
@@ -587,17 +584,6 @@ class ShipmentService
             return $payload;
         });
 
-        $invoiceHistory = [];
-        if ($shipment->relationLoaded('invoices')) {
-            $invoiceHistory = $shipment->invoices
-                ->map(fn(Invoice $invoice) => $this->transformInvoiceForApi($invoice, $shipment))
-                ->values()
-                ->toArray();
-        } elseif ($shipment->relationLoaded('invoice') && $shipment->invoice) {
-            // Fallback to keep invoice_history consistent when only current invoice is eager-loaded.
-            $invoiceHistory = [$this->transformInvoiceForApi($shipment->invoice, $shipment)];
-        }
-
         // Build collection info for self-pickup shipments
         $collectionData = null;
         if ($shipment->fulfillment_type?->isSelfPickup()) {
@@ -638,6 +624,9 @@ class ShipmentService
             ],
             'pickup_vehicles' => $this->transformPickupVehicleRequests($shipment),
             'pickup_vehicle_summary' => $this->pickupVehicleSummary($shipment),
+            'rejected_at' => $shipment->rejected_at?->toIso8601String(),
+            'rejection_reason' => $shipment->rejection_reason,
+            'rejected_by_admin_id' => $shipment->rejected_by_admin_id,
         ];
 
         if ($includeLegacyDeliveryAliases) {
@@ -671,7 +660,7 @@ class ShipmentService
                 ? $shipment->items->sum(fn ($item) => $item->relationLoaded('images') ? $item->images->count() : 0)
                 : 0,
             'is_processed' => $shipment->relationLoaded('items')
-                ? $shipment->items->count() > 1 || $shipment->items->contains(fn ($item) => !is_null($item->description))
+                ? $shipment->items->contains(fn ($item) => filled($item->description))
                 : false,
 
             'can_edit' => $shipment->canBeEdited(),
@@ -685,10 +674,6 @@ class ShipmentService
             'created_at' => $shipment->created_at->toIso8601String(),
             'updated_at' => $shipment->updated_at->toIso8601String(),
 
-            'invoice' => $shipment->relationLoaded('invoice') && $shipment->invoice
-                ? $this->transformInvoiceForApi($shipment->invoice, $shipment)
-                : null,
-            'invoice_history' => $invoiceHistory,
             'collection' => $collectionData,
             'delivery_verification' => $this->getDeliveryVerificationForVendor($shipment),
             'courier_handoff' => $this->getCourierHandoffForVendor($shipment),
@@ -848,34 +833,6 @@ class ShipmentService
         $value = $bytes / (1024 ** $power);
 
         return number_format($value, 2) . ' ' . $units[$power];
-    }
-
-    private function transformInvoiceForApi(Invoice $invoice, Shipment $shipment): array
-    {
-        return [
-            'id' => $invoice->id,
-            'invoice_number' => $invoice->invoice_number,
-            'shipment_id' => $shipment->id,
-            'shipment_number' => $shipment->shipment_number,
-            'status' => $invoice->status->value,
-            'pickup_fee' => (float) $invoice->pickup_fee,
-            'transport_fee' => (float) $invoice->transport_fee,
-            'handling_fee' => (float) $invoice->handling_fee,
-            'other_fee' => (float) $invoice->other_fee,
-            'total_amount' => (float) $invoice->total_amount,
-            'currency' => $invoice->currency,
-            'notes' => $invoice->notes,
-            'vendor_notes' => $invoice->vendor_notes,
-            'rejection_reason' => $invoice->rejection_reason,
-            'cancel_reason' => $invoice->cancel_reason,
-            'is_active' => $invoice->status->isActive(),
-            'sent_at' => $invoice->sent_at,
-            'accepted_at' => $invoice->accepted_at,
-            'rejected_at' => $invoice->rejected_at,
-            'cancelled_at' => $invoice->cancelled_at,
-            'created_at' => $invoice->created_at,
-            'updated_at' => $invoice->updated_at,
-        ];
     }
 
     private function getDeliveryVerificationForVendor(Shipment $shipment): ?array

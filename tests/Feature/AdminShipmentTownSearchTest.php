@@ -251,7 +251,6 @@ function buildTestSchema(): void
         $table->string('fulfillment_type')->nullable();
         $table->unsignedBigInteger('created_by_user_id')->nullable();
         $table->string('destination_mode')->default('single');
-        $table->unsignedBigInteger('current_invoice_id')->nullable();
         $table->string('pickup_contact_name')->nullable();
         $table->string('pickup_contact_phone')->nullable();
         $table->foreignId('pickup_region_id')->nullable()->constrained('regions')->nullOnDelete();

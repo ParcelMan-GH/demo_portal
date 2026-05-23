@@ -608,8 +608,7 @@ function buildOrdersTable(config) {
                 case 'draft':
                     return 'border-slate-200 bg-slate-50 text-slate-700';
                 case 'submitted':
-                case 'invoice_sent':
-                case 'invoice_accepted':
+                case 'processing':
                     return 'border-blue-200 bg-blue-50 text-blue-700';
                 case 'pickup_assigned':
                 case 'picked_up':

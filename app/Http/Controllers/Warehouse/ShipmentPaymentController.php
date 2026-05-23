@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Warehouse;
 use App\Http\Controllers\Controller;
 use App\Models\PickupAssignment;
 use App\Models\ShipmentPayment;
+use App\Services\ChargesService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,21 +18,20 @@ class ShipmentPaymentController extends Controller
      */
     public function data(PickupAssignment $pickupAssignment): JsonResponse
     {
-        $this->authorizeAny(['warehouse.invoices.view', 'warehouse.receiving.manage']);
+        $this->authorizeAny(['warehouse.receiving.manage']);
 
         $shipment = $pickupAssignment->shipment;
         if (!$shipment) {
-            return response()->json(['payments' => [], 'summary' => ['total_invoiced' => 0, 'total_paid' => 0, 'balance_due' => 0]]);
+            return response()->json(['payments' => [], 'summary' => ['total_due' => 0, 'total_paid' => 0, 'balance_due' => 0]]);
         }
 
         $payments = $shipment->payments()
-            ->with(['recordedBy:id,name', 'invoice:id,invoice_number'])
+            ->with(['recordedBy:id,name'])
             ->latest()
             ->get();
 
-        $totalInvoiced = $shipment->invoices()
-            ->where('status', 'accepted')
-            ->sum('total_amount');
+        $chargeSummary = app(ChargesService::class)->summariseShipment($shipment);
+        $totalDue = (float) ($chargeSummary['revenue_total'] ?? 0);
 
         $totalPaid = $payments->sum('amount');
 
@@ -46,13 +46,12 @@ class ShipmentPaymentController extends Controller
                 'notes'            => $p->notes,
                 'payment_date'     => $p->payment_date?->format('Y-m-d H:i'),
                 'recorded_by'      => $p->recordedBy?->name,
-                'invoice_number'   => $p->invoice?->invoice_number,
                 'created_at'       => $p->created_at?->format('Y-m-d H:i'),
             ]),
             'summary' => [
-                'total_invoiced' => (float) $totalInvoiced,
+                'total_due'      => $totalDue,
                 'total_paid'     => (float) $totalPaid,
-                'balance_due'    => max(0, (float) $totalInvoiced - (float) $totalPaid),
+                'balance_due'    => max(0, $totalDue - (float) $totalPaid),
             ],
         ]);
     }
@@ -62,17 +61,9 @@ class ShipmentPaymentController extends Controller
      */
     public function store(Request $request, PickupAssignment $pickupAssignment): JsonResponse
     {
-        $this->authorizePermission('warehouse.invoices.edit');
+        $this->authorizePermission('warehouse.receiving.manage');
 
         $shipment     = $pickupAssignment->shipment;
-        $activeInvoice = $shipment?->invoice;
-
-        if (!$activeInvoice) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cannot record a payment — this shipment has no active invoice.',
-            ], 422);
-        }
 
         $validated = $request->validate([
             'amount'           => ['required', 'numeric', 'min:0.01'],
@@ -85,7 +76,6 @@ class ShipmentPaymentController extends Controller
         $admin   = Auth::guard('admin')->user();
         $payment = ShipmentPayment::create([
             'shipment_id'          => $shipment->id,
-            'invoice_id'           => $activeInvoice->id,
             'amount'               => $validated['amount'],
             'payment_method'       => $validated['payment_method'],
             'reference_number'     => $validated['reference_number'] ?? null,
@@ -97,7 +87,7 @@ class ShipmentPaymentController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Payment recorded successfully.',
-            'data'    => ['payment' => $payment->load('recordedBy:id,name', 'invoice:id,invoice_number')],
+            'data'    => ['payment' => $payment->load('recordedBy:id,name')],
         ]);
     }
 
@@ -106,9 +96,9 @@ class ShipmentPaymentController extends Controller
      */
     public function download(ShipmentPayment $payment)
     {
-        $this->authorizeAny(['warehouse.invoices.view', 'warehouse.receiving.manage']);
+        $this->authorizeAny(['warehouse.receiving.manage']);
 
-        $payment->load(['shipment.vendor', 'invoice', 'recordedBy']);
+        $payment->load(['shipment.vendor', 'recordedBy']);
 
         $logoPath   = public_path('logo.png');
         $logoBase64 = '';
@@ -131,9 +121,9 @@ class ShipmentPaymentController extends Controller
      */
     public function print(ShipmentPayment $payment)
     {
-        $this->authorizeAny(['warehouse.invoices.view', 'warehouse.receiving.manage']);
+        $this->authorizeAny(['warehouse.receiving.manage']);
 
-        $payment->load(['shipment.vendor', 'invoice', 'recordedBy']);
+        $payment->load(['shipment.vendor', 'recordedBy']);
 
         $logoPath   = public_path('logo.png');
         $logoBase64 = '';

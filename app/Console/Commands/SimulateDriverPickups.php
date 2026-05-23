@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\Event;
  *   - ShipmentItemTracking per item (status = picked_up)
  *   - Shipment + ShipmentItem statuses advanced to picked_up
  *
- * No invoice or vendor-accept chain is simulated — the receiving screen
+ * No vendor-accept chain is simulated — the receiving screen
  * keys off PickupAssignment.target_warehouse_id and received_at IS NULL.
  */
 class SimulateDriverPickups extends Command

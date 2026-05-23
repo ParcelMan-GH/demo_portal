@@ -7,9 +7,6 @@ use App\Events\DriverAssignedToPickup;
 use App\Events\DriverAssignedToTransport;
 use App\Events\DriverUnassignedFromPickup;
 use App\Events\DriverUnassignedFromTransport;
-use App\Events\InvoiceAcceptedByVendor;
-use App\Events\InvoiceRejectedByVendor;
-use App\Events\InvoiceSent;
 use App\Events\PickupAssignmentStatusChanged;
 use App\Events\ShipmentCollected;
 use App\Events\ShipmentReadyForCollection;
@@ -17,10 +14,7 @@ use App\Events\ShipmentStatusChanged;
 use App\Events\TransportManifestStatusChanged;
 use App\Events\VendorRegistered;
 use App\Events\WalkinShipmentReceived;
-use App\Events\WarehouseInvoiceCancelled;
-use App\Events\WarehouseInvoiceCreated;
 use App\Listeners\SendAdminDeliveryNotification;
-use App\Listeners\SendAdminInvoiceResponseNotification;
 use App\Listeners\SendAdminPickupNotification;
 use App\Listeners\SendAdminShipmentNotification;
 use App\Listeners\SendAdminTransportNotification;
@@ -28,10 +22,8 @@ use App\Listeners\SendAdminVendorRegisteredNotification;
 use App\Listeners\SendDriverAssignmentNotification;
 use App\Listeners\SendDriverTransportNotification;
 use App\Listeners\SendDriverUnassignedNotification;
-use App\Listeners\SendAdminWarehouseInvoiceNotification;
 use App\Listeners\SendCollectionNotifications;
 use App\Listeners\SendCustomerEmailTemplateNotification;
-use App\Listeners\SendVendorInvoiceNotification;
 use App\Listeners\SendVendorShipmentNotification;
 use App\Listeners\SendWalkinShipmentNotifications;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
@@ -73,25 +65,6 @@ class EventServiceProvider extends ServiceProvider
         DeliveryRunStopStatusChanged::class => [
             SendAdminDeliveryNotification::class,
             SendCustomerEmailTemplateNotification::class,
-        ],
-
-        // Invoice events
-        InvoiceSent::class => [
-            SendVendorInvoiceNotification::class,
-        ],
-        InvoiceAcceptedByVendor::class => [
-            SendAdminInvoiceResponseNotification::class,
-        ],
-        InvoiceRejectedByVendor::class => [
-            SendAdminInvoiceResponseNotification::class,
-        ],
-
-        // Warehouse invoice events (notify HQ operators)
-        WarehouseInvoiceCreated::class => [
-            SendAdminWarehouseInvoiceNotification::class,
-        ],
-        WarehouseInvoiceCancelled::class => [
-            SendAdminWarehouseInvoiceNotification::class,
         ],
 
         // Walk-in shipment

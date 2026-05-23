@@ -3,8 +3,6 @@ import { apiRequest, clearToken, getToken } from './auth-client';
 const SHIPMENT_STATUS_OPTIONS = [
     { value: 'draft', label: 'Draft' },
     { value: 'submitted', label: 'Submitted' },
-    { value: 'invoice_sent', label: 'Invoice Sent' },
-    { value: 'invoice_accepted', label: 'Invoice Accepted' },
     { value: 'pickup_assigned', label: 'Pickup Assigned' },
     { value: 'picked_up', label: 'Picked Up' },
     { value: 'at_warehouse', label: 'At Warehouse' },
@@ -304,7 +302,7 @@ function vendorShipmentsListPage() {
         all: [],
         draft: ['draft'],
         submitted: ['submitted'],
-        in_progress: ['invoice_sent', 'invoice_accepted', 'pickup_assigned', 'picked_up', 'at_warehouse', 'sorted', 'in_transit', 'at_destination', 'out_for_delivery'],
+        in_progress: ['processing', 'pickup_assigned', 'picked_up', 'at_warehouse', 'sorted', 'in_transit', 'at_destination', 'out_for_delivery'],
         delivered: ['delivered'],
         cancelled: ['cancelled'],
     };
@@ -352,8 +350,7 @@ function vendorShipmentsListPage() {
             const map = {
                 draft: 'gray',
                 submitted: 'blue',
-                invoice_sent: 'orange',
-                invoice_accepted: 'orange',
+                processing: 'blue',
                 pickup_assigned: 'cyan',
                 picked_up: 'cyan',
                 at_warehouse: 'cyan',
@@ -1083,20 +1080,6 @@ function vendorShipmentShowPage() {
             return this.destinationMode === 'per_item';
         },
 
-        get currentInvoice() {
-            return this.shipment?.invoice || null;
-        },
-
-        get invoiceHistory() {
-            return Array.isArray(this.shipment?.invoice_history)
-                ? this.shipment.invoice_history
-                : [];
-        },
-
-        get canRespondToInvoice() {
-            return this.currentInvoice?.status === 'sent';
-        },
-
         get pickupAssignment() {
             return this.shipment?.pickup_assignment || null;
         },
@@ -1106,8 +1089,7 @@ function vendorShipmentShowPage() {
             const map = {
                 draft: 'hero-draft',
                 submitted: 'hero-submitted',
-                invoice_sent: 'hero-invoiced',
-                invoice_accepted: 'hero-invoiced',
+                processing: 'hero-submitted',
                 pickup_assigned: 'hero-pickup',
                 picked_up: 'hero-pickup',
                 at_warehouse: 'hero-warehouse',
@@ -1125,9 +1107,8 @@ function vendorShipmentShowPage() {
             const status = this.shipment?.status || 'draft';
             const messages = {
                 draft: { title: 'Shipment is a draft', text: 'Add items and submit when ready.' },
-                submitted: { title: 'Shipment submitted', text: 'Awaiting admin review and invoice.' },
-                invoice_sent: { title: 'Invoice ready - Review required', text: 'An invoice has been sent. Accept or reject to proceed.' },
-                invoice_accepted: { title: 'Invoice accepted', text: 'Your shipment is being prepared for pickup.' },
+                submitted: { title: 'Shipment submitted', text: 'Awaiting admin review.' },
+                processing: { title: 'Shipment processing', text: 'Your shipment is being reviewed for pickup.' },
                 pickup_assigned: { title: 'Pickup driver assigned', text: 'A driver has been assigned to collect your shipment.' },
                 picked_up: { title: 'Shipment picked up', text: 'Your items are on the way to the warehouse.' },
                 at_warehouse: { title: 'At warehouse', text: 'Your shipment has arrived at the sorting facility.' },
@@ -1145,7 +1126,7 @@ function vendorShipmentShowPage() {
             const steps = [
                 { key: 'draft', label: 'Draft', icon: 'pencil', statuses: ['draft'] },
                 { key: 'submitted', label: 'Submitted', icon: 'send', statuses: ['submitted'] },
-                { key: 'invoiced', label: 'Invoiced', icon: 'receipt', statuses: ['invoice_sent', 'invoice_accepted'] },
+                { key: 'processing', label: 'Processing', icon: 'receipt', statuses: ['processing'] },
                 { key: 'picked_up', label: 'Picked Up', icon: 'truck-pickup', statuses: ['pickup_assigned', 'picked_up'] },
                 { key: 'warehouse', label: 'Warehouse', icon: 'warehouse', statuses: ['at_warehouse', 'sorted'] },
                 { key: 'transit', label: 'In Transit', icon: 'truck', statuses: ['in_transit', 'at_destination', 'out_for_delivery'] },
@@ -1622,72 +1603,6 @@ function vendorShipmentShowPage() {
                 this.showToast('success', result.message || 'Shipment submitted.');
                 await this.loadShipment();
             });
-        },
-
-        async acceptCurrentInvoice() {
-            const invoiceId = this.currentInvoice?.id;
-            if (!invoiceId || !this.canRespondToInvoice) {
-                return;
-            }
-
-            const vendorNotes = window.prompt('Vendor notes (optional):', '') ?? '';
-
-            const result = await apiRequest(`/api/v1/vendor/invoices/${invoiceId}/accept`, {
-                method: 'POST',
-                role: 'vendor',
-                data: {
-                    vendor_notes: vendorNotes.trim() || null,
-                },
-            });
-
-            if (result.unauthorized) {
-                clearToken('vendor');
-                window.location.href = '/vendor/login';
-                return;
-            }
-
-            if (!result.success) {
-                this.showToast('error', result.message);
-                return;
-            }
-
-            this.showToast('success', result.message || 'Invoice accepted.');
-            await this.loadShipment();
-        },
-
-        async rejectCurrentInvoice() {
-            const invoiceId = this.currentInvoice?.id;
-            if (!invoiceId || !this.canRespondToInvoice) {
-                return;
-            }
-
-            const rejectionReason = window.prompt('Rejection reason (required):', '');
-            if (!rejectionReason || !rejectionReason.trim()) {
-                this.showToast('error', 'Rejection reason is required.');
-                return;
-            }
-
-            const result = await apiRequest(`/api/v1/vendor/invoices/${invoiceId}/reject`, {
-                method: 'POST',
-                role: 'vendor',
-                data: {
-                    rejection_reason: rejectionReason.trim(),
-                },
-            });
-
-            if (result.unauthorized) {
-                clearToken('vendor');
-                window.location.href = '/vendor/login';
-                return;
-            }
-
-            if (!result.success) {
-                this.showToast('error', result.message);
-                return;
-            }
-
-            this.showToast('success', result.message || 'Invoice rejected.');
-            await this.loadShipment();
         },
 
         deleteShipment() {

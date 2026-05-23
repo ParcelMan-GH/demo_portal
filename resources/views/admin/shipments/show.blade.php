@@ -8,6 +8,8 @@
 $shipmentConfig = [
     'shipment' => $shipment,
     'saveUrl' => route('admin.orders.update', $shipment),
+    'rejectEndpoint' => route('admin.orders.reject', $shipment),
+    'reopenEndpoint' => route('admin.orders.reopen', $shipment),
     'itemsEndpoint' => route('admin.orders.items', $shipment),
     'trackingEndpoint' => route('admin.orders.tracking', $shipment),
     'assignDriverEndpoint' => route('admin.assignments.assign', $shipment),
@@ -52,6 +54,7 @@ $shipmentConfig = [
 $timeline = [
     ['label' => 'Created', 'value' => $shipment->created_at, 'dot' => 'bg-slate-400'],
     ['label' => 'Submitted', 'value' => $shipment->submitted_at ?? null, 'dot' => 'bg-blue-500'],
+    ['label' => 'Rejected', 'value' => $shipment->rejected_at ?? null, 'dot' => 'bg-rose-500'],
     ['label' => 'Rider Assigned', 'value' => $currentAssignment?->assigned_at, 'dot' => 'bg-orange-600'],
     ['label' => 'En Route', 'value' => $currentAssignment?->en_route_at, 'dot' => 'bg-indigo-500'],
     ['label' => 'Arrived Pickup', 'value' => $currentAssignment?->arrived_at, 'dot' => 'bg-amber-500'],
@@ -83,18 +86,22 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                 $statusColors = match($shipment->status->value ?? $shipment->status) {
                     'draft' => 'bg-slate-500/15 text-slate-200 ring-1 ring-slate-400/30',
                     'submitted' => 'bg-blue-500/15 text-blue-100 ring-1 ring-blue-400/30',
+                    'processing' => 'bg-amber-500/15 text-amber-100 ring-1 ring-amber-400/30',
                     'pickup_assigned', 'picked_up', 'arrived_warehouse', 'at_warehouse', 'sorted' => 'bg-violet-500/15 text-violet-100 ring-1 ring-violet-400/30',
                     'in_transit', 'at_destination', 'out_for_delivery' => 'bg-amber-500/15 text-amber-100 ring-1 ring-amber-400/30',
                     'delivered' => 'bg-emerald-500/15 text-emerald-100 ring-1 ring-emerald-400/30',
                     'cancelled' => 'bg-rose-500/15 text-rose-100 ring-1 ring-rose-400/30',
+                    'rejected' => 'bg-rose-500/15 text-rose-100 ring-1 ring-rose-400/30',
                     default => 'bg-slate-500/15 text-slate-200 ring-1 ring-slate-400/30',
                 };
                 $dotColors = match($shipment->status->value ?? $shipment->status) {
                     'submitted' => 'bg-blue-300',
+                    'processing' => 'bg-amber-300',
                     'pickup_assigned', 'picked_up', 'arrived_warehouse', 'at_warehouse', 'sorted' => 'bg-violet-300',
                     'in_transit', 'at_destination', 'out_for_delivery' => 'bg-amber-300',
                     'delivered' => 'bg-emerald-300',
                     'cancelled' => 'bg-rose-300',
+                    'rejected' => 'bg-rose-300',
                     default => 'bg-slate-300',
                 };
                 $pickupSummary = $currentAssignment
@@ -124,6 +131,31 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                         Activity
                     </button>
                     @if($canManage)
+                        <button type="button"
+                                x-show="canRejectShipment()"
+                                x-cloak
+                                @@click="openRejectShipmentModal()"
+                                class="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-rose-400/45 bg-rose-500/15 px-3 text-xs font-black text-rose-100 transition hover:bg-rose-500/25">
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v3.75m0 3.75h.008M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+                            </svg>
+                            Reject
+                        </button>
+                        <button type="button"
+                                x-show="canReopenShipment()"
+                                x-cloak
+                                @@click="reopenRejectedShipment()"
+                                :disabled="reopeningRejected"
+                                class="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-emerald-400/45 bg-emerald-500/15 px-3 text-xs font-black text-emerald-100 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-60">
+                            <svg x-show="!reopeningRejected" class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v6h6M20 20v-6h-6M5 19A9 9 0 0 0 19 5M19 5h-5m5 0v5"/>
+                            </svg>
+                            <svg x-show="reopeningRejected" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" style="display:none">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
+                            </svg>
+                            <span x-text="reopeningRejected ? 'Reopening...' : 'Reopen'"></span>
+                        </button>
                         <button type="button"
                                 x-show="canManagePickupAssignment()"
                                 x-cloak
@@ -246,6 +278,25 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
             </div>
         </div>
     </section>
+
+    @if(($shipment->status->value ?? $shipment->status) === 'rejected' && $shipment->rejection_reason)
+        <section class="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 shadow-lg shadow-rose-100/50">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v3.75m0 3.75h.008M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-xs font-black uppercase tracking-[0.16em] text-rose-600">Rejected request</p>
+                    <p class="mt-1 text-sm font-semibold leading-6 text-slate-800">{{ $shipment->rejection_reason }}</p>
+                    @if($shipment->rejected_at)
+                        <p class="mt-1 text-xs font-bold text-rose-500">Rejected {{ $shipment->rejected_at->format('d M Y, h:i A') }}</p>
+                    @endif
+                </div>
+            </div>
+        </section>
+    @endif
 
     @if($latestTimelineEvent)
         <section x-data="{ timelineOpen: false }" class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-300/30">
@@ -3559,6 +3610,63 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                     <button type="button" @@click="confirmUnassign()" :disabled="assignmentActionLoading || !unassignReason.trim()" class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-rose-600/20 transition-all hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none">
                         <svg x-show="assignmentActionLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                         <span x-text="assignmentActionLoading ? 'Unassigning...' : 'Unassign Rider'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Reject Order Modal --}}
+    <div x-show="rejectModal.open" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="closeRejectShipmentModal()">
+        <div x-show="rejectModal.open"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
+             @@click="closeRejectShipmentModal()"></div>
+        <div class="relative flex min-h-full items-center justify-center p-4">
+            <div x-show="rejectModal.open"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-95"
+                 @@click.stop
+                 class="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+                <div class="border-b border-slate-200 px-6 py-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-600/20">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 9v3.75m0 3.75h.008M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-black text-slate-900">Reject Order</h3>
+                                <p class="mt-1 text-sm font-medium text-slate-500">The vendor will see this reason in the app.</p>
+                            </div>
+                        </div>
+                        <button @@click="closeRejectShipmentModal()" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="px-6 py-6">
+                    <label for="reject-reason" class="mb-2 block text-sm font-bold text-slate-700">Rejection reason <span class="text-rose-500">*</span></label>
+                    <textarea id="reject-reason" x-model="rejectModal.reason" rows="5" placeholder="Tell the vendor what needs to be corrected..." class="w-full resize-none rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 placeholder-slate-400 transition focus:border-rose-400 focus:ring-4 focus:ring-rose-100"></textarea>
+                    <p class="mt-2 text-xs font-semibold text-slate-500">Minimum 3 characters required.</p>
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-5">
+                    <button type="button" @@click="closeRejectShipmentModal()" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">Cancel</button>
+                    <button type="button" @@click="submitRejectShipment()" :disabled="rejectModal.saving || rejectModal.reason.trim().length < 3" class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-rose-600/20 transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none">
+                        <svg x-show="rejectModal.saving" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                        <span x-text="rejectModal.saving ? 'Rejecting...' : 'Reject Order'"></span>
                     </button>
                 </div>
             </div>

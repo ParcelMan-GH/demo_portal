@@ -530,7 +530,7 @@ $vendorConfig = [
                                             <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black"
                                                 :class="{
                                                     'bg-slate-100 text-slate-700': shipment.status === 'draft',
-                                                    'bg-blue-100 text-blue-700': ['submitted', 'invoice_sent', 'invoice_accepted'].includes(shipment.status),
+                                                    'bg-blue-100 text-blue-700': ['submitted', 'processing'].includes(shipment.status),
                                                     'bg-violet-100 text-violet-700': ['pickup_assigned', 'picked_up', 'at_warehouse', 'sorted'].includes(shipment.status),
                                                     'bg-amber-100 text-amber-700': ['in_transit', 'at_destination', 'out_for_delivery'].includes(shipment.status),
                                                     'bg-emerald-100 text-emerald-700': shipment.status === 'delivered',
@@ -1584,7 +1584,7 @@ $vendorConfig = [
                 </div>
                 <h3 class="text-xl font-bold text-slate-900">Delete Vendor?</h3>
                 <p class="mt-2 text-sm text-slate-600">
-                    Are you sure you want to delete <strong x-text="vendor.name"></strong>? Their API access will be revoked and phone number freed for re-registration. Shipment and invoice records will be preserved.
+                    Are you sure you want to delete <strong x-text="vendor.name"></strong>? Their API access will be revoked and phone number freed for re-registration. Shipment records will be preserved.
                 </p>
             </div>
             <div class="flex items-center gap-3 border-t border-slate-200/50 bg-slate-50/50 px-6 py-4">

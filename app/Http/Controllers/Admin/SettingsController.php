@@ -280,7 +280,7 @@ class SettingsController extends Controller
     {
         return [
             'types' => [
-                'shipment_status', 'invoice_sent', 'invoice_accepted', 'invoice_rejected',
+                'shipment_status',
                 'driver_assigned', 'payment_recorded', 'general',
             ],
             'channels' => ['push', 'email', 'sms'],

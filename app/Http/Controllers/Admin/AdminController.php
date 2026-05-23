@@ -599,7 +599,6 @@ class AdminController extends Controller
             'roles' => 'Role',
             'vendors' => 'Vendor',
             'shipments' => 'Shipment',
-            'invoices' => 'Invoice',
             'drivers' => 'Driver',
             'warehouses' => 'Warehouse',
             'assignments' => 'Pickup Assignment',

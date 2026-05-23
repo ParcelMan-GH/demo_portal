@@ -387,6 +387,101 @@ class ShipmentItemService
         ];
     }
 
+    public function copyImagesFromRejectedRequest(ShipmentItem $item, array $imageIds, array $phones, Request $request): array
+    {
+        $shipment = $item->shipment;
+
+        if (!$shipment->canBeEdited()) {
+            return [
+                'success' => false,
+                'message' => 'Cannot reuse images for a shipment that is not in draft status.',
+                'data' => null,
+            ];
+        }
+
+        $imageIds = collect($imageIds)
+            ->filter(fn ($id) => $id !== null && $id !== '')
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values();
+
+        if ($imageIds->isEmpty()) {
+            return [
+                'success' => true,
+                'message' => 'No reused images supplied.',
+                'data' => ['images' => []],
+            ];
+        }
+
+        $sourceImages = ShipmentItemImage::query()
+            ->whereIn('id', $imageIds->all())
+            ->whereHas('item.shipment', function ($query) use ($shipment) {
+                $query->where('vendor_id', $shipment->vendor_id)
+                    ->where('status', \App\Enums\ShipmentStatus::REJECTED->value);
+            })
+            ->get()
+            ->keyBy('id');
+
+        if ($sourceImages->count() !== $imageIds->unique()->count()) {
+            return [
+                'success' => false,
+                'message' => 'One or more selected photos cannot be reused.',
+                'data' => null,
+            ];
+        }
+
+        $maxImages = (int) PlatformSetting::getValue('shipment.max_images_per_item', 5);
+        $currentCount = $item->images()->count();
+        if ($currentCount + $imageIds->count() > $maxImages) {
+            $remaining = max(0, $maxImages - $currentCount);
+            return [
+                'success' => false,
+                'message' => "Cannot reuse {$imageIds->count()} images. Maximum {$maxImages} images allowed per item. You can add {$remaining} more image(s).",
+                'data' => null,
+            ];
+        }
+
+        $copied = [];
+        foreach ($imageIds as $index => $sourceId) {
+            $source = $sourceImages->get($sourceId);
+            $phone = !empty($phones[$index])
+                ? PhoneHelper::format($phones[$index])
+                : $source->recipient_phone;
+
+            $image = $item->images()->create([
+                'path' => $source->path,
+                'original_name' => $source->original_name,
+                'size' => $source->size,
+                'sort_order' => $currentCount++,
+                'recipient_phone' => $phone,
+            ]);
+
+            $copied[] = $image->getSignedUrl();
+        }
+
+        $this->activityLogService->logVendor(
+            vendor: $shipment->vendor,
+            action: 'shipment_item_images_reused',
+            description: "Reused {$imageIds->count()} image(s) for item in shipment {$shipment->shipment_number}",
+            request: $request,
+            metadata: [
+                'shipment_id' => $shipment->id,
+                'item_id' => $item->id,
+                'source_image_ids' => $imageIds->all(),
+            ]
+        );
+
+        return [
+            'success' => true,
+            'message' => count($copied) === 1
+                ? 'Image reused successfully.'
+                : count($copied) . ' images reused successfully.',
+            'data' => [
+                'images' => $copied,
+            ],
+        ];
+    }
+
     public function deleteImage(ShipmentItemImage $image, Request $request): array
     {
         $item = $image->item;

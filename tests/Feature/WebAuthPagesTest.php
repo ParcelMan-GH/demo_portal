@@ -53,8 +53,6 @@ test('web auth pages are accessible', function () {
     $this->get('/vendor/shipments/create')->assertOk();
     $this->get('/vendor/shipments/1')->assertOk();
     $this->get('/vendor/shipments/1/edit')->assertOk();
-    $this->get('/vendor/invoices')->assertOk();
-    $this->get('/vendor/invoices/1')->assertOk();
     $this->get('/driver/login')->assertOk();
     $this->get('/driver/home')->assertOk();
     $this->get('/driver/profile')->assertOk();
@@ -62,8 +60,7 @@ test('web auth pages are accessible', function () {
     $this->get('/driver/pickups/1')->assertOk();
 });
 
-test('existing api tester and admin login routes remain accessible', function () {
-    $this->get('/api-tester')->assertOk();
+test('admin login route remains accessible', function () {
     $this->get('/admin/login')->assertOk();
 });
 

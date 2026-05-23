@@ -104,27 +104,6 @@
                         </div>
                     </div>
 
-                    {{-- FINANCE --}}
-                    <div class="mb-8">
-                        <div class="flex items-center gap-2 mb-4">
-                            <span class="text-xs font-bold text-orange-600 uppercase tracking-wider">Finance</span>
-                            <div class="flex-1 h-px bg-gradient-to-r from-orange-200 to-transparent"></div>
-                        </div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            @php
-                                $finance = [
-                                    ['title' => 'All Invoices', 'desc' => 'Invoice list', 'img' => 'create-invoice.svg', 'route' => route('admin.invoices.index')],
-                                    ['title' => 'Record Payment', 'desc' => 'Per shipment', 'img' => 'record-payment.svg', 'route' => route('admin.orders.index')],
-                                    ['title' => 'Pending Invoices', 'desc' => 'Awaiting response', 'img' => 'pending-invoices.svg', 'route' => route('admin.invoices.index') . '?status=sent'],
-                                    ['title' => 'Accepted Invoices', 'desc' => 'Paid / confirmed', 'img' => 'create-invoice.svg', 'route' => route('admin.invoices.index') . '?status=accepted'],
-                                ];
-                            @endphp
-                            @foreach($finance as $action)
-                                @include('admin.dashboard.partials.quick-action-tile', $action)
-                            @endforeach
-                        </div>
-                    </div>
-
                     {{-- OPERATIONS --}}
                     <div class="mb-2">
                         <div class="flex items-center gap-2 mb-4">
@@ -291,10 +270,6 @@
                         <span class="text-sm text-slate-600 group-hover:text-slate-900">Out for delivery</span>
                         <span class="text-sm font-bold text-orange-600">{{ number_format($outForDelivery) }}</span>
                     </a>
-                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
-                        <span class="text-sm text-slate-600">Pending invoices</span>
-                        <span class="text-sm font-bold text-amber-600">{{ number_format($pendingInvoices) }}</span>
-                    </div>
                 </div>
             </div>
 
@@ -334,8 +309,8 @@
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <p class="text-lg font-bold text-emerald-400">GHS {{ number_format($totalInvoicedMonth, 2) }}</p>
-                            <p class="text-xs text-slate-400 mt-0.5">Invoiced</p>
+                            <p class="text-lg font-bold text-emerald-400">{{ number_format($totalVendors) }}</p>
+                            <p class="text-xs text-slate-400 mt-0.5">Total vendors</p>
                         </div>
                         <div>
                             <p class="text-lg font-bold">{{ number_format($activeVendorsMonth) }}</p>

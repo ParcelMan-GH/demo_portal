@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Vendor\Shipment\CreateShipmentRequest;
 use App\Http\Requests\Api\Vendor\Shipment\UpdateShipmentRequest;
 use App\Models\Shipment;
+use App\Models\ShipmentItem;
+use App\Models\ShipmentItemImage;
 use App\Services\ShipmentItemService;
 use App\Services\ShipmentService;
 use Illuminate\Http\JsonResponse;
@@ -144,6 +146,31 @@ class VendorShipmentController extends Controller
         $itemsData = $validated['items'] ?? [];
         unset($validated['items']);
 
+        $reusedImageIds = collect($itemsData)
+            ->flatMap(fn (array $item) => $item['reused_image_ids'] ?? [])
+            ->filter(fn ($id) => $id !== null && $id !== '')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($reusedImageIds->isNotEmpty()) {
+            $validReusedCount = ShipmentItemImage::query()
+                ->whereIn('id', $reusedImageIds->all())
+                ->whereHas('item.shipment', function ($query) use ($vendor) {
+                    $query->where('vendor_id', $vendor->id)
+                        ->where('status', ShipmentStatus::REJECTED->value);
+                })
+                ->count();
+
+            if ($validReusedCount !== $reusedImageIds->count()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'One or more selected photos cannot be reused.',
+                    'errors' => ['items' => ['One or more selected photos cannot be reused.']],
+                ], 422);
+            }
+        }
+
         if (empty($validated['vendor_declared_quantity'])) {
             $validated['vendor_declared_quantity'] = collect($itemsData)
                 ->sum(fn (array $item) => (int) ($item['quantity'] ?? 1));
@@ -165,6 +192,10 @@ class VendorShipmentController extends Controller
             $images = is_array($images) ? array_values(array_filter($images)) : [];
             $phones = $request->input("items.{$index}.phones", []);
             $phones = is_array($phones) ? $phones : [];
+            $reusedIds = $request->input("items.{$index}.reused_image_ids", []);
+            $reusedIds = is_array($reusedIds) ? array_values(array_filter($reusedIds)) : [];
+            $reusedPhones = $request->input("items.{$index}.reused_image_phones", []);
+            $reusedPhones = is_array($reusedPhones) ? $reusedPhones : [];
 
             $itemResult = $this->shipmentItemService->addItem(
                 shipment: $shipment,
@@ -176,6 +207,28 @@ class VendorShipmentController extends Controller
 
             if (!($itemResult['success'] ?? false)) {
                 $failedImages++;
+                continue;
+            }
+
+            if (!empty($reusedIds)) {
+                $itemId = $itemResult['data']['item']['id'] ?? null;
+                $item = $itemId ? ShipmentItem::find($itemId) : null;
+
+                if (! $item) {
+                    $failedImages++;
+                    continue;
+                }
+
+                $reuseResult = $this->shipmentItemService->copyImagesFromRejectedRequest(
+                    item: $item,
+                    imageIds: $reusedIds,
+                    phones: $reusedPhones,
+                    request: $request,
+                );
+
+                if (!($reuseResult['success'] ?? false)) {
+                    $failedImages++;
+                }
             }
         }
 
@@ -248,11 +301,7 @@ class VendorShipmentController extends Controller
             // Remove photos
             if (!empty($removePhotoIds)) {
                 $images = $item->images()->whereIn('id', $removePhotoIds)->get();
-                $storageService = app(\App\Services\StorageService::class);
                 foreach ($images as $image) {
-                    if ($image->path) {
-                        $storageService->delete($image->path);
-                    }
                     $image->delete();
                 }
             }

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
-use App\Models\Invoice;
 use App\Models\Shipment;
 use App\Models\Vendor;
 use Illuminate\Http\JsonResponse;
@@ -13,7 +12,7 @@ use Illuminate\Http\Request;
 class AdminSearchController extends Controller
 {
     /**
-     * Global admin search across Shipments, Vendors, Drivers, and Invoices.
+     * Global admin search across shipments, vendors, and drivers.
      * Returns top 5 results per category.
      *
      * GET /admin/search?q=
@@ -75,20 +74,6 @@ class AdminSearchController extends Controller
                 'url'    => route('admin.drivers.show', $d->id),
             ]);
 
-        $invoices = Invoice::query()
-            ->with('shipment:id,shipment_number,vendor_id', 'shipment.vendor:id,name,business_name')
-            ->where('invoice_number', 'like', $like)
-            ->latest()
-            ->limit(5)
-            ->get(['id', 'invoice_number', 'status', 'shipment_id', 'total_amount'])
-            ->map(fn($i) => [
-                'id'     => $i->id,
-                'label'  => $i->invoice_number,
-                'sub'    => $i->shipment?->vendor?->business_name ?? $i->shipment?->shipment_number ?? '—',
-                'status' => ucwords(str_replace('_', ' ', $i->status->value ?? $i->status)),
-                'url'    => route('admin.invoices.show', $i->id),
-            ]);
-
         $data = [];
 
         if ($shipments->isNotEmpty()) {
@@ -100,10 +85,6 @@ class AdminSearchController extends Controller
         if ($drivers->isNotEmpty()) {
             $data['drivers'] = $drivers->values()->all();
         }
-        if ($invoices->isNotEmpty()) {
-            $data['invoices'] = $invoices->values()->all();
-        }
-
         return response()->json(['data' => $data]);
     }
 }

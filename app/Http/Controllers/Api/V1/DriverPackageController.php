@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
 use App\Models\ShipmentItem;
 use App\Models\Warehouse;
-use App\Models\WarehouseReceipt;
+use App\Services\RiderTeamHandoverService;
 use App\Services\Warehouse\WarehouseDeliveryService;
 use App\Models\WarehouseReceiptItemLabel;
 use Illuminate\Http\JsonResponse;
@@ -30,7 +29,7 @@ class DriverPackageController extends Controller
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $label = WarehouseReceiptItemLabel::with('receiptItem.receipt')
+        $label = WarehouseReceiptItemLabel::with(['receiptItem.receipt', 'latestCustody', 'riderTeamHandoverItem.handover.team'])
             ->where('barcode_value', $validated['barcode'])
             ->first();
 
@@ -41,52 +40,25 @@ class DriverPackageController extends Controller
             ], 404);
         }
 
-        $receipt = $label->receiptItem?->receipt;
-        if (!$receipt || $receipt->status !== WarehouseReceipt::STATUS_FINALIZED) {
+        $result = app(RiderTeamHandoverService::class)->claimFromScan(
+            $driver,
+            $label,
+            $validated['latitude'] ?? null,
+            $validated['longitude'] ?? null,
+            $validated['notes'] ?? null,
+        );
+
+        if (($result['status'] ?? null) === 'conflict') {
             return response()->json([
                 'success' => false,
-                'message' => 'This package is not ready for driver pickup. Warehouse receiving has not been finalized yet.',
+                'message' => $result['message'],
             ], 409);
         }
-
-        // Check if already claimed by another driver
-        $latestEvent = $label->custodyEvents()->latest()->first();
-        if ($latestEvent
-            && $latestEvent->event_type === LabelCustodyEvent::TYPE_CLAIMED
-            && $latestEvent->driver_id !== $driver->id
-        ) {
-            $otherDriver = Driver::find($latestEvent->driver_id);
-            return response()->json([
-                'success' => false,
-                'message' => 'This package is already claimed by ' . ($otherDriver?->name ?? 'another driver') . '.',
-            ], 409);
-        }
-
-        // Check if already claimed by this driver
-        if ($latestEvent
-            && $latestEvent->event_type === LabelCustodyEvent::TYPE_CLAIMED
-            && $latestEvent->driver_id === $driver->id
-        ) {
-            return response()->json([
-                'success' => true,
-                'message' => 'You already have this package.',
-                'data' => ['label' => $this->transformLabel($label)],
-            ]);
-        }
-
-        // Create claim event
-        $event = LabelCustodyEvent::create([
-            'warehouse_receipt_item_label_id' => $label->id,
-            'event_type' => LabelCustodyEvent::TYPE_CLAIMED,
-            'driver_id' => $driver->id,
-            'latitude' => $validated['latitude'] ?? null,
-            'longitude' => $validated['longitude'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-        ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Package claimed successfully.',
+            'message' => $result['message'] ?? 'Package claimed successfully.',
+            'action' => $result['status'] ?? 'claimed',
             'data' => ['label' => $this->transformLabel($label->fresh())],
         ]);
     }

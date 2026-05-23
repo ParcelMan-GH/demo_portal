@@ -154,8 +154,6 @@ test('vendor shipment payload includes handoff proof photo for shipment and item
         tap($item, fn (ShipmentItem $record) => $record->setRelation('images', new Collection())),
     ]));
     $shipment->setRelation('charges', new Collection());
-    $shipment->setRelation('invoice', null);
-    $shipment->setRelation('invoices', new Collection());
     $shipment->setRelation('pickupAssignment', null);
 
     $activityLogService = Mockery::mock(ActivityLogService::class);
@@ -221,8 +219,6 @@ test('vendor item handoff remains visible after the package is delivered', funct
         tap($item, fn (ShipmentItem $record) => $record->setRelation('images', new Collection())),
     ]));
     $shipment->setRelation('charges', new Collection());
-    $shipment->setRelation('invoice', null);
-    $shipment->setRelation('invoices', new Collection());
     $shipment->setRelation('pickupAssignment', null);
 
     $activityLogService = Mockery::mock(ActivityLogService::class);

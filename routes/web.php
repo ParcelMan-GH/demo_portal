@@ -3,7 +3,6 @@
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminDeliveryRunController;
 use App\Http\Controllers\Admin\CollectionCenterController;
-use App\Http\Controllers\Admin\AdminInvoiceListController;
 use App\Http\Controllers\Admin\AdminLocationController;
 use App\Http\Controllers\Admin\AdminProfileController;
 use App\Http\Controllers\Admin\AdminSearchController;
@@ -14,8 +13,8 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DriverController;
 use App\Http\Controllers\Admin\ImpersonationController;
-use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PickupAssignmentController;
+use App\Http\Controllers\Admin\RiderTeamController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\ShipmentController;
@@ -32,7 +31,6 @@ use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\Admin\WarehouseCapabilityController;
 use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
 use App\Http\Controllers\Warehouse\DeliveryRunController as WarehouseDeliveryRunController;
-use App\Http\Controllers\Warehouse\InvoiceController as WarehouseInvoiceController;
 use App\Http\Controllers\Warehouse\PackageController as WarehousePackageController;
 use App\Http\Controllers\Warehouse\ReceiptController as WarehouseReceiptController;
 use App\Http\Controllers\Warehouse\ShipmentPaymentController as WarehouseShipmentPaymentController;
@@ -79,15 +77,6 @@ Route::prefix('vendor')->name('web.vendor.')->group(function () {
         })->name('show');
     });
 
-    Route::prefix('invoices')->name('invoices.')->group(function () {
-        Route::get('/', function () {
-            return view('web.vendor.invoices.index');
-        })->name('index');
-
-        Route::get('{invoice}', function ($invoice) {
-            return view('web.vendor.invoices.show', ['invoiceId' => $invoice]);
-        })->name('show');
-    });
 });
 
 Route::prefix('driver')->name('web.driver.')->group(function () {
@@ -135,10 +124,6 @@ Route::prefix('driver')->name('web.driver.')->group(function () {
 });
 
 // API Tester (no auth required)
-Route::get('/api-tester', function () {
-    return view('api-tester');
-});
-
 /*
 |--------------------------------------------------------------------------
 | Admin Routes
@@ -230,6 +215,8 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::get('orders/{shipment}', [ShipmentController::class, 'showPage'])->name('orders.show');
         Route::get('orders/{shipment}/edit', [ShipmentController::class, 'editPage'])->name('orders.edit');
         Route::post('orders/{shipment}/duplicate', [ShipmentController::class, 'duplicate'])->name('orders.duplicate');
+        Route::post('orders/{shipment}/reject', [ShipmentController::class, 'reject'])->name('orders.reject');
+        Route::post('orders/{shipment}/reopen', [ShipmentController::class, 'reopenRejected'])->name('orders.reopen');
         Route::put('orders/{shipment}', [ShipmentController::class, 'updateShipment'])->name('orders.update');
         Route::post('orders/{shipment}/packages', [ShipmentController::class, 'addPackage'])->name('orders.packages.add');
         Route::put('orders/{shipment}/packages/{item}', [ShipmentController::class, 'updatePackage'])->name('orders.packages.update');
@@ -274,6 +261,8 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::get('shipments/{shipment}', fn (\App\Models\Shipment $shipment) => redirect()->route('admin.orders.show', $shipment))->name('shipments.show');
         Route::get('shipments/{shipment}/edit', fn (\App\Models\Shipment $shipment) => redirect()->route('admin.orders.edit', $shipment))->name('shipments.edit');
         Route::post('shipments/{shipment}/duplicate', [ShipmentController::class, 'duplicate'])->name('shipments.duplicate');
+        Route::post('shipments/{shipment}/reject', [ShipmentController::class, 'reject'])->name('shipments.reject');
+        Route::post('shipments/{shipment}/reopen', [ShipmentController::class, 'reopenRejected'])->name('shipments.reopen');
         Route::put('shipments/{shipment}', [ShipmentController::class, 'updateShipment'])->name('shipments.update');
         Route::post('shipments/{shipment}/packages', [ShipmentController::class, 'addPackage'])->name('shipments.packages.add');
         Route::put('shipments/{shipment}/packages/{item}', [ShipmentController::class, 'updatePackage'])->name('shipments.packages.update');
@@ -304,18 +293,6 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::post('shipments/create-run-from-claims', [ShipmentController::class, 'createRunFromClaims'])->name('shipments.create-run-from-claims');
         Route::post('shipments/{shipment}/fulfillment-type', [ShipmentController::class, 'updateFulfillmentType'])->name('shipments.update-fulfillment-type');
         Route::get('shipments-export', [ShipmentController::class, 'export'])->name('shipments.export');
-
-        // Invoice Management (on shipments)
-        Route::post('shipments/{shipment}/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
-        Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
-        Route::put('invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
-        Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
-        Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
-        Route::post('invoices/{invoice}/admin-accept', [InvoiceController::class, 'adminAccept'])->name('invoices.admin-accept');
-        Route::get('invoices/{invoice}/download', [InvoiceController::class, 'download'])->name('invoices.download');
-        Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
-        Route::get('invoices/{invoice}/payments-data', [InvoiceController::class, 'paymentsData'])->name('invoices.payments.data');
-        Route::post('invoices/{invoice}/payments', [InvoiceController::class, 'recordPayment'])->name('invoices.payments.store');
 
         // Shipment Payments (Phase 4)
         Route::get('shipments/{shipment}/payments-data', [ShipmentPaymentController::class, 'data'])->name('shipments.payments.data');
@@ -351,6 +328,22 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::get('riders-drivers/{driver}/activity-logs', [DriverController::class, 'activityLogs'])->name('drivers.activity-logs');
         Route::get('riders-drivers/{driver}/transport-manifests', [DriverController::class, 'transportManifests'])->name('drivers.transport-manifests');
         Route::get('riders-drivers/{driver}/delivery-runs', [DriverController::class, 'deliveryRuns'])->name('drivers.delivery-runs');
+
+        // Rider Teams & Handovers
+        Route::get('rider-teams', [RiderTeamController::class, 'index'])->name('rider-teams.index');
+        Route::get('rider-teams-data', [RiderTeamController::class, 'data'])->name('rider-teams.data');
+        Route::post('rider-teams', [RiderTeamController::class, 'store'])->name('rider-teams.store');
+        Route::put('rider-teams/{team}', [RiderTeamController::class, 'update'])->name('rider-teams.update');
+        Route::get('rider-teams/{team}/members', [RiderTeamController::class, 'members'])->name('rider-teams.members');
+        Route::post('rider-teams/{team}/members/lookup', [RiderTeamController::class, 'lookupRider'])->name('rider-teams.members.lookup');
+        Route::post('rider-teams/{team}/members', [RiderTeamController::class, 'addMember'])->name('rider-teams.members.store');
+        Route::delete('rider-teams/{team}/members/{driver}', [RiderTeamController::class, 'removeMember'])->name('rider-teams.members.destroy');
+        Route::get('rider-team-handovers-data', [RiderTeamController::class, 'handoversData'])->name('rider-teams.handovers.data');
+        Route::post('rider-team-handovers', [RiderTeamController::class, 'storeHandover'])->name('rider-teams.handovers.store');
+        Route::get('rider-team-handovers/{handover}', [RiderTeamController::class, 'showHandover'])->name('rider-teams.handovers.show');
+        Route::post('rider-team-handovers/{handover}/labels', [RiderTeamController::class, 'assignLabels'])->name('rider-teams.handovers.labels.store');
+        Route::post('rider-team-handovers/{handover}/recall', [RiderTeamController::class, 'recallLabels'])->name('rider-teams.handovers.recall');
+        Route::get('rider-team-handovers/{handover}/print', [RiderTeamController::class, 'printHandover'])->name('rider-teams.handovers.print');
 
         Route::get('drivers', [DriverController::class, 'redirectLegacyIndex']);
         Route::get('drivers-data', [DriverController::class, 'data']);
@@ -516,11 +509,6 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::get('collection-center', [CollectionCenterController::class, 'index'])->name('collection-center.index');
         Route::get('collection-center-data', [CollectionCenterController::class, 'data'])->name('collection-center.data');
         Route::post('collection-center/{shipment}/handover', [CollectionCenterController::class, 'handover'])->name('collection-center.handover');
-
-        // Invoice List (all invoices across all shipments)
-        Route::get('invoices', [AdminInvoiceListController::class, 'index'])->name('invoices.index');
-        Route::get('invoices-data', [AdminInvoiceListController::class, 'data'])->name('invoices.data');
-        Route::get('invoices-export', [AdminInvoiceListController::class, 'export'])->name('invoices.export');
 
         // Notification Logs
         Route::get('notifications', [AdminNotificationController::class, 'index'])->name('notifications.index');
@@ -768,18 +756,6 @@ Route::prefix(config('backoffice.prefix', 'admin') . '/operations')
         Route::post('recipient-payments/{task}/fee', [RecipientPaymentController::class, 'setFee'])->name('recipient-payments.fee');
         Route::post('recipient-payments/{task}/mark-paid', [RecipientPaymentController::class, 'markPaid'])->name('recipient-payments.mark-paid');
         Route::post('recipient-payments/{task}/override', [RecipientPaymentController::class, 'override'])->name('recipient-payments.override');
-
-        // Invoice Management
-        Route::post('receipts/pending/{pickupAssignment}/invoices', [WarehouseInvoiceController::class, 'store'])->name('invoices.store');
-        Route::get('invoices/{invoice}', [WarehouseInvoiceController::class, 'show'])->name('invoices.show');
-        Route::put('invoices/{invoice}', [WarehouseInvoiceController::class, 'update'])->name('invoices.update');
-        Route::post('invoices/{invoice}/send', [WarehouseInvoiceController::class, 'send'])->name('invoices.send');
-        Route::post('invoices/{invoice}/cancel', [WarehouseInvoiceController::class, 'cancel'])->name('invoices.cancel');
-        Route::post('invoices/{invoice}/admin-accept', [WarehouseInvoiceController::class, 'adminAccept'])->name('invoices.admin-accept');
-        Route::get('invoices/{invoice}/download', [WarehouseInvoiceController::class, 'download'])->name('invoices.download');
-        Route::get('invoices/{invoice}/print', [WarehouseInvoiceController::class, 'print'])->name('invoices.print');
-        Route::get('invoices/{invoice}/payments-data', [WarehouseInvoiceController::class, 'paymentsData'])->name('invoices.payments.data');
-        Route::post('invoices/{invoice}/payments', [WarehouseInvoiceController::class, 'recordPayment'])->name('invoices.payments.store');
 
         // Shipment Payments
         Route::get('receipts/pending/{pickupAssignment}/payments-data', [WarehouseShipmentPaymentController::class, 'data'])->name('receipts.payments.data');

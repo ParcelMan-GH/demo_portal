@@ -5,8 +5,9 @@ use App\Http\Controllers\Api\V1\Auth\VendorAuthController;
 use App\Http\Controllers\Api\V1\DriverAssignmentController;
 use App\Http\Controllers\Api\V1\DriverDeliveryController;
 use App\Http\Controllers\Api\V1\DriverProfileController;
+use App\Http\Controllers\Api\V1\DriverRiderTeamController;
+use App\Http\Controllers\Api\V1\DriverRiderTeamHandoverController;
 use App\Http\Controllers\Api\V1\DriverTransportController;
-use App\Http\Controllers\Api\V1\VendorInvoiceController;
 use App\Http\Controllers\Api\V1\VendorLocationController;
 use App\Http\Controllers\Api\V1\VendorProfileController;
 use App\Http\Controllers\Api\V1\VendorEarningsController;
@@ -68,14 +69,6 @@ Route::prefix('v1/vendor')->middleware(['auth:sanctum', 'vendor.active'])->group
     Route::post('shipments/{shipment}/items/{item}/images', [VendorShipmentItemController::class, 'uploadImage']);
     Route::delete('shipments/{shipment}/items/{item}/images/{image}', [VendorShipmentItemController::class, 'deleteImage']);
 
-    // Invoice endpoints
-    Route::get('invoices', [VendorInvoiceController::class, 'index']);
-    Route::get('invoices/view', [VendorInvoiceController::class, 'showByFilter']);
-    Route::get('invoices/{invoice}', [VendorInvoiceController::class, 'show']);
-    Route::post('invoices/{invoice}/accept', [VendorInvoiceController::class, 'accept']);
-    Route::post('invoices/{invoice}/reject', [VendorInvoiceController::class, 'reject']);
-    Route::get('invoices/{invoice}/pdf', [VendorInvoiceController::class, 'downloadPdf']);
-
     // Notification endpoints
     Route::get('notifications', [VendorNotificationController::class, 'index']);
     Route::post('notifications/read-all', [VendorNotificationController::class, 'markAllAsRead']);
@@ -136,5 +129,17 @@ Route::prefix('v1/driver')->group(function () {
         Route::post('release-package', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'releasePackage']);
         Route::post('start-deliveries', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'startDeliveries']);
         Route::get('package-history/{barcode}', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'packageHistory']);
+
+        // Rider team custody
+        Route::get('rider-teams', [DriverRiderTeamController::class, 'index']);
+        Route::get('rider-teams/{team}', [DriverRiderTeamController::class, 'show']);
+        Route::post('rider-teams/{team}/members/lookup', [DriverRiderTeamController::class, 'lookupMember']);
+        Route::post('rider-teams/{team}/members', [DriverRiderTeamController::class, 'addMember']);
+        Route::delete('rider-teams/{team}/members/{driver}', [DriverRiderTeamController::class, 'removeMember']);
+        Route::get('rider-team-handovers', [DriverRiderTeamHandoverController::class, 'index']);
+        Route::get('rider-team-handovers/{handover}', [DriverRiderTeamHandoverController::class, 'show']);
+        Route::post('rider-team-handovers/{handover}/scan-receive', [DriverRiderTeamHandoverController::class, 'scanReceive']);
+        Route::post('rider-team-handovers/{handover}/allocate', [DriverRiderTeamHandoverController::class, 'allocate']);
+        Route::post('rider-team-handovers/scan-claim', [DriverRiderTeamHandoverController::class, 'scanClaim']);
     });
 });

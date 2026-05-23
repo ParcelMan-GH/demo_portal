@@ -1,7 +1,7 @@
 {
     "name": "Parcelman Vendor Portal",
     "short_name": "Parcelman",
-    "description": "Manage your shipments and invoices on the go",
+    "description": "Manage your shipments on the go",
     "start_url": "/vendor/home",
     "scope": "/vendor/",
     "display": "standalone",

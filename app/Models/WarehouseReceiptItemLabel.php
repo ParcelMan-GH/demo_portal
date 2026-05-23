@@ -43,13 +43,18 @@ class WarehouseReceiptItemLabel extends Model
         return $this->hasMany(TransportManifestLabelScan::class, 'warehouse_receipt_item_label_id');
     }
 
+    public function riderTeamHandoverItem(): HasOne
+    {
+        return $this->hasOne(RiderTeamHandoverItem::class, 'warehouse_receipt_item_label_id');
+    }
+
     /**
      * Get the current driver holding this label (if claimed and not released/delivered/returned).
      */
     public function currentDriverId(): ?int
     {
         $latest = $this->latestCustody;
-        if ($latest && $latest->event_type === LabelCustodyEvent::TYPE_CLAIMED) {
+        if ($latest && in_array($latest->event_type, [LabelCustodyEvent::TYPE_CLAIMED, LabelCustodyEvent::TYPE_MEMBER_CLAIMED], true)) {
             return $latest->driver_id;
         }
         return null;

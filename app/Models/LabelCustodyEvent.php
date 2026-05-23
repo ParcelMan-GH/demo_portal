@@ -23,6 +23,13 @@ class LabelCustodyEvent extends Model
     const TYPE_TRANSFERRED = 'transferred';
     const TYPE_DELIVERED = 'delivered';
     const TYPE_RETURNED = 'returned';
+    const TYPE_ASSIGNED_TO_LEADER = 'assigned_to_leader';
+    const TYPE_LEADER_RECEIVED = 'leader_received';
+    const TYPE_ALLOCATED_TO_MEMBER = 'allocated_to_member';
+    const TYPE_MEMBER_CLAIMED = 'member_claimed';
+    const TYPE_RETURNED_TO_LEADER = 'returned_to_leader';
+    const TYPE_RETURNED_TO_WAREHOUSE = 'returned_to_warehouse';
+    const TYPE_RECALLED = 'recalled';
 
     public function label(): BelongsTo
     {

@@ -42,9 +42,16 @@ class ShipmentItemImage extends Model
     {
         parent::boot();
 
-        // Delete from storage when model is deleted
+        // Delete from storage only when no other image row uses this file.
         static::deleting(function ($image) {
-            app(StorageService::class)->delete($image->path);
+            $stillReferenced = static::query()
+                ->where('path', $image->path)
+                ->whereKeyNot($image->getKey())
+                ->exists();
+
+            if (! $stillReferenced) {
+                app(StorageService::class)->delete($image->path);
+            }
         });
     }
 

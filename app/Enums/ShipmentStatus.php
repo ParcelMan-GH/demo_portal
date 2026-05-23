@@ -6,8 +6,7 @@ enum ShipmentStatus: string
 {
     case DRAFT = 'draft';
     case SUBMITTED = 'submitted';
-    case INVOICE_SENT = 'invoice_sent';
-    case INVOICE_ACCEPTED = 'invoice_accepted';
+    case PROCESSING = 'processing';
     case PICKUP_ASSIGNED = 'pickup_assigned';
     case PICKED_UP = 'picked_up';
     case AT_WAREHOUSE = 'at_warehouse';
@@ -18,6 +17,7 @@ enum ShipmentStatus: string
     case HANDED_TO_COURIER = 'handed_to_courier';
     case DELIVERED = 'delivered';
     case CANCELLED = 'cancelled';
+    case REJECTED = 'rejected';
 
     /**
      * Get human-readable label for status.
@@ -27,8 +27,7 @@ enum ShipmentStatus: string
         return match ($this) {
             self::DRAFT => 'Draft',
             self::SUBMITTED => 'Submitted',
-            self::INVOICE_SENT => 'Invoice Sent',
-            self::INVOICE_ACCEPTED => 'Invoice Accepted',
+            self::PROCESSING => 'Processing',
             self::PICKUP_ASSIGNED => 'Pickup Assigned',
             self::PICKED_UP => 'Picked Up',
             self::AT_WAREHOUSE => 'At Warehouse',
@@ -39,6 +38,7 @@ enum ShipmentStatus: string
             self::HANDED_TO_COURIER => 'Handed to Courier',
             self::DELIVERED => 'Delivered',
             self::CANCELLED => 'Cancelled',
+            self::REJECTED => 'Rejected',
         };
     }
 
@@ -75,7 +75,7 @@ enum ShipmentStatus: string
         return in_array($this, [
             self::DRAFT,
             self::SUBMITTED,
-            self::INVOICE_SENT,
+            self::PROCESSING,
             self::PICKUP_ASSIGNED,
         ]);
     }

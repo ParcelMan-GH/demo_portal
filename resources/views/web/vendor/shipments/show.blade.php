@@ -114,9 +114,6 @@
                         <template x-if="['submitted'].includes(shipment?.status)">
                             <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </template>
-                        <template x-if="['invoice_sent','invoice_accepted'].includes(shipment?.status)">
-                            <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                        </template>
                         <template x-if="['pickup_assigned','picked_up'].includes(shipment?.status)">
                             <svg class="h-[22px] w-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
                         </template>
@@ -694,72 +691,6 @@
                     </div>
                 </div>
 
-                {{-- ---- Invoice Card (priority) ---- --}}
-                <div class="sh-sidebar-card sh-invoice-card" x-show="currentInvoice" x-cloak>
-                    <div class="sh-sidebar-head">
-                        <div class="head-icon">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                        </div>
-                        <h4>Invoice</h4>
-                        <button x-show="invoiceHistory.length > 1" x-cloak type="button"
-                                @click="document.getElementById('invoice-history').scrollIntoView({ behavior: 'smooth' })"
-                                class="ml-auto text-xs font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1">
-                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            View History
-                        </button>
-                    </div>
-                    <div class="sh-sidebar-body">
-                        <template x-if="currentInvoice">
-                            <div>
-                                <div class="sh-invoice-total">
-                                    <div class="sh-invoice-label">Total Amount</div>
-                                    <div class="sh-invoice-amount" x-text="formatMoney(currentInvoice?.total_amount, currentInvoice?.currency || 'GHS')"></div>
-                                </div>
-                                <div class="sh-invoice-meta">
-                                    <div class="sh-invoice-row">
-                                        <span>Invoice #</span>
-                                        <span class="font-semibold" x-text="currentInvoice?.invoice_number || '-'"></span>
-                                    </div>
-                                    <div class="sh-invoice-row">
-                                        <span>Created</span>
-                                        <span class="font-semibold" x-text="formatDateTime(currentInvoice?.created_at)"></span>
-                                    </div>
-                                </div>
-
-                                {{-- Accept / Reject --}}
-                                <div class="grid grid-cols-2 gap-2 mt-3" x-show="canRespondToInvoice" x-cloak>
-                                    <button type="button" @click="acceptCurrentInvoice()"
-                                            class="sh-accept-btn">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                        Accept
-                                    </button>
-                                    <button type="button" @click="rejectCurrentInvoice()"
-                                            class="sh-reject-btn">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                        Reject
-                                    </button>
-                                </div>
-
-                                {{-- View invoice link --}}
-                                <a x-show="currentInvoice?.id" x-cloak :href="`/vendor/invoices/${currentInvoice?.id}`"
-                                   class="sh-invoice-link">
-                                    View Full Invoice
-                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-                                </a>
-                            </div>
-                        </template>
-                        <template x-if="!currentInvoice">
-                            <div class="text-center py-6">
-                                <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-50">
-                                    <svg class="h-6 w-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                                </div>
-                                <p class="text-xs font-medium text-slate-500">No invoice yet</p>
-                                <p class="mt-0.5 text-[11px] text-slate-400">Invoice will appear after submission</p>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-
                 {{-- ---- Pickup Location ---- --}}
                 <div class="sh-sidebar-card sh-pickup-card">
                     <div class="sh-sidebar-head">
@@ -895,49 +826,6 @@
                                 <p class="mt-0.5 text-[11px] text-slate-400">Driver will be assigned after processing</p>
                             </div>
                         </template>
-                    </div>
-                </div>
-
-                {{-- ---- Invoice History ---- --}}
-                <div class="sh-sidebar-card sh-history-card" id="invoice-history" x-show="invoiceHistory.length > 1" x-cloak>
-                    <div class="sh-sidebar-head">
-                        <div class="head-icon purple">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        </div>
-                        <h4>Invoice History</h4>
-                        <span class="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-100 px-1.5 text-[10px] font-bold text-slate-600" x-text="invoiceHistory.length"></span>
-                    </div>
-                    <div class="sh-sidebar-body">
-                        <div class="space-y-2.5">
-                            <template x-for="(inv, i) in invoiceHistory" :key="inv.id || i">
-                                <a :href="`/vendor/invoices/${inv.id}`" class="block rounded-lg border border-gray-100 bg-gray-50/50 p-3 hover:border-slate-300 hover:bg-white hover:shadow-sm transition no-underline">
-                                    <div class="flex items-center justify-between gap-2 mb-1.5">
-                                        <div class="flex items-center gap-2">
-                                            <div class="h-2 w-2 rounded-full flex-shrink-0"
-                                                 :class="{
-                                                     'bg-green-400': inv.status === 'accepted',
-                                                     'bg-red-400': inv.status === 'rejected',
-                                                     'bg-blue-400': inv.status === 'sent',
-                                                     'bg-amber-400': inv.status === 'pending',
-                                                     'bg-slate-300': !['accepted','rejected','sent','pending'].includes(inv.status)
-                                                 }"></div>
-                                            <span class="text-xs font-bold text-slate-800" x-text="inv.invoice_number || `Invoice #${i + 1}`"></span>
-                                        </div>
-                                        <span class="vendor-badge text-[10px]" :class="'vendor-badge-' + inv.status" x-text="statusLabel(inv.status)"></span>
-                                    </div>
-                                    <div class="flex items-center justify-between pl-4">
-                                        <span class="text-sm font-bold text-slate-700" x-text="formatMoney(inv.total_amount, inv.currency || 'GHS')"></span>
-                                        <span class="text-[10px] text-slate-400" x-text="formatDateTime(inv.created_at)"></span>
-                                    </div>
-                                    <div x-show="inv.rejection_reason" class="mt-2 ml-4 rounded-md bg-red-50 border border-red-100 px-2.5 py-2 text-[11px] text-red-600">
-                                        <span x-text="inv.rejection_reason"></span>
-                                    </div>
-                                    <div x-show="inv.vendor_notes" class="mt-2 ml-4 rounded-md bg-slate-50 border border-slate-100 px-2.5 py-2 text-[11px] text-slate-500">
-                                        <span x-text="inv.vendor_notes"></span>
-                                    </div>
-                                </a>
-                            </template>
-                        </div>
                     </div>
                 </div>
 

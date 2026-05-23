@@ -29,10 +29,10 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register model observers
         \App\Models\Shipment::observe(\App\Observers\ShipmentObserver::class);
-        \App\Models\Invoice::observe(\App\Observers\InvoiceObserver::class);
         \App\Models\PickupAssignment::observe(\App\Observers\PickupAssignmentObserver::class);
         \App\Models\TransportManifest::observe(\App\Observers\TransportManifestObserver::class);
         \App\Models\DeliveryRunStop::observe(\App\Observers\DeliveryRunStopObserver::class);
+        \App\Models\DeliveryRunItem::observe(\App\Observers\DeliveryRunItemObserver::class);
 
         // Register authorization gates for permissions
         $this->registerPermissionGates();

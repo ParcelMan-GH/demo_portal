@@ -305,7 +305,7 @@
         <div class="amount-label-cell">Amount Paid</div>
         <div class="amount-value-cell">
             <div class="amount-value">
-                <span class="amount-currency">{{ $payment->invoice?->currency ?: 'GHS' }}</span>{{ number_format((float) $payment->amount, 2) }}
+                <span class="amount-currency">GHS</span>{{ number_format((float) $payment->amount, 2) }}
             </div>
         </div>
     </div>
@@ -336,12 +336,6 @@
             <div class="detail-key">Shipment</div>
             <div class="detail-val">{{ $payment->shipment?->shipment_number ?? '—' }}</div>
         </div>
-        @if($payment->invoice)
-        <div class="detail-row">
-            <div class="detail-key">Invoice</div>
-            <div class="detail-val">{{ $payment->invoice->invoice_number }}</div>
-        </div>
-        @endif
         @if($payment->shipment?->vendor)
         <div class="detail-row">
             <div class="detail-key">Vendor</div>

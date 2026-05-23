@@ -1,0 +1,571 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\DeliveryRunItem;
+use App\Models\Driver;
+use App\Models\LabelCustodyEvent;
+use App\Models\RiderTeam;
+use App\Models\RiderTeamHandover;
+use App\Models\RiderTeamHandoverItem;
+use App\Models\RiderTeamMembership;
+use App\Models\User;
+use App\Models\Warehouse;
+use App\Models\WarehouseReceipt;
+use App\Models\WarehouseReceiptItemLabel;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class RiderTeamHandoverService
+{
+    public function lookupRider(string $phone): ?Driver
+    {
+        $normalized = $this->normalizePhone($phone);
+
+        return Driver::query()
+            ->where('is_active', true)
+            ->where(function ($query) use ($phone, $normalized) {
+                $query->where('phone', $phone);
+                if ($normalized !== '') {
+                    $query->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '') like ?", ['%' . $normalized]);
+                }
+            })
+            ->first();
+    }
+
+    public function addMembership(RiderTeam $team, Driver $driver, string $role, string $actorType, int $actorId): RiderTeamMembership
+    {
+        if (! in_array($role, [RiderTeamMembership::ROLE_LEADER, RiderTeamMembership::ROLE_MEMBER], true)) {
+            throw ValidationException::withMessages(['role' => 'Select a valid rider team role.']);
+        }
+
+        return DB::transaction(function () use ($team, $driver, $role, $actorType, $actorId) {
+            $existing = RiderTeamMembership::query()
+                ->where('rider_team_id', $team->id)
+                ->where('driver_id', $driver->id)
+                ->where('role', $role)
+                ->where('is_active', true)
+                ->whereNull('removed_at')
+                ->first();
+
+            if ($existing) {
+                return $existing;
+            }
+
+            return RiderTeamMembership::create([
+                'rider_team_id' => $team->id,
+                'driver_id' => $driver->id,
+                'role' => $role,
+                'is_active' => true,
+                'added_by_type' => $actorType,
+                'added_by_id' => $actorId,
+                'joined_at' => now(),
+            ]);
+        });
+    }
+
+    public function removeMembership(RiderTeam $team, Driver $driver, ?string $role = null): int
+    {
+        return RiderTeamMembership::query()
+            ->where('rider_team_id', $team->id)
+            ->where('driver_id', $driver->id)
+            ->when($role, fn ($query) => $query->where('role', $role))
+            ->where('is_active', true)
+            ->whereNull('removed_at')
+            ->update([
+                'is_active' => false,
+                'removed_at' => now(),
+            ]);
+    }
+
+    public function driverCanManageTeam(Driver $driver, RiderTeam $team): bool
+    {
+        return $this->hasActiveRole($driver, $team, RiderTeamMembership::ROLE_LEADER);
+    }
+
+    public function driverBelongsToTeam(Driver $driver, RiderTeam $team): bool
+    {
+        return RiderTeamMembership::query()
+            ->where('rider_team_id', $team->id)
+            ->where('driver_id', $driver->id)
+            ->where('is_active', true)
+            ->whereNull('removed_at')
+            ->exists();
+    }
+
+    public function createHandover(
+        RiderTeam $team,
+        Driver $leader,
+        ?Warehouse $warehouse = null,
+        ?User $createdByUser = null,
+        ?Driver $createdByDriver = null,
+        ?string $notes = null
+    ): RiderTeamHandover {
+        if (! $team->is_active) {
+            throw ValidationException::withMessages(['rider_team_id' => 'Selected rider team is inactive.']);
+        }
+
+        if (! $leader->is_active) {
+            throw ValidationException::withMessages(['leader_driver_id' => 'Selected team leader is inactive.']);
+        }
+
+        if (! $this->driverCanManageTeam($leader, $team)) {
+            throw ValidationException::withMessages(['leader_driver_id' => 'Selected rider is not an active leader for this rider team.']);
+        }
+
+        return RiderTeamHandover::create([
+            'handover_number' => $this->generateHandoverNumber($warehouse),
+            'warehouse_id' => $warehouse?->id ?? $team->warehouse_id,
+            'rider_team_id' => $team->id,
+            'leader_driver_id' => $leader->id,
+            'created_by_user_id' => $createdByUser?->id,
+            'created_by_driver_id' => $createdByDriver?->id,
+            'status' => RiderTeamHandover::STATUS_DRAFT,
+            'notes' => $notes,
+        ]);
+    }
+
+    public function assignLabels(RiderTeamHandover $handover, array $barcodes, ?string $notes = null): array
+    {
+        $handover->loadMissing('team');
+        if (! $handover->team?->is_active) {
+            throw ValidationException::withMessages(['rider_team_id' => 'This rider team is inactive.']);
+        }
+
+        $barcodes = collect($barcodes)
+            ->map(fn ($barcode) => trim((string) $barcode))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($barcodes->isEmpty()) {
+            throw ValidationException::withMessages(['barcodes' => 'Add at least one package label.']);
+        }
+
+        $labels = WarehouseReceiptItemLabel::query()
+            ->with(['receiptItem.receipt', 'latestCustody', 'riderTeamHandoverItem.handover'])
+            ->whereIn('barcode_value', $barcodes)
+            ->get();
+
+        $missing = $barcodes->diff($labels->pluck('barcode_value'))->values();
+        if ($missing->isNotEmpty()) {
+            throw ValidationException::withMessages(['barcodes' => 'Label not found: ' . $missing->first()]);
+        }
+
+        return DB::transaction(function () use ($handover, $labels, $notes) {
+            $assigned = 0;
+            foreach ($labels as $label) {
+                $this->assertLabelAssignableToLeader($label);
+
+                $item = RiderTeamHandoverItem::create([
+                    'rider_team_handover_id' => $handover->id,
+                    'warehouse_receipt_item_label_id' => $label->id,
+                    'status' => RiderTeamHandoverItem::STATUS_ASSIGNED_TO_LEADER,
+                    'assigned_at' => now(),
+                    'notes' => $notes,
+                ]);
+
+                LabelCustodyEvent::create([
+                    'warehouse_receipt_item_label_id' => $label->id,
+                    'event_type' => LabelCustodyEvent::TYPE_ASSIGNED_TO_LEADER,
+                    'driver_id' => $handover->leader_driver_id,
+                    'notes' => 'Rider team handover ' . $handover->handover_number,
+                ]);
+
+                $assigned++;
+            }
+
+            $this->refreshHandoverCounts($handover->fresh());
+
+            return ['assigned' => $assigned];
+        });
+    }
+
+    public function receiveByLeader(RiderTeamHandover $handover, Driver $leader, string $barcode): RiderTeamHandoverItem
+    {
+        $handover->loadMissing('team');
+        if (! $handover->team?->is_active) {
+            throw ValidationException::withMessages(['barcode' => 'This rider team is inactive.']);
+        }
+
+        if ((int) $handover->leader_driver_id !== (int) $leader->id) {
+            throw ValidationException::withMessages(['barcode' => 'This handover belongs to another rider team leader.']);
+        }
+
+        $item = $this->handoverItemForBarcode($handover, $barcode);
+
+        return DB::transaction(function () use ($handover, $leader, $item) {
+            if (! in_array($item->status, [
+                RiderTeamHandoverItem::STATUS_ASSIGNED_TO_LEADER,
+                RiderTeamHandoverItem::STATUS_LEADER_RECEIVED,
+            ], true)) {
+                throw ValidationException::withMessages(['barcode' => 'This package has already moved past leader receiving.']);
+            }
+
+            $item->update([
+                'status' => RiderTeamHandoverItem::STATUS_LEADER_RECEIVED,
+                'leader_received_at' => $item->leader_received_at ?? now(),
+            ]);
+
+            LabelCustodyEvent::create([
+                'warehouse_receipt_item_label_id' => $item->warehouse_receipt_item_label_id,
+                'event_type' => LabelCustodyEvent::TYPE_LEADER_RECEIVED,
+                'driver_id' => $leader->id,
+                'notes' => 'Leader received handover ' . $handover->handover_number,
+            ]);
+
+            $this->refreshHandoverCounts($handover);
+
+            return $item->fresh(['label.receiptItem.shipmentItem']);
+        });
+    }
+
+    public function allocateLabels(RiderTeamHandover $handover, Driver $leader, Driver $member, array $barcodes): array
+    {
+        $handover->loadMissing('team');
+        if (! $handover->team?->is_active) {
+            throw ValidationException::withMessages(['team' => 'This rider team is inactive.']);
+        }
+
+        if (! $member->is_active) {
+            throw ValidationException::withMessages(['member' => 'Selected rider is inactive.']);
+        }
+
+        if (! $this->driverCanManageTeam($leader, $handover->team)) {
+            throw ValidationException::withMessages(['team' => 'Only an active leader can distribute this rider team handover.']);
+        }
+
+        if (! $this->driverBelongsToTeam($member, $handover->team)) {
+            throw ValidationException::withMessages(['member' => 'Selected rider is not an active member of this rider team.']);
+        }
+
+        $barcodes = collect($barcodes)->map(fn ($barcode) => trim((string) $barcode))->filter()->unique()->values();
+        if ($barcodes->isEmpty()) {
+            throw ValidationException::withMessages(['barcodes' => 'Select at least one package label.']);
+        }
+
+        return DB::transaction(function () use ($handover, $member, $barcodes) {
+            $items = $this->handoverItemsForBarcodes($handover, $barcodes);
+            $allocated = 0;
+
+            foreach ($items as $item) {
+                if (! in_array($item->status, [
+                    RiderTeamHandoverItem::STATUS_ASSIGNED_TO_LEADER,
+                    RiderTeamHandoverItem::STATUS_LEADER_RECEIVED,
+                    RiderTeamHandoverItem::STATUS_ALLOCATED_TO_MEMBER,
+                ], true)) {
+                    throw ValidationException::withMessages(['barcodes' => 'One selected package cannot be allocated now.']);
+                }
+
+                $item->update([
+                    'status' => RiderTeamHandoverItem::STATUS_ALLOCATED_TO_MEMBER,
+                    'allocated_to_driver_id' => $member->id,
+                    'allocated_at' => now(),
+                    'leader_received_at' => $item->leader_received_at ?? now(),
+                ]);
+
+                LabelCustodyEvent::create([
+                    'warehouse_receipt_item_label_id' => $item->warehouse_receipt_item_label_id,
+                    'event_type' => LabelCustodyEvent::TYPE_ALLOCATED_TO_MEMBER,
+                    'driver_id' => $member->id,
+                    'notes' => 'Allocated from rider team handover ' . $handover->handover_number,
+                ]);
+
+                $allocated++;
+            }
+
+            $this->refreshHandoverCounts($handover);
+
+            return ['allocated' => $allocated];
+        });
+    }
+
+    public function claimFromScan(Driver $driver, WarehouseReceiptItemLabel $label, ?float $latitude = null, ?float $longitude = null, ?string $notes = null): array
+    {
+        $label->loadMissing(['receiptItem.receipt', 'latestCustody', 'riderTeamHandoverItem.handover.team']);
+        $latest = $label->latestCustody;
+
+        if ($latest && in_array($latest->event_type, [LabelCustodyEvent::TYPE_CLAIMED, LabelCustodyEvent::TYPE_MEMBER_CLAIMED], true)) {
+            if ((int) $latest->driver_id === (int) $driver->id) {
+                return ['status' => 'already_claimed', 'message' => 'You already have this package.'];
+            }
+
+            $otherDriver = Driver::find($latest->driver_id);
+            return [
+                'status' => 'conflict',
+                'message' => 'This package is already claimed by ' . ($otherDriver?->name ?? 'another rider') . '.',
+            ];
+        }
+
+        $handoverItem = $label->riderTeamHandoverItem;
+        if ($handoverItem && ! in_array($handoverItem->status, [
+            RiderTeamHandoverItem::STATUS_DELIVERED,
+            RiderTeamHandoverItem::STATUS_RETURNED,
+            RiderTeamHandoverItem::STATUS_RECALLED,
+        ], true)) {
+            return $this->claimLeaderHeldLabel($driver, $handoverItem, $latitude, $longitude, $notes);
+        }
+
+        $this->assertLabelCanBeClaimedDirectly($label);
+
+        LabelCustodyEvent::create([
+            'warehouse_receipt_item_label_id' => $label->id,
+            'event_type' => LabelCustodyEvent::TYPE_CLAIMED,
+            'driver_id' => $driver->id,
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+            'notes' => $notes,
+        ]);
+
+        return ['status' => 'claimed', 'message' => 'Package claimed successfully.'];
+    }
+
+    public function refreshHandoverCounts(RiderTeamHandover $handover): RiderTeamHandover
+    {
+        $items = $handover->items()->get(['status', 'leader_received_at', 'allocated_to_driver_id', 'member_claimed_at', 'delivered_at']);
+        $assigned = $items->count();
+        $received = $items->filter(fn ($item) => $item->leader_received_at !== null || in_array($item->status, [
+            RiderTeamHandoverItem::STATUS_LEADER_RECEIVED,
+            RiderTeamHandoverItem::STATUS_ALLOCATED_TO_MEMBER,
+            RiderTeamHandoverItem::STATUS_MEMBER_CLAIMED,
+            RiderTeamHandoverItem::STATUS_IN_DELIVERY,
+            RiderTeamHandoverItem::STATUS_DELIVERED,
+        ], true))->count();
+        $distributed = $items->filter(fn ($item) => $item->allocated_to_driver_id !== null || in_array($item->status, [
+            RiderTeamHandoverItem::STATUS_ALLOCATED_TO_MEMBER,
+            RiderTeamHandoverItem::STATUS_MEMBER_CLAIMED,
+            RiderTeamHandoverItem::STATUS_IN_DELIVERY,
+            RiderTeamHandoverItem::STATUS_DELIVERED,
+        ], true))->count();
+        $claimed = $items->filter(fn ($item) => $item->member_claimed_at !== null || in_array($item->status, [
+            RiderTeamHandoverItem::STATUS_MEMBER_CLAIMED,
+            RiderTeamHandoverItem::STATUS_IN_DELIVERY,
+            RiderTeamHandoverItem::STATUS_DELIVERED,
+        ], true))->count();
+        $delivered = $items->where('status', RiderTeamHandoverItem::STATUS_DELIVERED)->count();
+        $failed = $items->where('status', RiderTeamHandoverItem::STATUS_FAILED)->count();
+
+        $status = match (true) {
+            $assigned === 0 => RiderTeamHandover::STATUS_DRAFT,
+            $delivered > 0 && $delivered === $assigned => RiderTeamHandover::STATUS_CLOSED,
+            $distributed > 0 && $distributed === $assigned => RiderTeamHandover::STATUS_DISTRIBUTED,
+            $distributed > 0 => RiderTeamHandover::STATUS_PARTIALLY_DISTRIBUTED,
+            $received > 0 && $received === $assigned => RiderTeamHandover::STATUS_RECEIVED,
+            $received > 0 => RiderTeamHandover::STATUS_PARTIALLY_RECEIVED,
+            default => RiderTeamHandover::STATUS_ASSIGNED,
+        };
+
+        $handover->update([
+            'assigned_count' => $assigned,
+            'received_count' => $received,
+            'distributed_count' => $distributed,
+            'claimed_count' => $claimed,
+            'delivered_count' => $delivered,
+            'failed_count' => $failed,
+            'status' => $status,
+            'assigned_at' => $assigned > 0 ? ($handover->assigned_at ?? now()) : null,
+            'received_at' => $received === $assigned && $assigned > 0 ? ($handover->received_at ?? now()) : $handover->received_at,
+        ]);
+
+        return $handover->fresh();
+    }
+
+    private function claimLeaderHeldLabel(Driver $driver, RiderTeamHandoverItem $handoverItem, ?float $latitude, ?float $longitude, ?string $notes): array
+    {
+        $handoverItem->loadMissing('handover.team');
+        $handover = $handoverItem->handover;
+        $team = $handover->team;
+
+        if (! $this->driverBelongsToTeam($driver, $team)) {
+            return [
+                'status' => 'conflict',
+                'message' => 'This package is assigned to another rider team.',
+            ];
+        }
+
+        if ((int) $handover->leader_driver_id === (int) $driver->id && ! $handoverItem->allocated_to_driver_id) {
+            $this->receiveByLeader($handover, $driver, $handoverItem->label->barcode_value);
+
+            return [
+                'status' => 'leader_received',
+                'message' => 'Package received into rider team handover.',
+            ];
+        }
+
+        if ($handoverItem->allocated_to_driver_id && (int) $handoverItem->allocated_to_driver_id !== (int) $driver->id) {
+            $assigned = Driver::find($handoverItem->allocated_to_driver_id);
+            return [
+                'status' => 'conflict',
+                'message' => 'This package is already allocated to ' . ($assigned?->name ?? 'another rider') . '.',
+            ];
+        }
+
+        if ($this->labelIsInActiveDeliveryRun($handoverItem->label)) {
+            return [
+                'status' => 'conflict',
+                'message' => 'This package is already in an active delivery run.',
+            ];
+        }
+
+        DB::transaction(function () use ($driver, $handoverItem, $handover, $latitude, $longitude, $notes) {
+            if (! $handoverItem->leader_received_at) {
+                $handoverItem->leader_received_at = now();
+                LabelCustodyEvent::create([
+                    'warehouse_receipt_item_label_id' => $handoverItem->warehouse_receipt_item_label_id,
+                    'event_type' => LabelCustodyEvent::TYPE_LEADER_RECEIVED,
+                    'driver_id' => $handover->leader_driver_id,
+                    'notes' => 'Auto-confirmed before team member claim.',
+                ]);
+            }
+
+            if (! $handoverItem->allocated_to_driver_id) {
+                $handoverItem->allocated_to_driver_id = $driver->id;
+                $handoverItem->allocated_at = now();
+                LabelCustodyEvent::create([
+                    'warehouse_receipt_item_label_id' => $handoverItem->warehouse_receipt_item_label_id,
+                    'event_type' => LabelCustodyEvent::TYPE_ALLOCATED_TO_MEMBER,
+                    'driver_id' => $driver->id,
+                    'notes' => 'Auto-allocated by rider team member scan.',
+                ]);
+            }
+
+            $handoverItem->status = RiderTeamHandoverItem::STATUS_MEMBER_CLAIMED;
+            $handoverItem->member_claimed_at = now();
+            $handoverItem->save();
+
+            LabelCustodyEvent::create([
+                'warehouse_receipt_item_label_id' => $handoverItem->warehouse_receipt_item_label_id,
+                'event_type' => LabelCustodyEvent::TYPE_MEMBER_CLAIMED,
+                'driver_id' => $driver->id,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'notes' => $notes,
+            ]);
+
+            LabelCustodyEvent::create([
+                'warehouse_receipt_item_label_id' => $handoverItem->warehouse_receipt_item_label_id,
+                'event_type' => LabelCustodyEvent::TYPE_CLAIMED,
+                'driver_id' => $driver->id,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'notes' => $notes,
+            ]);
+
+            $this->refreshHandoverCounts($handover);
+        });
+
+        return ['status' => 'claimed', 'message' => 'Package claimed from rider team handover.'];
+    }
+
+    private function assertLabelAssignableToLeader(WarehouseReceiptItemLabel $label): void
+    {
+        $receipt = $label->receiptItem?->receipt;
+        if (! $receipt || $receipt->status !== WarehouseReceipt::STATUS_FINALIZED) {
+            throw ValidationException::withMessages(['barcodes' => "{$label->barcode_value} is not ready. Warehouse receiving has not been finalized."]);
+        }
+
+        if ($label->riderTeamHandoverItem) {
+            throw ValidationException::withMessages(['barcodes' => "{$label->barcode_value} is already attached to a rider team handover."]);
+        }
+
+        if ($this->labelIsInActiveDeliveryRun($label)) {
+            throw ValidationException::withMessages(['barcodes' => "{$label->barcode_value} is already in an active delivery run."]);
+        }
+
+        $latest = $label->latestCustody;
+        if ($latest && in_array($latest->event_type, [
+            LabelCustodyEvent::TYPE_CLAIMED,
+            LabelCustodyEvent::TYPE_MEMBER_CLAIMED,
+            LabelCustodyEvent::TYPE_DELIVERED,
+        ], true)) {
+            throw ValidationException::withMessages(['barcodes' => "{$label->barcode_value} is already claimed or delivered."]);
+        }
+    }
+
+    private function assertLabelCanBeClaimedDirectly(WarehouseReceiptItemLabel $label): void
+    {
+        $receipt = $label->receiptItem?->receipt;
+        if (! $receipt || $receipt->status !== WarehouseReceipt::STATUS_FINALIZED) {
+            throw ValidationException::withMessages(['barcode' => 'This package is not ready for rider pickup. Warehouse receiving has not been finalized yet.']);
+        }
+
+        if ($this->labelIsInActiveDeliveryRun($label)) {
+            throw ValidationException::withMessages(['barcode' => 'This package is already in an active delivery run.']);
+        }
+    }
+
+    private function handoverItemForBarcode(RiderTeamHandover $handover, string $barcode): RiderTeamHandoverItem
+    {
+        $item = $handover->items()
+            ->whereHas('label', fn ($query) => $query->where('barcode_value', trim($barcode)))
+            ->with('label.receiptItem.shipmentItem')
+            ->first();
+
+        if (! $item) {
+            throw ValidationException::withMessages(['barcode' => 'This package is not part of this rider team handover.']);
+        }
+
+        return $item;
+    }
+
+    private function handoverItemsForBarcodes(RiderTeamHandover $handover, Collection $barcodes): EloquentCollection
+    {
+        $items = $handover->items()
+            ->whereHas('label', fn ($query) => $query->whereIn('barcode_value', $barcodes))
+            ->with('label')
+            ->get();
+
+        if ($items->count() !== $barcodes->count()) {
+            throw ValidationException::withMessages(['barcodes' => 'One or more selected labels were not found in this handover.']);
+        }
+
+        return $items;
+    }
+
+    private function hasActiveRole(Driver $driver, RiderTeam $team, string $role): bool
+    {
+        return RiderTeamMembership::query()
+            ->where('rider_team_id', $team->id)
+            ->where('driver_id', $driver->id)
+            ->where('role', $role)
+            ->where('is_active', true)
+            ->whereNull('removed_at')
+            ->exists();
+    }
+
+    private function labelIsInActiveDeliveryRun(?WarehouseReceiptItemLabel $label): bool
+    {
+        $shipmentItemId = $label?->receiptItem?->shipment_item_id;
+        if (! $shipmentItemId) {
+            return false;
+        }
+
+        return DeliveryRunItem::query()
+            ->where('shipment_item_id', $shipmentItemId)
+            ->whereHas('run', fn ($query) => $query->whereNotIn('status', ['completed', 'cancelled']))
+            ->exists();
+    }
+
+    private function generateHandoverNumber(?Warehouse $warehouse = null): string
+    {
+        $prefix = 'RTH-' . now()->format('Y') . '-' . ($warehouse?->code ? str_replace('-', '', $warehouse->code) : 'GEN') . '-';
+        $last = RiderTeamHandover::query()
+            ->where('handover_number', 'like', $prefix . '%')
+            ->latest('id')
+            ->first();
+
+        $next = 1;
+        if ($last && preg_match('/(\d+)$/', $last->handover_number, $matches)) {
+            $next = ((int) $matches[1]) + 1;
+        }
+
+        return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+    }
+
+    private function normalizePhone(string $phone): string
+    {
+        return preg_replace('/\D+/', '', $phone) ?? '';
+    }
+}

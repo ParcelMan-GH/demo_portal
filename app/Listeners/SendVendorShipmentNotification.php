@@ -43,8 +43,6 @@ class SendVendorShipmentNotification
             'pickup_assigned'   => ["Driver Assigned — {$shipmentNumber}", 'A driver has been assigned to pick up your shipment.'],
             'picked_up'         => ["Shipment Picked Up — {$shipmentNumber}", 'Your shipment has been collected by the driver.'],
             'at_warehouse'      => ["Shipment at Warehouse — {$shipmentNumber}", 'Your shipment has arrived at the warehouse.'],
-            'invoice_sent'      => ["Invoice Ready — {$shipmentNumber}", 'An invoice has been generated for your shipment. Please review and respond.'],
-            'invoice_accepted'  => ["Invoice Accepted — {$shipmentNumber}", 'Your invoice has been accepted. Processing will continue.'],
             'sorted'            => ["Shipment Sorted — {$shipmentNumber}", 'Your shipment has been sorted and is ready for dispatch.'],
             'in_transit'        => ["In Transit — {$shipmentNumber}", 'Your shipment is in transit to the destination.'],
             'out_for_delivery'  => ["Out for Delivery — {$shipmentNumber}", 'Your shipment is out for delivery.'],

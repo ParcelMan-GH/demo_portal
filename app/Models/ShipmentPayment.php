@@ -9,7 +9,6 @@ class ShipmentPayment extends Model
 {
     protected $fillable = [
         'shipment_id',
-        'invoice_id',
         'amount',
         'payment_method',
         'reference_number',
@@ -33,11 +32,6 @@ class ShipmentPayment extends Model
     public function shipment(): BelongsTo
     {
         return $this->belongsTo(Shipment::class);
-    }
-
-    public function invoice(): BelongsTo
-    {
-        return $this->belongsTo(Invoice::class);
     }
 
     public function recordedBy(): BelongsTo
