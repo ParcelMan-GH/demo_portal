@@ -318,10 +318,6 @@ class RecipientPaymentService
                 ->lockForUpdate()
                 ->findOrFail($task->id);
 
-            if ($this->taskIsCleared($task)) {
-                return ['success' => true, 'message' => 'Package loaded.', 'task' => $task];
-            }
-
             if ($task->assigned_to_user_id && (int) $task->assigned_to_user_id !== (int) $user->id) {
                 return [
                     'success' => false,
@@ -331,15 +327,25 @@ class RecipientPaymentService
                 ];
             }
 
-            $task->update([
+            $isCleared = $this->taskIsCleared($task);
+            $updates = [
                 'assigned_to_user_id' => $user->id,
                 'assigned_at' => $task->assigned_at ?: now(),
-                'status' => in_array($task->status, [RecipientPaymentTask::STATUS_PENDING, RecipientPaymentTask::STATUS_FAILED, RecipientPaymentTask::STATUS_DISPUTED], true)
-                    ? RecipientPaymentTask::STATUS_ASSIGNED
-                    : $task->status,
-            ]);
+            ];
 
-            return ['success' => true, 'message' => 'Package assigned to you.', 'task' => $task->fresh(['assignedTo'])];
+            if (!$isCleared) {
+                $updates['status'] = in_array($task->status, [RecipientPaymentTask::STATUS_PENDING, RecipientPaymentTask::STATUS_FAILED, RecipientPaymentTask::STATUS_DISPUTED], true)
+                    ? RecipientPaymentTask::STATUS_ASSIGNED
+                    : $task->status;
+            }
+
+            $task->update($updates);
+
+            return [
+                'success' => true,
+                'message' => $isCleared ? 'Package already paid or cleared and assigned to you for review.' : 'Package assigned to you.',
+                'task' => $task->fresh(['assignedTo']),
+            ];
         });
     }
 
