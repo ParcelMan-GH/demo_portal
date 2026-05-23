@@ -97,6 +97,10 @@ class WarehousePackageLedgerService
             $relations[] = 'shipmentItem.deliveryRunItems.stop.district:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.stop.confirmedBy:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.stop.verificationAttempts.driver:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.reason:id,label,type';
+            $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.handoffDriver:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByDriver:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByAdmin:id,name';
         }
 
         return WarehouseReceiptItem::query()

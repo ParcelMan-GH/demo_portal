@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Auth\DriverAuthController;
 use App\Http\Controllers\Api\V1\Auth\VendorAuthController;
 use App\Http\Controllers\Api\V1\DriverAssignmentController;
+use App\Http\Controllers\Api\V1\DriverBusHandoffController;
 use App\Http\Controllers\Api\V1\DriverBusStationController;
 use App\Http\Controllers\Api\V1\DriverDeliveryController;
 use App\Http\Controllers\Api\V1\DriverProfileController;
@@ -93,6 +94,13 @@ Route::prefix('v1/driver')->group(function () {
         Route::put('change-password', [DriverProfileController::class, 'changePassword']);
         Route::post('fcm-token', [DriverProfileController::class, 'updateFcmToken']);
         Route::get('bus-stations', [DriverBusStationController::class, 'index']);
+        Route::get('delivery-failure-reasons', [DriverBusHandoffController::class, 'reasons']);
+        Route::get('bus-handoff-reasons', [DriverBusHandoffController::class, 'reasons']);
+        Route::get('bus-handoffs', [DriverBusHandoffController::class, 'index']);
+        Route::get('bus-handoffs/{deliveryRunItem}', [DriverBusHandoffController::class, 'show']);
+        Route::post('bus-handoffs/{deliveryRunItem}/send-confirmation', [DriverBusHandoffController::class, 'sendConfirmation']);
+        Route::post('bus-handoffs/{deliveryRunItem}/confirm-code', [DriverBusHandoffController::class, 'confirmCode']);
+        Route::post('bus-handoffs/{deliveryRunItem}/report-issue', [DriverBusHandoffController::class, 'reportIssue']);
 
         // Pickup endpoints
         Route::get('pickups', [DriverAssignmentController::class, 'index']);

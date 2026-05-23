@@ -13,6 +13,8 @@
         'membersUrl' => route('admin.rider-teams.members', ['team' => '__TEAM__']),
         'lookupMemberUrl' => route('admin.rider-teams.members.lookup', ['team' => '__TEAM__']),
         'addMemberUrl' => route('admin.rider-teams.members.store', ['team' => '__TEAM__']),
+        'makeLeaderUrl' => route('admin.rider-teams.members.leader.store', ['team' => '__TEAM__', 'driver' => '__DRIVER__']),
+        'removeLeaderUrl' => route('admin.rider-teams.members.leader.destroy', ['team' => '__TEAM__', 'driver' => '__DRIVER__']),
         'removeMemberUrl' => route('admin.rider-teams.members.destroy', ['team' => '__TEAM__', 'driver' => '__DRIVER__']),
         'handoversUrl' => route('admin.rider-teams.handovers.data'),
         'storeHandoverUrl' => route('admin.rider-teams.handovers.store'),
@@ -61,8 +63,8 @@
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 6v6l4 2m6-2a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z"/></svg>
             </div>
             <div class="min-w-0">
-                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">With Leaders</p>
-                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="handovers.reduce((sum, h) => sum + (h.counts?.still_with_leader || 0), 0)"></p>
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">With Receiver</p>
+                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="handovers.reduce((sum, h) => sum + (h.counts?.with_receiver || 0), 0)"></p>
             </div>
         </button>
     </div>
@@ -109,7 +111,7 @@
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
                         <div class="relative">
                             <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"/></svg>
-                            <input type="text" x-model.debounce.300ms="teamSearch" @@input="teamPage = 1" placeholder="Search team, warehouse, leader..."
+                            <input type="text" x-model.debounce.300ms="teamSearch" @@input="teamPage = 1" placeholder="Search team or warehouse..."
                                    class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                         </div>
                     </div>
@@ -126,7 +128,7 @@
                 </div>
 
                 <div x-show="showTeamFilters" x-transition class="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4" style="display:none">
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div>
                             <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Status</label>
                             <select x-model="teamStatusFilter" @@change="teamPage = 1" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
@@ -144,14 +146,6 @@
                                 </template>
                             </select>
                         </div>
-                        <div>
-                            <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Leadership</label>
-                            <select x-model="teamLeaderFilter" @@change="teamPage = 1" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                <option value="">Any leadership state</option>
-                                <option value="has_leader">Has leader</option>
-                                <option value="no_leader">No leader</option>
-                            </select>
-                        </div>
                     </div>
                     <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
                         <button type="button" @@click="showTeamFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
@@ -167,8 +161,8 @@
                             <tr>
                                 <th class="w-[26%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Team</th>
                                 <th class="w-[22%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Warehouse</th>
-                                <th class="w-[12%] px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Leaders</th>
                                 <th class="w-[12%] px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Members</th>
+                                <th class="w-[12%] px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Leaders</th>
                                 <th class="w-[12%] px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
                                 <th class="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Actions</th>
                             </tr>
@@ -187,8 +181,8 @@
                                         <p class="truncate text-sm font-bold text-slate-800" x-text="team.warehouse?.name || 'No warehouse selected'"></p>
                                         <p class="mt-1 text-xs font-semibold text-slate-500" x-text="team.warehouse?.code || '-'"></p>
                                     </td>
-                                    <td class="px-4 py-4 text-center"><span class="text-sm font-black text-slate-900" x-text="team.leaders_count || 0"></span></td>
                                     <td class="px-4 py-4 text-center"><span class="text-sm font-black text-slate-900" x-text="team.members_count || 0"></span></td>
+                                    <td class="px-4 py-4 text-center"><span class="text-sm font-black text-slate-900" x-text="team.leaders_count || 0"></span></td>
                                     <td class="px-4 py-4 text-center">
                                         <span class="rounded-full px-2.5 py-1 text-[10px] font-black" :class="team.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'" x-text="team.is_active ? 'Active' : 'Inactive'"></span>
                                     </td>
@@ -224,8 +218,8 @@
                                 <span class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black" :class="team.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'" x-text="team.is_active ? 'Active' : 'Inactive'"></span>
                             </div>
                             <div class="mt-3 grid grid-cols-3 gap-2">
-                                <div class="rounded-xl bg-slate-50 p-3"><p class="text-[10px] font-bold uppercase text-slate-400">Leaders</p><p class="text-lg font-black" x-text="team.leaders_count || 0"></p></div>
                                 <div class="rounded-xl bg-slate-50 p-3"><p class="text-[10px] font-bold uppercase text-slate-400">Members</p><p class="text-lg font-black" x-text="team.members_count || 0"></p></div>
+                                <div class="rounded-xl bg-slate-50 p-3"><p class="text-[10px] font-bold uppercase text-slate-400">Leaders</p><p class="text-lg font-black" x-text="team.leaders_count || 0"></p></div>
                                 <div class="rounded-xl bg-slate-50 p-3"><p class="text-[10px] font-bold uppercase text-slate-400">Handovers</p><p class="text-lg font-black" x-text="team.handovers_count || 0"></p></div>
                             </div>
                             <div class="mt-3 flex flex-nowrap justify-end gap-2">
@@ -254,7 +248,7 @@
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
                         <div class="relative">
                             <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"/></svg>
-                            <input type="text" x-model.debounce.300ms="handoverSearch" @@input="handoverPage = 1" placeholder="Search handover, team, leader..."
+                            <input type="text" x-model.debounce.300ms="handoverSearch" @@input="handoverPage = 1" placeholder="Search handover, team, receiver..."
                                    class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                         </div>
                     </div>
@@ -297,7 +291,7 @@
                             <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Custody</label>
                             <select x-model="handoverCustodyFilter" @@change="handoverPage = 1" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                 <option value="">Any custody state</option>
-                                <option value="with_leader">Still with leader</option>
+                                <option value="with_receiver">Still with receiver</option>
                                 <option value="distributed">Distributed to members</option>
                                 <option value="delivered">Has delivered packages</option>
                             </select>
@@ -317,7 +311,7 @@
                             <tr>
                                 <th class="w-[20%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Handover</th>
                                 <th class="w-[18%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Team</th>
-                                <th class="w-[18%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Leader</th>
+                                <th class="w-[18%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Receiver</th>
                                 <th class="w-[22%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Movement</th>
                                 <th class="w-[12%] px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
                                 <th class="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Actions</th>
@@ -338,14 +332,14 @@
                                         <p class="mt-1 text-xs font-semibold text-slate-500" x-text="handover.warehouse?.name || '-'"></p>
                                     </td>
                                     <td class="px-4 py-4">
-                                        <p class="truncate text-sm font-bold text-slate-800" x-text="handover.leader?.name || '-'"></p>
-                                        <p class="mt-1 text-xs font-semibold text-slate-500" x-text="handover.leader?.phone || '-'"></p>
+                                        <p class="truncate text-sm font-bold text-slate-800" x-text="handover.receiver?.name || '-'"></p>
+                                        <p class="mt-1 text-xs font-semibold text-slate-500" x-text="handover.receiver?.phone || '-'"></p>
                                     </td>
                                     <td class="px-4 py-4">
                                         <div class="grid grid-cols-4 gap-1">
                                             <div><p class="text-[9px] font-black uppercase text-slate-400">Assigned</p><p class="font-black text-slate-900" x-text="handover.counts.assigned"></p></div>
                                             <div><p class="text-[9px] font-black uppercase text-slate-400">Received</p><p class="font-black text-slate-900" x-text="handover.counts.received"></p></div>
-                                            <div><p class="text-[9px] font-black uppercase text-slate-400">With Lead</p><p class="font-black text-slate-900" x-text="handover.counts.still_with_leader"></p></div>
+                                            <div><p class="text-[9px] font-black uppercase text-slate-400">With Receiver</p><p class="font-black text-slate-900" x-text="handover.counts.with_receiver || 0"></p></div>
                                             <div><p class="text-[9px] font-black uppercase text-slate-400">Delivered</p><p class="font-black text-slate-900" x-text="handover.counts.delivered"></p></div>
                                         </div>
                                     </td>
@@ -382,7 +376,7 @@
                             <div class="mt-3 grid grid-cols-4 gap-2">
                                 <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-bold uppercase text-slate-400">Assigned</p><p class="text-base font-black" x-text="handover.counts.assigned"></p></div>
                                 <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-bold uppercase text-slate-400">Received</p><p class="text-base font-black" x-text="handover.counts.received"></p></div>
-                                <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-bold uppercase text-slate-400">Leader</p><p class="text-base font-black" x-text="handover.counts.still_with_leader"></p></div>
+                                <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-bold uppercase text-slate-400">Receiver</p><p class="text-base font-black" x-text="handover.counts.with_receiver || 0"></p></div>
                                 <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-bold uppercase text-slate-400">Delivered</p><p class="text-base font-black" x-text="handover.counts.delivered"></p></div>
                             </div>
                             <div class="mt-3 flex flex-nowrap justify-end gap-2">
@@ -506,7 +500,7 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <h2 class="truncate text-2xl font-black text-slate-950" x-text="membersModal.team?.name || 'Team Members'"></h2>
-                        <p class="mt-1 text-sm font-semibold text-slate-500">Add riders, then set leaders.</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-500">Manage riders and team leaders.</p>
                     </div>
                     <button type="button" @@click="membersModal.open=false" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
@@ -565,7 +559,7 @@
                     </div>
 
                     <div class="overflow-x-auto overflow-y-hidden rounded-2xl border border-slate-200">
-                        <div class="grid min-w-[660px] grid-cols-[minmax(0,1fr)_120px_190px] bg-slate-50 px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        <div class="grid min-w-[680px] grid-cols-[minmax(0,1fr)_120px_220px] bg-slate-50 px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
                             <div>Rider</div>
                             <div>Role</div>
                             <div class="text-right">Action</div>
@@ -574,15 +568,17 @@
                             <div class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No riders have been added to this team.</div>
                         </template>
                         <template x-for="member in members" :key="member.id">
-                            <div class="grid min-w-[660px] grid-cols-[minmax(0,1fr)_120px_190px] items-center gap-3 border-t border-slate-100 px-4 py-3">
+                            <div class="grid min-w-[680px] grid-cols-[minmax(0,1fr)_120px_220px] items-center gap-3 border-t border-slate-100 px-4 py-3">
                                 <div class="min-w-0">
                                     <p class="truncate text-sm font-black text-slate-900" x-text="member.driver?.name || '-'"></p>
                                     <p class="truncate text-xs font-semibold text-slate-500" x-text="member.driver?.phone || '-'"></p>
                                 </div>
-                                <span class="w-max rounded-full px-2.5 py-1 text-[10px] font-black uppercase" :class="member.is_leader ? 'bg-orange-50 text-orange-700 ring-1 ring-orange-100' : 'bg-slate-100 text-slate-600'" x-text="member.role"></span>
+                                <div>
+                                    <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase" :class="member.role === 'leader' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'" x-text="member.role === 'leader' ? 'Leader' : 'Member'"></span>
+                                </div>
                                 <div class="flex justify-end gap-2">
-                                    <button type="button" x-show="!member.is_leader" @@click="makeLeader(member)" class="rounded-xl border border-orange-200 px-3 py-2 text-xs font-black text-orange-700 hover:bg-orange-50">Make Leader</button>
-                                    <button type="button" x-show="member.is_leader" @@click="removeLeader(member)" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50">Remove Leader</button>
+                                    <button type="button" x-show="member.role !== 'leader'" @@click="makeLeader(member)" class="rounded-xl border border-orange-200 px-3 py-2 text-xs font-black text-orange-700 hover:bg-orange-50">Make Leader</button>
+                                    <button type="button" x-show="member.role === 'leader'" @@click="removeLeader(member)" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">Remove Leader</button>
                                     <button type="button" @@click="removeMember(member)" class="rounded-xl border border-rose-200 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50">Remove</button>
                                 </div>
                             </div>
@@ -615,7 +611,7 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <h2 class="text-2xl font-black text-slate-950">New Handover</h2>
-                        <p class="mt-1 text-sm font-semibold text-slate-500">Assign ready package labels to a team leader for custody.</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-500">Assign package custody to a team member.</p>
                     </div>
                     <button type="button" @@click="handoverModal.open=false" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
@@ -625,7 +621,7 @@
                     <div class="grid gap-5 md:grid-cols-2">
                     <div>
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Team</label>
-                        <select x-model="handoverModal.rider_team_id" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                        <select x-model="handoverModal.rider_team_id" @@change="loadHandoverTeamMembers()" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                             <option value="">Choose team</option>
                             <template x-for="team in teams.filter(t => t.is_active)" :key="team.id">
                                 <option :value="team.id" x-text="team.name"></option>
@@ -633,13 +629,14 @@
                         </select>
                     </div>
                     <div>
-                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Team Leader</label>
-                        <select x-model="handoverModal.leader_driver_id" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                            <option value="">Choose leader</option>
-                            <template x-for="driver in drivers" :key="driver.id">
-                                <option :value="driver.id" x-text="`${driver.name} / ${driver.phone}`"></option>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Handover Receiver</label>
+                        <select x-model="handoverModal.receiver_driver_id" :disabled="!handoverModal.rider_team_id || handoverMembers.length === 0" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100 disabled:bg-slate-100 disabled:text-slate-400">
+                            <option value="" x-text="handoverModal.rider_team_id ? 'Choose receiver' : 'Choose team first'"></option>
+                            <template x-for="member in handoverMembers" :key="member.driver?.id">
+                                <option :value="member.driver.id" x-text="`${member.driver.name} / ${member.driver.phone}${member.role === 'leader' ? ' / Leader' : ''}`"></option>
                             </template>
                         </select>
+                        <p x-show="handoverModal.rider_team_id && handoverMembers.length === 0" class="mt-2 text-xs font-bold text-amber-700">Add riders to this team before creating a handover.</p>
                     </div>
                     <div class="md:col-span-2">
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Package Labels</label>
@@ -678,7 +675,7 @@
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
                     <div class="min-w-0">
                         <h2 class="truncate font-mono text-xl font-black text-slate-950" x-text="detailsModal.handover?.handover_number"></h2>
-                        <p class="mt-1 text-sm font-semibold text-slate-500" x-text="`${detailsModal.handover?.team?.name || '-'} / ${detailsModal.handover?.leader?.name || '-'}`"></p>
+                        <p class="mt-1 text-sm font-semibold text-slate-500" x-text="`${detailsModal.handover?.team?.name || '-'} / ${detailsModal.handover?.receiver?.name || '-'}`"></p>
                     </div>
                     <button type="button" @@click="detailsModal.open=false" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
@@ -740,7 +737,6 @@ function riderTeamsPage(config, warehouses, drivers) {
         teamSearch: '',
         teamStatusFilter: '',
         teamWarehouseFilter: '',
-        teamLeaderFilter: '',
         showTeamFilters: false,
         teamPage: 1,
         teamPerPage: 10,
@@ -756,7 +752,8 @@ function riderTeamsPage(config, warehouses, drivers) {
         selectedMemberDriverId: '',
         teamModal: { open: false, id: null, name: '', warehouse_id: '', is_active: true },
         membersModal: { open: false, team: null },
-        handoverModal: { open: false, rider_team_id: '', leader_driver_id: '', barcode_text: '', notes: '' },
+        handoverMembers: [],
+        handoverModal: { open: false, rider_team_id: '', receiver_driver_id: '', barcode_text: '', notes: '' },
         detailsModal: { open: false, handover: null },
 
         init() {
@@ -861,7 +858,7 @@ function riderTeamsPage(config, warehouses, drivers) {
             try {
                 await this.request(this.url(this.config.addMemberUrl, {'__TEAM__': this.membersModal.team.id}), {
                     method: 'POST',
-                    body: JSON.stringify({ driver_id: this.selectedMemberDriverId, role: 'member' }),
+                    body: JSON.stringify({ driver_id: this.selectedMemberDriverId }),
                 });
                 this.memberSearch = '';
                 this.selectedMemberDriverId = '';
@@ -870,34 +867,6 @@ function riderTeamsPage(config, warehouses, drivers) {
                 await this.loadTeams();
             } catch (error) {
                 alert(error.message || 'Could not add rider.');
-            }
-        },
-
-        async makeLeader(member) {
-            if (!this.membersModal.team || !member.driver?.id) return;
-            try {
-                await this.request(this.url(this.config.addMemberUrl, {'__TEAM__': this.membersModal.team.id}), {
-                    method: 'POST',
-                    body: JSON.stringify({ driver_id: member.driver.id, role: 'leader' }),
-                });
-                await this.loadMembers(this.membersModal.team);
-                await this.loadTeams();
-            } catch (error) {
-                alert(error.message || 'Could not set rider as leader.');
-            }
-        },
-
-        async removeLeader(member) {
-            if (!this.membersModal.team || !member.driver?.id || !confirm('Remove leader role from this rider?')) return;
-            try {
-                await this.request(`${this.url(this.config.removeMemberUrl, {
-                    '__TEAM__': this.membersModal.team.id,
-                    '__DRIVER__': member.driver.id,
-                })}?role=leader`, { method: 'DELETE' });
-                await this.loadMembers(this.membersModal.team);
-                await this.loadTeams();
-            } catch (error) {
-                alert(error.message || 'Could not remove leader role.');
             }
         },
 
@@ -912,6 +881,34 @@ function riderTeamsPage(config, warehouses, drivers) {
                 await this.loadTeams();
             } catch (error) {
                 alert(error.message || 'Could not remove rider.');
+            }
+        },
+
+        async makeLeader(member) {
+            if (!this.membersModal.team || !member.driver?.id) return;
+            try {
+                await this.request(this.url(this.config.makeLeaderUrl, {
+                    '__TEAM__': this.membersModal.team.id,
+                    '__DRIVER__': member.driver.id,
+                }), { method: 'POST' });
+                await this.loadMembers(this.membersModal.team);
+                await this.loadTeams();
+            } catch (error) {
+                alert(error.message || 'Could not mark rider as leader.');
+            }
+        },
+
+        async removeLeader(member) {
+            if (!this.membersModal.team || !member.driver?.id) return;
+            try {
+                await this.request(this.url(this.config.removeLeaderUrl, {
+                    '__TEAM__': this.membersModal.team.id,
+                    '__DRIVER__': member.driver.id,
+                }), { method: 'DELETE' });
+                await this.loadMembers(this.membersModal.team);
+                await this.loadTeams();
+            } catch (error) {
+                alert(error.message || 'Could not remove leader role.');
             }
         },
 
@@ -940,10 +937,38 @@ function riderTeamsPage(config, warehouses, drivers) {
         },
 
         openHandoverModal() {
-            this.handoverModal = { open: true, rider_team_id: '', leader_driver_id: '', barcode_text: '', notes: '' };
+            this.handoverMembers = [];
+            this.handoverModal = { open: true, rider_team_id: '', receiver_driver_id: '', barcode_text: '', notes: '' };
+        },
+
+        async loadHandoverTeamMembers() {
+            this.handoverModal.receiver_driver_id = '';
+            this.handoverMembers = [];
+            const team = this.teams.find((item) => String(item.id) === String(this.handoverModal.rider_team_id));
+            if (!team) return;
+
+            try {
+                const data = await this.request(this.url(this.config.membersUrl, {'__TEAM__': team.id}));
+                this.handoverMembers = data.data.members || [];
+                if (this.handoverMembers.length === 1) {
+                    this.handoverModal.receiver_driver_id = this.handoverMembers[0].driver?.id || '';
+                }
+            } catch (error) {
+                alert(error.message || 'Could not load team members.');
+            }
         },
 
         async saveHandover() {
+            if (!this.handoverModal.rider_team_id) {
+                alert('Select the rider team.');
+                return;
+            }
+
+            if (!this.handoverModal.receiver_driver_id) {
+                alert('Select the handover receiver.');
+                return;
+            }
+
             try {
                 await this.request(this.config.storeHandoverUrl, { method: 'POST', body: JSON.stringify(this.handoverModal) });
                 this.handoverModal.open = false;
@@ -972,8 +997,6 @@ function riderTeamsPage(config, warehouses, drivers) {
                 if (this.teamStatusFilter === 'active' && !team.is_active) return false;
                 if (this.teamStatusFilter === 'inactive' && team.is_active) return false;
                 if (this.teamWarehouseFilter && String(team.warehouse?.id || '') !== String(this.teamWarehouseFilter)) return false;
-                if (this.teamLeaderFilter === 'has_leader' && Number(team.leaders_count || 0) === 0) return false;
-                if (this.teamLeaderFilter === 'no_leader' && Number(team.leaders_count || 0) > 0) return false;
                 return true;
             });
         },
@@ -999,18 +1022,17 @@ function riderTeamsPage(config, warehouses, drivers) {
             this.teamSearch = '';
             this.teamStatusFilter = '';
             this.teamWarehouseFilter = '';
-            this.teamLeaderFilter = '';
             this.teamPage = 1;
         },
 
         filteredHandovers() {
             const term = this.handoverSearch.trim().toLowerCase();
             return this.handovers.filter((handover) => {
-                const haystack = [handover.handover_number, handover.team?.name, handover.leader?.name, handover.leader?.phone].filter(Boolean).join(' ').toLowerCase();
+                const haystack = [handover.handover_number, handover.team?.name, handover.receiver?.name, handover.receiver?.phone].filter(Boolean).join(' ').toLowerCase();
                 if (term && !haystack.includes(term)) return false;
                 if (this.handoverStatusFilter && handover.status !== this.handoverStatusFilter) return false;
                 if (this.handoverTeamFilter && String(handover.team?.id || '') !== String(this.handoverTeamFilter)) return false;
-                if (this.handoverCustodyFilter === 'with_leader' && Number(handover.counts?.still_with_leader || 0) <= 0) return false;
+                if (this.handoverCustodyFilter === 'with_receiver' && Number(handover.counts?.with_receiver || 0) <= 0) return false;
                 if (this.handoverCustodyFilter === 'distributed' && Number(handover.counts?.distributed || 0) <= 0) return false;
                 if (this.handoverCustodyFilter === 'delivered' && Number(handover.counts?.delivered || 0) <= 0) return false;
                 return true;

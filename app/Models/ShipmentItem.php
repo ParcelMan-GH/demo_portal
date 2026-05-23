@@ -173,6 +173,11 @@ class ShipmentItem extends Model
         return $this->hasMany(DeliveryRunItem::class);
     }
 
+    public function busHandoffConfirmations(): HasMany
+    {
+        return $this->hasMany(BusHandoffConfirmation::class);
+    }
+
     public function charges(): HasMany
     {
         return $this->hasMany(ShipmentCharge::class);

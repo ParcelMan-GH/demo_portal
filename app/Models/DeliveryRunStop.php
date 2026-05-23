@@ -103,6 +103,11 @@ class DeliveryRunStop extends Model
         return $this->belongsTo(User::class, 'confirmed_by_admin_id');
     }
 
+    public function busHandoffConfirmations(): HasMany
+    {
+        return $this->hasMany(BusHandoffConfirmation::class, 'delivery_run_stop_id');
+    }
+
     public function isBusHandoff(): bool
     {
         return $this->delivery_method === self::METHOD_BUS_HANDOFF;

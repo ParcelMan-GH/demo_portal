@@ -107,6 +107,11 @@
                     <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Warehouse Packages</span>
                     <template x-if="sidebarCollapsed"><span class="wh-tooltip">Warehouse Packages</span></template>
                 </a>
+                <a href="{{ route('warehouse.bus-station-packages.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.bus-station-packages.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 6h8m-9 4h10m-9 8h8M6 18V5a2 2 0 012-2h8a2 2 0 012 2v13M6 18h12M8 21h.01M16 21h.01M9 14h6"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Bus Station Packages</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Bus Station Packages</span></template>
+                </a>
                 @endif
                 @if($canSorting)
                 <a href="{{ route('warehouse.sorting.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.sorting.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">

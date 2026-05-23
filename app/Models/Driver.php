@@ -128,6 +128,6 @@ class Driver extends Authenticatable
 
     public function riderTeamHandovers(): HasMany
     {
-        return $this->hasMany(RiderTeamHandover::class, 'leader_driver_id');
+        return $this->hasMany(RiderTeamHandover::class, 'receiver_driver_id');
     }
 }

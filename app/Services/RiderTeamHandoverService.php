@@ -97,7 +97,7 @@ class RiderTeamHandoverService
 
     public function createHandover(
         RiderTeam $team,
-        Driver $leader,
+        Driver $receiver,
         ?Warehouse $warehouse = null,
         ?User $createdByUser = null,
         ?Driver $createdByDriver = null,
@@ -107,19 +107,21 @@ class RiderTeamHandoverService
             throw ValidationException::withMessages(['rider_team_id' => 'Selected rider team is inactive.']);
         }
 
-        if (! $leader->is_active) {
-            throw ValidationException::withMessages(['leader_driver_id' => 'Selected team leader is inactive.']);
+        if (! $receiver->is_active) {
+            throw ValidationException::withMessages(['receiver_driver_id' => 'Selected handover receiver is inactive.']);
         }
 
-        if (! $this->driverCanManageTeam($leader, $team)) {
-            throw ValidationException::withMessages(['leader_driver_id' => 'Selected rider is not an active leader for this rider team.']);
+        if (! $this->driverBelongsToTeam($receiver, $team)) {
+            throw ValidationException::withMessages(['receiver_driver_id' => 'Selected rider is not an active member of this rider team.']);
         }
 
         return RiderTeamHandover::create([
             'handover_number' => $this->generateHandoverNumber($warehouse),
             'warehouse_id' => $warehouse?->id ?? $team->warehouse_id,
             'rider_team_id' => $team->id,
-            'leader_driver_id' => $leader->id,
+            // Keep the legacy leader column mirrored for old records/code paths; receiver_driver_id is the source of truth.
+            'leader_driver_id' => $receiver->id,
+            'receiver_driver_id' => $receiver->id,
             'created_by_user_id' => $createdByUser?->id,
             'created_by_driver_id' => $createdByDriver?->id,
             'status' => RiderTeamHandover::STATUS_DRAFT,
@@ -157,7 +159,7 @@ class RiderTeamHandoverService
         return DB::transaction(function () use ($handover, $labels, $notes) {
             $assigned = 0;
             foreach ($labels as $label) {
-                $this->assertLabelAssignableToLeader($label);
+                $this->assertLabelAssignableToReceiver($label);
 
                 $item = RiderTeamHandoverItem::create([
                     'rider_team_handover_id' => $handover->id,
@@ -170,7 +172,7 @@ class RiderTeamHandoverService
                 LabelCustodyEvent::create([
                     'warehouse_receipt_item_label_id' => $label->id,
                     'event_type' => LabelCustodyEvent::TYPE_ASSIGNED_TO_LEADER,
-                    'driver_id' => $handover->leader_driver_id,
+                    'driver_id' => $this->handoverReceiverId($handover),
                     'notes' => 'Rider team handover ' . $handover->handover_number,
                 ]);
 
@@ -183,25 +185,25 @@ class RiderTeamHandoverService
         });
     }
 
-    public function receiveByLeader(RiderTeamHandover $handover, Driver $leader, string $barcode): RiderTeamHandoverItem
+    public function receiveByReceiver(RiderTeamHandover $handover, Driver $receiver, string $barcode): RiderTeamHandoverItem
     {
         $handover->loadMissing('team');
         if (! $handover->team?->is_active) {
             throw ValidationException::withMessages(['barcode' => 'This rider team is inactive.']);
         }
 
-        if ((int) $handover->leader_driver_id !== (int) $leader->id) {
-            throw ValidationException::withMessages(['barcode' => 'This handover belongs to another rider team leader.']);
+        if ($this->handoverReceiverId($handover) !== (int) $receiver->id) {
+            throw ValidationException::withMessages(['barcode' => 'This handover belongs to another rider team receiver.']);
         }
 
         $item = $this->handoverItemForBarcode($handover, $barcode);
 
-        return DB::transaction(function () use ($handover, $leader, $item) {
+        return DB::transaction(function () use ($handover, $receiver, $item) {
             if (! in_array($item->status, [
                 RiderTeamHandoverItem::STATUS_ASSIGNED_TO_LEADER,
                 RiderTeamHandoverItem::STATUS_LEADER_RECEIVED,
             ], true)) {
-                throw ValidationException::withMessages(['barcode' => 'This package has already moved past leader receiving.']);
+                throw ValidationException::withMessages(['barcode' => 'This package has already moved past receiver confirmation.']);
             }
 
             $item->update([
@@ -212,8 +214,8 @@ class RiderTeamHandoverService
             LabelCustodyEvent::create([
                 'warehouse_receipt_item_label_id' => $item->warehouse_receipt_item_label_id,
                 'event_type' => LabelCustodyEvent::TYPE_LEADER_RECEIVED,
-                'driver_id' => $leader->id,
-                'notes' => 'Leader received handover ' . $handover->handover_number,
+                'driver_id' => $receiver->id,
+                'notes' => 'Receiver accepted handover ' . $handover->handover_number,
             ]);
 
             $this->refreshHandoverCounts($handover);
@@ -222,7 +224,7 @@ class RiderTeamHandoverService
         });
     }
 
-    public function allocateLabels(RiderTeamHandover $handover, Driver $leader, Driver $member, array $barcodes): array
+    public function allocateLabels(RiderTeamHandover $handover, Driver $receiver, Driver $member, array $barcodes): array
     {
         $handover->loadMissing('team');
         if (! $handover->team?->is_active) {
@@ -233,8 +235,11 @@ class RiderTeamHandoverService
             throw ValidationException::withMessages(['member' => 'Selected rider is inactive.']);
         }
 
-        if (! $this->driverCanManageTeam($leader, $handover->team)) {
-            throw ValidationException::withMessages(['team' => 'Only an active leader can distribute this rider team handover.']);
+        $canDistribute = $this->handoverReceiverId($handover) === (int) $receiver->id
+            || $this->driverCanManageTeam($receiver, $handover->team);
+
+        if (! $canDistribute) {
+            throw ValidationException::withMessages(['team' => 'Only the handover receiver or a team leader can distribute this handover.']);
         }
 
         if (! $this->driverBelongsToTeam($member, $handover->team)) {
@@ -305,7 +310,7 @@ class RiderTeamHandoverService
             RiderTeamHandoverItem::STATUS_RETURNED,
             RiderTeamHandoverItem::STATUS_RECALLED,
         ], true)) {
-            return $this->claimLeaderHeldLabel($driver, $handoverItem, $latitude, $longitude, $notes);
+            return $this->claimReceiverHeldLabel($driver, $handoverItem, $latitude, $longitude, $notes);
         }
 
         $this->assertLabelCanBeClaimedDirectly($label);
@@ -372,7 +377,7 @@ class RiderTeamHandoverService
         return $handover->fresh();
     }
 
-    private function claimLeaderHeldLabel(Driver $driver, RiderTeamHandoverItem $handoverItem, ?float $latitude, ?float $longitude, ?string $notes): array
+    private function claimReceiverHeldLabel(Driver $driver, RiderTeamHandoverItem $handoverItem, ?float $latitude, ?float $longitude, ?string $notes): array
     {
         $handoverItem->loadMissing('handover.team');
         $handover = $handoverItem->handover;
@@ -385,11 +390,11 @@ class RiderTeamHandoverService
             ];
         }
 
-        if ((int) $handover->leader_driver_id === (int) $driver->id && ! $handoverItem->allocated_to_driver_id) {
-            $this->receiveByLeader($handover, $driver, $handoverItem->label->barcode_value);
+        if ($this->handoverReceiverId($handover) === (int) $driver->id && ! $handoverItem->allocated_to_driver_id) {
+            $this->receiveByReceiver($handover, $driver, $handoverItem->label->barcode_value);
 
             return [
-                'status' => 'leader_received',
+                'status' => 'receiver_received',
                 'message' => 'Package received into rider team handover.',
             ];
         }
@@ -415,7 +420,7 @@ class RiderTeamHandoverService
                 LabelCustodyEvent::create([
                     'warehouse_receipt_item_label_id' => $handoverItem->warehouse_receipt_item_label_id,
                     'event_type' => LabelCustodyEvent::TYPE_LEADER_RECEIVED,
-                    'driver_id' => $handover->leader_driver_id,
+                    'driver_id' => $this->handoverReceiverId($handover),
                     'notes' => 'Auto-confirmed before team member claim.',
                 ]);
             }
@@ -459,7 +464,7 @@ class RiderTeamHandoverService
         return ['status' => 'claimed', 'message' => 'Package claimed from rider team handover.'];
     }
 
-    private function assertLabelAssignableToLeader(WarehouseReceiptItemLabel $label): void
+    private function assertLabelAssignableToReceiver(WarehouseReceiptItemLabel $label): void
     {
         $receipt = $label->receiptItem?->receipt;
         if (! $receipt || $receipt->status !== WarehouseReceipt::STATUS_FINALIZED) {
@@ -533,6 +538,11 @@ class RiderTeamHandoverService
             ->where('is_active', true)
             ->whereNull('removed_at')
             ->exists();
+    }
+
+    private function handoverReceiverId(RiderTeamHandover $handover): int
+    {
+        return (int) ($handover->receiver_driver_id ?: $handover->leader_driver_id);
     }
 
     private function labelIsInActiveDeliveryRun(?WarehouseReceiptItemLabel $label): bool

@@ -1091,29 +1091,33 @@
             </div>
 
             <div class="space-y-4 p-5">
+                <p x-show="scannerActive && scannerStatus" class="-mb-2 text-xs font-semibold text-slate-500" x-text="scannerStatus" style="display:none"></p>
                 <div class="relative aspect-[4/3] overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 sm:aspect-video">
                     <video x-ref="scanVideo" class="hidden h-full w-full object-cover" playsinline muted></video>
                     <canvas x-ref="scanCanvas" class="hidden"></canvas>
-                    <div x-show="scannerActive" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-between p-4" style="display:none">
-                        <div class="rounded-full bg-black/55 px-3 py-1.5 text-xs font-bold text-white shadow-lg" x-text="scannerStatus || 'Scanning barcode...'"></div>
-                        <div></div>
-                        <p class="rounded-full bg-black/55 px-3 py-1.5 text-[11px] font-semibold text-white">Point the camera anywhere on the package label</p>
-                    </div>
                     <div x-show="!scannerActive" class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
                         <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-white">
                             <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 7V5a2 2 0 012-2h2m10 0h2a2 2 0 012 2v2M3 17v2a2 2 0 002 2h2m10 0h2a2 2 0 002-2v-2M7 12h10"/>
                             </svg>
                         </div>
-                        <p class="text-sm font-semibold text-white" x-text="scannerStatus || 'Camera scanner is ready when supported by this browser.'"></p>
                         <button type="button" @click="startScanner()" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700">Start Camera Scan</button>
                     </div>
                 </div>
 
                 <div x-show="scanModalMessage" class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700" x-text="scanModalMessage"></div>
 
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Manual entry</label>
+                <div x-show="!manualEntryOpen" class="-mt-1 flex justify-end">
+                    <button type="button" @click="openManualEntry()" class="text-sm font-bold text-orange-700 transition hover:text-orange-800">
+                        Manual entry
+                    </button>
+                </div>
+
+                <div x-show="manualEntryOpen" x-transition class="rounded-2xl border border-slate-200 bg-slate-50 p-4" style="display:none">
+                    <div class="mb-2 flex items-center justify-between gap-3">
+                        <label class="block text-xs font-bold uppercase tracking-wide text-slate-500">Manual entry</label>
+                        <button type="button" @click="manualEntryOpen = false" class="text-xs font-bold text-slate-400 transition hover:text-slate-600">Hide</button>
+                    </div>
                     <form class="flex flex-col gap-3 sm:flex-row" @submit.prevent="scanPackage()">
                         <input type="text" x-model="scanCode" @input="scanModalMessage = ''" x-ref="scanCodeInput" placeholder="Enter or paste label code"
                                class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
@@ -1657,6 +1661,7 @@ function recipientPaymentsPage() {
         taskSortDirection: 'desc',
         scanCode: '',
         scanModalOpen: false,
+        manualEntryOpen: false,
         scannerActive: false,
         scannerStatus: '',
         scanModalMessage: '',
@@ -2242,11 +2247,16 @@ function recipientPaymentsPage() {
 
         openScanModal() {
             this.scanCode = '';
+            this.manualEntryOpen = false;
             this.scannerStatus = '';
             this.scanModalMessage = '';
             this.scannerPending = false;
             this.scannerRejectedCodes = {};
             this.scanModalOpen = true;
+        },
+
+        openManualEntry() {
+            this.manualEntryOpen = true;
             this.$nextTick(() => this.$refs.scanCodeInput?.focus());
         },
 
@@ -2262,13 +2272,13 @@ function recipientPaymentsPage() {
             }
 
             this.scannerStatus = 'Camera scanning is not supported in this browser. Use manual entry below.';
-            this.$nextTick(() => this.$refs.scanCodeInput?.focus());
+            this.openManualEntry();
         },
 
         async startZxingScanner() {
             if (!navigator.mediaDevices?.getUserMedia) {
                 this.scannerStatus = 'Camera access is not available. Use manual entry below.';
-                this.$nextTick(() => this.$refs.scanCodeInput?.focus());
+                this.openManualEntry();
                 return;
             }
 
@@ -2317,7 +2327,7 @@ function recipientPaymentsPage() {
                 console.error('ZXing scanner failed', e);
                 this.scannerStatus = 'Camera scanner could not start. Use manual entry below.';
                 this.stopScanner();
-                this.$nextTick(() => this.$refs.scanCodeInput?.focus());
+                this.openManualEntry();
             }
         },
 

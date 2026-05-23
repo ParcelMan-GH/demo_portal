@@ -56,6 +56,34 @@ class PackageController extends Controller
     {
         $this->authorizePermission('warehouse.items.scan');
 
+        return $this->packageIndexView(
+            endpoint: route('warehouse.packages.data'),
+            title: 'Warehouse Packages',
+            subtitle: 'Every package that has passed through',
+            exportFileName: 'warehouse-packages',
+        );
+    }
+
+    public function busStationIndex(): View
+    {
+        $this->authorizePermission('warehouse.items.scan');
+
+        return $this->packageIndexView(
+            endpoint: route('warehouse.bus-station-packages.data'),
+            title: 'Bus Station Packages',
+            subtitle: 'Packages marked to be sent through a bus station at',
+            exportFileName: 'bus-station-packages',
+            forcedFilters: ['delivery_method' => ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF],
+        );
+    }
+
+    private function packageIndexView(
+        string $endpoint,
+        string $title,
+        string $subtitle,
+        string $exportFileName,
+        array $forcedFilters = [],
+    ): View {
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
         $openBatches = SortBatch::query()
             ->where('origin_warehouse_id', $warehouse->id)
@@ -82,6 +110,11 @@ class PackageController extends Controller
 
         return view('warehouse.items.received', [
             'warehouse' => $warehouse,
+            'pageTitle' => $title,
+            'pageSubtitle' => $subtitle,
+            'dataEndpoint' => $endpoint,
+            'exportFileName' => $exportFileName,
+            'forcedFilters' => $forcedFilters,
             'openBatches' => $openBatches,
             'warehouseUsers' => $warehouseUsers,
             'transferWarehouses' => $transferWarehouses,
@@ -92,6 +125,20 @@ class PackageController extends Controller
     {
         $this->authorizePermission('warehouse.items.scan');
 
+        return $this->packageDataResponse($request);
+    }
+
+    public function busStationData(Request $request): JsonResponse
+    {
+        $this->authorizePermission('warehouse.items.scan');
+
+        $request->merge(['delivery_method' => ShipmentItem::DELIVERY_METHOD_BUS_HANDOFF]);
+
+        return $this->packageDataResponse($request);
+    }
+
+    private function packageDataResponse(Request $request): JsonResponse
+    {
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
         $query = $this->ledgerService->applyFilters($this->ledgerService->query($warehouse), $request);
         $summary = $this->ledgerService->summary(clone $query);
@@ -757,6 +804,7 @@ class PackageController extends Controller
         $deliveryHistory = $deliveryRunItems->map(function ($item) {
             $run = $item->run;
             $stop = $item->stop;
+            $handoffConfirmation = $item->busHandoffConfirmation;
             $proofPhotoUrl = $stop?->proof_photo_path ? $this->storageService->getUrl($stop->proof_photo_path) : null;
             $canViewOtp = (bool) Auth::guard('admin')->user()?->hasPermission('warehouse.delivery.code.reset');
             $otpCode = $canViewOtp ? $this->getDeliveryOtpCode($stop) : null;
@@ -813,6 +861,19 @@ class PackageController extends Controller
                     'vehicle_number' => $stop->handoff_vehicle_number,
                     'handoff_at' => $this->humanDate($stop->handoff_at),
                     'proof_photo_url' => $proofPhotoUrl,
+                    'confirmation_status' => $this->statusLabel($handoffConfirmation?->status),
+                    'confirmation_source' => $this->statusLabel($handoffConfirmation?->source),
+                    'confirmation_target' => $handoffConfirmation?->target_type
+                        ? collect([$this->statusLabel($handoffConfirmation->target_type), $handoffConfirmation->target_name, $handoffConfirmation->target_phone])->filter()->join(' / ')
+                        : null,
+                    'handoff_owner' => $handoffConfirmation?->handoffDriver
+                        ? collect([$handoffConfirmation->handoffDriver->name, $handoffConfirmation->handoffDriver->phone])->filter()->join(' / ')
+                        : null,
+                    'confirmed_by' => $handoffConfirmation?->confirmedByDriver?->name ?: $handoffConfirmation?->confirmedByAdmin?->name,
+                    'confirmed_at' => $this->humanDate($handoffConfirmation?->confirmed_at),
+                    'reason' => $handoffConfirmation?->reason_label ?: $handoffConfirmation?->reason?->label,
+                    'issue_notes' => $handoffConfirmation?->issue_notes,
+                    'confirmation_notes' => $handoffConfirmation?->confirmation_notes,
                 ] : null,
                 'url' => $run ? route('warehouse.deliveries.runs.show', $run) : null,
             ];

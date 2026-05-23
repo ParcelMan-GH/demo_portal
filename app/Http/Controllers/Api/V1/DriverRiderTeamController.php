@@ -31,7 +31,10 @@ class DriverRiderTeamController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'teams' => $memberships->map(fn ($membership) => $this->teamSummary($membership->team, $driver))->values(),
+                'teams' => $memberships
+                    ->unique('rider_team_id')
+                    ->map(fn ($membership) => $this->teamSummary($membership->team, $driver))
+                    ->values(),
             ],
         ]);
     }
@@ -42,31 +45,34 @@ class DriverRiderTeamController extends Controller
         abort_unless($this->service->driverBelongsToTeam($driver, $team), 403);
 
         $team->load(['warehouse:id,name,code']);
-        $isLeader = $this->service->driverCanManageTeam($driver, $team);
 
         $data = $this->teamSummary($team, $driver);
-        if ($isLeader) {
-            $data['members'] = $team->activeMemberships()
-                ->with('driver:id,name,phone,vehicle_type,vehicle_number,is_active')
-                ->orderByRaw("role = 'leader' desc")
-                ->orderBy('id')
-                ->get()
-                ->map(fn ($membership) => [
+        $data['members'] = $team->activeMemberships()
+            ->with('driver:id,name,phone,vehicle_type,vehicle_number,is_active')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('driver_id')
+            ->map(function ($memberships) {
+                $membership = $memberships->firstWhere('role', RiderTeamMembership::ROLE_MEMBER) ?: $memberships->first();
+
+                return [
                     'id' => $membership->id,
-                    'role' => $membership->role,
+                    'role' => $memberships->contains('role', RiderTeamMembership::ROLE_LEADER)
+                        ? RiderTeamMembership::ROLE_LEADER
+                        : RiderTeamMembership::ROLE_MEMBER,
                     'joined_at' => $membership->joined_at?->toIso8601String(),
                     'driver' => $this->driverSummary($membership->driver),
-                ])
-                ->values();
-        }
+                ];
+            })
+            ->values();
 
         return response()->json(['success' => true, 'data' => ['team' => $data]]);
     }
 
     public function lookupMember(Request $request, RiderTeam $team): JsonResponse
     {
-        $driver = $request->user();
-        abort_unless($this->service->driverCanManageTeam($driver, $team), 403);
+        $leader = $request->user();
+        abort_unless($this->service->driverCanManageTeam($leader, $team), 403);
 
         $validated = $request->validate([
             'phone' => ['required', 'string', 'max:30'],
@@ -97,7 +103,6 @@ class DriverRiderTeamController extends Controller
         $validated = $request->validate([
             'driver_id' => ['nullable', 'integer', 'exists:drivers,id'],
             'phone' => ['nullable', 'string', 'max:30'],
-            'role' => ['nullable', 'in:leader,member'],
         ]);
 
         $rider = ! empty($validated['driver_id'])
@@ -111,7 +116,7 @@ class DriverRiderTeamController extends Controller
         $membership = $this->service->addMembership(
             $team,
             $rider,
-            $validated['role'] ?? RiderTeamMembership::ROLE_MEMBER,
+            RiderTeamMembership::ROLE_MEMBER,
             'driver',
             $leader->id,
         );
@@ -122,7 +127,7 @@ class DriverRiderTeamController extends Controller
             'data' => [
                 'membership' => [
                     'id' => $membership->id,
-                    'role' => $membership->role,
+                    'role' => RiderTeamMembership::ROLE_MEMBER,
                     'driver' => $this->driverSummary($rider),
                 ],
             ],
@@ -147,7 +152,6 @@ class DriverRiderTeamController extends Controller
     {
         $team->loadMissing('warehouse:id,name,code');
         $isLeader = $this->service->driverCanManageTeam($driver, $team);
-
         $handovers = $team->handovers()
             ->whereNotIn('status', ['closed', 'recalled'])
             ->get(['assigned_count', 'received_count', 'distributed_count', 'claimed_count', 'delivered_count']);
@@ -155,7 +159,6 @@ class DriverRiderTeamController extends Controller
         return [
             'id' => $team->id,
             'name' => $team->name,
-            'zone' => $team->zone,
             'is_active' => $team->is_active,
             'role' => $isLeader ? RiderTeamMembership::ROLE_LEADER : RiderTeamMembership::ROLE_MEMBER,
             'warehouse' => $team->warehouse ? [
@@ -169,7 +172,7 @@ class DriverRiderTeamController extends Controller
                 'distributed' => (int) $handovers->sum('distributed_count'),
                 'claimed' => (int) $handovers->sum('claimed_count'),
                 'delivered' => (int) $handovers->sum('delivered_count'),
-                'still_with_leader' => max((int) $handovers->sum('received_count') - (int) $handovers->sum('distributed_count'), 0),
+                'with_receiver' => max((int) $handovers->sum('received_count') - (int) $handovers->sum('distributed_count'), 0),
             ],
         ];
     }

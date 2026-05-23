@@ -44,8 +44,10 @@ class DriverDeliveryService
             ->with([
                 'warehouse:id,name,code,address,latitude,longitude,contact_phone',
                 'stops:id,delivery_run_id,recipient_name,recipient_phone,status,delivery_method,total_packages,town,landmark,gh_post_address,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,proof_photo_path,failure_reason,failure_notes,delivery_notes,handoff_courier_name,handoff_courier_phone,handoff_vehicle_number,bus_station_name,handoff_at',
-                'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status',
-                'items.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
+            'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status',
+            'items.busHandoffConfirmation:id,delivery_run_item_id,status,source,target_type,target_phone,confirmation_code_sent_at,confirmed_at,reason_id',
+            'items.busHandoffConfirmation.reason:id,label,type',
+            'items.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
                 'items.shipmentItem.shipment:id,shipment_number,delivery_recipient_name,delivery_recipient_phone,delivery_town',
             ]);
 
@@ -114,6 +116,8 @@ class DriverDeliveryService
             'stops.region:id,name',
             'stops.district:id,name',
             'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status,notes,delivered_at',
+            'items.busHandoffConfirmation:id,delivery_run_item_id,status,source,target_type,target_phone,confirmation_code_sent_at,confirmed_at,reason_id',
+            'items.busHandoffConfirmation.reason:id,label,type',
             'items.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
             'items.shipmentItem.shipment:id,shipment_number,vendor_id,delivery_recipient_name,delivery_recipient_phone,delivery_town',
             'items.shipmentItem.shipment.vendor:id,name,phone,business_name',
@@ -209,7 +213,10 @@ class DriverDeliveryService
                         $vendor = $item->shipmentItem?->shipment?->vendor;
                         $si = $item->shipmentItem;
                         $shipment = $si?->shipment;
+                        $confirmation = $item->busHandoffConfirmation;
                         return [
+                            'id' => $item->id,
+                            'delivery_run_item_id' => $item->id,
                             'shipment_item_id' => $item->shipment_item_id,
                             'shipment_number' => $shipment?->shipment_number,
                             'description' => $si?->description,
@@ -226,6 +233,20 @@ class DriverDeliveryService
                                 'name' => $vendor->name,
                                 'phone' => $vendor->phone,
                                 'business_name' => $vendor->business_name,
+                            ] : null,
+                            'bus_handoff_confirmation' => $confirmation ? [
+                                'id' => $confirmation->id,
+                                'status' => $confirmation->status,
+                                'source' => $confirmation->source,
+                                'target_type' => $confirmation->target_type,
+                                'target_phone' => $confirmation->target_phone,
+                                'code_sent_at' => $confirmation->confirmation_code_sent_at?->toIso8601String(),
+                                'confirmed_at' => $confirmation->confirmed_at?->toIso8601String(),
+                                'reason' => $confirmation->reason ? [
+                                    'id' => $confirmation->reason->id,
+                                    'label' => $confirmation->reason->label,
+                                    'type' => $confirmation->reason->type,
+                                ] : null,
                             ] : null,
                         ];
                     })->values(),

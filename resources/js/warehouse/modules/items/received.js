@@ -25,8 +25,8 @@ function registerWarehousePackagesPage() {
         endpoint: config.endpoint,
         defaultSort: 'received_at',
         defaultPerPage: 25,
-        exportFileName: 'warehouse-packages',
-        printTitle: 'Warehouse Packages',
+        exportFileName: config.export_file_name || 'warehouse-packages',
+        printTitle: config.page_title || 'Warehouse Packages',
         columns: [
             { key: 'package', label: 'Package', sortable: false },
             { key: 'qty', label: 'Qty', sortable: false },
@@ -51,6 +51,7 @@ function registerWarehousePackagesPage() {
             ...page,
             showFilters: false,
             summary: { total: 0, at_warehouse: 0, in_transit: 0, out_for_delivery: 0, delivered: 0, payment_due: 0, total_paid: 0 },
+            forcedFilters: config.forced_filters && typeof config.forced_filters === 'object' ? config.forced_filters : {},
             statCards: [
                 { key: 'total', label: 'Total', icon: 'package', iconClass: 'bg-slate-100 text-slate-700 ring-slate-200' },
                 { key: 'at_warehouse', label: 'At Warehouse', icon: 'warehouse', iconClass: 'bg-orange-50 text-orange-700 ring-orange-200' },
@@ -108,6 +109,11 @@ function registerWarehousePackagesPage() {
             buildParams(overrides = {}) {
                 const params = page.buildParams.call(this, overrides);
                 Object.entries(this.filters).forEach(([key, value]) => {
+                    if (value !== '' && value !== null && value !== undefined) {
+                        params.set(key, value);
+                    }
+                });
+                Object.entries(this.forcedFilters).forEach(([key, value]) => {
                     if (value !== '' && value !== null && value !== undefined) {
                         params.set(key, value);
                     }

@@ -21,6 +21,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\ShipmentCharge;
 use App\Services\ChargesService;
+use App\Services\BusHandoffConfirmationService;
 use App\Services\SmsService;
 use App\Services\StorageService;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,6 +38,7 @@ class WarehouseDeliveryService
         private SmsService $smsService,
         private \App\Services\VendorCommissionService $commissionService,
         private ChargesService $chargesService,
+        private BusHandoffConfirmationService $busHandoffConfirmationService,
         private ?RecipientPaymentService $recipientPaymentService = null,
     ) {
     }
@@ -1480,7 +1482,7 @@ class WarehouseDeliveryService
             $stop->update([
                 'status' => DeliveryRunStop::STATUS_HANDED_OFF,
                 'arrived_at' => $stop->arrived_at ?? $now,
-                'delivered_at' => $now,
+                'delivered_at' => null,
                 'delivery_latitude' => $data['latitude'] ?? null,
                 'delivery_longitude' => $data['longitude'] ?? null,
                 'proof_photo_path' => $upload['path'],
@@ -1516,11 +1518,13 @@ class WarehouseDeliveryService
 
             foreach ($runItems as $runItem) {
                 $runItem->update([
-                    'delivered_quantity' => $runItem->expected_quantity,
+                    'delivered_quantity' => 0,
                     'status' => DeliveryRunItem::STATUS_HANDED_OFF,
                     'notes' => $itemNote,
-                    'delivered_at' => $now,
+                    'delivered_at' => null,
                 ]);
+
+                $this->busHandoffConfirmationService->ensureForRunItem($runItem->fresh(), $driver);
 
                 if ($runItem->shipmentItem) {
                     $runItem->shipmentItem->update(['status' => ItemStatus::HANDED_TO_COURIER]);

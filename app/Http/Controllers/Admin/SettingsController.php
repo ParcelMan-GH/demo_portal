@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
+use App\Models\DeliveryFailureReason;
 use App\Models\BusStation;
 use App\Models\EmailTemplate;
 use App\Models\NotificationLog;
@@ -41,6 +42,7 @@ class SettingsController extends Controller
         'delivery' => ['label' => 'Delivery Settings', 'icon' => 'truck'],
         'pickup-vehicles' => ['label' => 'Pickup Vehicles', 'icon' => 'truck'],
         'bus-stations' => ['label' => 'Bus Stations', 'icon' => 'map'],
+        'delivery-failure-reasons' => ['label' => 'Delivery Failure Reasons', 'icon' => 'chat'],
         'pricing' => ['label' => 'Vendor Commissions', 'icon' => 'cash'],
         'push' => ['label' => 'Push Notifications', 'icon' => 'bell'],
         'health' => ['label' => 'System Health', 'icon' => 'heart'],
@@ -53,6 +55,10 @@ class SettingsController extends Controller
     public function index(Request $request): View
     {
         $activeTab = $request->get('tab', 'platform');
+
+        if ($activeTab === 'bus-handoff-reasons') {
+            $activeTab = 'delivery-failure-reasons';
+        }
 
         // Validate tab exists
         if (!array_key_exists($activeTab, $this->tabs)) {
@@ -145,6 +151,7 @@ class SettingsController extends Controller
             'notification-logs' => $this->getNotificationLogsMeta(),
             'pickup-vehicles' => $this->getPickupVehiclesMeta(),
             'bus-stations' => $this->getBusStationsMeta(),
+            'delivery-failure-reasons' => $this->getDeliveryFailureReasonsMeta(),
             default => [],
         };
     }
@@ -175,6 +182,18 @@ class SettingsController extends Controller
                 ->get()
                 ->map(fn (BusStation $station) => $this->busStationPayload($station))
                 ->values(),
+        ];
+    }
+
+    protected function getDeliveryFailureReasonsMeta(): array
+    {
+        return [
+            'reasons' => DeliveryFailureReason::query()
+                ->latest('id')
+                ->get()
+                ->map(fn (DeliveryFailureReason $reason) => $this->deliveryFailureReasonPayload($reason))
+                ->values(),
+            'types' => DeliveryFailureReason::types(),
         ];
     }
 
@@ -625,6 +644,96 @@ class SettingsController extends Controller
             'location_hint' => $station->location_hint,
             'sort_order' => $station->sort_order,
             'is_active' => $station->is_active,
+        ];
+    }
+
+    public function storeDeliveryFailureReason(Request $request): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $validated = $request->validate([
+            'label' => ['required', 'string', 'max:120', 'unique:delivery_failure_reasons,label'],
+            'type' => ['required', Rule::in(DeliveryFailureReason::types())],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $reason = DeliveryFailureReason::create([
+            'label' => $validated['label'],
+            'slug' => Str::slug($validated['label']),
+            'type' => $validated['type'],
+            'sort_order' => $validated['sort_order'] ?? ((DeliveryFailureReason::max('sort_order') ?? 0) + 1),
+            'is_active' => $validated['is_active'] ?? true,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delivery failure reason created.',
+            'reason' => $this->deliveryFailureReasonPayload($reason),
+        ], 201);
+    }
+
+    public function updateDeliveryFailureReason(Request $request, DeliveryFailureReason $deliveryFailureReason): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $validated = $request->validate([
+            'label' => ['required', 'string', 'max:120', Rule::unique('delivery_failure_reasons', 'label')->ignore($deliveryFailureReason->id)],
+            'type' => ['required', Rule::in(DeliveryFailureReason::types())],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $deliveryFailureReason->update([
+            'label' => $validated['label'],
+            'slug' => Str::slug($validated['label']),
+            'type' => $validated['type'],
+            'sort_order' => $validated['sort_order'] ?? $deliveryFailureReason->sort_order,
+            'is_active' => $validated['is_active'] ?? $deliveryFailureReason->is_active,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delivery failure reason updated.',
+            'reason' => $this->deliveryFailureReasonPayload($deliveryFailureReason->fresh()),
+        ]);
+    }
+
+    public function toggleDeliveryFailureReason(DeliveryFailureReason $deliveryFailureReason): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $deliveryFailureReason->update(['is_active' => !$deliveryFailureReason->is_active]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delivery failure reason status updated.',
+            'reason' => $this->deliveryFailureReasonPayload($deliveryFailureReason->fresh()),
+        ]);
+    }
+
+    public function deleteDeliveryFailureReason(DeliveryFailureReason $deliveryFailureReason): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $deliveryFailureReason->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delivery failure reason deleted.',
+        ]);
+    }
+
+    private function deliveryFailureReasonPayload(DeliveryFailureReason $reason): array
+    {
+        return [
+            'id' => $reason->id,
+            'label' => $reason->label,
+            'slug' => $reason->slug,
+            'type' => $reason->type,
+            'type_label' => Str::of($reason->type)->replace('_', ' ')->title()->toString(),
+            'sort_order' => $reason->sort_order,
+            'is_active' => $reason->is_active,
         ];
     }
 

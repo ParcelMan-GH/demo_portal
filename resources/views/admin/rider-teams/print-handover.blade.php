@@ -21,7 +21,7 @@
     <p class="muted">{{ $handover->handover_number }}</p>
     <div class="grid">
         <div class="box"><strong>Team</strong><br>{{ $handover->team?->name ?? '-' }}</div>
-        <div class="box"><strong>Leader</strong><br>{{ $handover->leader?->name ?? '-' }}<br>{{ $handover->leader?->phone ?? '' }}</div>
+        <div class="box"><strong>Receiver</strong><br>{{ $handover->receiver?->name ?? '-' }}<br>{{ $handover->receiver?->phone ?? '' }}</div>
         <div class="box"><strong>Warehouse</strong><br>{{ $handover->warehouse?->name ?? '-' }}</div>
     </div>
     <div class="grid">
@@ -39,7 +39,7 @@
     </table>
     <div class="grid" style="margin-top:44px">
         <div><strong>Prepared By</strong><br><br>Name<br><br>Signature<br><br>Date</div>
-        <div><strong>Leader Received</strong><br><br>Name<br><br>Signature<br><br>Date</div>
+        <div><strong>Receiver Accepted</strong><br><br>Name<br><br>Signature<br><br>Date</div>
         <div><strong>Warehouse Witness</strong><br><br>Name<br><br>Signature<br><br>Date</div>
     </div>
 </body>

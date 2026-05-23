@@ -27,7 +27,7 @@ class DriverRiderTeamHandoverController extends Controller
             ->pluck('rider_team_id');
 
         $handovers = RiderTeamHandover::query()
-            ->with(['team:id,name,zone', 'leader:id,name,phone'])
+            ->with(['team:id,name', 'receiver:id,name,phone'])
             ->whereIn('rider_team_id', $teamIds)
             ->latest('id')
             ->limit((int) min(max((int) $request->input('limit', 50), 1), 100))
@@ -44,11 +44,12 @@ class DriverRiderTeamHandoverController extends Controller
     public function show(Request $request, RiderTeamHandover $handover): JsonResponse
     {
         $driver = $request->user();
-        $handover->load(['team', 'leader:id,name,phone', 'warehouse:id,name,code']);
+        $handover->load(['team', 'receiver:id,name,phone', 'warehouse:id,name,code']);
         abort_unless($this->service->driverBelongsToTeam($driver, $handover->team), 403);
 
-        $isLeader = (int) $handover->leader_driver_id === (int) $driver->id
-            && $this->service->driverCanManageTeam($driver, $handover->team);
+        $isReceiver = (int) ($handover->receiver_driver_id ?: $handover->leader_driver_id) === (int) $driver->id;
+        $isTeamLeader = $this->service->driverCanManageTeam($driver, $handover->team);
+        $canSeeFullHandover = $isReceiver || $isTeamLeader;
 
         $itemsQuery = $handover->items()
             ->with([
@@ -57,17 +58,19 @@ class DriverRiderTeamHandoverController extends Controller
             ])
             ->orderBy('id');
 
-        if (! $isLeader) {
+        if (! $canSeeFullHandover) {
             $itemsQuery->where('allocated_to_driver_id', $driver->id);
         }
 
-        $items = $itemsQuery->get()->map(fn ($item) => $this->handoverItem($item, $isLeader))->values();
+        $items = $itemsQuery->get()->map(fn ($item) => $this->handoverItem($item, $canSeeFullHandover))->values();
 
         return response()->json([
             'success' => true,
             'data' => [
                 'handover' => array_merge($this->handoverSummary($handover), [
-                    'can_manage' => $isLeader,
+                    'can_manage' => $isTeamLeader,
+                    'can_receive' => $isReceiver,
+                    'can_distribute' => $isReceiver || $isTeamLeader,
                     'items' => $items,
                 ]),
             ],
@@ -76,10 +79,10 @@ class DriverRiderTeamHandoverController extends Controller
 
     public function scanReceive(Request $request, RiderTeamHandover $handover): JsonResponse
     {
-        $leader = $request->user();
+        $receiver = $request->user();
         $validated = $request->validate(['barcode' => ['required', 'string', 'max:100']]);
 
-        $item = $this->service->receiveByLeader($handover->loadMissing('team'), $leader, $validated['barcode']);
+        $item = $this->service->receiveByReceiver($handover->loadMissing('team'), $receiver, $validated['barcode']);
 
         return response()->json([
             'success' => true,
@@ -90,7 +93,7 @@ class DriverRiderTeamHandoverController extends Controller
 
     public function allocate(Request $request, RiderTeamHandover $handover): JsonResponse
     {
-        $leader = $request->user();
+        $receiver = $request->user();
         $validated = $request->validate([
             'driver_id' => ['required', 'integer', 'exists:drivers,id'],
             'barcodes' => ['required', 'array', 'min:1'],
@@ -98,7 +101,7 @@ class DriverRiderTeamHandoverController extends Controller
         ]);
 
         $member = Driver::findOrFail($validated['driver_id']);
-        $result = $this->service->allocateLabels($handover->loadMissing('team'), $leader, $member, $validated['barcodes']);
+        $result = $this->service->allocateLabels($handover->loadMissing('team'), $receiver, $member, $validated['barcodes']);
 
         return response()->json([
             'success' => true,
@@ -153,12 +156,11 @@ class DriverRiderTeamHandoverController extends Controller
             'team' => $handover->team ? [
                 'id' => $handover->team->id,
                 'name' => $handover->team->name,
-                'zone' => $handover->team->zone,
             ] : null,
-            'leader' => $handover->leader ? [
-                'id' => $handover->leader->id,
-                'name' => $handover->leader->name,
-                'phone' => $handover->leader->phone,
+            'receiver' => $handover->receiver ? [
+                'id' => $handover->receiver->id,
+                'name' => $handover->receiver->name,
+                'phone' => $handover->receiver->phone,
             ] : null,
             'counts' => [
                 'assigned' => $handover->assigned_count,
@@ -167,7 +169,7 @@ class DriverRiderTeamHandoverController extends Controller
                 'claimed' => $handover->claimed_count,
                 'delivered' => $handover->delivered_count,
                 'failed' => $handover->failed_count,
-                'still_with_leader' => max($handover->received_count - $handover->distributed_count, 0),
+                'with_receiver' => max($handover->received_count - $handover->distributed_count, 0),
             ],
             'created_at' => $handover->created_at?->toIso8601String(),
             'assigned_at' => $handover->assigned_at?->toIso8601String(),
@@ -190,7 +192,7 @@ class DriverRiderTeamHandoverController extends Controller
                 'phone' => $item->allocatedTo->phone,
             ] : null,
             'assigned_at' => $item->assigned_at?->toIso8601String(),
-            'leader_received_at' => $item->leader_received_at?->toIso8601String(),
+            'receiver_received_at' => $item->leader_received_at?->toIso8601String(),
             'allocated_at' => $item->allocated_at?->toIso8601String(),
             'member_claimed_at' => $item->member_claimed_at?->toIso8601String(),
             'package' => $includePackageDetails ? [

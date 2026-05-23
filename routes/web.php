@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\AdminContactQueueController;
 use App\Http\Controllers\Admin\AdminShipmentChargesController;
 use App\Http\Controllers\Admin\BackOfficeContextController;
 use App\Http\Controllers\Admin\RecipientPaymentController;
+use App\Http\Controllers\BusHandoffPublicController;
 use App\Http\Controllers\Warehouse\WarehouseShipmentChargesController;
 use App\Http\Controllers\Admin\VendorPayoutController;
 use App\Http\Controllers\Admin\WarehouseController;
@@ -45,6 +46,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('web.landing');
 })->name('web.landing');
+
+Route::get('h/{token}', [BusHandoffPublicController::class, 'show'])->name('bus-handoff.public.show');
+Route::post('h/{token}/confirm', [BusHandoffPublicController::class, 'confirm'])->name('bus-handoff.public.confirm');
+Route::post('h/{token}/issue', [BusHandoffPublicController::class, 'issue'])->name('bus-handoff.public.issue');
 
 Route::prefix('vendor')->name('web.vendor.')->group(function () {
     Route::get('login', function () {
@@ -337,6 +342,8 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::get('rider-teams/{team}/members', [RiderTeamController::class, 'members'])->name('rider-teams.members');
         Route::post('rider-teams/{team}/members/lookup', [RiderTeamController::class, 'lookupRider'])->name('rider-teams.members.lookup');
         Route::post('rider-teams/{team}/members', [RiderTeamController::class, 'addMember'])->name('rider-teams.members.store');
+        Route::post('rider-teams/{team}/members/{driver}/leader', [RiderTeamController::class, 'makeLeader'])->name('rider-teams.members.leader.store');
+        Route::delete('rider-teams/{team}/members/{driver}/leader', [RiderTeamController::class, 'removeLeader'])->name('rider-teams.members.leader.destroy');
         Route::delete('rider-teams/{team}/members/{driver}', [RiderTeamController::class, 'removeMember'])->name('rider-teams.members.destroy');
         Route::get('rider-team-handovers-data', [RiderTeamController::class, 'handoversData'])->name('rider-teams.handovers.data');
         Route::post('rider-team-handovers', [RiderTeamController::class, 'storeHandover'])->name('rider-teams.handovers.store');
@@ -533,6 +540,10 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::put('settings/bus-stations/{busStation}', [SettingsController::class, 'updateBusStation'])->name('settings.bus-stations.update');
         Route::patch('settings/bus-stations/{busStation}/toggle', [SettingsController::class, 'toggleBusStation'])->name('settings.bus-stations.toggle');
         Route::delete('settings/bus-stations/{busStation}', [SettingsController::class, 'deleteBusStation'])->name('settings.bus-stations.delete');
+        Route::post('settings/delivery-failure-reasons', [SettingsController::class, 'storeDeliveryFailureReason'])->name('settings.delivery-failure-reasons.store');
+        Route::put('settings/delivery-failure-reasons/{deliveryFailureReason}', [SettingsController::class, 'updateDeliveryFailureReason'])->name('settings.delivery-failure-reasons.update');
+        Route::patch('settings/delivery-failure-reasons/{deliveryFailureReason}/toggle', [SettingsController::class, 'toggleDeliveryFailureReason'])->name('settings.delivery-failure-reasons.toggle');
+        Route::delete('settings/delivery-failure-reasons/{deliveryFailureReason}', [SettingsController::class, 'deleteDeliveryFailureReason'])->name('settings.delivery-failure-reasons.delete');
         Route::post('settings/email-templates', [SettingsController::class, 'storeEmailTemplate'])->name('settings.email-templates.store');
         Route::put('settings/email-templates/{emailTemplate}', [SettingsController::class, 'updateEmailTemplate'])->name('settings.email-templates.update');
         Route::patch('settings/email-templates/{emailTemplate}/toggle', [SettingsController::class, 'toggleEmailTemplate'])->name('settings.email-templates.toggle');
@@ -625,6 +636,8 @@ Route::prefix(config('backoffice.prefix', 'admin') . '/operations')
         Route::get('pickups/received', [WarehouseReceiptController::class, 'receivedPickupsIndex'])->name('pickups.received.index');
         Route::get('pickups/received-data', [WarehouseReceiptController::class, 'receivedPickupsData'])->name('pickups.received.data');
         Route::get('pickups/received/{pickupAssignment}', [WarehouseReceiptController::class, 'receivedPickupShow'])->name('pickups.received.show');
+        Route::get('bus-station-packages', [WarehousePackageController::class, 'busStationIndex'])->name('bus-station-packages.index');
+        Route::get('bus-station-packages-data', [WarehousePackageController::class, 'busStationData'])->name('bus-station-packages.data');
         Route::get('packages', [WarehousePackageController::class, 'index'])->name('packages.index');
         Route::get('packages-data', [WarehousePackageController::class, 'data'])->name('packages.data');
         Route::get('packages/{warehouseReceiptItem}', [WarehousePackageController::class, 'show'])->name('packages.show');

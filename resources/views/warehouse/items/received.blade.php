@@ -1,14 +1,19 @@
 @extends('warehouse.layouts.app')
 
-@section('title', 'Warehouse Packages')
-@section('page-title', 'Warehouse Packages')
+@section('title', $pageTitle ?? 'Warehouse Packages')
+@section('page-title', $pageTitle ?? 'Warehouse Packages')
 
 @php
+    $isBusStationPackagesPage = (($forcedFilters['delivery_method'] ?? null) === 'bus_handoff');
     $config = [
-        'endpoint' => route('warehouse.packages.data'),
+        'endpoint' => $dataEndpoint ?? route('warehouse.packages.data'),
         'update_url' => route('warehouse.packages.update', ['warehouseReceiptItem' => '__ITEM__']),
         'print_label_url' => route('warehouse.packages.print-label', ['warehouseReceiptItem' => '__ITEM__']),
         'location_search_url' => route('warehouse.locations.search'),
+        'page_title' => $pageTitle ?? 'Warehouse Packages',
+        'page_subtitle' => $pageSubtitle ?? 'Every package that has passed through',
+        'export_file_name' => $exportFileName ?? 'warehouse-packages',
+        'forced_filters' => $forcedFilters ?? [],
         'transfer_warehouses' => $transferWarehouses,
         'open_batches' => $openBatches->map(fn ($batch) => [
             'id' => $batch->id,
@@ -64,8 +69,8 @@
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                         </div>
                         <div class="min-w-0">
-                            <h2 class="text-lg font-extrabold text-slate-900">Warehouse Packages</h2>
-                            <p class="truncate text-sm text-slate-500">Every package that has passed through {{ $warehouse->name ?? 'this warehouse' }}.</p>
+                            <h2 class="text-lg font-extrabold text-slate-900">{{ $pageTitle ?? 'Warehouse Packages' }}</h2>
+                            <p class="truncate text-sm text-slate-500">{{ $pageSubtitle ?? 'Every package that has passed through' }} {{ $warehouse->name ?? 'this warehouse' }}.</p>
                         </div>
                     </div>
                 </div>
@@ -182,12 +187,18 @@
                     </div>
                     <div>
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Delivery Method</label>
-                        <select x-model="filters.delivery_method" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                            <option value="">All methods</option>
-                            <option value="direct">Direct</option>
-                            <option value="bus_handoff">Bus handoff</option>
-                            <option value="pickup">Self pickup</option>
-                        </select>
+                        @if($isBusStationPackagesPage)
+                            <div class="flex min-h-[48px] items-center rounded-xl border-2 border-violet-100 bg-violet-50 px-3 py-3 text-sm font-extrabold text-violet-700">
+                                Bus handoff only
+                            </div>
+                        @else
+                            <select x-model="filters.delivery_method" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                <option value="">All methods</option>
+                                <option value="direct">Direct</option>
+                                <option value="bus_handoff">Bus handoff</option>
+                                <option value="pickup">Self pickup</option>
+                            </select>
+                        @endif
                     </div>
                     <div>
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payment</label>

@@ -154,6 +154,28 @@
                             <input type="number" min="0" x-model="filters.packages_max" placeholder="Max" class="min-w-0 flex-1 border-0 bg-transparent px-3 py-3 text-sm font-semibold text-slate-900 outline-none">
                         </div>
                     </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Confirmation</label>
+                        <select x-model="filters.confirmation_status" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All confirmation states</option>
+                            <option value="pending">Pending</option>
+                            <option value="code_sent">Code sent</option>
+                            <option value="issue_reported">Issue reported</option>
+                            <option value="confirmed">Rider/Public confirmed</option>
+                            <option value="admin_confirmed">Admin confirmed</option>
+                            <option value="failed">Failed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Source</label>
+                        <select x-model="filters.confirmation_source" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All sources</option>
+                            <option value="rider_code">Rider code</option>
+                            <option value="public_link">Public link</option>
+                            <option value="admin">Admin</option>
+                            <option value="vendor_followup">Vendor follow-up</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
                     <button type="button" @@click="showFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
@@ -397,6 +419,8 @@ function pendingConfirmations() {
             handoff_date_to: '',
             packages_min: '',
             packages_max: '',
+            confirmation_status: '',
+            confirmation_source: '',
         },
         columns: [
             { key: 'run_number', label: 'Run #' },

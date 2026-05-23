@@ -44,7 +44,7 @@ class RiderTeamController extends Controller
             ->with(['warehouse:id,name,code'])
             ->whereIn('warehouse_id', $warehouseIds)
             ->withCount([
-                'activeMemberships as members_count',
+                'members as members_count',
                 'leaders as leaders_count',
                 'handovers as handovers_count',
             ])
@@ -119,18 +119,16 @@ class RiderTeamController extends Controller
 
         $members = $team->activeMemberships()
             ->with('driver:id,name,phone,vehicle_type,vehicle_number,is_active')
-            ->orderByRaw("role = 'leader' desc")
             ->orderBy('id')
             ->get()
             ->groupBy('driver_id')
             ->map(function ($memberships) {
-                $leader = $memberships->firstWhere('role', RiderTeamMembership::ROLE_LEADER);
-                $membership = $leader ?: $memberships->first();
+                $membership = $memberships->firstWhere('role', RiderTeamMembership::ROLE_MEMBER) ?: $memberships->first();
+                $isLeader = $memberships->contains('role', RiderTeamMembership::ROLE_LEADER);
 
                 return [
                     'id' => $membership->id,
-                    'role' => $leader ? RiderTeamMembership::ROLE_LEADER : RiderTeamMembership::ROLE_MEMBER,
-                    'is_leader' => (bool) $leader,
+                    'role' => $isLeader ? RiderTeamMembership::ROLE_LEADER : RiderTeamMembership::ROLE_MEMBER,
                     'joined_at' => $membership->joined_at?->format('M d, Y h:i A'),
                     'driver' => [
                         'id' => $membership->driver?->id,
@@ -181,7 +179,6 @@ class RiderTeamController extends Controller
         $validated = $request->validate([
             'driver_id' => ['nullable', 'integer', 'exists:drivers,id'],
             'phone' => ['nullable', 'string', 'max:30'],
-            'role' => ['nullable', 'in:leader,member'],
         ]);
 
         $driver = ! empty($validated['driver_id'])
@@ -192,9 +189,33 @@ class RiderTeamController extends Controller
             return response()->json(['success' => false, 'message' => 'Rider not found.'], 404);
         }
 
-        $membership = $this->service->addMembership($team, $driver, $validated['role'] ?? RiderTeamMembership::ROLE_MEMBER, 'user', Auth::guard('admin')->id());
+        $membership = $this->service->addMembership($team, $driver, RiderTeamMembership::ROLE_MEMBER, 'user', Auth::guard('admin')->id());
 
         return response()->json(['success' => true, 'message' => 'Rider added to team.', 'data' => ['membership' => $membership]]);
+    }
+
+    public function makeLeader(RiderTeam $team, Driver $driver): JsonResponse
+    {
+        $this->authorizeRiderTeamManage();
+        $this->assertTeamAccess($team);
+
+        if (! $this->service->driverBelongsToTeam($driver, $team)) {
+            return response()->json(['success' => false, 'message' => 'Add this rider to the team first.'], 422);
+        }
+
+        $this->service->addMembership($team, $driver, RiderTeamMembership::ROLE_LEADER, 'user', Auth::guard('admin')->id());
+
+        return response()->json(['success' => true, 'message' => 'Rider marked as team leader.']);
+    }
+
+    public function removeLeader(RiderTeam $team, Driver $driver): JsonResponse
+    {
+        $this->authorizeRiderTeamManage();
+        $this->assertTeamAccess($team);
+
+        $this->service->removeMembership($team, $driver, RiderTeamMembership::ROLE_LEADER);
+
+        return response()->json(['success' => true, 'message' => 'Team leader role removed.']);
     }
 
     public function removeMember(RiderTeam $team, Driver $driver): JsonResponse
@@ -202,12 +223,7 @@ class RiderTeamController extends Controller
         $this->authorizeRiderTeamManage();
         $this->assertTeamAccess($team);
 
-        $role = request('role');
-        if (! in_array($role, [RiderTeamMembership::ROLE_LEADER, RiderTeamMembership::ROLE_MEMBER], true)) {
-            $role = null;
-        }
-
-        $this->service->removeMembership($team, $driver, $role);
+        $this->service->removeMembership($team, $driver);
 
         return response()->json(['success' => true, 'message' => 'Rider removed from team.']);
     }
@@ -218,7 +234,7 @@ class RiderTeamController extends Controller
         $warehouseIds = $this->scopedWarehouseIds();
 
         $handovers = RiderTeamHandover::query()
-            ->with(['team:id,name', 'leader:id,name,phone', 'warehouse:id,name,code'])
+            ->with(['team:id,name', 'receiver:id,name,phone', 'warehouse:id,name,code'])
             ->whereIn('warehouse_id', $warehouseIds)
             ->when($request->filled('team_id'), fn ($query) => $query->where('rider_team_id', $request->integer('team_id')))
             ->latest('id')
@@ -235,7 +251,7 @@ class RiderTeamController extends Controller
 
         $validated = $request->validate([
             'rider_team_id' => ['required', 'exists:rider_teams,id'],
-            'leader_driver_id' => ['required', 'exists:drivers,id'],
+            'receiver_driver_id' => ['nullable', 'exists:drivers,id'],
             'warehouse_id' => ['nullable', 'exists:warehouses,id'],
             'barcodes' => ['nullable', 'array'],
             'barcodes.*' => ['string', 'max:100'],
@@ -245,7 +261,12 @@ class RiderTeamController extends Controller
 
         $team = RiderTeam::findOrFail($validated['rider_team_id']);
         $this->assertTeamAccess($team);
-        $leader = Driver::findOrFail($validated['leader_driver_id']);
+        $receiverId = $validated['receiver_driver_id'] ?? null;
+        if (! $receiverId) {
+            return response()->json(['success' => false, 'message' => 'Select the handover receiver.'], 422);
+        }
+
+        $receiver = Driver::findOrFail($receiverId);
         $warehouse = $team->warehouse;
 
         $barcodes = collect($validated['barcodes'] ?? [])
@@ -256,13 +277,13 @@ class RiderTeamController extends Controller
             ->values()
             ->all();
 
-        $handover = DB::transaction(function () use ($team, $leader, $warehouse, $validated, $barcodes) {
-            $handover = $this->service->createHandover($team, $leader, $warehouse, Auth::guard('admin')->user(), null, $validated['notes'] ?? null);
+        $handover = DB::transaction(function () use ($team, $receiver, $warehouse, $validated, $barcodes) {
+            $handover = $this->service->createHandover($team, $receiver, $warehouse, Auth::guard('admin')->user(), null, $validated['notes'] ?? null);
             if ($barcodes) {
                 $this->service->assignLabels($handover, $barcodes, $validated['notes'] ?? null);
             }
 
-            return $handover->fresh(['team', 'leader', 'warehouse']);
+            return $handover->fresh(['team', 'receiver', 'warehouse']);
         });
 
         return response()->json(['success' => true, 'message' => 'Rider team handover created.', 'data' => ['handover' => $this->serializeHandover($handover)]]);
@@ -275,7 +296,7 @@ class RiderTeamController extends Controller
 
         $handover->load([
             'team:id,name',
-            'leader:id,name,phone',
+            'receiver:id,name,phone',
             'warehouse:id,name,code',
             'items.allocatedTo:id,name,phone',
             'items.label.receiptItem.shipmentItem:id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
@@ -359,7 +380,7 @@ class RiderTeamController extends Controller
 
         $handover->load([
             'team:id,name',
-            'leader:id,name,phone',
+            'receiver:id,name,phone',
             'warehouse:id,name,code',
             'items.label',
         ]);
@@ -434,7 +455,7 @@ class RiderTeamController extends Controller
             'handover_number' => $handover->handover_number,
             'status' => $handover->status,
             'team' => $handover->team ? ['id' => $handover->team->id, 'name' => $handover->team->name] : null,
-            'leader' => $handover->leader ? ['id' => $handover->leader->id, 'name' => $handover->leader->name, 'phone' => $handover->leader->phone] : null,
+            'receiver' => $handover->receiver ? ['id' => $handover->receiver->id, 'name' => $handover->receiver->name, 'phone' => $handover->receiver->phone] : null,
             'warehouse' => $handover->warehouse ? ['id' => $handover->warehouse->id, 'name' => $handover->warehouse->name, 'code' => $handover->warehouse->code] : null,
             'counts' => [
                 'assigned' => $handover->assigned_count,
@@ -443,7 +464,7 @@ class RiderTeamController extends Controller
                 'claimed' => $handover->claimed_count,
                 'delivered' => $handover->delivered_count,
                 'failed' => $handover->failed_count,
-                'still_with_leader' => max($handover->received_count - $handover->distributed_count, 0),
+                'with_receiver' => max($handover->received_count - $handover->distributed_count, 0),
             ],
             'created_at' => $handover->created_at?->format('M d, Y h:i A'),
             'print_url' => route('admin.rider-teams.handovers.print', $handover),

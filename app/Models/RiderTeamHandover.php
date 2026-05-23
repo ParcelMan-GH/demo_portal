@@ -22,6 +22,7 @@ class RiderTeamHandover extends Model
         'warehouse_id',
         'rider_team_id',
         'leader_driver_id',
+        'receiver_driver_id',
         'created_by_user_id',
         'created_by_driver_id',
         'status',
@@ -62,6 +63,11 @@ class RiderTeamHandover extends Model
     public function leader(): BelongsTo
     {
         return $this->belongsTo(Driver::class, 'leader_driver_id');
+    }
+
+    public function receiver(): BelongsTo
+    {
+        return $this->belongsTo(Driver::class, 'receiver_driver_id');
     }
 
     public function createdByUser(): BelongsTo

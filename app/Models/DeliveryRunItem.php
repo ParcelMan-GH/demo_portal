@@ -47,5 +47,9 @@ class DeliveryRunItem extends Model
     {
         return $this->belongsTo(ShipmentItem::class);
     }
-}
 
+    public function busHandoffConfirmation(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(BusHandoffConfirmation::class, 'delivery_run_item_id');
+    }
+}
