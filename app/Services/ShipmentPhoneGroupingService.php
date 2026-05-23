@@ -40,6 +40,76 @@ class ShipmentPhoneGroupingService
         });
     }
 
+    public function regroupCurrentPhotos(Shipment $shipment): ?ShipmentDestinationMode
+    {
+        return DB::transaction(function () use ($shipment) {
+            $shipment = Shipment::query()
+                ->with(['items.images', 'items.deliveryRegion', 'items.deliveryDistrict', 'deliveryRegion', 'deliveryDistrict'])
+                ->lockForUpdate()
+                ->find($shipment->id);
+
+            if (! $shipment) {
+                return null;
+            }
+
+            $allImages = $shipment->items
+                ->flatMap(fn (ShipmentItem $item) => $item->images)
+                ->values();
+
+            if ($allImages->isEmpty()) {
+                return null;
+            }
+
+            $grouped = $allImages->groupBy(function (ShipmentItemImage $image) {
+                return $this->normalizePhone($image->recipient_phone) ?: '__untagged__';
+            })->sortKeys();
+
+            $sourceItems = $shipment->items->keyBy('id');
+            $usedItemIds = collect();
+            $groupedItems = [];
+
+            foreach ($grouped as $phone => $images) {
+                $isUntagged = $phone === '__untagged__';
+                $images = collect($images)->values();
+
+                $keeper = $this->findKeeperForGroup($shipment, $sourceItems, $usedItemIds, $phone, $images);
+                if (! $keeper) {
+                    continue;
+                }
+
+                $keeper->update([
+                    'quantity' => max(1, $images->count()),
+                    'delivery_recipient_phone' => $isUntagged ? null : $phone,
+                ]);
+
+                ShipmentItemImage::query()
+                    ->whereIn('id', $images->pluck('id')->all())
+                    ->update(['shipment_item_id' => $keeper->id]);
+
+                $usedItemIds->push((int) $keeper->id);
+                $sourceItems->put($keeper->id, $keeper);
+                $groupedItems[] = [
+                    'id' => $keeper->id,
+                    'phone' => $isUntagged ? null : $phone,
+                ];
+            }
+
+            $keepItemIds = collect($groupedItems)->pluck('id')->unique()->values();
+            $shipment->items()
+                ->whereNotIn('id', $keepItemIds)
+                ->get()
+                ->each(function (ShipmentItem $item) {
+                    if ($item->images()->count() === 0) {
+                        $item->delete();
+                    }
+                });
+
+            $shipment->load(['items.images', 'items.deliveryRegion', 'items.deliveryDistrict', 'deliveryRegion', 'deliveryDistrict']);
+
+            return $this->syncDestinationModeFromGroups($shipment, $groupedItems);
+        });
+    }
+
     private function splitItemsWithMultipleTaggedPhones(Shipment $shipment): void
     {
         $shipment->items->each(function (ShipmentItem $item) {
@@ -122,6 +192,81 @@ class ShipmentPhoneGroupingService
         }
 
         return null;
+    }
+
+    private function syncDestinationModeFromGroups(Shipment $shipment, array $groupedItems): ?ShipmentDestinationMode
+    {
+        $groups = collect($groupedItems);
+        if ($groups->isEmpty()) {
+            return null;
+        }
+
+        $taggedPhones = $groups->pluck('phone')->filter()->unique()->values();
+        $hasUntagged = $groups->contains(fn (array $group) => blank($group['phone']));
+
+        if ($groups->count() > 1 || $taggedPhones->count() > 1) {
+            $this->seedPackageDeliveryFromShipment($shipment);
+            $shipment->update(array_merge(
+                ['destination_mode' => ShipmentDestinationMode::PER_ITEM],
+                $this->emptyShipmentDeliveryAttributes()
+            ));
+
+            return ShipmentDestinationMode::PER_ITEM;
+        }
+
+        $phone = $taggedPhones->first();
+        $seed = $shipment->destination_mode === ShipmentDestinationMode::PER_ITEM
+            ? $this->shipmentDeliverySeedFromItems($shipment)
+            : [];
+
+        $shipment->update(array_merge($seed, [
+            'destination_mode' => ShipmentDestinationMode::SINGLE,
+            'delivery_recipient_phone' => $hasUntagged ? null : $phone,
+        ]));
+
+        if ($hasUntagged) {
+            $shipment->items()->update($this->emptyItemDeliveryAttributes());
+        }
+
+        return ShipmentDestinationMode::SINGLE;
+    }
+
+    private function findKeeperForGroup(Shipment $shipment, Collection $sourceItems, Collection $usedItemIds, string $phone, Collection $images): ?ShipmentItem
+    {
+        $isUntagged = $phone === '__untagged__';
+
+        $matchingItem = $sourceItems
+            ->reject(fn (ShipmentItem $item) => $usedItemIds->contains((int) $item->id))
+            ->first(function (ShipmentItem $item) use ($phone, $isUntagged) {
+                $itemPhone = $this->normalizePhone($item->delivery_recipient_phone);
+
+                return $isUntagged ? blank($itemPhone) : $itemPhone === $phone;
+            });
+
+        if ($matchingItem) {
+            return $matchingItem;
+        }
+
+        $imageItemIds = $images->pluck('shipment_item_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+
+        foreach ($imageItemIds as $imageItemId) {
+            if (! $usedItemIds->contains($imageItemId) && $sourceItems->has($imageItemId)) {
+                return $sourceItems->get($imageItemId);
+            }
+        }
+
+        $sourceItem = $sourceItems->get($imageItemIds->first()) ?: $sourceItems->first();
+        if (! $sourceItem) {
+            return null;
+        }
+
+        return ShipmentItem::create($this->cloneItemAttributes($sourceItem, [
+            'delivery_recipient_phone' => $isUntagged ? null : $phone,
+            'quantity' => max(1, $images->count()),
+        ]));
     }
 
     private function normalizePhone(?string $phone): ?string
@@ -229,6 +374,11 @@ class ShipmentPhoneGroupingService
     }
 
     private function emptyShipmentDeliveryAttributes(): array
+    {
+        return array_fill_keys($this->deliveryFieldKeys(), null);
+    }
+
+    private function emptyItemDeliveryAttributes(): array
     {
         return array_fill_keys($this->deliveryFieldKeys(), null);
     }

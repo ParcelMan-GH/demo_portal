@@ -10,6 +10,7 @@ use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemImage;
 use App\Services\ShipmentItemService;
+use App\Services\ShipmentPhoneGroupingService;
 use App\Services\ShipmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,8 @@ class VendorShipmentController extends Controller
 {
     public function __construct(
         private ShipmentService $shipmentService,
-        private ShipmentItemService $shipmentItemService
+        private ShipmentItemService $shipmentItemService,
+        private ShipmentPhoneGroupingService $shipmentPhoneGroupingService
     ) {}
 
     /**
@@ -295,14 +297,20 @@ class VendorShipmentController extends Controller
             return response()->json($result, 400);
         }
 
-        // Handle photo operations on the first item (unprocessed = 1 item holds all photos)
+        $photoOperationsChanged = false;
+
+        // Handle photo operations on the first item (editable submitted shipments are still unprocessed)
         $item = $shipment->items()->first();
         if ($item) {
             // Remove photos
             if (!empty($removePhotoIds)) {
-                $images = $item->images()->whereIn('id', $removePhotoIds)->get();
+                $images = ShipmentItemImage::query()
+                    ->whereIn('id', $removePhotoIds)
+                    ->whereHas('item', fn ($query) => $query->where('shipment_id', $shipment->id))
+                    ->get();
                 foreach ($images as $image) {
                     $image->delete();
+                    $photoOperationsChanged = true;
                 }
             }
 
@@ -311,7 +319,12 @@ class VendorShipmentController extends Controller
             $newPhotosPhones = is_array($newPhotosPhones) ? $newPhotosPhones : [];
             if (!empty($newPhotos)) {
                 $this->shipmentItemService->uploadImages($item, $newPhotos, $request, $newPhotosPhones);
+                $photoOperationsChanged = true;
             }
+        }
+
+        if ($photoOperationsChanged) {
+            $this->shipmentPhoneGroupingService->regroupCurrentPhotos($shipment);
         }
 
         // Reload and return
