@@ -50,10 +50,12 @@
             <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
                 <div>
                     <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Vendor phone</label>
-                    <input type="text" x-model="vendorPhone" @@keydown.enter.prevent="lookupVendor()" placeholder="0241234567"
-                           class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                    <input type="tel" x-model="vendorPhone" @@input="normalizeVendorPhoneInput()" @@blur="validateVendorPhone(true)" @@keydown.enter.prevent="lookupVendor()" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="0241234567"
+                           class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm"
+                           :class="vendorPhoneError ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : ''">
+                    <p x-show="vendorPhoneError" x-text="vendorPhoneError" class="mt-1 text-xs font-semibold text-rose-600"></p>
                 </div>
-                <button type="button" @@click="lookupVendor()" :disabled="vendorLoading || vendorPhone.length < 9"
+                <button type="button" @@click="lookupVendor()" :disabled="vendorLoading || !isValidPhone(vendorPhone)"
                         class="mt-auto rounded-xl border-2 border-slate-900 bg-slate-900 px-5 py-3 text-base font-black text-white transition hover:border-slate-800 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm">
                     <span x-show="!vendorLoading">Search</span>
                     <span x-show="vendorLoading">Searching...</span>
@@ -317,7 +319,7 @@
                                 <span class="block truncate text-sm font-bold text-slate-700" x-text="packageForm.photos.length ? packageForm.photos.length + ' photo(s) selected' : 'Upload or take package photos'"></span>
                                 <span class="block text-xs font-medium text-slate-400">PNG, JPG or WEBP up to 12MB each</span>
                             </span>
-                            <span class="inline-flex w-fit shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-black text-orange-700 shadow-sm ring-1 ring-orange-100">Choose</span>
+                            <span class="inline-flex w-fit shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-black text-orange-700 shadow-sm ring-1 ring-orange-100">Take Photo</span>
                             <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" capture="environment" multiple class="hidden" @@change="handlePackagePhotos($event)">
                         </label>
                     </div>
@@ -341,7 +343,10 @@
                             </div>
                             <div>
                                 <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Recipient phone <span class="text-rose-500">*</span></label>
-                                <input x-model="packageForm.delivery.recipient_phone" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                                <input type="tel" x-model="packageForm.delivery.recipient_phone" @@input="normalizeDeliveryPhoneInput(packageForm.delivery)" @@blur="validateDeliveryPhone(packageForm.delivery, true)" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="0241234567"
+                                       class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm"
+                                       :class="packageForm.delivery.phoneError ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : ''">
+                                <p x-show="packageForm.delivery.phoneError" x-text="packageForm.delivery.phoneError" class="mt-1 text-xs font-semibold text-rose-600"></p>
                             </div>
                             <div class="relative sm:col-span-2" @@click.outside="packageForm.delivery._showDropdown = false" @@focusout="closeLocationDropdownSoon(packageForm.delivery)">
                                 <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Location <span class="text-rose-500">*</span></label>
@@ -428,6 +433,7 @@ function walkinShipment() {
         vendorData: null,
         vendorId: null,
         vendorError: '',
+        vendorPhoneError: '',
         newVendor: { name: '', business_name: '', phone: '', email: '' },
         creatingVendor: false,
         delivery: null,
@@ -457,6 +463,7 @@ function walkinShipment() {
             return {
                 recipient_name: '',
                 recipient_phone: '',
+                phoneError: '',
                 locationQuery: '',
                 locationResults: [],
                 selectedLocation: null,
@@ -506,6 +513,7 @@ function walkinShipment() {
             this.packageModalIndex = index;
             this.packageForm = index === null ? this.makeItem() : this.cloneItem(this.items[index]);
             this.packageForm.send_to_bus_station = this.packageForm.delivery_method === 'bus_handoff';
+            this.validateDeliveryPhone(this.packageForm.delivery, false);
             this.packageModalOpen = true;
         },
 
@@ -516,7 +524,10 @@ function walkinShipment() {
         },
 
         savePackageFromModal() {
-            if (!this.canSavePackageForm()) return;
+            if (!this.canSavePackageForm()) {
+                this.validateDeliveryPhone(this.packageForm?.delivery, true);
+                return;
+            }
             const item = this.cloneItem(this.packageForm);
             item.delivery.recipient_name = item.delivery.recipient_name?.trim() || 'Recipient';
             item.delivery_method = item.send_to_bus_station ? 'bus_handoff' : 'direct';
@@ -538,7 +549,7 @@ function walkinShipment() {
             return Boolean(
                 this.packageForm.description?.trim()
                 && Number(this.packageForm.quantity || 0) > 0
-                && delivery.recipient_phone?.trim()
+                && this.isValidPhone(delivery.recipient_phone)
                 && delivery.locationQuery?.trim()
                 && (this.packageForm.photos || []).length > 0
             );
@@ -591,8 +602,58 @@ function walkinShipment() {
             this.activePhotoIndex = (this.activePhotoIndex - 1 + this.photoPreviewUrls.length) % this.photoPreviewUrls.length;
         },
 
+        phoneValidationMessage(phone, showIncomplete = true) {
+            const value = String(phone || '');
+            const validPrefixes = ['020', '024', '025', '026', '027', '050', '054', '055', '056', '057', '059'];
+
+            if (!value) return '';
+
+            if (value.length !== 10) {
+                return showIncomplete ? 'Phone number must be exactly 10 digits.' : '';
+            }
+
+            if (!value.startsWith('0') || !validPrefixes.includes(value.slice(0, 3))) {
+                return 'Please enter a valid Ghana phone number.';
+            }
+
+            return '';
+        },
+
+        normalizePhoneValue(value) {
+            return String(value || '').replace(/\D/g, '').slice(0, 10);
+        },
+
+        isValidPhone(phone) {
+            return String(phone || '').length === 10 && !this.phoneValidationMessage(phone, true);
+        },
+
+        normalizeVendorPhoneInput() {
+            this.vendorPhone = this.normalizePhoneValue(this.vendorPhone);
+            this.validateVendorPhone(this.vendorPhone.length === 10);
+            this.vendorFound = null;
+            this.vendorData = null;
+            this.vendorError = '';
+        },
+
+        validateVendorPhone(showIncomplete = true) {
+            this.vendorPhoneError = this.phoneValidationMessage(this.vendorPhone, showIncomplete);
+            return !this.vendorPhoneError;
+        },
+
+        normalizeDeliveryPhoneInput(delivery) {
+            if (!delivery) return;
+            delivery.recipient_phone = this.normalizePhoneValue(delivery.recipient_phone);
+            this.validateDeliveryPhone(delivery, delivery.recipient_phone.length === 10);
+        },
+
+        validateDeliveryPhone(delivery, showIncomplete = true) {
+            if (!delivery) return false;
+            delivery.phoneError = this.phoneValidationMessage(delivery.recipient_phone, showIncomplete);
+            return !delivery.phoneError;
+        },
+
         async lookupVendor() {
-            if (this.vendorPhone.length < 9) return;
+            if (!this.validateVendorPhone(true)) return;
             this.vendorLoading = true;
             this.vendorFound = null;
             this.vendorData = null;
@@ -631,7 +692,7 @@ function walkinShipment() {
         },
 
         async createVendor() {
-            if (!this.newVendor.name) return;
+            if (!this.newVendor.name || !this.validateVendorPhone(true)) return;
             this.creatingVendor = true;
             this.vendorError = '';
             try {
@@ -710,7 +771,7 @@ function walkinShipment() {
 
         canProceedToReview() {
             if (!this.vendorId || this.items.length === 0) return false;
-            return this.items.every(item => item.description && item.quantity > 0 && item.delivery.recipient_phone && item.delivery.locationQuery.trim());
+            return this.items.every(item => item.description && item.quantity > 0 && this.isValidPhone(item.delivery.recipient_phone) && item.delivery.locationQuery.trim());
         },
 
         detectedDropoffMode() {

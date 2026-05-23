@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Warehouse;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\PhoneHelper;
 use App\Models\Location;
 use App\Models\ShipmentItem;
 use App\Models\Warehouse;
@@ -40,6 +41,15 @@ class WalkinController extends Controller
     {
         $user = Auth::guard('admin')->user();
         $warehouse = $this->portalService->resolveWarehouse($user);
+        $ghanaPhoneRule = function (string $attribute, mixed $value, \Closure $fail): void {
+            if (blank($value)) {
+                return;
+            }
+
+            if (!PhoneHelper::hasValidPrefix((string) $value)) {
+                $fail('Please enter a valid Ghana phone number.');
+            }
+        };
 
         if ($request->filled('items_json')) {
             $decodedItems = json_decode((string) $request->input('items_json'), true);
@@ -57,14 +67,14 @@ class WalkinController extends Controller
             'items.*.delivery_method'            => 'nullable|in:direct,bus_handoff',
             'items.*.forward_to_warehouse_id'    => 'nullable|integer|exists:warehouses,id',
             'items.*.delivery.recipient_name'    => 'required_if:destination_mode,per_item|nullable|string|max:255',
-            'items.*.delivery.recipient_phone'   => 'required_if:destination_mode,per_item|nullable|string|max:20',
+            'items.*.delivery.recipient_phone'   => ['required_if:destination_mode,per_item', 'nullable', 'string', 'max:20', $ghanaPhoneRule],
             'items.*.delivery.region_id'         => 'nullable|integer',
             'items.*.delivery.district_id'       => 'nullable|integer',
             'items.*.delivery.town'              => 'nullable|string|max:255',
             'items.*.delivery.landmark'          => 'nullable|string|max:255',
             'items.*.delivery.instructions'      => 'nullable|string|max:1000',
             'delivery.recipient_name'            => 'required_if:destination_mode,single|nullable|string|max:255',
-            'delivery.recipient_phone'           => 'required_if:destination_mode,single|nullable|string|max:20',
+            'delivery.recipient_phone'           => ['required_if:destination_mode,single', 'nullable', 'string', 'max:20', $ghanaPhoneRule],
             'delivery.region_id'                 => 'nullable|integer',
             'delivery.district_id'               => 'nullable|integer',
             'delivery.town'                      => 'required_if:destination_mode,single|nullable|string|max:255',
@@ -168,7 +178,18 @@ class WalkinController extends Controller
 
     public function vendorLookup(Request $request, WalkinShipmentService $service): JsonResponse
     {
-        $request->validate(['phone' => 'required|string|min:9']);
+        $request->validate([
+            'phone' => [
+                'required',
+                'string',
+                'min:9',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (!PhoneHelper::hasValidPrefix((string) $value)) {
+                        $fail('Please enter a valid Ghana phone number.');
+                    }
+                },
+            ],
+        ]);
 
         $vendor = $service->lookupVendor($request->get('phone'));
 
@@ -190,7 +211,17 @@ class WalkinController extends Controller
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
             'business_name' => 'nullable|string|max:255',
-            'phone'         => 'required|string|min:9|unique:vendors,phone',
+            'phone'         => [
+                'required',
+                'string',
+                'min:9',
+                'unique:vendors,phone',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (!PhoneHelper::hasValidPrefix((string) $value)) {
+                        $fail('Please enter a valid Ghana phone number.');
+                    }
+                },
+            ],
             'email'         => 'nullable|email|unique:vendors,email',
         ]);
 

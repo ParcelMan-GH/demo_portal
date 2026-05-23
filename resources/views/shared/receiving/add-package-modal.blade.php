@@ -29,7 +29,7 @@
                         <span class="block truncate text-sm font-bold text-slate-700" x-text="receivingReceiptPhotoNames({{ $modal }}) || 'Upload or take package photos'"></span>
                         <span class="block text-xs font-medium text-slate-400">PNG, JPG or WEBP up to 12MB each</span>
                     </span>
-                    <span class="inline-flex w-fit shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-black text-orange-700 shadow-sm ring-1 ring-orange-100">Choose</span>
+                    <span class="inline-flex w-fit shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-black text-orange-700 shadow-sm ring-1 ring-orange-100">Take Photo</span>
                     <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" capture="environment" multiple class="hidden" :disabled="{{ $modal }}.saving" @@change="setReceivingReceiptPhotos({{ $modal }}, $event.target.files)">
                 </label>
             </div>
