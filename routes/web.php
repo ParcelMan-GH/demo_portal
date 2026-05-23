@@ -529,6 +529,10 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::put('settings/pickup-vehicles/{pickupVehicleType}', [SettingsController::class, 'updatePickupVehicle'])->name('settings.pickup-vehicles.update');
         Route::patch('settings/pickup-vehicles/{pickupVehicleType}/toggle', [SettingsController::class, 'togglePickupVehicle'])->name('settings.pickup-vehicles.toggle');
         Route::delete('settings/pickup-vehicles/{pickupVehicleType}', [SettingsController::class, 'deletePickupVehicle'])->name('settings.pickup-vehicles.delete');
+        Route::post('settings/bus-stations', [SettingsController::class, 'storeBusStation'])->name('settings.bus-stations.store');
+        Route::put('settings/bus-stations/{busStation}', [SettingsController::class, 'updateBusStation'])->name('settings.bus-stations.update');
+        Route::patch('settings/bus-stations/{busStation}/toggle', [SettingsController::class, 'toggleBusStation'])->name('settings.bus-stations.toggle');
+        Route::delete('settings/bus-stations/{busStation}', [SettingsController::class, 'deleteBusStation'])->name('settings.bus-stations.delete');
         Route::post('settings/email-templates', [SettingsController::class, 'storeEmailTemplate'])->name('settings.email-templates.store');
         Route::put('settings/email-templates/{emailTemplate}', [SettingsController::class, 'updateEmailTemplate'])->name('settings.email-templates.update');
         Route::patch('settings/email-templates/{emailTemplate}/toggle', [SettingsController::class, 'toggleEmailTemplate'])->name('settings.email-templates.toggle');

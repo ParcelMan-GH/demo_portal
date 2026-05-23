@@ -7,12 +7,12 @@
 @section('content')
 @php
     $tabGroups = [
-        'General' => ['platform', 'delivery', 'pickup-vehicles', 'pricing'],
+        'General' => ['platform', 'delivery', 'pickup-vehicles', 'bus-stations', 'pricing'],
         'Communication' => ['sms', 'mail', 'push', 'email-templates'],
         'Logs' => ['email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'notification-logs'],
         'System' => ['health', 'logs'],
     ];
-    $readOnlyTabs = ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates', 'notification-logs', 'pickup-vehicles'];
+    $readOnlyTabs = ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates', 'notification-logs', 'pickup-vehicles', 'bus-stations'];
     $activeGroup = collect($tabGroups)->filter(fn ($keys) => in_array($activeTab, $keys, true))->keys()->first() ?? 'General';
     $canEditSettings = auth('admin')->user()?->hasPermission('settings.edit') ?? false;
 @endphp
@@ -121,6 +121,8 @@
                                 Manage vendor commission and payout rules.
                             @elseif($activeTab === 'pickup-vehicles')
                                 Manage optional vehicle requests vendors can add to pickup requests.
+                            @elseif($activeTab === 'bus-stations')
+                                Manage bus stations riders can choose during courier handoff.
                             @else
                                 Configure values used across the platform.
                             @endif
@@ -145,6 +147,15 @@
                                     class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 Add Vehicle
+                            </button>
+                        @endif
+                    @elseif($activeTab === 'bus-stations')
+                        @if($canEditSettings)
+                            <button type="button"
+                                    @@click="$dispatch('bus-station-create')"
+                                    class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Add Station
                             </button>
                         @endif
                     @elseif($activeTab === 'notification-logs')
@@ -216,6 +227,10 @@ window.settingsConfig = {
     pickupVehiclesUpdateEndpoint: @json(route('admin.settings.pickup-vehicles.update', ['pickupVehicleType' => '__ID__'])),
     pickupVehiclesToggleEndpoint: @json(route('admin.settings.pickup-vehicles.toggle', ['pickupVehicleType' => '__ID__'])),
     pickupVehiclesDeleteEndpoint: @json(route('admin.settings.pickup-vehicles.delete', ['pickupVehicleType' => '__ID__'])),
+    busStationsStoreEndpoint: @json(route('admin.settings.bus-stations.store')),
+    busStationsUpdateEndpoint: @json(route('admin.settings.bus-stations.update', ['busStation' => '__ID__'])),
+    busStationsToggleEndpoint: @json(route('admin.settings.bus-stations.toggle', ['busStation' => '__ID__'])),
+    busStationsDeleteEndpoint: @json(route('admin.settings.bus-stations.delete', ['busStation' => '__ID__'])),
     testEmailEndpoint: @json(route('admin.settings.test-email')),
     testSmsEndpoint: @json(route('admin.settings.test-sms')),
     clearCacheEndpoint: @json(route('admin.settings.clear-cache')),

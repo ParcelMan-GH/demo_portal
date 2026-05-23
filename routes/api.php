@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Auth\DriverAuthController;
 use App\Http\Controllers\Api\V1\Auth\VendorAuthController;
 use App\Http\Controllers\Api\V1\DriverAssignmentController;
+use App\Http\Controllers\Api\V1\DriverBusStationController;
 use App\Http\Controllers\Api\V1\DriverDeliveryController;
 use App\Http\Controllers\Api\V1\DriverProfileController;
 use App\Http\Controllers\Api\V1\DriverRiderTeamController;
@@ -91,6 +92,7 @@ Route::prefix('v1/driver')->group(function () {
         Route::put('profile', [DriverProfileController::class, 'update']);
         Route::put('change-password', [DriverProfileController::class, 'changePassword']);
         Route::post('fcm-token', [DriverProfileController::class, 'updateFcmToken']);
+        Route::get('bus-stations', [DriverBusStationController::class, 'index']);
 
         // Pickup endpoints
         Route::get('pickups', [DriverAssignmentController::class, 'index']);

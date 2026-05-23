@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
+use App\Models\BusStation;
 use App\Models\EmailTemplate;
 use App\Models\NotificationLog;
 use App\Models\OtpCode;
@@ -39,6 +40,7 @@ class SettingsController extends Controller
         'notification-logs' => ['label' => 'Notification Logs', 'icon' => 'bell'],
         'delivery' => ['label' => 'Delivery Settings', 'icon' => 'truck'],
         'pickup-vehicles' => ['label' => 'Pickup Vehicles', 'icon' => 'truck'],
+        'bus-stations' => ['label' => 'Bus Stations', 'icon' => 'map'],
         'pricing' => ['label' => 'Vendor Commissions', 'icon' => 'cash'],
         'push' => ['label' => 'Push Notifications', 'icon' => 'bell'],
         'health' => ['label' => 'System Health', 'icon' => 'heart'],
@@ -142,6 +144,7 @@ class SettingsController extends Controller
             'email-templates' => $this->getEmailTemplates(),
             'notification-logs' => $this->getNotificationLogsMeta(),
             'pickup-vehicles' => $this->getPickupVehiclesMeta(),
+            'bus-stations' => $this->getBusStationsMeta(),
             default => [],
         };
     }
@@ -160,6 +163,17 @@ class SettingsController extends Controller
                     'sort_order' => $type->sort_order,
                     'is_active' => $type->is_active,
                 ])
+                ->values(),
+        ];
+    }
+
+    protected function getBusStationsMeta(): array
+    {
+        return [
+            'stations' => BusStation::query()
+                ->latest('id')
+                ->get()
+                ->map(fn (BusStation $station) => $this->busStationPayload($station))
                 ->values(),
         ];
     }
@@ -522,6 +536,95 @@ class SettingsController extends Controller
             'capacity_hint' => $type->capacity_hint,
             'sort_order' => $type->sort_order,
             'is_active' => $type->is_active,
+        ];
+    }
+
+    public function storeBusStation(Request $request): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:120', 'unique:bus_stations,name'],
+            'location_hint' => ['nullable', 'string', 'max:180'],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $station = BusStation::create([
+            'name' => $validated['name'],
+            'slug' => Str::slug($validated['name']),
+            'location_hint' => $validated['location_hint'] ?? null,
+            'sort_order' => $validated['sort_order'] ?? ((BusStation::max('sort_order') ?? 0) + 1),
+            'is_active' => $validated['is_active'] ?? true,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Bus station created.',
+            'bus_station' => $this->busStationPayload($station),
+        ], 201);
+    }
+
+    public function updateBusStation(Request $request, BusStation $busStation): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:120', Rule::unique('bus_stations', 'name')->ignore($busStation->id)],
+            'location_hint' => ['nullable', 'string', 'max:180'],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $busStation->update([
+            'name' => $validated['name'],
+            'slug' => Str::slug($validated['name']),
+            'location_hint' => $validated['location_hint'] ?? null,
+            'sort_order' => $validated['sort_order'] ?? $busStation->sort_order,
+            'is_active' => $validated['is_active'] ?? $busStation->is_active,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Bus station updated.',
+            'bus_station' => $this->busStationPayload($busStation->fresh()),
+        ]);
+    }
+
+    public function toggleBusStation(BusStation $busStation): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $busStation->update(['is_active' => !$busStation->is_active]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Bus station status updated.',
+            'bus_station' => $this->busStationPayload($busStation->fresh()),
+        ]);
+    }
+
+    public function deleteBusStation(BusStation $busStation): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $busStation->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Bus station deleted.',
+        ]);
+    }
+
+    private function busStationPayload(BusStation $station): array
+    {
+        return [
+            'id' => $station->id,
+            'name' => $station->name,
+            'slug' => $station->slug,
+            'location_hint' => $station->location_hint,
+            'sort_order' => $station->sort_order,
+            'is_active' => $station->is_active,
         ];
     }
 
