@@ -95,6 +95,11 @@ class BusHandoffConfirmationService
                     BusHandoffConfirmation::STATUS_CODE_SENT,
                     BusHandoffConfirmation::STATUS_ISSUE_REPORTED,
                 ]);
+            } elseif ($validated['status'] === 'needs_follow_up') {
+                $query->whereIn('status', [
+                    BusHandoffConfirmation::STATUS_PENDING,
+                    BusHandoffConfirmation::STATUS_CODE_SENT,
+                ]);
             } elseif ($validated['status'] === 'confirmed') {
                 $query->whereIn('status', [
                     BusHandoffConfirmation::STATUS_CONFIRMED,
@@ -146,6 +151,18 @@ class BusHandoffConfirmationService
                     'next_offset' => ($offset + $rows->count()) < $total ? $offset + $limit : null,
                 ],
                 'summary' => [
+                    'total' => (clone $this->driverQuery($driver))->count(),
+                    'open' => (clone $this->driverQuery($driver))->whereIn('status', [
+                        BusHandoffConfirmation::STATUS_PENDING,
+                        BusHandoffConfirmation::STATUS_CODE_SENT,
+                        BusHandoffConfirmation::STATUS_ISSUE_REPORTED,
+                    ])->count(),
+                    'needs_follow_up' => (clone $this->driverQuery($driver))->whereIn('status', [
+                        BusHandoffConfirmation::STATUS_PENDING,
+                        BusHandoffConfirmation::STATUS_CODE_SENT,
+                    ])->count(),
+                    'pending_only' => (clone $this->driverQuery($driver))->where('status', BusHandoffConfirmation::STATUS_PENDING)->count(),
+                    'code_sent' => (clone $this->driverQuery($driver))->where('status', BusHandoffConfirmation::STATUS_CODE_SENT)->count(),
                     'pending' => (clone $this->driverQuery($driver))->whereIn('status', [
                         BusHandoffConfirmation::STATUS_PENDING,
                         BusHandoffConfirmation::STATUS_CODE_SENT,
@@ -742,6 +759,8 @@ class BusHandoffConfirmationService
 
         return [
             'id' => $confirmation->id,
+            'delivery_run_id' => $confirmation->delivery_run_id,
+            'delivery_run_stop_id' => $confirmation->delivery_run_stop_id,
             'delivery_run_item_id' => $confirmation->delivery_run_item_id,
             'status' => $confirmation->status,
             'status_label' => Str::of($confirmation->status)->replace('_', ' ')->title()->toString(),
