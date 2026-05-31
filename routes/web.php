@@ -51,6 +51,39 @@ Route::get('h/{token}', [BusHandoffPublicController::class, 'show'])->name('bus-
 Route::post('h/{token}/confirm', [BusHandoffPublicController::class, 'confirm'])->name('bus-handoff.public.confirm');
 Route::post('h/{token}/issue', [BusHandoffPublicController::class, 'issue'])->name('bus-handoff.public.issue');
 
+if (app()->environment(['local', 'testing'])) {
+    Route::get('dev/bus-handoff-confirmation-preview', function () {
+        $reasons = \App\Models\DeliveryFailureReason::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('label')
+            ->get(['id', 'label'])
+            ->map(fn ($reason) => ['id' => $reason->id, 'label' => $reason->label])
+            ->values()
+            ->all();
+
+        return view('public.bus-handoff-confirmation', [
+            'token' => 'PREVIEWTOKEN',
+            'handoff' => [
+                'package' => [
+                    'tracking_code' => 'TRKPREVIEW001',
+                    'description' => 'Foodstuff bag',
+                ],
+                'handoff' => [
+                    'bus_station' => 'Neoplan Station',
+                    'handed_off_at' => now()->subHours(3)->toIso8601String(),
+                ],
+            ],
+            'reasons' => $reasons ?: [
+                ['id' => 1, 'label' => 'Recipient says not received'],
+                ['id' => 2, 'label' => 'Recipient unreachable'],
+                ['id' => 3, 'label' => 'Courier delay'],
+                ['id' => 4, 'label' => 'Package damaged'],
+            ],
+        ]);
+    })->name('dev.bus-handoff-confirmation-preview');
+}
+
 Route::prefix('vendor')->name('web.vendor.')->group(function () {
     Route::get('login', function () {
         return view('web.vendor.login');

@@ -11,6 +11,7 @@ use App\Models\NotificationLog;
 use App\Models\OtpCode;
 use App\Models\PickupVehicleType;
 use App\Models\PlatformSetting;
+use App\Models\SmsLog;
 use App\Services\EmailTemplateService;
 use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
@@ -1063,17 +1064,52 @@ class SettingsController extends Controller
      */
     public function smsLogsData(Request $request): JsonResponse
     {
-        // This would typically come from a database table that logs SMS
-        // For now, return empty data structure
+        $query = SmsLog::query();
+
+        if ($search = trim((string) $request->get('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('recipient', 'like', "%{$search}%")
+                    ->orWhere('message', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhere('provider', 'like', "%{$search}%")
+                    ->orWhere('sender', 'like', "%{$search}%");
+            });
+        }
+
+        if ($status = trim((string) $request->get('status', ''))) {
+            $query->where('status', $status);
+        }
+
+        if ($dateFrom = $request->get('date_from')) {
+            $query->whereDate('sent_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo = $request->get('date_to')) {
+            $query->whereDate('sent_at', '<=', $dateTo);
+        }
+
+        $query->orderByDesc('sent_at')->orderByDesc('id');
+
+        $perPage = min(max((int) $request->get('per_page', 25), 1), 100);
+        $logs = $query->paginate($perPage);
+
         return response()->json([
-            'data' => [],
+            'data' => $logs->map(function (SmsLog $log) {
+                return [
+                    'id' => $log->id,
+                    'recipient' => $log->recipient,
+                    'message' => Str::limit($log->message, 180),
+                    'status' => $log->status,
+                    'sent_at' => $log->sent_at?->format('Y-m-d H:i:s') ?? $log->created_at?->format('Y-m-d H:i:s'),
+                ];
+            }),
             'meta' => [
-                'total' => 0,
-                'per_page' => 50,
-                'current_page' => 1,
-                'last_page' => 1,
-                'from' => 0,
-                'to' => 0,
+                'total' => $logs->total(),
+                'per_page' => $logs->perPage(),
+                'current_page' => $logs->currentPage(),
+                'last_page' => $logs->lastPage(),
+                'from' => $logs->firstItem() ?? 0,
+                'to' => $logs->lastItem() ?? 0,
             ],
         ]);
     }

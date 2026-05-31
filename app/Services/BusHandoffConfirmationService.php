@@ -227,7 +227,7 @@ class BusHandoffConfirmationService
         $code = $this->generateCode();
         $token = $this->generatePublicToken();
         $now = now();
-        $link = url('/h/' . $token);
+        $link = $this->publicConfirmationUrl($token);
         $tracking = $confirmation->shipmentItem?->tracking_code ?: 'your package';
         $message = "Code {$code} confirms you received package {$tracking}. Only share this code if the package is in your hands. You can also confirm or report an issue: {$link}";
 
@@ -857,5 +857,23 @@ class BusHandoffConfirmationService
         } while (BusHandoffConfirmation::query()->where('public_token_hash', $this->hashValue($token))->exists());
 
         return $token;
+    }
+
+    private function publicConfirmationUrl(string $token): string
+    {
+        $configuredUrl = (string) (config('app.public_url') ?: config('app.url'));
+        $parts = parse_url($configuredUrl);
+
+        if (is_array($parts) && !empty($parts['scheme']) && !empty($parts['host'])) {
+            $baseUrl = $parts['scheme'] . '://' . $parts['host'];
+
+            if (!empty($parts['port'])) {
+                $baseUrl .= ':' . $parts['port'];
+            }
+        } else {
+            $baseUrl = request()->getSchemeAndHttpHost();
+        }
+
+        return rtrim($baseUrl, '/') . '/h/' . rawurlencode($token);
     }
 }

@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\PlatformSetting;
+use App\Models\SmsLog;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class SmsService
 {
@@ -15,32 +17,37 @@ class SmsService
      */
     public function send(string $phone, string $message): bool
     {
+        $formattedPhone = $this->formatPhoneNumber($phone);
+        $provider = $this->getProvider();
+        $senderId = $this->getSenderId();
+
         if (!$this->isEnabled()) {
             Log::warning('SMS skipped because SMS notifications are disabled', [
-                'phone' => $this->formatPhoneNumber($phone),
+                'phone' => $formattedPhone,
             ]);
+            $this->recordLog($formattedPhone, $message, 'failed', $provider, $senderId, null, null, 'SMS notifications are disabled');
 
             return false;
         }
 
-        if ($this->getProvider() !== 'arkesel') {
+        if ($provider !== 'arkesel') {
             Log::error('SMS provider is not supported for runtime sends', [
-                'provider' => $this->getProvider(),
+                'provider' => $provider,
             ]);
+            $this->recordLog($formattedPhone, $message, 'failed', $provider, $senderId, null, null, 'SMS provider is not supported for runtime sends');
 
             return false;
         }
 
         $apiKey = $this->getApiKey();
-        $senderId = $this->getSenderId();
 
         if (!$apiKey || !$senderId) {
             Log::error('SMS: Arkesel API key or Sender ID not configured');
+            $this->recordLog($formattedPhone, $message, 'failed', $provider, $senderId, null, null, 'Arkesel API key or Sender ID not configured');
             return false;
         }
 
-        // Format phone number (ensure it has country code)
-        $formattedPhone = $this->formatPhoneNumber($phone);
+        $smsLog = $this->recordLog($formattedPhone, $message, 'pending', $provider, $senderId);
 
         try {
             $response = Http::withHeaders([
@@ -54,29 +61,32 @@ class SmsService
             if ($response->successful()) {
                 Log::info('SMS sent successfully', [
                     'phone' => $formattedPhone,
-                    'provider' => $this->getProvider(),
+                    'provider' => $provider,
                     'sender' => $senderId,
                     'response' => $response->json(),
                 ]);
+                $this->updateLog($smsLog, 'sent', $response->status(), $response->json(), null);
                 return true;
             }
 
             Log::error('SMS failed', [
                 'phone' => $formattedPhone,
-                'provider' => $this->getProvider(),
+                'provider' => $provider,
                 'sender' => $senderId,
                 'status' => $response->status(),
                 'response' => $response->body(),
             ]);
+            $this->updateLog($smsLog, 'failed', $response->status(), $this->responsePayload($response), $response->body());
             return false;
 
         } catch (\Exception $e) {
             Log::error('SMS exception', [
                 'phone' => $formattedPhone,
-                'provider' => $this->getProvider(),
+                'provider' => $provider,
                 'sender' => $senderId,
                 'error' => $e->getMessage(),
             ]);
+            $this->updateLog($smsLog, 'failed', null, null, $e->getMessage());
             return false;
         }
     }
@@ -141,5 +151,76 @@ class SmsService
 
         // Otherwise, assume it needs 233 prefix
         return '233' . $phone;
+    }
+
+    protected function recordLog(
+        string $recipient,
+        string $message,
+        string $status,
+        ?string $provider = null,
+        ?string $sender = null,
+        ?int $statusCode = null,
+        ?array $response = null,
+        ?string $error = null,
+    ): ?SmsLog {
+        try {
+            if (!Schema::hasTable('sms_logs')) {
+                return null;
+            }
+
+            return SmsLog::create([
+                'recipient' => $recipient,
+                'provider' => $provider,
+                'sender' => $sender,
+                'message' => $message,
+                'status' => $status,
+                'status_code' => $statusCode,
+                'response' => $response,
+                'error' => $error,
+                'sent_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Unable to record SMS log', [
+                'recipient' => $recipient,
+                'status' => $status,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    protected function updateLog(?SmsLog $log, string $status, ?int $statusCode = null, ?array $response = null, ?string $error = null): void
+    {
+        if (!$log) {
+            return;
+        }
+
+        try {
+            $log->update([
+                'status' => $status,
+                'status_code' => $statusCode,
+                'response' => $response,
+                'error' => $error,
+                'sent_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Unable to update SMS log', [
+                'sms_log_id' => $log->id,
+                'status' => $status,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    protected function responsePayload($response): ?array
+    {
+        try {
+            $json = $response->json();
+
+            return is_array($json) ? $json : ['body' => $response->body()];
+        } catch (\Throwable) {
+            return ['body' => $response->body()];
+        }
     }
 }
