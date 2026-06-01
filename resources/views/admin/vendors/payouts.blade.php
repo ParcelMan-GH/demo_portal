@@ -82,13 +82,21 @@
 
         <div x-show="showFilters" x-transition class="border-b border-slate-100 px-5 pb-4" style="display:none">
             <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                     <div>
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payout State</label>
                         <select x-model="status" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                             <option value="">All accrued vendors</option>
                             <option value="ready">Ready to pay</option>
                             <option value="below_minimum">Below minimum</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payout Account</label>
+                        <select x-model="payoutAccount" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All account states</option>
+                            <option value="set">Account set</option>
+                            <option value="missing">Missing account</option>
                         </select>
                     </div>
                     <div>
@@ -120,10 +128,11 @@
             <div x-show="loading" class="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px]" style="display:none"></div>
 
             <div class="hidden overflow-x-auto lg:block">
-                <table class="w-full min-w-[920px] divide-y divide-slate-200/60 text-xs">
+                <table class="w-full min-w-[1080px] divide-y divide-slate-200/60 text-xs">
                     <thead class="bg-slate-50">
                         <tr>
                             <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Vendor</th>
+                            <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Payout Account</th>
                             <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Available</th>
                             <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Total Earned</th>
                             <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Total Paid</th>
@@ -133,7 +142,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
                         <template x-if="vendors.length === 0 && !loading">
-                            <tr><td colspan="6" class="px-4 py-12 text-center text-sm font-semibold text-slate-400">No vendors with accrued commission found</td></tr>
+                            <tr><td colspan="7" class="px-4 py-12 text-center text-sm font-semibold text-slate-400">No vendors with accrued commission found</td></tr>
                         </template>
                         <template x-for="vendor in vendors" :key="vendor.vendor_id">
                             <tr class="hover:bg-slate-50/70">
@@ -144,6 +153,17 @@
                                         <p class="mt-0.5 text-xs font-semibold text-slate-400" x-text="vendor.vendor_phone || '-'"></p>
                                     </div>
                                 </td>
+                                <td class="px-4 py-3">
+                                    <template x-if="vendor.payout_account?.is_set">
+                                        <div>
+                                            <p class="font-black text-slate-800" x-text="vendor.payout_account.account_name"></p>
+                                            <p class="mt-0.5 text-xs font-semibold text-slate-500" x-text="payoutAccountText(vendor)"></p>
+                                        </div>
+                                    </template>
+                                    <template x-if="!vendor.payout_account?.is_set">
+                                        <span class="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-700">Missing</span>
+                                    </template>
+                                </td>
                                 <td class="whitespace-nowrap px-4 py-3 text-right text-sm font-black text-emerald-700" x-text="'GHS ' + formatMoney(vendor.available_balance)"></td>
                                 <td class="whitespace-nowrap px-4 py-3 text-right font-bold text-slate-700" x-text="'GHS ' + formatMoney(vendor.total_earned)"></td>
                                 <td class="whitespace-nowrap px-4 py-3 text-right font-bold text-slate-700" x-text="'GHS ' + formatMoney(vendor.total_paid)"></td>
@@ -153,7 +173,7 @@
                                 <td class="whitespace-nowrap px-4 py-3 text-right">
                                     <div class="inline-flex items-center justify-end gap-2">
                                         <button type="button" @@click="openHistory(vendor)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">History</button>
-                                        <button type="button" x-show="vendor.can_payout" @@click="openPayout(vendor)" class="rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-orange-600/20 hover:bg-orange-700">Pay Vendor</button>
+                                        <button type="button" x-show="vendor.can_payout" @@click="openPayout(vendor)" :disabled="!vendor.payout_account?.is_set" :class="vendor.payout_account?.is_set ? 'bg-orange-600 text-white shadow-sm shadow-orange-600/20 hover:bg-orange-700' : 'cursor-not-allowed bg-slate-200 text-slate-500'" class="rounded-lg px-3 py-2 text-xs font-bold">Pay Vendor</button>
                                     </div>
                                 </td>
                             </tr>
@@ -173,6 +193,7 @@
                                 <p class="font-black text-slate-900" x-text="vendor.vendor_name"></p>
                                 <p class="mt-0.5 truncate text-sm font-semibold text-slate-500" x-text="vendor.business_name || 'No business name'"></p>
                                 <p class="mt-0.5 text-sm font-semibold text-slate-400" x-text="vendor.vendor_phone || '-'"></p>
+                                <p class="mt-1 text-xs font-bold" :class="vendor.payout_account?.is_set ? 'text-emerald-700' : 'text-amber-700'" x-text="vendor.payout_account?.is_set ? payoutAccountText(vendor) : 'No payout account'"></p>
                             </div>
                             <span class="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide" :class="vendor.can_payout ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-slate-200 bg-slate-50 text-slate-500'" x-text="vendor.can_payout ? 'Ready' : 'Below min'"></span>
                         </div>
@@ -192,7 +213,7 @@
                         </div>
                         <div class="mt-4 flex items-center justify-end gap-2">
                             <button type="button" @@click="openHistory(vendor)" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">History</button>
-                            <button type="button" x-show="vendor.can_payout" @@click="openPayout(vendor)" class="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/20 hover:bg-orange-700">Pay Vendor</button>
+                            <button type="button" x-show="vendor.can_payout" @@click="openPayout(vendor)" :disabled="!vendor.payout_account?.is_set" :class="vendor.payout_account?.is_set ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20 hover:bg-orange-700' : 'cursor-not-allowed bg-slate-200 text-slate-500'" class="rounded-xl px-4 py-2.5 text-sm font-bold">Pay Vendor</button>
                         </div>
                     </article>
                 </template>
@@ -232,21 +253,14 @@
                     </div>
                 </div>
                 <div class="space-y-4 px-6 py-5">
+                    <div class="rounded-2xl border border-emerald-200 bg-emerald-50/50 px-4 py-3">
+                        <p class="text-[10px] font-black uppercase tracking-wide text-emerald-700">MoMo payout account</p>
+                        <p class="mt-1 text-sm font-black text-slate-900" x-text="selectedVendor?.payout_account?.account_name || '-'"></p>
+                        <p class="mt-0.5 text-sm font-semibold text-slate-600" x-text="selectedVendor ? payoutAccountText(selectedVendor) : '-'"></p>
+                    </div>
                     <div>
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Amount</label>
                         <input type="number" step="0.01" min="1" x-model="payoutForm.amount" required class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                    </div>
-                    <div>
-                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payment Method</label>
-                        <select x-model="payoutForm.payment_method" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                            <option value="momo">MOMO</option>
-                            <option value="bank">Bank Transfer</option>
-                            <option value="cash">Cash</option>
-                        </select>
-                    </div>
-                    <div x-show="payoutForm.payment_method === 'momo'">
-                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payment Phone</label>
-                        <input type="text" x-model="payoutForm.payment_phone" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                     </div>
                     <div>
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Payment Reference</label>
@@ -456,6 +470,7 @@ function vendorPayoutsPage(config) {
         loading: false,
         search: '',
         status: '',
+        payoutAccount: '',
         sort: 'available_balance',
         sortDir: 'desc',
         page: 1,
@@ -508,6 +523,7 @@ function vendorPayoutsPage(config) {
                 per_page: 15,
                 search: this.search || '',
                 status: this.status || '',
+                payout_account: this.payoutAccount || '',
                 sort: this.sort || 'available_balance',
                 sort_dir: this.sortDir || 'desc',
             });
@@ -525,6 +541,7 @@ function vendorPayoutsPage(config) {
         },
         clearFilters() {
             this.status = '';
+            this.payoutAccount = '';
             this.sort = 'available_balance';
             this.sortDir = 'desc';
             this.page = 1;
@@ -541,11 +558,15 @@ function vendorPayoutsPage(config) {
             this.loadVendors();
         },
         openPayout(vendor) {
+            if (!vendor.payout_account?.is_set) {
+                this.toast('Set the vendor MoMo payout account before processing payout.', 'error');
+                return;
+            }
             this.selectedVendor = vendor;
             this.payoutForm = {
                 amount: vendor.available_balance,
                 payment_method: 'momo',
-                payment_phone: vendor.vendor_phone || '',
+                payment_phone: vendor.payout_account?.account_number || '',
                 payment_reference: '',
                 notes: '',
             };
@@ -678,6 +699,13 @@ function vendorPayoutsPage(config) {
         },
         methodLabel(method) {
             return { momo: 'MOMO', bank: 'Bank Transfer', cash: 'Cash' }[method] || '-';
+        },
+        networkLabel(network) {
+            return { mtn: 'MTN MoMo', telecel: 'Telecel Cash', airteltigo: 'AirtelTigo Money' }[network] || '-';
+        },
+        payoutAccountText(vendor) {
+            if (!vendor?.payout_account?.is_set) return 'No payout account';
+            return `${this.networkLabel(vendor.payout_account.network)} / ${vendor.payout_account.account_number}`;
         },
         statusLabel(status) {
             return { pending: 'Pending', sent: 'Sent', confirmed: 'Confirmed' }[status] || status || '-';

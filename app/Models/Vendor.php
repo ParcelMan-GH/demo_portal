@@ -19,11 +19,16 @@ class Vendor extends Model
         'is_active',
         'fcm_token',
         'commission_rate_override',
+        'payout_momo_network',
+        'payout_account_name',
+        'payout_account_number',
+        'payout_account_updated_at',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'commission_rate_override' => 'decimal:2',
+        'payout_account_updated_at' => 'datetime',
     ];
 
     /**

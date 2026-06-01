@@ -4,13 +4,15 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Services\VendorCommissionService;
+use App\Services\VendorProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class VendorEarningsController extends Controller
 {
     public function __construct(
-        private VendorCommissionService $commissionService
+        private VendorCommissionService $commissionService,
+        private VendorProfileService $profileService
     ) {}
 
     /**
@@ -20,6 +22,7 @@ class VendorEarningsController extends Controller
     {
         $vendor = $request->user();
         $summary = $this->commissionService->getVendorSummary($vendor);
+        $summary['payout_account'] = $this->profileService->formatPayoutAccount($vendor);
 
         return response()->json([
             'success' => true,

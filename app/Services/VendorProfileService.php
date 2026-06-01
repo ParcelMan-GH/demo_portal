@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\PhoneHelper;
 use App\Models\PlatformSetting;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
@@ -58,6 +59,37 @@ class VendorProfileService
         ];
     }
 
+    public function updatePayoutAccount(Vendor $vendor, array $data, Request $request): array
+    {
+        $oldAccount = $this->formatPayoutAccount($vendor);
+
+        $vendor->payout_momo_network = $data['payout_momo_network'];
+        $vendor->payout_account_name = $data['payout_account_name'];
+        $vendor->payout_account_number = PhoneHelper::format($data['payout_account_number']);
+        $vendor->payout_account_updated_at = now();
+        $vendor->save();
+
+        $this->activityLogService->log(
+            $vendor->id,
+            'payout_account_updated',
+            'Payout account updated successfully',
+            $request,
+            [
+                'old' => $this->maskPayoutAccount($oldAccount),
+                'new' => $this->maskPayoutAccount($this->formatPayoutAccount($vendor)),
+            ]
+        );
+
+        return [
+            'success' => true,
+            'message' => 'Payout account updated successfully.',
+            'data' => [
+                'payout_account' => $this->formatPayoutAccount($vendor),
+                'user' => $this->formatVendor($vendor),
+            ],
+        ];
+    }
+
     /**
      * Format vendor for API response.
      */
@@ -69,8 +101,39 @@ class VendorProfileService
             'business_name' => $vendor->business_name,
             'phone' => $vendor->phone,
             'email' => $vendor->email,
+            'payout_account' => $this->formatPayoutAccount($vendor),
             'created_at' => $vendor->created_at?->toISOString(),
         ];
+    }
+
+    public function formatPayoutAccount(Vendor $vendor): array
+    {
+        $isSet = filled($vendor->payout_momo_network)
+            && filled($vendor->payout_account_name)
+            && filled($vendor->payout_account_number);
+
+        return [
+            'is_set' => $isSet,
+            'method' => 'momo',
+            'network' => $vendor->payout_momo_network,
+            'account_name' => $vendor->payout_account_name,
+            'account_number' => $vendor->payout_account_number,
+            'updated_at' => $vendor->payout_account_updated_at?->toISOString(),
+        ];
+    }
+
+    protected function maskPayoutAccount(array $account): array
+    {
+        $number = (string) ($account['account_number'] ?? '');
+
+        if ($number !== '') {
+            $digits = preg_replace('/\D/', '', $number);
+            $account['account_number'] = strlen($digits) >= 4
+                ? str_repeat('*', max(strlen($digits) - 4, 0)) . substr($digits, -4)
+                : '****';
+        }
+
+        return $account;
     }
 
     /**

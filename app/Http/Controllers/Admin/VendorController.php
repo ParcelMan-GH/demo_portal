@@ -497,6 +497,11 @@ class VendorController extends Controller
                     'business_name' => $vendor->business_name,
                     'email' => $vendor->email,
                     'phone' => $vendor->phone,
+                    'payout_momo_network' => $vendor->payout_momo_network,
+                    'payout_account_name' => $vendor->payout_account_name,
+                    'payout_account_number' => $vendor->payout_account_number,
+                    'payout_account_updated_at' => $vendor->payout_account_updated_at?->format('Y-m-d H:i:s'),
+                    'payout_account' => $this->formatVendorPayoutAccount($vendor),
                     'is_active' => $vendor->is_active,
                     'is_deleted' => $vendor->trashed(),
                     'deleted_at' => $vendor->deleted_at?->format('Y-m-d H:i:s'),
@@ -557,7 +562,11 @@ class VendorController extends Controller
                 }
             }],
             'is_active' => ['boolean'],
+            'payout_momo_network' => ['nullable', 'string', Rule::in(['mtn', 'telecel', 'airteltigo'])],
+            'payout_account_name' => ['nullable', 'string', 'max:255'],
+            'payout_account_number' => ['nullable', 'string', 'max:20'],
         ]);
+        $payoutAccount = $this->validatedPayoutAccount($validated);
 
         $phone = PhoneHelper::format($validated['phone']);
 
@@ -567,12 +576,13 @@ class VendorController extends Controller
         $vendor->email = $validated['email'] ?? null;
         $vendor->phone = $phone;
         $vendor->is_active = $validated['is_active'] ?? true;
+        $this->fillPayoutAccount($vendor, $payoutAccount);
         $vendor->save();
 
         return response()->json([
             'success' => true,
             'message' => 'Vendor created successfully.',
-            'vendor' => $vendor,
+            'vendor' => $this->formatVendorForResponse($vendor),
         ]);
     }
 
@@ -590,6 +600,10 @@ class VendorController extends Controller
                 'business_name' => $vendor->business_name,
                 'email' => $vendor->email,
                 'phone' => $vendor->phone,
+                'payout_momo_network' => $vendor->payout_momo_network,
+                'payout_account_name' => $vendor->payout_account_name,
+                'payout_account_number' => $vendor->payout_account_number,
+                'payout_account' => $this->formatVendorPayoutAccount($vendor),
                 'is_active' => $vendor->is_active,
             ],
         ]);
@@ -625,7 +639,11 @@ class VendorController extends Controller
             }],
             'is_active' => ['boolean'],
             'commission_rate_override' => ['nullable', 'numeric', 'min:0', 'max:9999.99'],
+            'payout_momo_network' => ['nullable', 'string', Rule::in(['mtn', 'telecel', 'airteltigo'])],
+            'payout_account_name' => ['nullable', 'string', 'max:255'],
+            'payout_account_number' => ['nullable', 'string', 'max:20'],
         ]);
+        $payoutAccount = $this->validatedPayoutAccount($validated);
 
         $vendor->name = $validated['name'];
         $vendor->business_name = $validated['business_name'] ?? null;
@@ -637,12 +655,13 @@ class VendorController extends Controller
             $vendor->commission_rate_override = $validated['commission_rate_override'] ?? null;
         }
 
+        $this->fillPayoutAccount($vendor, $payoutAccount);
         $vendor->save();
 
         return response()->json([
             'success' => true,
             'message' => 'Vendor updated successfully.',
-            'vendor' => $vendor,
+            'vendor' => $this->formatVendorForResponse($vendor),
         ]);
     }
 
@@ -1095,5 +1114,82 @@ class VendorController extends Controller
         if (!Auth::guard('admin')->user()->hasPermission($permission)) {
             abort(403, 'Unauthorized action.');
         }
+    }
+
+    protected function validatedPayoutAccount(array $data): ?array
+    {
+        $network = $data['payout_momo_network'] ?? null;
+        $name = trim((string) ($data['payout_account_name'] ?? ''));
+        $number = trim((string) ($data['payout_account_number'] ?? ''));
+        $hasAny = filled($network) || $name !== '' || $number !== '';
+
+        if (!$hasAny) {
+            return null;
+        }
+
+        if (!filled($network) || $name === '' || $number === '') {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'payout_account_number' => ['Complete the MoMo network, account name, and account number.'],
+            ]);
+        }
+
+        $local = PhoneHelper::toLocal($number);
+        if (!$local || !preg_match('/^0(?:2\d|5\d)\d{7}$/', $local)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'payout_account_number' => ['Enter a valid 10-digit Ghana phone number'],
+            ]);
+        }
+
+        return [
+            'network' => $network,
+            'name' => $name,
+            'number' => PhoneHelper::format($number),
+        ];
+    }
+
+    protected function fillPayoutAccount(Vendor $vendor, ?array $account): void
+    {
+        $before = [
+            $vendor->payout_momo_network,
+            $vendor->payout_account_name,
+            $vendor->payout_account_number,
+        ];
+
+        $vendor->payout_momo_network = $account['network'] ?? null;
+        $vendor->payout_account_name = $account['name'] ?? null;
+        $vendor->payout_account_number = $account['number'] ?? null;
+
+        $after = [
+            $vendor->payout_momo_network,
+            $vendor->payout_account_name,
+            $vendor->payout_account_number,
+        ];
+
+        if ($before !== $after) {
+            $vendor->payout_account_updated_at = $account ? now() : null;
+        }
+    }
+
+    protected function formatVendorPayoutAccount(Vendor $vendor): array
+    {
+        $isSet = filled($vendor->payout_momo_network)
+            && filled($vendor->payout_account_name)
+            && filled($vendor->payout_account_number);
+
+        return [
+            'is_set' => $isSet,
+            'method' => 'momo',
+            'network' => $vendor->payout_momo_network,
+            'account_name' => $vendor->payout_account_name,
+            'account_number' => $vendor->payout_account_number,
+            'updated_at' => $vendor->payout_account_updated_at?->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    protected function formatVendorForResponse(Vendor $vendor): array
+    {
+        return array_merge($vendor->toArray(), [
+            'payout_account' => $this->formatVendorPayoutAccount($vendor),
+        ]);
     }
 }

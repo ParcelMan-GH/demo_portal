@@ -47,6 +47,8 @@ Route::prefix('v1/auth/vendor')->group(function () {
 Route::prefix('v1/vendor')->middleware(['auth:sanctum', 'vendor.active'])->group(function () {
     Route::get('profile', [VendorProfileController::class, 'show']);
     Route::put('profile', [VendorProfileController::class, 'update']);
+    Route::get('payout-account', [VendorProfileController::class, 'payoutAccount']);
+    Route::put('payout-account', [VendorProfileController::class, 'updatePayoutAccount']);
     Route::post('fcm-token', [VendorProfileController::class, 'updateFcmToken']);
     Route::delete('account', [VendorProfileController::class, 'deleteAccount']);
 

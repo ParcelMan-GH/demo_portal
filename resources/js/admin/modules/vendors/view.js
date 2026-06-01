@@ -196,7 +196,10 @@ function vendorShow() {
             email: '',
             phone: '',
             is_active: true,
-            commission_rate_override: ''
+            commission_rate_override: '',
+            payout_momo_network: '',
+            payout_account_name: '',
+            payout_account_number: ''
         },
 
         init() {
@@ -722,10 +725,14 @@ function vendorShow() {
 
         openPayoutModal() {
             if (!this.payouts.summary.can_request_payout) return;
+            if (!this.payouts.summary.payout_account?.is_set) {
+                if (window.showToast) window.showToast('Set the vendor MoMo payout account before processing payout.', 'error');
+                return;
+            }
             this.payoutForm = {
                 amount: this.payouts.summary.available_balance || '',
                 payment_method: 'momo',
-                payment_phone: this.vendor.phone || '',
+                payment_phone: this.payouts.summary.payout_account.account_number || '',
                 payment_reference: '',
                 notes: '',
                 confirm_immediately: true,
@@ -848,6 +855,10 @@ function vendorShow() {
             }[status] || 'bg-slate-100 text-slate-600';
         },
 
+        payoutNetworkLabel(network) {
+            return ({ mtn: 'MTN MoMo', telecel: 'Telecel Cash', airteltigo: 'AirtelTigo Money' })[network] || '-';
+        },
+
         // ── Print helpers ──────────────────────────────────────────
         printTable(tab) {
             const tabData = this[tab];
@@ -940,7 +951,10 @@ function vendorShow() {
                 email: this.vendor.email,
                 phone: this.vendor.phone,
                 is_active: this.vendor.is_active,
-                commission_rate_override: this.vendor.commission_rate_override ?? ''
+                commission_rate_override: this.vendor.commission_rate_override ?? '',
+                payout_momo_network: this.vendor.payout_momo_network || this.vendor.payout_account?.network || '',
+                payout_account_name: this.vendor.payout_account_name || this.vendor.payout_account?.account_name || '',
+                payout_account_number: this.vendor.payout_account_number || this.vendor.payout_account?.account_number || ''
             };
             this.errors = {};
             this.showEditModal = true;
@@ -979,6 +993,11 @@ function vendorShow() {
                 this.vendor.phone = data.vendor?.phone || this.form.phone;
                 this.vendor.is_active = this.form.is_active;
                 this.vendor.commission_rate_override = this.form.commission_rate_override === '' ? null : this.form.commission_rate_override;
+                this.vendor.payout_momo_network = this.form.payout_momo_network || null;
+                this.vendor.payout_account_name = this.form.payout_account_name || null;
+                this.vendor.payout_account_number = data.vendor?.payout_account_number || this.form.payout_account_number || null;
+                this.vendor.payout_account = data.vendor?.payout_account || null;
+                this.payouts.summary.payout_account = data.vendor?.payout_account || this.payouts.summary.payout_account;
 
                 this.showEditModal = false;
 

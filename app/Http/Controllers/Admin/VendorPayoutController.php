@@ -59,6 +59,10 @@ class VendorPayoutController extends Controller
                 'vendors.name as vendor_name',
                 'vendors.phone as vendor_phone',
                 'vendors.business_name',
+                'vendors.payout_momo_network',
+                'vendors.payout_account_name',
+                'vendors.payout_account_number',
+                'vendors.payout_account_updated_at',
                 DB::raw('COALESCE(earnings_agg.total_earned, 0) as total_earned'),
                 DB::raw('COALESCE(earnings_agg.available_balance, 0) as available_balance'),
                 DB::raw('COALESCE(payouts_agg.total_paid, 0) as total_paid'),
@@ -97,7 +101,9 @@ class VendorPayoutController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('vendors.name', 'like', "%{$search}%")
                     ->orWhere('vendors.phone', 'like', "%{$search}%")
-                    ->orWhere('vendors.business_name', 'like', "%{$search}%");
+                    ->orWhere('vendors.business_name', 'like', "%{$search}%")
+                    ->orWhere('vendors.payout_account_name', 'like', "%{$search}%")
+                    ->orWhere('vendors.payout_account_number', 'like', "%{$search}%");
             });
         }
 
@@ -112,6 +118,19 @@ class VendorPayoutController extends Controller
         } elseif ($status === 'below_minimum') {
             $query->having('available_balance', '>', 0)
                 ->having('available_balance', '<', $minPayout);
+        }
+
+        $payoutAccount = $request->get('payout_account');
+        if ($payoutAccount === 'set') {
+            $query->whereNotNull('vendors.payout_momo_network')
+                ->whereNotNull('vendors.payout_account_name')
+                ->whereNotNull('vendors.payout_account_number');
+        } elseif ($payoutAccount === 'missing') {
+            $query->where(function ($q) {
+                $q->whereNull('vendors.payout_momo_network')
+                    ->orWhereNull('vendors.payout_account_name')
+                    ->orWhereNull('vendors.payout_account_number');
+            });
         }
 
         // Sorting
@@ -141,6 +160,7 @@ class VendorPayoutController extends Controller
                 'vendor_name' => $row->vendor_name,
                 'vendor_phone' => $row->vendor_phone,
                 'business_name' => $row->business_name,
+                'payout_account' => $this->formatPayoutAccount($row),
                 'total_earned' => (float) $row->total_earned,
                 'available_balance' => (float) $row->available_balance,
                 'total_paid' => (float) $row->total_paid,
@@ -240,7 +260,7 @@ class VendorPayoutController extends Controller
         $request->validate([
             'amount' => 'required|numeric|min:1',
             'payment_method' => 'required|in:momo,bank,cash',
-            'payment_phone' => 'required_if:payment_method,momo|nullable|string|max:20',
+            'payment_phone' => 'nullable|string|max:20',
             'payment_reference' => [$request->boolean('confirm_immediately') ? 'required' : 'nullable', 'string', 'max:255'],
             'confirm_immediately' => 'sometimes|boolean',
             'notes' => 'nullable|string|max:500',
@@ -302,5 +322,21 @@ class VendorPayoutController extends Controller
         if (!Auth::guard('admin')->user()->hasPermission($permission)) {
             abort(403, 'Unauthorized action.');
         }
+    }
+
+    protected function formatPayoutAccount($vendor): array
+    {
+        $isSet = filled($vendor->payout_momo_network)
+            && filled($vendor->payout_account_name)
+            && filled($vendor->payout_account_number);
+
+        return [
+            'is_set' => $isSet,
+            'method' => 'momo',
+            'network' => $vendor->payout_momo_network,
+            'account_name' => $vendor->payout_account_name,
+            'account_number' => $vendor->payout_account_number,
+            'updated_at' => $vendor->payout_account_updated_at,
+        ];
     }
 }

@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Vendor\UpdateProfileRequest;
+use App\Helpers\PhoneHelper;
 use App\Services\VendorProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class VendorProfileController extends Controller
 {
@@ -41,6 +43,40 @@ class VendorProfileController extends Controller
         $result = $this->profileService->updateProfile(
             $vendor,
             $request->validated(),
+            $request
+        );
+
+        return response()->json($result);
+    }
+
+    public function payoutAccount(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'message' => 'Payout account retrieved successfully.',
+            'data' => [
+                'payout_account' => $this->profileService->formatPayoutAccount($request->user()),
+            ],
+        ]);
+    }
+
+    public function updatePayoutAccount(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'payout_momo_network' => ['required', 'string', Rule::in(['mtn', 'telecel', 'airteltigo'])],
+            'payout_account_name' => ['required', 'string', 'max:255'],
+            'payout_account_number' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
+                $local = PhoneHelper::toLocal((string) $value);
+
+                if (!$local || !preg_match('/^0(?:2\d|5\d)\d{7}$/', $local)) {
+                    $fail('Enter a valid 10-digit Ghana phone number');
+                }
+            }],
+        ]);
+
+        $result = $this->profileService->updatePayoutAccount(
+            $request->user(),
+            $validated,
             $request
         );
 

@@ -644,6 +644,65 @@
                                 </div>
                             </div>
 
+                            <div class="rounded-2xl border border-emerald-200/70 bg-emerald-50/30 p-5">
+                                <div class="mb-4 flex items-start gap-3">
+                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 9V7a5 5 0 0 0-10 0v2M5 9h14l-1 11H6L5 9Zm7 4v3"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-bold text-slate-800">MoMo Payout Account</h4>
+                                        <p class="mt-0.5 text-xs font-semibold text-slate-500">Where vendor commission should be transferred.</p>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label class="mb-2 block text-sm font-semibold text-slate-700">Network</label>
+                                        <select
+                                            x-model="form.payout_momo_network"
+                                            :disabled="modalMode === 'view'"
+                                            class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 disabled:bg-slate-50 disabled:text-slate-500"
+                                        >
+                                            <option value="">No payout account</option>
+                                            <option value="mtn">MTN MoMo</option>
+                                            <option value="telecel">Telecel Cash</option>
+                                            <option value="airteltigo">AirtelTigo Money</option>
+                                        </select>
+                                        <template x-if="errors.payout_momo_network">
+                                            <p class="mt-1.5 text-xs text-rose-600" x-text="errors.payout_momo_network[0]"></p>
+                                        </template>
+                                    </div>
+                                    <div>
+                                        <label class="mb-2 block text-sm font-semibold text-slate-700">Account Number</label>
+                                        <input
+                                            type="text"
+                                            x-model="form.payout_account_number"
+                                            :disabled="modalMode === 'view'"
+                                            class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 disabled:bg-slate-50 disabled:text-slate-500"
+                                            placeholder="0551234567"
+                                        >
+                                        <template x-if="errors.payout_account_number">
+                                            <p class="mt-1.5 text-xs text-rose-600" x-text="errors.payout_account_number[0]"></p>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div class="mt-4">
+                                    <label class="mb-2 block text-sm font-semibold text-slate-700">Account Name</label>
+                                    <input
+                                        type="text"
+                                        x-model="form.payout_account_name"
+                                        :disabled="modalMode === 'view'"
+                                        class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 disabled:bg-slate-50 disabled:text-slate-500"
+                                        placeholder="Name on MoMo account"
+                                    >
+                                    <template x-if="errors.payout_account_name">
+                                        <p class="mt-1.5 text-xs text-rose-600" x-text="errors.payout_account_name[0]"></p>
+                                    </template>
+                                </div>
+                            </div>
+
                                             <!-- Status Toggle -->
                             <div x-show="modalMode !== 'view'" class="bg-slate-50/70 rounded-2xl p-5 border border-slate-200">
                                 <div class="flex items-center justify-between">

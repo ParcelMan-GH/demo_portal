@@ -116,6 +116,9 @@ function buildVendorsTable(config) {
             phone: '',
             is_active: true,
             commission_rate_override: '',
+            payout_momo_network: '',
+            payout_account_name: '',
+            payout_account_number: '',
         },
         init() {
             this.initDateRange();
@@ -581,6 +584,9 @@ function buildVendorsTable(config) {
                 phone: '',
                 is_active: true,
                 commission_rate_override: '',
+                payout_momo_network: '',
+                payout_account_name: '',
+                payout_account_number: '',
             };
             this.showModal = true;
         },
@@ -596,6 +602,9 @@ function buildVendorsTable(config) {
                 phone: vendor.phone,
                 is_active: vendor.is_active,
                 commission_rate_override: vendor.commission_rate_override ?? '',
+                payout_momo_network: vendor.payout_momo_network || vendor.payout_account?.network || '',
+                payout_account_name: vendor.payout_account_name || vendor.payout_account?.account_name || '',
+                payout_account_number: vendor.payout_account_number || vendor.payout_account?.account_number || '',
             };
             this.showModal = true;
         },
@@ -611,6 +620,9 @@ function buildVendorsTable(config) {
                 phone: vendor.phone,
                 is_active: vendor.is_active,
                 commission_rate_override: vendor.commission_rate_override ?? '',
+                payout_momo_network: vendor.payout_momo_network || vendor.payout_account?.network || '',
+                payout_account_name: vendor.payout_account_name || vendor.payout_account?.account_name || '',
+                payout_account_number: vendor.payout_account_number || vendor.payout_account?.account_number || '',
             };
             this.showModal = true;
         },

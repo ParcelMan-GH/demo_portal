@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\PhoneHelper;
 use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
 use App\Models\PlatformSetting;
@@ -129,6 +130,14 @@ class VendorCommissionService
             'min_payout' => $this->getMinPayout(),
             'can_request_payout' => $approvedBalance >= $this->getMinPayout(),
             'currency' => 'GHS',
+            'payout_account' => [
+                'is_set' => filled($vendor->payout_momo_network) && filled($vendor->payout_account_name) && filled($vendor->payout_account_number),
+                'method' => 'momo',
+                'network' => $vendor->payout_momo_network,
+                'account_name' => $vendor->payout_account_name,
+                'account_number' => $vendor->payout_account_number,
+                'updated_at' => $vendor->payout_account_updated_at?->toIso8601String(),
+            ],
         ];
     }
 
@@ -144,7 +153,25 @@ class VendorCommissionService
             return ['success' => false, 'message' => 'Minimum payout amount is GHS ' . number_format($this->getMinPayout(), 2)];
         }
 
-        return DB::transaction(function () use ($vendor, $amount, $adminId, $data) {
+        $paymentMethod = $data['payment_method'] ?? 'momo';
+        $paymentPhone = $data['payment_phone'] ?? $vendor->payout_account_number;
+
+        if ($paymentMethod === 'momo') {
+            if (!filled($vendor->payout_momo_network) || !filled($vendor->payout_account_name) || !filled($vendor->payout_account_number)) {
+                return ['success' => false, 'message' => 'This vendor has no MoMo payout account set.'];
+            }
+
+            $paymentPhone = $vendor->payout_account_number;
+            $localPhone = PhoneHelper::toLocal((string) $paymentPhone);
+
+            if (!$localPhone || !preg_match('/^0(?:2\d|5\d)\d{7}$/', $localPhone)) {
+                return ['success' => false, 'message' => 'Enter a valid 10-digit Ghana phone number'];
+            }
+
+            $paymentPhone = PhoneHelper::format($paymentPhone);
+        }
+
+        return DB::transaction(function () use ($vendor, $amount, $adminId, $data, $paymentMethod, $paymentPhone) {
             $confirmImmediately = (bool) ($data['confirm_immediately'] ?? false);
             $now = now();
 
@@ -152,9 +179,9 @@ class VendorCommissionService
                 'vendor_id' => $vendor->id,
                 'amount' => $amount,
                 'status' => $confirmImmediately ? VendorPayout::STATUS_CONFIRMED : VendorPayout::STATUS_PENDING,
-                'payment_method' => $data['payment_method'] ?? 'momo',
+                'payment_method' => $paymentMethod,
                 'payment_reference' => $data['payment_reference'] ?? null,
-                'payment_phone' => $data['payment_phone'] ?? $vendor->phone,
+                'payment_phone' => $paymentPhone,
                 'notes' => $data['notes'] ?? null,
                 'processed_by_admin_id' => $adminId,
                 'sent_at' => $confirmImmediately ? $now : null,
