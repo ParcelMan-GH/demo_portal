@@ -337,6 +337,32 @@ class DriverPackageController extends Controller
         ]);
     }
 
+    public function outgoingTransfers(Request $request): JsonResponse
+    {
+        $driver = $request->user();
+
+        $transfers = RiderPackageTransfer::query()
+            ->with([
+                'shipmentItem.shipment:id,shipment_number',
+                'fromDriver:id,name,phone',
+                'toDriver:id,name,phone',
+            ])
+            ->where('from_driver_id', $driver->id)
+            ->latest('requested_at')
+            ->limit(100)
+            ->get()
+            ->map(fn (RiderPackageTransfer $transfer) => $this->transformTransfer($transfer))
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Outgoing transfers retrieved.',
+            'data' => [
+                'transfers' => $transfers,
+            ],
+        ]);
+    }
+
     public function acceptTransfer(
         Request $request,
         RiderPackageTransfer $transfer,
@@ -365,6 +391,38 @@ class DriverPackageController extends Controller
             'message' => 'Transfer rejected.',
             'data' => [
                 'transfer' => $this->transformTransfer($rejected),
+            ],
+        ]);
+    }
+
+    public function cancelTransfer(
+        Request $request,
+        RiderPackageTransfer $transfer,
+        DriverPackageOperationsService $operations
+    ): JsonResponse {
+        $cancelled = $operations->cancelTransfer($request->user(), $transfer);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transfer request cancelled.',
+            'data' => [
+                'transfer' => $this->transformTransfer($cancelled),
+            ],
+        ]);
+    }
+
+    public function recallTransfer(
+        Request $request,
+        RiderPackageTransfer $transfer,
+        DriverPackageOperationsService $operations
+    ): JsonResponse {
+        $recalled = $operations->recallTransfer($request->user(), $transfer);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transfer recalled.',
+            'data' => [
+                'transfer' => $this->transformTransfer($recalled),
             ],
         ]);
     }

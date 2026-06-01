@@ -146,8 +146,11 @@ Route::prefix('v1/driver')->group(function () {
         Route::post('packages/{trackingCode}/location-change', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'changePackageLocation']);
         Route::post('packages/{trackingCode}/transfer', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'requestTransfer']);
         Route::get('package-transfers/incoming', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'incomingTransfers']);
+        Route::get('package-transfers/outgoing', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'outgoingTransfers']);
         Route::post('package-transfers/{transfer}/accept', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'acceptTransfer']);
         Route::post('package-transfers/{transfer}/reject', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'rejectTransfer']);
+        Route::post('package-transfers/{transfer}/cancel', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'cancelTransfer']);
+        Route::post('package-transfers/{transfer}/recall', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'recallTransfer']);
 
         // Rider team custody
         Route::get('rider-teams', [DriverRiderTeamController::class, 'index']);

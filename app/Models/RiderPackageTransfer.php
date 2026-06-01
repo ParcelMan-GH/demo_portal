@@ -11,6 +11,7 @@ class RiderPackageTransfer extends Model
     public const STATUS_ACCEPTED = 'accepted';
     public const STATUS_REJECTED = 'rejected';
     public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_RECALLED = 'recalled';
 
     protected $fillable = [
         'shipment_item_id',

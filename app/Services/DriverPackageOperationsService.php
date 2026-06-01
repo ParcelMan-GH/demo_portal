@@ -197,6 +197,94 @@ class DriverPackageOperationsService
         });
     }
 
+    public function cancelTransfer(Driver $driver, RiderPackageTransfer $transfer): RiderPackageTransfer
+    {
+        return DB::transaction(function () use ($driver, $transfer) {
+            $transfer = RiderPackageTransfer::lockForUpdate()
+                ->with(['shipmentItem', 'fromDriver', 'toDriver'])
+                ->findOrFail($transfer->id);
+
+            $this->assertTransferSender($driver, $transfer);
+            $this->assertTransferPending($transfer);
+
+            $transfer->update([
+                'status' => RiderPackageTransfer::STATUS_CANCELLED,
+                'responded_at' => now(),
+            ]);
+
+            $this->notifyTransferDriver(
+                $transfer->toDriver,
+                'Transfer request cancelled',
+                "{$driver->name} cancelled the transfer request for {$transfer->shipmentItem?->tracking_code}.",
+                $transfer,
+                'package_transfer_cancelled'
+            );
+
+            return $transfer->fresh(['shipmentItem', 'fromDriver', 'toDriver']);
+        });
+    }
+
+    public function recallTransfer(Driver $driver, RiderPackageTransfer $transfer): RiderPackageTransfer
+    {
+        return DB::transaction(function () use ($driver, $transfer) {
+            $transfer = RiderPackageTransfer::lockForUpdate()
+                ->with(['shipmentItem', 'fromDriver', 'toDriver'])
+                ->findOrFail($transfer->id);
+
+            $this->assertTransferSender($driver, $transfer);
+
+            if ($transfer->status !== RiderPackageTransfer::STATUS_ACCEPTED) {
+                throw ValidationException::withMessages(['transfer' => 'Only accepted transfers can be recalled.']);
+            }
+
+            $this->assertEditableBeforeDelivery($transfer->shipmentItem);
+            $this->assertDriverHoldsAllLabels($transfer->toDriver, $transfer->shipmentItem);
+
+            $labels = $this->labelsForItem($transfer->shipmentItem);
+            foreach ($labels as $label) {
+                LabelCustodyEvent::create([
+                    'warehouse_receipt_item_label_id' => $label->id,
+                    'event_type' => LabelCustodyEvent::TYPE_TRANSFERRED,
+                    'driver_id' => $transfer->to_driver_id,
+                    'notes' => "Recalled by {$driver->name}",
+                ]);
+
+                LabelCustodyEvent::create([
+                    'warehouse_receipt_item_label_id' => $label->id,
+                    'event_type' => LabelCustodyEvent::TYPE_CLAIMED,
+                    'driver_id' => $driver->id,
+                    'notes' => "Recalled from {$transfer->toDriver?->name}",
+                ]);
+
+                if ($label->riderTeamHandoverItem && ! in_array($label->riderTeamHandoverItem->status, [
+                    RiderTeamHandoverItem::STATUS_DELIVERED,
+                    RiderTeamHandoverItem::STATUS_RETURNED,
+                    RiderTeamHandoverItem::STATUS_RECALLED,
+                ], true)) {
+                    $label->riderTeamHandoverItem->update([
+                        'allocated_to_driver_id' => $driver->id,
+                        'status' => RiderTeamHandoverItem::STATUS_MEMBER_CLAIMED,
+                    ]);
+                }
+            }
+
+            $transfer->update([
+                'status' => RiderPackageTransfer::STATUS_RECALLED,
+                'responded_at' => now(),
+            ]);
+
+            $this->notifyTransferDriver(
+                $transfer->toDriver,
+                'Package transfer recalled',
+                "{$driver->name} recalled {$transfer->shipmentItem?->tracking_code}.",
+                $transfer,
+                'package_transfer_recalled'
+            );
+
+            return $transfer->fresh(['shipmentItem', 'fromDriver', 'toDriver']);
+        });
+    }
+
     public function pendingTransferForItem(int $shipmentItemId): ?RiderPackageTransfer
     {
         return RiderPackageTransfer::query()
@@ -312,6 +400,13 @@ class DriverPackageOperationsService
         }
     }
 
+    private function assertTransferSender(Driver $driver, RiderPackageTransfer $transfer): void
+    {
+        if ((int) $transfer->from_driver_id !== (int) $driver->id) {
+            throw ValidationException::withMessages(['transfer' => 'This transfer was not sent by you.']);
+        }
+    }
+
     private function assertTransferPending(RiderPackageTransfer $transfer): void
     {
         if ($transfer->status !== RiderPackageTransfer::STATUS_PENDING) {
@@ -325,6 +420,36 @@ class DriverPackageOperationsService
             ->with(['latestCustody', 'riderTeamHandoverItem'])
             ->whereHas('receiptItem', fn ($query) => $query->where('shipment_item_id', $item->id))
             ->get();
+    }
+
+    private function notifyTransferDriver(?Driver $driver, string $title, string $body, RiderPackageTransfer $transfer, string $type): void
+    {
+        if (! $driver) {
+            return;
+        }
+
+        $data = [
+            'transfer_id' => (string) $transfer->id,
+            'tracking_code' => (string) $transfer->shipmentItem?->tracking_code,
+            'screen' => 'driver_package_transfers',
+        ];
+
+        if (! $driver->fcm_token) {
+            NotificationLog::create([
+                'notifiable_type' => Driver::class,
+                'notifiable_id' => $driver->id,
+                'type' => $type,
+                'channel' => 'app',
+                'title' => $title,
+                'body' => $body,
+                'data' => $data,
+                'status' => 'queued',
+            ]);
+
+            return;
+        }
+
+        $this->pushNotificationService->sendToDriver($driver, $title, $body, $data, $type);
     }
 
     private function driverHasEffectiveCustody(Driver $driver, WarehouseReceiptItemLabel $label): bool
