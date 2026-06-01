@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\PhoneHelper;
 use App\Models\DeliveryRunItem;
 use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
@@ -22,14 +23,21 @@ class RiderTeamHandoverService
 {
     public function lookupRider(string $phone): ?Driver
     {
-        $normalized = $this->normalizePhone($phone);
+        $formatted = PhoneHelper::format($phone);
+        $local = $formatted ? PhoneHelper::toLocal($formatted) : null;
+        $normalized = $this->normalizePhone($formatted ?: $phone);
+        $exactMatches = collect([$phone, $formatted, $local])
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
 
         return Driver::query()
             ->where('is_active', true)
-            ->where(function ($query) use ($phone, $normalized) {
-                $query->where('phone', $phone);
+            ->where(function ($query) use ($exactMatches, $normalized) {
+                $query->whereIn('phone', $exactMatches);
                 if ($normalized !== '') {
-                    $query->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '') like ?", ['%' . $normalized]);
+                    $query->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalized]);
                 }
             })
             ->first();
