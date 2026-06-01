@@ -150,6 +150,7 @@ Route::prefix('v1/driver')->group(function () {
         Route::delete('rider-teams/{team}/members/{driver}', [DriverRiderTeamController::class, 'removeMember']);
         Route::get('rider-team-handovers', [DriverRiderTeamHandoverController::class, 'index']);
         Route::get('rider-team-handovers/{handover}', [DriverRiderTeamHandoverController::class, 'show']);
+        Route::post('rider-teams/{team}/scan-receive', [DriverRiderTeamHandoverController::class, 'scanReceiveForTeam']);
         Route::post('rider-team-handovers/{handover}/scan-receive', [DriverRiderTeamHandoverController::class, 'scanReceive']);
         Route::post('rider-team-handovers/{handover}/allocate', [DriverRiderTeamHandoverController::class, 'allocate']);
         Route::post('rider-team-handovers/scan-claim', [DriverRiderTeamHandoverController::class, 'scanClaim']);

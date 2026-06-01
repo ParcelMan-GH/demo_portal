@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
+use App\Models\RiderTeam;
 use App\Models\RiderTeamHandover;
 use App\Models\RiderTeamHandoverItem;
 use App\Models\WarehouseReceiptItemLabel;
@@ -88,6 +89,34 @@ class DriverRiderTeamHandoverController extends Controller
             'success' => true,
             'message' => 'Package received into rider team handover.',
             'data' => ['item' => $this->handoverItem($item, true)],
+        ]);
+    }
+
+    public function scanReceiveForTeam(Request $request, RiderTeam $team): JsonResponse
+    {
+        $receiver = $request->user();
+        $validated = $request->validate([
+            'barcode' => ['required', 'string', 'max:100'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+        ]);
+
+        $result = $this->service->receiveTeamCustody(
+            $receiver,
+            $team->loadMissing('warehouse'),
+            $validated['barcode'],
+            $validated['latitude'] ?? null,
+            $validated['longitude'] ?? null,
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'] ?? 'Package received into rider team custody.',
+            'action' => $result['status'] ?? 'team_received',
+            'data' => [
+                'handover' => $this->handoverSummary($result['handover']->loadMissing(['team', 'receiver'])),
+                'item' => $this->handoverItem($result['item'], true),
+            ],
         ]);
     }
 

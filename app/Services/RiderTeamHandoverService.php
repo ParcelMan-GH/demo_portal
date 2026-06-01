@@ -295,6 +295,106 @@ class RiderTeamHandoverService
         });
     }
 
+    public function receiveTeamCustody(Driver $receiver, RiderTeam $team, string $barcode, ?float $latitude = null, ?float $longitude = null): array
+    {
+        if (! $team->is_active) {
+            throw ValidationException::withMessages(['team_id' => 'This rider team is inactive.']);
+        }
+
+        if (! $receiver->is_active || ! $this->driverBelongsToTeam($receiver, $team)) {
+            throw ValidationException::withMessages(['team_id' => 'You are not an active member of this rider team.']);
+        }
+
+        $barcode = trim($barcode);
+        $label = WarehouseReceiptItemLabel::query()
+            ->with(['receiptItem.receipt', 'latestCustody', 'riderTeamHandoverItem.handover.team'])
+            ->where('barcode_value', $barcode)
+            ->first();
+
+        if (! $label) {
+            throw ValidationException::withMessages(['barcode' => 'Label not found. Check the barcode and try again.']);
+        }
+
+        return DB::transaction(function () use ($receiver, $team, $label, $latitude, $longitude) {
+            $existingItem = $label->riderTeamHandoverItem;
+            if ($existingItem && ! in_array($existingItem->status, [
+                RiderTeamHandoverItem::STATUS_DELIVERED,
+                RiderTeamHandoverItem::STATUS_RETURNED,
+                RiderTeamHandoverItem::STATUS_RECALLED,
+            ], true)) {
+                $existingItem->loadMissing('handover.team');
+                $existingHandover = $existingItem->handover;
+
+                if ((int) $existingHandover->rider_team_id !== (int) $team->id) {
+                    throw ValidationException::withMessages(['barcode' => 'This package is assigned to another rider team.']);
+                }
+
+                if ($this->handoverReceiverId($existingHandover) !== (int) $receiver->id) {
+                    throw ValidationException::withMessages(['barcode' => 'This package is already in another team handover.']);
+                }
+
+                if (! in_array($existingItem->status, [
+                    RiderTeamHandoverItem::STATUS_ASSIGNED_TO_LEADER,
+                    RiderTeamHandoverItem::STATUS_LEADER_RECEIVED,
+                ], true)) {
+                    throw ValidationException::withMessages(['barcode' => 'This package has already moved past team receiving.']);
+                }
+
+                if (! $existingItem->leader_received_at) {
+                    $this->receiveByReceiver($existingHandover, $receiver, $label->barcode_value);
+                }
+
+                return [
+                    'status' => 'already_in_team',
+                    'message' => 'Package is already in ' . $team->name . ' custody.',
+                    'handover' => $existingHandover->fresh(),
+                    'item' => $existingItem->fresh(['label.receiptItem.shipmentItem']),
+                ];
+            }
+
+            $this->assertLabelAssignableToReceiver($label);
+
+            $handover = $this->activeReceiverHandover($team, $receiver)
+                ?: $this->createHandover($team, $receiver, $team->warehouse, null, $receiver, 'Created from rider team scanner.');
+
+            $item = RiderTeamHandoverItem::create([
+                'rider_team_handover_id' => $handover->id,
+                'warehouse_receipt_item_label_id' => $label->id,
+                'status' => RiderTeamHandoverItem::STATUS_LEADER_RECEIVED,
+                'assigned_at' => now(),
+                'leader_received_at' => now(),
+                'notes' => 'Received from rider team scanner.',
+            ]);
+
+            LabelCustodyEvent::create([
+                'warehouse_receipt_item_label_id' => $label->id,
+                'event_type' => LabelCustodyEvent::TYPE_ASSIGNED_TO_LEADER,
+                'driver_id' => $receiver->id,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'notes' => 'Rider team scanner handover ' . $handover->handover_number,
+            ]);
+
+            LabelCustodyEvent::create([
+                'warehouse_receipt_item_label_id' => $label->id,
+                'event_type' => LabelCustodyEvent::TYPE_LEADER_RECEIVED,
+                'driver_id' => $receiver->id,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'notes' => 'Received into ' . $team->name . ' custody.',
+            ]);
+
+            $this->refreshHandoverCounts($handover);
+
+            return [
+                'status' => 'team_received',
+                'message' => 'Package added to ' . $team->name . ' custody.',
+                'handover' => $handover->fresh(),
+                'item' => $item->fresh(['label.receiptItem.shipmentItem']),
+            ];
+        });
+    }
+
     public function claimFromScan(Driver $driver, WarehouseReceiptItemLabel $label, ?float $latitude = null, ?float $longitude = null, ?string $notes = null): array
     {
         $label->loadMissing(['receiptItem.receipt', 'latestCustody', 'riderTeamHandoverItem.handover.team']);
@@ -546,6 +646,22 @@ class RiderTeamHandoverService
             ->where('is_active', true)
             ->whereNull('removed_at')
             ->exists();
+    }
+
+    private function activeReceiverHandover(RiderTeam $team, Driver $receiver): ?RiderTeamHandover
+    {
+        return RiderTeamHandover::query()
+            ->where('rider_team_id', $team->id)
+            ->where(function ($query) use ($receiver) {
+                $query->where('receiver_driver_id', $receiver->id)
+                    ->orWhere(function ($query) use ($receiver) {
+                        $query->whereNull('receiver_driver_id')
+                            ->where('leader_driver_id', $receiver->id);
+                    });
+            })
+            ->whereNotIn('status', [RiderTeamHandover::STATUS_CLOSED, RiderTeamHandover::STATUS_RECALLED])
+            ->latest('id')
+            ->first();
     }
 
     private function handoverReceiverId(RiderTeamHandover $handover): int
