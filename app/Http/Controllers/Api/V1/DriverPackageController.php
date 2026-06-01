@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\DeliveryRun;
+use App\Models\DeliveryRunItem;
 use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
 use App\Models\RiderPackageTransfer;
@@ -590,10 +592,15 @@ class DriverPackageController extends Controller
         ]);
 
         $item = $transfer->shipmentItem;
+        $canCancel = $transfer->status === RiderPackageTransfer::STATUS_PENDING;
+        $canRecall = $this->canRecallTransfer($transfer);
 
         return [
             'id' => $transfer->id,
             'status' => $transfer->status,
+            'can_cancel' => $canCancel,
+            'can_recall' => $canRecall,
+            'is_open' => $canCancel || $canRecall,
             'tracking_code' => $item?->tracking_code,
             'description' => $item?->description,
             'shipment_number' => $item?->shipment?->shipment_number,
@@ -612,6 +619,43 @@ class DriverPackageController extends Controller
             'requested_at' => $transfer->requested_at?->toIso8601String(),
             'responded_at' => $transfer->responded_at?->toIso8601String(),
         ];
+    }
+
+    private function canRecallTransfer(RiderPackageTransfer $transfer): bool
+    {
+        if ($transfer->status !== RiderPackageTransfer::STATUS_ACCEPTED || ! $transfer->shipmentItem || ! $transfer->to_driver_id) {
+            return false;
+        }
+
+        $hasNewPendingTransfer = RiderPackageTransfer::query()
+            ->where('shipment_item_id', $transfer->shipment_item_id)
+            ->where('status', RiderPackageTransfer::STATUS_PENDING)
+            ->whereKeyNot($transfer->id)
+            ->exists();
+
+        if ($hasNewPendingTransfer) {
+            return false;
+        }
+
+        $isInActiveDelivery = DeliveryRunItem::query()
+            ->where('shipment_item_id', $transfer->shipment_item_id)
+            ->whereHas('run', fn ($query) => $query->whereNotIn('status', [
+                DeliveryRun::STATUS_COMPLETED,
+                DeliveryRun::STATUS_CANCELLED,
+            ]))
+            ->exists();
+
+        if ($isInActiveDelivery) {
+            return false;
+        }
+
+        $labels = WarehouseReceiptItemLabel::query()
+            ->with('latestCustody')
+            ->whereHas('receiptItem', fn ($query) => $query->where('shipment_item_id', $transfer->shipment_item_id))
+            ->get();
+
+        return $labels->isNotEmpty()
+            && $labels->every(fn (WarehouseReceiptItemLabel $label) => (int) $label->currentDriverId() === (int) $transfer->to_driver_id);
     }
 
     private function transformLocationChange($change): array
