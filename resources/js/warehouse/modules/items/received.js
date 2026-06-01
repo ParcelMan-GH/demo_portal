@@ -892,6 +892,18 @@ function registerWarehousePackageShowPage() {
             }[tone || 'slate'] || 'bg-slate-100 text-slate-600 ring-slate-200';
         },
 
+        auditDotClass(tone) {
+            return {
+                emerald: 'bg-emerald-500',
+                blue: 'bg-blue-500',
+                violet: 'bg-violet-500',
+                amber: 'bg-amber-500',
+                orange: 'bg-orange-500',
+                rose: 'bg-rose-500',
+                slate: 'bg-slate-400',
+            }[tone || 'slate'] || 'bg-slate-400';
+        },
+
         openDelayModal(delivery = null) {
             this.delayTarget = delivery || (Array.isArray(this.pkg.histories?.deliveries) ? this.pkg.histories.deliveries[0] : null);
             this.delayForm = {
@@ -1190,6 +1202,13 @@ function registerWarehousePackageShowPage() {
                 url: photo.url,
                 source: photo.source || row?.photos?.primary_label || 'Photo',
             }));
+            this.activePhotoIndex = 0;
+            this.photoPreviewOpen = true;
+        },
+
+        openSinglePhoto(url, name = 'Photo', source = 'Proof') {
+            if (!url) return;
+            this.photoPreviewUrls = [{ id: null, name, url, source }];
             this.activePhotoIndex = 0;
             this.photoPreviewOpen = true;
         },

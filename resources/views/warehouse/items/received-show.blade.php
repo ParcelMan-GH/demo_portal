@@ -270,6 +270,35 @@
             </section>
 
             <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                    <div>
+                        <h2 class="text-sm font-black uppercase tracking-wide text-slate-700">Audit Log</h2>
+                        <p class="mt-1 text-xs font-bold text-slate-400">Package touches, rider edits, and transfer activity.</p>
+                    </div>
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600" x-text="(pkg.histories.timeline || []).length + ' events'"></span>
+                </div>
+                <div class="divide-y divide-slate-100">
+                    <template x-for="event in pkg.histories.timeline" :key="[event.label, event.at, event.actor, event.detail].filter(Boolean).join('|')">
+                        <div class="flex gap-3 p-5">
+                            <div class="pt-1">
+                                <span class="block h-2.5 w-2.5 rounded-full ring-4 ring-slate-100" :class="auditDotClass(event.tone)"></span>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-black text-slate-900" x-text="event.label || '-'"></p>
+                                <p class="mt-1 text-xs font-bold text-slate-500" x-show="event.detail" x-text="event.detail"></p>
+                                <div class="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-bold text-slate-400">
+                                    <span x-show="event.actor" x-text="event.actor"></span>
+                                    <span x-show="event.actor && event.at">/</span>
+                                    <span x-show="event.at" x-text="event.at"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="!pkg.histories.timeline?.length" class="p-5 text-sm font-bold text-slate-400">-</div>
+                </div>
+            </section>
+
+            <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-100 px-5 py-4"><h2 class="text-sm font-black uppercase tracking-wide text-slate-700">Rider Location Changes</h2></div>
                 <div class="divide-y divide-slate-100">
                     <template x-for="change in pkg.histories.location_changes" :key="'lc' + change.id">
@@ -277,7 +306,7 @@
                             <p class="font-black text-slate-900" x-text="change.new_location || '-'"></p>
                             <p class="mt-1 text-xs font-semibold text-slate-500" x-text="'From ' + (change.old_location || '-')"></p>
                             <p class="mt-2 text-xs text-slate-400" x-text="[change.driver, change.driver_phone, change.changed_at].filter(Boolean).join(' / ')"></p>
-                            <a x-show="change.proof_photo_url" :href="change.proof_photo_url" target="_blank" class="mt-3 inline-flex rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-orange-700">View proof photo</a>
+                            <button type="button" x-show="change.proof_photo_url" @@click="openSinglePhoto(change.proof_photo_url, 'Location change proof', change.new_location)" class="mt-3 inline-flex rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-orange-700">View proof photo</button>
                         </div>
                     </template>
                     <div x-show="!pkg.histories.location_changes?.length" class="p-5 text-sm font-bold text-slate-400">-</div>
