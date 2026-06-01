@@ -130,4 +130,19 @@ class Driver extends Authenticatable
     {
         return $this->hasMany(RiderTeamHandover::class, 'receiver_driver_id');
     }
+
+    public function packageLocationChanges(): HasMany
+    {
+        return $this->hasMany(RiderPackageLocationChange::class);
+    }
+
+    public function sentPackageTransfers(): HasMany
+    {
+        return $this->hasMany(RiderPackageTransfer::class, 'from_driver_id');
+    }
+
+    public function receivedPackageTransfers(): HasMany
+    {
+        return $this->hasMany(RiderPackageTransfer::class, 'to_driver_id');
+    }
 }

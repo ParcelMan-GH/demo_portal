@@ -34,6 +34,7 @@ use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardCont
 use App\Http\Controllers\Warehouse\DeliveryRunController as WarehouseDeliveryRunController;
 use App\Http\Controllers\Warehouse\PackageController as WarehousePackageController;
 use App\Http\Controllers\Warehouse\ReceiptController as WarehouseReceiptController;
+use App\Http\Controllers\Warehouse\RiderPackageAuditController as WarehouseRiderPackageAuditController;
 use App\Http\Controllers\Warehouse\ShipmentPaymentController as WarehouseShipmentPaymentController;
 use App\Http\Controllers\Warehouse\SortingController as WarehouseSortingController;
 use App\Http\Controllers\Warehouse\TransportManifestController as WarehouseTransportManifestController;
@@ -676,6 +677,10 @@ Route::prefix(config('backoffice.prefix', 'admin') . '/operations')
         Route::get('pickups/received/{pickupAssignment}', [WarehouseReceiptController::class, 'receivedPickupShow'])->name('pickups.received.show');
         Route::get('bus-station-packages', [WarehousePackageController::class, 'busStationIndex'])->name('bus-station-packages.index');
         Route::get('bus-station-packages-data', [WarehousePackageController::class, 'busStationData'])->name('bus-station-packages.data');
+        Route::get('package-location-changes', [WarehouseRiderPackageAuditController::class, 'locationChangesIndex'])->name('package-location-changes.index');
+        Route::get('package-location-changes-data', [WarehouseRiderPackageAuditController::class, 'locationChangesData'])->name('package-location-changes.data');
+        Route::get('rider-package-transfers', [WarehouseRiderPackageAuditController::class, 'transfersIndex'])->name('rider-package-transfers.index');
+        Route::get('rider-package-transfers-data', [WarehouseRiderPackageAuditController::class, 'transfersData'])->name('rider-package-transfers.data');
         Route::get('packages', [WarehousePackageController::class, 'index'])->name('packages.index');
         Route::get('packages-data', [WarehousePackageController::class, 'data'])->name('packages.data');
         Route::get('packages/{warehouseReceiptItem}', [WarehousePackageController::class, 'show'])->name('packages.show');

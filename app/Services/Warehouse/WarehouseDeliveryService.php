@@ -301,8 +301,24 @@ class WarehouseDeliveryService
             }
         }
 
+        $allocatedLabelIds = collect();
+        if (Schema::hasTable('rider_team_handover_items')) {
+            $allocatedLabelIds = RiderTeamHandoverItem::query()
+                ->where('allocated_to_driver_id', $driver->id)
+                ->where('status', RiderTeamHandoverItem::STATUS_ALLOCATED_TO_MEMBER)
+                ->when($barcodes !== null, function ($query) use ($barcodes) {
+                    $query->whereHas('label', fn ($labelQuery) => $labelQuery->whereIn('barcode_value', $barcodes));
+                })
+                ->pluck('warehouse_receipt_item_label_id');
+        }
+
+        $claimedLabelIds = $claimedLabelIds
+            ->concat($allocatedLabelIds)
+            ->unique()
+            ->values();
+
         if ($claimedLabelIds->isEmpty()) {
-            return ['success' => false, 'message' => 'No available claimed packages found.'];
+            return ['success' => false, 'message' => 'No available packages found.'];
         }
 
         $labels = WarehouseReceiptItemLabel::whereIn('id', $claimedLabelIds)
@@ -312,6 +328,23 @@ class WarehouseDeliveryService
         $labelsByItemId = $labels
             ->filter(fn ($label) => $label->receiptItem?->shipmentItem)
             ->groupBy(fn ($label) => (int) $label->receiptItem->shipment_item_id);
+
+        $pendingTransferCodes = \App\Models\RiderPackageTransfer::query()
+            ->whereIn('shipment_item_id', $labelsByItemId->keys())
+            ->where('status', \App\Models\RiderPackageTransfer::STATUS_PENDING)
+            ->with('shipmentItem:id,tracking_code')
+            ->get()
+            ->map(fn ($transfer) => $transfer->shipmentItem?->tracking_code)
+            ->filter()
+            ->values();
+
+        if ($pendingTransferCodes->isNotEmpty()) {
+            return [
+                'success' => false,
+                'message' => 'Some packages have pending rider transfer requests and cannot be started for delivery.',
+                'pending_transfer_packages' => $pendingTransferCodes,
+            ];
+        }
 
         $activeRunStatuses = [DeliveryRun::STATUS_COMPLETED, DeliveryRun::STATUS_CANCELLED];
         $activeQuantitiesByItemId = DeliveryRunItem::query()

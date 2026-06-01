@@ -13,6 +13,8 @@ use App\Models\OtpCode;
 use App\Models\RecipientPaymentSession;
 use App\Models\RecipientPaymentSessionEntry;
 use App\Models\RecipientPaymentTask;
+use App\Models\RiderPackageLocationChange;
+use App\Models\RiderPackageTransfer;
 use App\Models\SortBatch;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -868,6 +870,20 @@ class PackageController extends Controller
         $deliveryRunItems = $shipmentItem && $shipmentItem->relationLoaded('deliveryRunItems')
             ? $shipmentItem->deliveryRunItems->sortBy('id')->values()
             : collect();
+        $riderLocationChanges = $shipmentItem
+            ? RiderPackageLocationChange::query()
+                ->with('driver:id,name,phone')
+                ->where('shipment_item_id', $shipmentItem->id)
+                ->latest('changed_at')
+                ->get()
+            : collect();
+        $riderTransfers = $shipmentItem
+            ? RiderPackageTransfer::query()
+                ->with(['fromDriver:id,name,phone', 'toDriver:id,name,phone'])
+                ->where('shipment_item_id', $shipmentItem->id)
+                ->latest('requested_at')
+                ->get()
+            : collect();
         $latestTask = $this->latestPaymentTask($receiptItem);
         $collection = $shipment?->collection;
 
@@ -992,6 +1008,27 @@ class PackageController extends Controller
             ];
         })->values();
 
+        $locationChangeHistory = $riderLocationChanges->map(fn (RiderPackageLocationChange $change) => [
+            'id' => $change->id,
+            'driver' => $change->driver?->name,
+            'driver_phone' => $change->driver?->phone,
+            'old_location' => $this->locationTextFromSnapshot($change->old_location),
+            'new_location' => $this->locationTextFromSnapshot($change->new_location),
+            'proof_photo_url' => $change->proof_photo_path ? $this->storageService->getUrl($change->proof_photo_path) : null,
+            'changed_at' => $this->humanDate($change->changed_at),
+        ])->values();
+
+        $riderTransferHistory = $riderTransfers->map(fn (RiderPackageTransfer $transfer) => [
+            'id' => $transfer->id,
+            'status' => $this->statusLabel($transfer->status),
+            'from_driver' => $transfer->fromDriver?->name,
+            'from_driver_phone' => $transfer->fromDriver?->phone,
+            'to_driver' => $transfer->toDriver?->name,
+            'to_driver_phone' => $transfer->toDriver?->phone,
+            'requested_at' => $this->humanDate($transfer->requested_at),
+            'responded_at' => $this->humanDate($transfer->responded_at),
+        ])->values();
+
         $timeline = collect([
             [
                 'label' => 'Shipment created',
@@ -1030,6 +1067,20 @@ class PackageController extends Controller
                     : ($entry['confirmed_by'] ?: $entry['driver']),
                 'detail' => $entry['bus_handoff']['bus_station'] ?? $entry['number'],
                 'tone' => $entry['bus_handoff'] ? 'amber' : 'orange',
+            ]))
+            ->merge($locationChangeHistory->map(fn ($entry) => [
+                'label' => 'Rider changed delivery location',
+                'at' => $entry['changed_at'],
+                'actor' => $entry['driver'],
+                'detail' => $entry['new_location'],
+                'tone' => 'amber',
+            ]))
+            ->merge($riderTransferHistory->map(fn ($entry) => [
+                'label' => 'Rider package transfer',
+                'at' => $entry['responded_at'] ?: $entry['requested_at'],
+                'actor' => collect([$entry['from_driver'], $entry['to_driver']])->filter()->join(' → '),
+                'detail' => $entry['status'],
+                'tone' => 'blue',
             ]))
             ->when($collection, fn ($timeline) => $timeline->push([
                 'label' => $collection->isCollected() ? 'Collected at warehouse' : 'Ready for collection',
@@ -1098,6 +1149,8 @@ class PackageController extends Controller
                 'sort_batches' => $sortHistory,
                 'manifests' => $manifestHistory,
                 'deliveries' => $deliveryHistory,
+                'location_changes' => $locationChangeHistory,
+                'rider_transfers' => $riderTransferHistory,
                 'timeline' => $timeline,
             ],
             'audit' => [
@@ -1143,6 +1196,19 @@ class PackageController extends Controller
     private function humanDate($date): ?string
     {
         return $date ? $date->format('M j, Y g:i A') : null;
+    }
+
+    private function locationTextFromSnapshot(?array $location): string
+    {
+        if (!$location) {
+            return '-';
+        }
+
+        return collect([
+            $location['town'] ?? null,
+            $location['district'] ?? null,
+            $location['region'] ?? null,
+        ])->filter()->join(', ') ?: '-';
     }
 
     private function statusLabel(?string $status): ?string

@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
+use App\Models\RiderPackageTransfer;
 use App\Models\RiderTeamHandoverItem;
 use App\Models\ShipmentItem;
 use App\Models\Warehouse;
+use App\Services\DriverPackageOperationsService;
 use App\Services\RiderTeamHandoverService;
 use App\Services\Warehouse\WarehouseDeliveryService;
 use App\Models\WarehouseReceiptItemLabel;
@@ -213,7 +216,16 @@ class DriverPackageController extends Controller
 
 
         $labelsById = $labels->keyBy('id');
-        $packages = $pagedRows->map(function (array $row) use ($labelsById, $unavailableLabelIds) {
+
+        $pendingTransfersByItemId = RiderPackageTransfer::query()
+            ->with(['toDriver:id,name,phone', 'fromDriver:id,name,phone'])
+            ->whereIn('shipment_item_id', $shipmentItemIds)
+            ->where('status', RiderPackageTransfer::STATUS_PENDING)
+            ->latest('requested_at')
+            ->get()
+            ->keyBy('shipment_item_id');
+
+        $packages = $pagedRows->map(function (array $row) use ($driver, $labelsById, $unavailableLabelIds, $pendingTransfersByItemId) {
             $label = $labelsById->get($row['label_id']);
             if (! $label) {
                 return null;
@@ -226,7 +238,16 @@ class DriverPackageController extends Controller
             $data = $this->transformLabel($label, $event, $handoverItem);
             $data['claimed_at'] = $event?->created_at?->toIso8601String();
             $data['in_delivery_run'] = $unavailableLabelIds->contains($label->id);
-            $data['can_start_delivery'] = (bool) $event && ! $data['in_delivery_run'];
+            $shipmentItemId = (int) ($label->receiptItem?->shipment_item_id ?? 0);
+            $pendingTransfer = $shipmentItemId > 0 ? $pendingTransfersByItemId->get($shipmentItemId) : null;
+            $teamAllocatedToDriver = $handoverItem
+                && (int) $handoverItem->allocated_to_driver_id === (int) $driver->id
+                && $handoverItem->status === RiderTeamHandoverItem::STATUS_ALLOCATED_TO_MEMBER;
+            $driverHasCustody = (bool) $event || $teamAllocatedToDriver;
+            $data['pending_transfer'] = $pendingTransfer ? $this->transformTransfer($pendingTransfer) : null;
+            $data['can_change_location'] = $driverHasCustody && ! $data['in_delivery_run'] && ! $pendingTransfer;
+            $data['can_transfer'] = $driverHasCustody && ! $data['in_delivery_run'] && ! $pendingTransfer;
+            $data['can_start_delivery'] = $driverHasCustody && ! $data['in_delivery_run'] && ! $pendingTransfer;
             return $data;
         })->filter()->values();
 
@@ -239,6 +260,111 @@ class DriverPackageController extends Controller
                 'limit' => $limit,
                 'offset' => $offset,
                 'has_more' => ($offset + $limit) < $total,
+            ],
+        ]);
+    }
+
+    public function changePackageLocation(
+        Request $request,
+        string $trackingCode,
+        DriverPackageOperationsService $operations
+    ): JsonResponse {
+        $driver = $request->user();
+
+        $validated = $request->validate([
+            'delivery_town' => ['required', 'string', 'max:255'],
+            'delivery_region_id' => ['nullable', 'integer', 'exists:regions,id'],
+            'delivery_district_id' => ['nullable', 'integer', 'exists:districts,id'],
+            'proof_photo' => ['required', 'image', 'max:12288'],
+        ]);
+
+        $change = $operations->changeLocation($driver, $trackingCode, $validated, $request->file('proof_photo'));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delivery location updated.',
+            'data' => [
+                'change' => $this->transformLocationChange($change->fresh(['driver', 'shipmentItem'])),
+            ],
+        ]);
+    }
+
+    public function requestTransfer(
+        Request $request,
+        string $trackingCode,
+        DriverPackageOperationsService $operations
+    ): JsonResponse {
+        $driver = $request->user();
+
+        $validated = $request->validate([
+            'receiver_phone' => ['required', 'string', 'max:30'],
+        ]);
+
+        $transfer = $operations->requestTransfer($driver, $trackingCode, $validated['receiver_phone']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transfer request sent.',
+            'data' => [
+                'transfer' => $this->transformTransfer($transfer),
+            ],
+        ]);
+    }
+
+    public function incomingTransfers(Request $request): JsonResponse
+    {
+        $driver = $request->user();
+
+        $transfers = RiderPackageTransfer::query()
+            ->with([
+                'shipmentItem.shipment:id,shipment_number',
+                'fromDriver:id,name,phone',
+                'toDriver:id,name,phone',
+            ])
+            ->where('to_driver_id', $driver->id)
+            ->where('status', RiderPackageTransfer::STATUS_PENDING)
+            ->latest('requested_at')
+            ->get()
+            ->map(fn (RiderPackageTransfer $transfer) => $this->transformTransfer($transfer))
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Incoming transfers retrieved.',
+            'data' => [
+                'transfers' => $transfers,
+            ],
+        ]);
+    }
+
+    public function acceptTransfer(
+        Request $request,
+        RiderPackageTransfer $transfer,
+        DriverPackageOperationsService $operations
+    ): JsonResponse {
+        $accepted = $operations->acceptTransfer($request->user(), $transfer);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transfer accepted.',
+            'data' => [
+                'transfer' => $this->transformTransfer($accepted),
+            ],
+        ]);
+    }
+
+    public function rejectTransfer(
+        Request $request,
+        RiderPackageTransfer $transfer,
+        DriverPackageOperationsService $operations
+    ): JsonResponse {
+        $rejected = $operations->rejectTransfer($request->user(), $transfer);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transfer rejected.',
+            'data' => [
+                'transfer' => $this->transformTransfer($rejected),
             ],
         ]);
     }
@@ -397,6 +523,55 @@ class DriverPackageController extends Controller
         ];
     }
 
+    private function transformTransfer(RiderPackageTransfer $transfer): array
+    {
+        $transfer->loadMissing([
+            'shipmentItem.shipment:id,shipment_number',
+            'fromDriver:id,name,phone',
+            'toDriver:id,name,phone',
+        ]);
+
+        $item = $transfer->shipmentItem;
+
+        return [
+            'id' => $transfer->id,
+            'status' => $transfer->status,
+            'tracking_code' => $item?->tracking_code,
+            'description' => $item?->description,
+            'shipment_number' => $item?->shipment?->shipment_number,
+            'recipient_name' => $item?->delivery_recipient_name ?: $item?->shipment?->delivery_recipient_name,
+            'delivery_town' => $item?->delivery_town ?: $item?->shipment?->delivery_town,
+            'from_driver' => $transfer->fromDriver ? [
+                'id' => $transfer->fromDriver->id,
+                'name' => $transfer->fromDriver->name,
+                'phone' => $transfer->fromDriver->phone,
+            ] : null,
+            'to_driver' => $transfer->toDriver ? [
+                'id' => $transfer->toDriver->id,
+                'name' => $transfer->toDriver->name,
+                'phone' => $transfer->toDriver->phone,
+            ] : null,
+            'requested_at' => $transfer->requested_at?->toIso8601String(),
+            'responded_at' => $transfer->responded_at?->toIso8601String(),
+        ];
+    }
+
+    private function transformLocationChange($change): array
+    {
+        return [
+            'id' => $change->id,
+            'tracking_code' => $change->shipmentItem?->tracking_code,
+            'old_location' => $change->old_location,
+            'new_location' => $change->new_location,
+            'changed_at' => $change->changed_at?->toIso8601String(),
+            'driver' => $change->driver ? [
+                'id' => $change->driver->id,
+                'name' => $change->driver->name,
+                'phone' => $change->driver->phone,
+            ] : null,
+        ];
+    }
+
     /**
      * Start deliveries — auto-create a delivery run from claimed packages.
      * POST /api/v1/driver/start-deliveries
@@ -433,6 +608,26 @@ class DriverPackageController extends Controller
         }
 
         $warehouse = Warehouse::findOrFail($warehouseId);
+
+        $selectedItemIds = collect($validated['barcodes'] ?? [])
+            ->filter()
+            ->whenNotEmpty(function ($barcodes) {
+                return WarehouseReceiptItemLabel::query()
+                    ->whereIn('barcode_value', $barcodes)
+                    ->with('receiptItem:id,shipment_item_id')
+                    ->get()
+                    ->map(fn ($label) => $label->receiptItem?->shipment_item_id)
+                    ->filter()
+                    ->unique()
+                    ->values();
+            });
+
+        if ($selectedItemIds->isNotEmpty() && app(DriverPackageOperationsService::class)->hasPendingTransferFromDriver($driver->id, $selectedItemIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'One or more selected packages have a pending rider transfer.',
+            ], 422);
+        }
 
         $deliveryService = app(WarehouseDeliveryService::class);
         $result = $deliveryService->createRunFromClaims(

@@ -96,6 +96,7 @@ Route::prefix('v1/driver')->group(function () {
         Route::put('change-password', [DriverProfileController::class, 'changePassword']);
         Route::post('fcm-token', [DriverProfileController::class, 'updateFcmToken']);
         Route::get('bus-stations', [DriverBusStationController::class, 'index']);
+        Route::get('locations/search', [VendorLocationController::class, 'searchLocations']);
         Route::get('delivery-failure-reasons', [DriverBusHandoffController::class, 'reasons']);
         Route::get('bus-handoff-reasons', [DriverBusHandoffController::class, 'reasons']);
         Route::get('bus-handoffs', [DriverBusHandoffController::class, 'index']);
@@ -142,6 +143,11 @@ Route::prefix('v1/driver')->group(function () {
         Route::post('release-package', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'releasePackage']);
         Route::post('start-deliveries', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'startDeliveries']);
         Route::get('package-history/{barcode}', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'packageHistory']);
+        Route::post('packages/{trackingCode}/location-change', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'changePackageLocation']);
+        Route::post('packages/{trackingCode}/transfer', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'requestTransfer']);
+        Route::get('package-transfers/incoming', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'incomingTransfers']);
+        Route::post('package-transfers/{transfer}/accept', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'acceptTransfer']);
+        Route::post('package-transfers/{transfer}/reject', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'rejectTransfer']);
 
         // Rider team custody
         Route::get('rider-teams', [DriverRiderTeamController::class, 'index']);

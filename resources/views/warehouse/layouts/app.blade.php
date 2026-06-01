@@ -112,6 +112,16 @@
                     <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Bus Station Packages</span>
                     <template x-if="sidebarCollapsed"><span class="wh-tooltip">Bus Station Packages</span></template>
                 </a>
+                <a href="{{ route('warehouse.package-location-changes.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.package-location-changes.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 21s7-4.35 7-11a7 7 0 10-14 0c0 6.65 7 11 7 11z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10h.01"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Location Changes</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Location Changes</span></template>
+                </a>
+                <a href="{{ route('warehouse.rider-package-transfers.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.rider-package-transfers.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h11m0 0l-4-4m4 4l-4 4M17 17H6m0 0l4 4m-4-4l4-4"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Rider Transfers</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Rider Transfers</span></template>
+                </a>
                 @endif
                 @if($canSorting)
                 <a href="{{ route('warehouse.sorting.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.sorting.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
