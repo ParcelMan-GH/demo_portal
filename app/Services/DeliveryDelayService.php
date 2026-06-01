@@ -167,7 +167,7 @@ class DeliveryDelayService
             return $this->emptySnapshot();
         }
 
-        $relations = ['run.assignedDriver', 'stop'];
+        $relations = ['run.assignedDriver', 'stop', 'expectedDeliverySetByDriver', 'expectedDeliverySetByUser'];
         if (Schema::hasTable('bus_handoff_confirmations')) {
             $relations[] = 'busHandoffConfirmation';
         }

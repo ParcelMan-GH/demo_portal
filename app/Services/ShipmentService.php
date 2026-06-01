@@ -15,18 +15,22 @@ use App\Models\ShipmentPickupVehicleRequest;
 use App\Models\ShipmentItem;
 use App\Models\Vendor;
 use App\Enums\ItemStatus;
+use App\Models\DeliveryRunItem;
 use Illuminate\Http\Request;
 
 class ShipmentService
 {
     private ShipmentPhoneGroupingService $phoneGroupingService;
+    private DeliveryDelayService $deliveryDelayService;
 
     public function __construct(
         private ActivityLogService $activityLogService,
         private StorageService $storageService,
-        ?ShipmentPhoneGroupingService $phoneGroupingService = null
+        ?ShipmentPhoneGroupingService $phoneGroupingService = null,
+        ?DeliveryDelayService $deliveryDelayService = null
     ) {
         $this->phoneGroupingService = $phoneGroupingService ?? app(ShipmentPhoneGroupingService::class);
+        $this->deliveryDelayService = $deliveryDelayService ?? app(DeliveryDelayService::class);
     }
 
     public function list(Vendor $vendor, array $filters, Request $request): array
@@ -188,7 +192,13 @@ class ShipmentService
             'items.images',
             'items.deliveryRegion',
             'items.deliveryDistrict',
-            'items.deliveryRunItems',
+            'items.deliveryRunItems.run.assignedDriver',
+            'items.deliveryRunItems.stop',
+            'items.deliveryRunItems.expectedDeliverySetByDriver',
+            'items.deliveryRunItems.expectedDeliverySetByUser',
+            'items.deliveryRunItems.delayEvents.reason',
+            'items.deliveryRunItems.delayEvents.actorDriver',
+            'items.deliveryRunItems.delayEvents.actorUser',
             'pickupAssignment.driver',
             'pickupAssignment.targetWarehouse',
             'pickupAssignment.receivedWarehouse',
@@ -522,6 +532,11 @@ class ShipmentService
                 : null;
 
             $itemHandoff = null;
+            $latestDeliveryRunItem = $item->relationLoaded('deliveryRunItems')
+                ? $item->deliveryRunItems->sortByDesc('id')->first()
+                : null;
+            $deliveryEta = $this->transformDeliveryEtaForVendor($latestDeliveryRunItem);
+
             if (in_array($item->status, [ItemStatus::HANDED_TO_COURIER, ItemStatus::DELIVERED], true)) {
                 $stop = \App\Models\DeliveryRunStop::with('run.assignedDriver')
                     ->where('delivery_method', 'bus_handoff')
@@ -560,6 +575,8 @@ class ShipmentService
                     ->first()?->delivered_at?->toIso8601String(),
                 'fulfillment_type' => $item->fulfillment_type?->value,
                 'delivery' => $itemDelivery,
+                'delivery_eta' => $deliveryEta,
+                'eta' => $deliveryEta,
                 'handoff' => $itemHandoff,
                 'images' => $item->images->map(fn($img) => $img->getSignedUrl()),
                 'created_at' => $item->created_at->toIso8601String(),
@@ -741,6 +758,33 @@ class ShipmentService
         return collect($vehicles)
             ->map(fn (array $row) => number_format((int) $row['quantity']) . ' ' . ($row['name'] ?? 'Vehicle'))
             ->implode(', ');
+    }
+
+    private function transformDeliveryEtaForVendor(?DeliveryRunItem $deliveryRunItem): ?array
+    {
+        if (!$deliveryRunItem) {
+            return null;
+        }
+
+        $snapshot = $this->deliveryDelayService->snapshot($deliveryRunItem);
+        $hasEta = filled($snapshot['expected_delivery_at'] ?? null);
+        $hasDelayNotice = filled($snapshot['last_reason'] ?? null) || filled($snapshot['last_notice_at'] ?? null);
+
+        if (!$hasEta && !$hasDelayNotice) {
+            return null;
+        }
+
+        return [
+            'status' => $snapshot['status'] ?? null,
+            'label' => $snapshot['label'] ?? null,
+            'tone' => $snapshot['tone'] ?? null,
+            'is_overdue' => (bool) ($snapshot['is_overdue'] ?? false),
+            'expected_delivery_at' => $snapshot['expected_delivery_at'] ?? null,
+            'expected_delivery_at_iso' => $snapshot['expected_delivery_at_iso'] ?? null,
+            'expected_delivery_set_at' => $snapshot['expected_delivery_set_at'] ?? null,
+            'last_notice_at' => $snapshot['last_notice_at'] ?? null,
+            'last_reason' => $snapshot['last_reason'] ?? null,
+        ];
     }
 
     private function transformPickupItemConfirmationForApi(?PickupItemConfirmation $confirmation): ?array
