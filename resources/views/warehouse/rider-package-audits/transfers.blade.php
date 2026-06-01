@@ -295,7 +295,7 @@ function riderTransfersPage() {
             return 'border-amber-200 bg-amber-50 text-amber-700';
         },
         packageUrl(row) {
-            return @js(route('warehouse.packages.index')) + '?search=' + encodeURIComponent(row.tracking_code || '');
+            return row.package_url || '#';
         },
         exportRows() {
             const headers = ['Package', 'Description', 'From Rider', 'From Phone', 'To Rider', 'To Phone', 'Status', 'Requested At', 'Resolved At'];

@@ -109,10 +109,10 @@
                                 </td>
                                 <td x-show="visibleColumns.changed_at" class="w-[14%] whitespace-nowrap px-4 py-3 text-slate-600" x-text="formatDate(row.changed_at)"></td>
                                 <td x-show="visibleColumns.proof" class="w-[10%] whitespace-nowrap px-4 py-3 text-right">
-                                    <a x-show="row.proof_photo_url" :href="row.proof_photo_url" target="_blank" class="inline-flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-[11px] font-semibold text-orange-700 transition-colors hover:bg-orange-100">
+                                    <button type="button" x-show="row.proof_photo_url" @@click="openProof(row)" class="inline-flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-[11px] font-semibold text-orange-700 transition-colors hover:bg-orange-100">
                                         <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                         View
-                                    </a>
+                                    </button>
                                     <span x-show="!row.proof_photo_url" class="text-slate-400">-</span>
                                 </td>
                             </tr>
@@ -132,7 +132,7 @@
                                 <a :href="packageUrl(row)" class="truncate text-sm font-extrabold text-slate-900 hover:text-orange-700" x-text="row.tracking_code || '-'"></a>
                                 <p class="mt-1 text-xs font-semibold text-slate-500" x-text="row.description || row.shipment_number || ''"></p>
                             </div>
-                            <a x-show="row.proof_photo_url" :href="row.proof_photo_url" target="_blank" class="shrink-0 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700">Proof</a>
+                            <button type="button" x-show="row.proof_photo_url" @@click="openProof(row)" class="shrink-0 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700">Proof</button>
                         </div>
                         <div class="mt-3 grid grid-cols-1 gap-3 text-xs">
                             <div><p class="font-black uppercase tracking-wide text-slate-400">Rider</p><p class="font-bold text-slate-800" x-text="row.driver?.name || '-'"></p><p class="text-slate-500" x-text="row.driver?.phone || ''"></p></div>
@@ -175,6 +175,16 @@
             </div>
         </div>
     </div>
+
+    <div x-show="lightbox.open" x-cloak x-transition.opacity class="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/85 p-4 sm:p-6" style="display:none" @@keydown.escape.window="closeProof()">
+        <button type="button" @@click="closeProof()" class="absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 transition hover:bg-white/20">
+            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <div class="max-h-[92vh] w-full max-w-5xl">
+            <img :src="lightbox.url" :alt="lightbox.title || 'Proof photo'" class="mx-auto max-h-[84vh] max-w-full rounded-2xl object-contain shadow-2xl">
+            <p class="mt-3 text-center text-sm font-semibold text-white/80" x-text="lightbox.title"></p>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -185,6 +195,11 @@ function riderLocationChangesPage() {
         search: '',
         page: 1,
         perPage: 25,
+        lightbox: {
+            open: false,
+            url: null,
+            title: '',
+        },
         columns: [
             { key: 'package', label: 'Package' },
             { key: 'rider', label: 'Rider' },
@@ -254,7 +269,19 @@ function riderLocationChangesPage() {
             return new Intl.DateTimeFormat('en-GH', { dateStyle: 'medium', timeStyle: 'short', hour12: true }).format(new Date(value));
         },
         packageUrl(row) {
-            return @js(route('warehouse.packages.index')) + '?search=' + encodeURIComponent(row.tracking_code || '');
+            return row.package_url || '#';
+        },
+        openProof(row) {
+            this.lightbox.url = row.proof_photo_url;
+            this.lightbox.title = row.tracking_code ? `Proof photo for ${row.tracking_code}` : 'Proof photo';
+            this.lightbox.open = true;
+            document.body.classList.add('overflow-hidden');
+        },
+        closeProof() {
+            this.lightbox.open = false;
+            this.lightbox.url = null;
+            this.lightbox.title = '';
+            document.body.classList.remove('overflow-hidden');
         },
         exportRows() {
             const headers = ['Package', 'Description', 'Rider', 'Rider Phone', 'Old Location', 'New Location', 'Changed At', 'Proof Photo'];
