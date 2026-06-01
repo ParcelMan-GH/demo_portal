@@ -52,6 +52,7 @@ class DriverRiderTeamController extends Controller
             ->orderBy('id')
             ->get()
             ->groupBy('driver_id')
+            ->sortByDesc(fn ($memberships) => $memberships->max('id'))
             ->map(function ($memberships) {
                 $membership = $memberships->firstWhere('role', RiderTeamMembership::ROLE_MEMBER) ?: $memberships->first();
 
