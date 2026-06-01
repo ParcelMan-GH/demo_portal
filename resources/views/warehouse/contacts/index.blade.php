@@ -244,6 +244,16 @@
                             <p class="font-black uppercase tracking-wide text-slate-400">Attempts</p>
                             <p class="mt-1 font-bold text-slate-800" x-text="task.attempts_count || 0"></p>
                         </div>
+                        <template x-if="task.delivered_by">
+                            <div class="col-span-2">
+                                <p class="font-black uppercase tracking-wide text-slate-400">Delivered By</p>
+                                <div class="mt-1 flex flex-wrap items-center gap-2">
+                                    <span class="rounded-full border px-2 py-0.5 text-[10px] font-black" :class="deliveryMarkerBadgeClass(task.delivered_by.type)" x-text="task.delivered_by.type_label"></span>
+                                    <span class="font-bold text-slate-800" x-text="task.delivered_by.name || '-'"></span>
+                                    <span x-show="task.delivered_by.at" class="text-[11px] font-semibold text-slate-500" x-text="task.delivered_by.at"></span>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                     <div class="mt-4 flex flex-wrap justify-end gap-2">
                         <template x-if="task.status === 'pending' && !task.assigned_to_id">
@@ -272,6 +282,7 @@
                         <th x-show="visibleColumns.delivery_town" class="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Town</th>
                         <th x-show="visibleColumns.assigned_to" class="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Assigned To</th>
                         <th x-show="visibleColumns.status" class="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                        <th x-show="visibleColumns.delivered_by" class="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Delivered By</th>
                         <th x-show="visibleColumns.attempts_count" class="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Attempts</th>
                         <th x-show="visibleColumns.callback_at" class="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Callback</th>
                         <th x-show="visibleColumns.actions" class="px-4 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Actions</th>
@@ -337,6 +348,20 @@
                                           'bg-violet-100 text-violet-700': task.outcome === 'callback',
                                       }" x-text="outcomeLabel(task.outcome)"></span>
                                 </div>
+                            </td>
+                            {{-- Delivered By --}}
+                            <td x-show="visibleColumns.delivered_by" class="whitespace-nowrap px-4 py-3">
+                                <template x-if="task.delivered_by">
+                                    <div class="space-y-1">
+                                        <span class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black" :class="deliveryMarkerBadgeClass(task.delivered_by.type)" x-text="task.delivered_by.type_label"></span>
+                                        <p class="font-semibold text-slate-900" x-text="task.delivered_by.name || '-'"></p>
+                                        <p x-show="task.delivered_by.phone" class="text-[11px] font-semibold text-slate-500" x-text="task.delivered_by.phone"></p>
+                                        <p x-show="task.delivered_by.at" class="text-[11px] font-semibold text-slate-400" x-text="task.delivered_by.at"></p>
+                                    </div>
+                                </template>
+                                <template x-if="!task.delivered_by">
+                                    <span class="text-xs font-semibold text-slate-400">-</span>
+                                </template>
                             </td>
                             {{-- Attempts --}}
                             <td x-show="visibleColumns.attempts_count" class="whitespace-nowrap px-3 py-3 text-center">
@@ -451,6 +476,13 @@
                     <div x-show="processTask?.is_package_delivered" class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                         <p class="text-sm font-black text-emerald-800">This package is already delivered.</p>
                         <p class="mt-1 text-xs font-semibold text-emerald-700">The recipient desk task is closed. You can still view the package details here.</p>
+                        <template x-if="processTask?.delivered_by">
+                            <div class="mt-3 flex flex-wrap items-center gap-2">
+                                <span class="rounded-full border px-2.5 py-1 text-[10px] font-black" :class="deliveryMarkerBadgeClass(processTask.delivered_by.type)" x-text="processTask.delivered_by.type_label"></span>
+                                <span class="text-xs font-black text-slate-900" x-text="processTask.delivered_by.name || '-'"></span>
+                                <span x-show="processTask.delivered_by.at" class="text-xs font-semibold text-emerald-700" x-text="processTask.delivered_by.at"></span>
+                            </div>
+                        </template>
                     </div>
 
                     <div x-show="shouldShowHandoverSection()" class="space-y-4">
@@ -805,6 +837,7 @@ function contactQueuePage() {
             { key: 'delivery_town', label: 'Town' },
             { key: 'assigned_to', label: 'Assigned To' },
             { key: 'status', label: 'Status' },
+            { key: 'delivered_by', label: 'Delivered By' },
             { key: 'attempts_count', label: 'Attempts' },
             { key: 'callback_at', label: 'Callback' },
             { key: 'actions', label: 'Actions' },
@@ -816,6 +849,7 @@ function contactQueuePage() {
             delivery_town: true,
             assigned_to: true,
             status: true,
+            delivered_by: true,
             attempts_count: true,
             callback_at: false,
             actions: true,
@@ -945,6 +979,15 @@ function contactQueuePage() {
                 resolved: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
             };
             return map[status] || 'bg-slate-50 text-slate-700 border border-slate-200';
+        },
+
+        deliveryMarkerBadgeClass(type) {
+            const map = {
+                rider: 'bg-blue-50 text-blue-700 border-blue-200',
+                agent: 'bg-orange-50 text-orange-700 border-orange-200',
+                public: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+            };
+            return map[type] || 'bg-slate-50 text-slate-600 border-slate-200';
         },
 
         formatDate(value) {
@@ -1077,7 +1120,7 @@ function contactQueuePage() {
                 window.print();
                 return;
             }
-            const headers = ['Tracking', 'Recipient', 'Phone', 'Town', 'Assigned To', 'Status', 'Attempts'];
+            const headers = ['Tracking', 'Recipient', 'Phone', 'Town', 'Assigned To', 'Status', 'Delivered By', 'Delivered By Type', 'Delivered At', 'Attempts'];
             const rows = this.tasks.map((task) => [
                 task.tracking_code || '',
                 task.recipient_name || '',
@@ -1085,6 +1128,9 @@ function contactQueuePage() {
                 task.delivery_town || '',
                 task.assigned_to || 'Unassigned',
                 this.statusLabel(task.status),
+                task.delivered_by?.name || '',
+                task.delivered_by?.type_label || '',
+                task.delivered_by?.at || '',
                 task.attempts_count || 0,
             ]);
             const csv = [headers, ...rows].map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n');

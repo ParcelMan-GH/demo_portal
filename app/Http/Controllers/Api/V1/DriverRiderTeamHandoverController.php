@@ -9,8 +9,10 @@ use App\Models\RiderTeamHandover;
 use App\Models\RiderTeamHandoverItem;
 use App\Models\WarehouseReceiptItemLabel;
 use App\Services\RiderTeamHandoverService;
+use App\Services\StorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class DriverRiderTeamHandoverController extends Controller
 {
@@ -55,7 +57,12 @@ class DriverRiderTeamHandoverController extends Controller
         $itemsQuery = $handover->items()
             ->with([
                 'allocatedTo:id,name,phone',
-                'label.receiptItem.shipmentItem:id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
+                'label.receiptItem.shipmentItem:id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town,delivery_landmark,delivery_instructions',
+                'label.receiptItem.shipmentItem.images:id,shipment_item_id,path,original_name,size,sort_order,recipient_phone',
+                'label.receiptItem.receipt:id,pickup_assignment_id',
+                'label.receiptItem.receipt.pickupAssignment:id',
+                'label.receiptItem.receipt.pickupAssignment.photos:id,pickup_assignment_id,shipment_item_id,path,original_name,size,type',
+                'label.receiptItem.photos:id,warehouse_receipt_item_id,path,original_name,size,photo_type',
             ])
             ->orderBy('id');
 
@@ -208,8 +215,19 @@ class DriverRiderTeamHandoverController extends Controller
 
     private function handoverItem(RiderTeamHandoverItem $item, bool $includePackageDetails): array
     {
+        $item->loadMissing([
+            'allocatedTo:id,name,phone',
+            'label.receiptItem.shipmentItem:id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town,delivery_landmark,delivery_instructions',
+            'label.receiptItem.shipmentItem.images:id,shipment_item_id,path,original_name,size,sort_order,recipient_phone',
+            'label.receiptItem.receipt:id,pickup_assignment_id',
+            'label.receiptItem.receipt.pickupAssignment:id',
+            'label.receiptItem.receipt.pickupAssignment.photos:id,pickup_assignment_id,shipment_item_id,path,original_name,size,type',
+            'label.receiptItem.photos:id,warehouse_receipt_item_id,path,original_name,size,photo_type',
+        ]);
+
         $label = $item->label;
-        $shipmentItem = $label?->receiptItem?->shipmentItem;
+        $receiptItem = $label?->receiptItem;
+        $shipmentItem = $receiptItem?->shipmentItem;
 
         return [
             'id' => $item->id,
@@ -230,7 +248,50 @@ class DriverRiderTeamHandoverController extends Controller
                 'recipient_name' => $shipmentItem?->delivery_recipient_name,
                 'recipient_phone' => $shipmentItem?->delivery_recipient_phone,
                 'delivery_town' => $shipmentItem?->delivery_town,
+                'delivery_landmark' => $shipmentItem?->delivery_landmark,
+                'delivery_instructions' => $shipmentItem?->delivery_instructions,
+                'images' => $this->packagePhotos($receiptItem, $shipmentItem),
             ] : null,
+        ];
+    }
+
+    private function packagePhotos($receiptItem, $shipmentItem): array
+    {
+        $vendorPhotos = $shipmentItem?->images
+            ?->map(fn ($photo) => $photo->getSignedUrl() + ['source' => 'Vendor'])
+            ->values() ?? collect();
+
+        $driverPhotos = $receiptItem?->receipt?->pickupAssignment?->photos
+            ?->filter(fn ($photo) => ! $photo->shipment_item_id || (int) $photo->shipment_item_id === (int) $shipmentItem?->id)
+            ->map(fn ($photo) => $this->formatPhoto($photo, 'Driver'))
+            ->values() ?? collect();
+
+        $receiptPhotos = $receiptItem?->photos
+            ?->map(fn ($photo) => $this->formatPhoto($photo, 'Receipt'))
+            ->values() ?? collect();
+
+        return ($vendorPhotos->isNotEmpty()
+            ? $vendorPhotos
+            : ($driverPhotos->isNotEmpty() ? $driverPhotos : $receiptPhotos))
+            ->values()
+            ->all();
+    }
+
+    private function formatPhoto($photo, string $source): array
+    {
+        $storage = app(StorageService::class);
+        $url = $storage->getUrl($photo->path);
+
+        if (! $storage->exists($photo->path) && Storage::disk('public')->exists($photo->path)) {
+            $url = url(Storage::disk('public')->url($photo->path));
+        }
+
+        return [
+            'id' => $photo->id,
+            'url' => $url,
+            'original_name' => $photo->original_name,
+            'source' => $source,
+            'size' => $photo->size,
         ];
     }
 }

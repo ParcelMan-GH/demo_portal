@@ -32,7 +32,7 @@
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
             </div>
             <div class="min-w-0">
-                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Active</p>
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Active Accounts</p>
                 <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="activeCount()"></p>
             </div>
         </button>
@@ -41,7 +41,7 @@
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 9v3.75m0 3.75h.008v.008H12V16.5Zm-8.25 3h16.5a1.5 1.5 0 0 0 1.296-2.256L13.296 3.006a1.5 1.5 0 0 0-2.592 0L2.454 17.244A1.5 1.5 0 0 0 3.75 19.5Z"/></svg>
             </div>
             <div class="min-w-0">
-                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Inactive</p>
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Inactive Accounts</p>
                 <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="inactiveCount()"></p>
             </div>
         </button>
@@ -50,7 +50,7 @@
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h7.5m-7.5 0H3.375A1.125 1.125 0 0 1 2.25 17.625V7.5h13.5v11.25m0 0h1.5m-1.5 0a1.5 1.5 0 0 1 3 0m-3 0a1.5 1.5 0 0 0 3 0m0 0h1.125c.621 0 1.125-.504 1.125-1.125V13.5h-4.5V9h2.25l3.375 4.5"/></svg>
             </div>
             <div class="min-w-0">
-                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Available</p>
+                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Available Now</p>
                 <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="availableCount()"></p>
             </div>
         </button>
@@ -220,10 +220,10 @@
                             Vehicle
                         </th>
                         <th x-show="visibleColumns.status" class="w-[8%] px-4 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                            Status
+                            Availability
                         </th>
                         <th x-show="visibleColumns.is_active" class="w-[8%] px-4 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                            Active
+                            Account
                         </th>
                         <th x-show="visibleColumns.assignments" class="w-[7%] px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                             Pickups
@@ -400,7 +400,7 @@
                             <div><p class="font-black uppercase tracking-wide text-slate-400">Phone</p><p class="font-bold text-slate-800" x-text="driver.phone || '-'"></p></div>
                             <div><p class="font-black uppercase tracking-wide text-slate-400">Pickups</p><p class="font-bold text-slate-800" x-text="driver.assignments_count || 0"></p></div>
                             <div><p class="font-black uppercase tracking-wide text-slate-400">Vehicle</p><p class="font-bold capitalize text-slate-800" x-text="driver.vehicle_type || '-'"></p></div>
-                            <div><p class="font-black uppercase tracking-wide text-slate-400">Status</p><p class="font-bold text-slate-800" x-text="driverStatusLabel(driver)"></p></div>
+                            <div><p class="font-black uppercase tracking-wide text-slate-400">Availability</p><p class="font-bold text-slate-800" x-text="driverStatusLabel(driver)"></p></div>
                             <div class="col-span-2"><p class="font-black uppercase tracking-wide text-slate-400">Email</p><p class="break-words font-bold text-slate-800" x-text="driver.email || '-'"></p></div>
                             <div class="col-span-2">
                                 <p class="font-black uppercase tracking-wide text-slate-400">Capabilities</p>

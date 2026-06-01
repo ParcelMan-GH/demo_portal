@@ -762,6 +762,7 @@ class BusHandoffConfirmationService
             'delivery_run_id' => $confirmation->delivery_run_id,
             'delivery_run_stop_id' => $confirmation->delivery_run_stop_id,
             'delivery_run_item_id' => $confirmation->delivery_run_item_id,
+            'delivery_run_number' => $confirmation->run?->run_number,
             'status' => $confirmation->status,
             'status_label' => Str::of($confirmation->status)->replace('_', ' ')->title()->toString(),
             'source' => $confirmation->source,

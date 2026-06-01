@@ -372,8 +372,8 @@ class DriverController extends Controller
                 'Vehicle Type' => $driver->vehicle_type,
                 'Vehicle Number' => $driver->vehicle_number,
                 'Capabilities' => implode(', ', $driver->getCapabilities()),
-                'Status' => $driver->status,
-                'Active' => $driver->is_active ? 'Active' : 'Inactive',
+                'Availability' => $driver->status,
+                'Account' => $driver->is_active ? 'Active' : 'Inactive',
                 'Created At' => $driver->created_at->format('Y-m-d H:i:s'),
             ];
         })->values()->toArray();

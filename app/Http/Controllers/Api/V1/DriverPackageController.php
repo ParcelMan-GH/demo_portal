@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\LabelCustodyEvent;
+use App\Models\RiderTeamHandoverItem;
 use App\Models\ShipmentItem;
 use App\Models\Warehouse;
 use App\Services\RiderTeamHandoverService;
@@ -107,18 +108,57 @@ class DriverPackageController extends Controller
             $eventsQuery->whereDate('created_at', '<=', $validated['to_date']);
         }
 
-        $total = $eventsQuery->count();
         $limit = (int) ($validated['limit'] ?? 50);
         $offset = (int) ($validated['offset'] ?? 0);
 
-        $claimedEvents = $eventsQuery->latest('created_at')->skip($offset)->take($limit)->get();
-        $claimedLabelIds = $claimedEvents->pluck('warehouse_receipt_item_label_id');
-        $claimedAtMap = $claimedEvents->keyBy('warehouse_receipt_item_label_id');
+        $claimedEvents = $eventsQuery->get();
+
+        $allocatedItemsQuery = RiderTeamHandoverItem::query()
+            ->with(['handover.team:id,name', 'handover.receiver:id,name,phone', 'allocatedTo:id,name,phone'])
+            ->where('allocated_to_driver_id', $driver->id)
+            ->where('status', RiderTeamHandoverItem::STATUS_ALLOCATED_TO_MEMBER);
+
+        if (!empty($validated['from_date'])) {
+            $allocatedItemsQuery->whereDate('allocated_at', '>=', $validated['from_date']);
+        }
+        if (!empty($validated['to_date'])) {
+            $allocatedItemsQuery->whereDate('allocated_at', '<=', $validated['to_date']);
+        }
+
+        $allocatedItems = $allocatedItemsQuery->get();
+
+        $claimRows = $claimedEvents->map(fn (LabelCustodyEvent $event) => [
+            'label_id' => (int) $event->warehouse_receipt_item_label_id,
+            'claimed_event' => $event,
+            'handover_item' => null,
+            'sort_at' => $event->created_at,
+        ]);
+
+        $allocatedRows = $allocatedItems
+            ->reject(fn (RiderTeamHandoverItem $item) => $claimedEvents->contains('warehouse_receipt_item_label_id', $item->warehouse_receipt_item_label_id))
+            ->map(fn (RiderTeamHandoverItem $item) => [
+                'label_id' => (int) $item->warehouse_receipt_item_label_id,
+                'claimed_event' => null,
+                'handover_item' => $item,
+                'sort_at' => $item->allocated_at ?: $item->updated_at,
+            ]);
+
+        $rows = $claimRows
+            ->concat($allocatedRows)
+            ->sortByDesc(fn (array $row) => $row['sort_at']?->timestamp ?? 0)
+            ->values();
+
+        $total = $rows->count();
+        $pagedRows = $rows->slice($offset, $limit)->values();
+        $contextByLabelId = $pagedRows->keyBy('label_id');
+        $claimedLabelIds = $pagedRows->pluck('label_id');
 
         $labels = WarehouseReceiptItemLabel::whereIn('id', $claimedLabelIds)
             ->with([
                 'receiptItem.shipmentItem.shipment:id,shipment_number,delivery_recipient_name,delivery_recipient_phone,delivery_town',
                 'receiptItem.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town,delivery_method',
+                'riderTeamHandoverItem.handover.team:id,name',
+                'riderTeamHandoverItem.handover.receiver:id,name,phone',
             ])
             ->get();
 
@@ -172,13 +212,23 @@ class DriverPackageController extends Controller
             });
 
 
-        $packages = $labels->map(function ($label) use ($claimedAtMap, $unavailableLabelIds) {
-            $data = $this->transformLabel($label);
-            $event = $claimedAtMap->get($label->id);
+        $labelsById = $labels->keyBy('id');
+        $packages = $pagedRows->map(function (array $row) use ($labelsById, $unavailableLabelIds) {
+            $label = $labelsById->get($row['label_id']);
+            if (! $label) {
+                return null;
+            }
+
+            /** @var LabelCustodyEvent|null $event */
+            $event = $row['claimed_event'];
+            /** @var RiderTeamHandoverItem|null $handoverItem */
+            $handoverItem = $row['handover_item'] ?: $label->riderTeamHandoverItem;
+            $data = $this->transformLabel($label, $event, $handoverItem);
             $data['claimed_at'] = $event?->created_at?->toIso8601String();
             $data['in_delivery_run'] = $unavailableLabelIds->contains($label->id);
+            $data['can_start_delivery'] = (bool) $event && ! $data['in_delivery_run'];
             return $data;
-        })->values();
+        })->filter()->values();
 
         return response()->json([
             'success' => true,
@@ -284,15 +334,25 @@ class DriverPackageController extends Controller
         ]);
     }
 
-    private function transformLabel(WarehouseReceiptItemLabel $label): array
+    private function transformLabel(
+        WarehouseReceiptItemLabel $label,
+        ?LabelCustodyEvent $claimedEvent = null,
+        ?RiderTeamHandoverItem $handoverItem = null
+    ): array
     {
         $label->loadMissing([
             'receiptItem.shipmentItem.shipment:id,shipment_number,delivery_recipient_name,delivery_recipient_phone,delivery_town',
             'receiptItem.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town,delivery_method',
+            'riderTeamHandoverItem.handover.team:id,name',
+            'riderTeamHandoverItem.handover.receiver:id,name,phone',
         ]);
 
         $item = $label->receiptItem?->shipmentItem;
         $shipment = $item?->shipment;
+        $handoverItem = $handoverItem ?: $label->riderTeamHandoverItem;
+        $handover = $handoverItem?->handover;
+        $isTeamPackage = (bool) $handoverItem;
+        $isClaimed = (bool) $claimedEvent;
         $deliveryMethod = $item?->delivery_method ?? ShipmentItem::DELIVERY_METHOD_DIRECT;
 
         // Use per-item delivery if available, otherwise shipment-level
@@ -316,6 +376,24 @@ class DriverPackageController extends Controller
             'recipient_name' => $recipientName,
             'recipient_phone' => $recipientPhone,
             'delivery_town' => $deliveryTown,
+            'custody_status' => $isClaimed ? 'claimed' : ($handoverItem?->status ?: 'available'),
+            'claim_source' => $isTeamPackage ? ($isClaimed ? 'rider_team_claimed' : 'rider_team_assigned') : 'self_scan',
+            'is_claimed' => $isClaimed,
+            'team' => $handover?->team ? [
+                'id' => $handover->team->id,
+                'name' => $handover->team->name,
+            ] : null,
+            'handover' => $handover ? [
+                'id' => $handover->id,
+                'handover_number' => $handover->handover_number,
+            ] : null,
+            'assigned_by' => $handover?->receiver ? [
+                'id' => $handover->receiver->id,
+                'name' => $handover->receiver->name,
+                'phone' => $handover->receiver->phone,
+            ] : null,
+            'allocated_at' => $handoverItem?->allocated_at?->toIso8601String(),
+            'member_claimed_at' => $handoverItem?->member_claimed_at?->toIso8601String(),
         ];
     }
 

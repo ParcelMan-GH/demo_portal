@@ -1,357 +1,1459 @@
 @extends('web.layouts.portal')
 
-@section('title', 'Parcelman — Ship Smarter, Grow Faster')
+@section('title', 'Parcelman | Delivery for Ghanaian businesses')
 
 @section('content')
-
-{{-- Full light override over the dark portal layout --}}
-<div x-data="{ mobileOpen: false }" style="font-family:'Plus Jakarta Sans',sans-serif;background:#f8fafc;min-height:100vh;position:relative;z-index:10;">
-
-{{-- ================================================================
-     NAVBAR
-================================================================ --}}
-<header style="position:sticky;top:0;z-index:50;background:rgba(255,255,255,0.92);backdrop-filter:blur(20px);border-bottom:1px solid #e2e8f0;box-shadow:0 1px 8px rgba(0,0,0,0.06);">
-    <div style="max-width:1200px;margin:0 auto;padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:66px;">
-
-        <a href="{{ route('web.landing') }}" style="display:flex;align-items:center;text-decoration:none;flex-shrink:0;">
-            <img src="{{ asset('logo-2.png') }}" alt="Parcelman" style="height:40px;width:auto;">
+<main
+    class="pm-page"
+    x-data="{
+        mobileOpen: false,
+        slide: 0,
+        slides: [
+            {
+                image: 'https://images.unsplash.com/photo-1566576721346-d4a3b4eaeb55?auto=format&fit=crop&w=2400&q=85',
+                kicker: 'Parcelman Express',
+                title: 'Fast parcel delivery for Ghanaian businesses.',
+                text: 'Book pickups, follow every order, and keep customers updated from one simple mobile experience.'
+            },
+            {
+                image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=2400&q=85',
+                kicker: 'Built for vendors',
+                title: 'Move more orders with less back-and-forth.',
+                text: 'From online sellers to growing shops, Parcelman helps you send packages without chasing updates all day.'
+            },
+            {
+                image: 'https://images.unsplash.com/photo-1605902711622-cfb43c4437d5?auto=format&fit=crop&w=2400&q=85',
+                kicker: 'Reliable customer delivery',
+                title: 'Give your customers clearer delivery confidence.',
+                text: 'Simple status updates and confirmed delivery records make every order easier to manage.'
+            }
+        ],
+        next() { this.slide = (this.slide + 1) % this.slides.length },
+        previous() { this.slide = (this.slide + this.slides.length - 1) % this.slides.length },
+        start() { setInterval(() => this.next(), 6500) }
+    }"
+    x-init="start()"
+>
+    <header class="pm-header">
+        <a href="{{ route('web.landing') }}" class="pm-logo" aria-label="Parcelman home">
+            <img src="{{ asset('logo-2.png') }}" alt="Parcelman">
         </a>
 
-        <nav class="landing-desktop-nav" style="display:none;align-items:center;gap:0.25rem;">
-            <a href="#features" style="padding:0.4rem 0.85rem;border-radius:8px;font-size:0.875rem;font-weight:500;color:#475569;text-decoration:none;transition:color 0.2s,background 0.2s;" onmouseover="this.style.color='#0f172a';this.style.background='#f1f5f9'" onmouseout="this.style.color='#475569';this.style.background='transparent'">Features</a>
-            <a href="#how-it-works" style="padding:0.4rem 0.85rem;border-radius:8px;font-size:0.875rem;font-weight:500;color:#475569;text-decoration:none;transition:color 0.2s,background 0.2s;" onmouseover="this.style.color='#0f172a';this.style.background='#f1f5f9'" onmouseout="this.style.color='#475569';this.style.background='transparent'">How it Works</a>
-            <a href="#portals" style="padding:0.4rem 0.85rem;border-radius:8px;font-size:0.875rem;font-weight:500;color:#475569;text-decoration:none;transition:color 0.2s,background 0.2s;" onmouseover="this.style.color='#0f172a';this.style.background='#f1f5f9'" onmouseout="this.style.color='#475569';this.style.background='transparent'">Portals</a>
+        <nav class="pm-nav" aria-label="Primary navigation">
+            <a href="#services">Services</a>
+            <a href="#how">How it works</a>
+            <a href="#coverage">Coverage</a>
+            <a href="#contact">Contact</a>
         </nav>
 
-        <div style="display:flex;align-items:center;gap:0.75rem;">
-            <a href="{{ route('web.vendor.login') }}" class="landing-desktop-nav" style="display:none;padding:0.5rem 1.25rem;border-radius:10px;background:linear-gradient(135deg,#ea580c,#c2410c);font-size:0.875rem;font-weight:700;color:#fff;text-decoration:none;box-shadow:0 2px 8px rgba(234,88,12,0.3);" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-                Get Started
-            </a>
-            <button type="button" @@click="mobileOpen = !mobileOpen" class="landing-mobile-btn" style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;background:#f1f5f9;border:1px solid #e2e8f0;cursor:pointer;color:#475569;">
-                <svg x-show="!mobileOpen" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                <svg x-show="mobileOpen" x-cloak width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <a href="#" class="pm-header-cta">Get the app</a>
+
+        <button type="button" class="pm-menu" @@click="mobileOpen = ! mobileOpen" aria-label="Toggle navigation">
+            <svg x-show="!mobileOpen" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/>
+            </svg>
+            <svg x-show="mobileOpen" x-cloak width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/>
+            </svg>
+        </button>
+
+        <div class="pm-mobile-nav" x-show="mobileOpen" x-cloak @@click.outside="mobileOpen = false">
+            <a href="#services" @@click="mobileOpen = false">Services</a>
+            <a href="#how" @@click="mobileOpen = false">How it works</a>
+            <a href="#coverage" @@click="mobileOpen = false">Coverage</a>
+            <a href="#contact" @@click="mobileOpen = false">Contact</a>
+            <a href="#" @@click="mobileOpen = false">Get the app</a>
+        </div>
+    </header>
+
+    <section class="pm-hero" aria-label="Parcelman highlights">
+        <template x-for="(item, index) in slides" :key="item.title">
+            <div class="pm-hero-slide" x-show="slide === index" x-transition.opacity.duration.500ms>
+                <img :src="item.image" :alt="item.title">
+            </div>
+        </template>
+        <div class="pm-hero-shade"></div>
+
+        <div class="pm-hero-content">
+            <p class="pm-kicker" x-text="slides[slide].kicker"></p>
+            <h1 x-text="slides[slide].title"></h1>
+            <p class="pm-hero-text" x-text="slides[slide].text"></p>
+            <div class="pm-actions">
+                <a href="#" class="pm-button pm-button-primary">Get the app</a>
+                <a href="#services" class="pm-button pm-button-ghost">Explore services</a>
+            </div>
+        </div>
+
+        <div class="pm-hero-controls" aria-label="Hero slider controls">
+            <button type="button" @@click="previous()" aria-label="Previous slide">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+                    <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <template x-for="(item, index) in slides" :key="index">
+                <button type="button" class="pm-dot" :class="{ 'is-active': slide === index }" @@click="slide = index" :aria-label="`Go to slide ${index + 1}`"></button>
+            </template>
+            <button type="button" @@click="next()" aria-label="Next slide">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+                    <path d="M9 18l6-6-6-6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
             </button>
         </div>
-    </div>
 
-    <div x-show="mobileOpen" x-cloak style="background:#fff;border-top:1px solid #e2e8f0;padding:1rem 1.5rem 1.25rem;">
-        <nav style="display:flex;flex-direction:column;gap:0.25rem;">
-            <a href="#features" @@click="mobileOpen=false" style="padding:0.7rem 0.85rem;border-radius:8px;font-size:0.9rem;font-weight:500;color:#475569;text-decoration:none;">Features</a>
-            <a href="#how-it-works" @@click="mobileOpen=false" style="padding:0.7rem 0.85rem;border-radius:8px;font-size:0.9rem;font-weight:500;color:#475569;text-decoration:none;">How it Works</a>
-            <a href="#portals" @@click="mobileOpen=false" style="padding:0.7rem 0.85rem;border-radius:8px;font-size:0.9rem;font-weight:500;color:#475569;text-decoration:none;">Portals</a>
-            <div style="height:1px;background:#e2e8f0;margin:0.5rem 0;"></div>
-            <a href="{{ route('web.vendor.login') }}" style="padding:0.75rem 1rem;border-radius:10px;background:linear-gradient(135deg,#ea580c,#c2410c);font-size:0.9rem;font-weight:700;color:#fff;text-decoration:none;text-align:center;">Vendor Portal</a>
-            <a href="{{ route('web.driver.login') }}" style="padding:0.75rem 1rem;border-radius:10px;background:#f0f9ff;border:1px solid #bae6fd;font-size:0.9rem;font-weight:700;color:#0369a1;text-decoration:none;text-align:center;margin-top:0.375rem;">Driver Portal</a>
-        </nav>
-    </div>
-</header>
+        <div class="pm-hero-card">
+            <span>Today with Parcelman</span>
+            <strong>Pickup requested</strong>
+            <p>Vendor gets clear delivery progress without calling around for updates.</p>
+        </div>
+    </section>
 
-{{-- ================================================================
-     HERO
-================================================================ --}}
-<section style="padding:5.5rem 1.5rem 5rem;text-align:center;position:relative;overflow:hidden;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);">
+    <section class="pm-trust" aria-label="Parcelman trust points">
+        <div>
+            <strong>Same-day pickup</strong>
+            <span>Available in supported areas</span>
+        </div>
+        <div>
+            <strong>Business-friendly delivery</strong>
+            <span>Made for vendors and shops</span>
+        </div>
+        <div>
+            <strong>Clear order updates</strong>
+            <span>Know what is happening</span>
+        </div>
+        <div>
+            <strong>Ghana-focused coverage</strong>
+            <span>Built around local delivery needs</span>
+        </div>
+    </section>
 
-    {{-- Subtle orange glow --}}
-    <div style="position:absolute;top:-6rem;left:50%;transform:translateX(-50%);width:600px;height:300px;background:radial-gradient(ellipse,rgba(234,88,12,0.08) 0%,transparent 70%);pointer-events:none;"></div>
-
-    <div style="max-width:780px;margin:0 auto;position:relative;z-index:1;">
-
-        <div style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.35rem 1rem;border-radius:100px;background:#fff7ed;border:1px solid #fed7aa;margin-bottom:1.75rem;">
-            <span style="width:6px;height:6px;border-radius:50%;background:#f97316;display:inline-block;animation:pulse-dot 2s infinite;"></span>
-            <span style="font-size:0.75rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c2410c;">Ghana's Premier Parcel Logistics Platform</span>
+    <section class="pm-section pm-services" id="services">
+        <div class="pm-section-head">
+            <p class="pm-kicker">Services</p>
+            <h2>Delivery support for businesses that send parcels every day.</h2>
+            <p>Parcelman helps vendors handle customer orders with cleaner pickup requests, better tracking, and dependable delivery communication.</p>
         </div>
 
-        <h1 style="font-size:clamp(2.5rem,6vw,4.25rem);font-weight:800;line-height:1.1;letter-spacing:-0.025em;margin:0 0 1.5rem;color:#0f172a;">
-            Ship Smarter,<br>
-            <span style="background:linear-gradient(135deg,#ea580c 0%,#f97316 50%,#fb923c 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Grow Faster.</span>
-        </h1>
-
-        <p style="font-size:clamp(1rem,2.5vw,1.175rem);color:#64748b;line-height:1.8;margin:0 auto 2.5rem;max-width:580px;">
-            Parcelman connects vendors and drivers on a single platform — from booking pickups and live tracking to invoicing and last-mile delivery, all in real time.
-        </p>
-
-        <div style="display:flex;flex-wrap:wrap;gap:0.875rem;justify-content:center;">
-            <a href="{{ route('web.vendor.login') }}" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.9rem 2rem;border-radius:14px;background:linear-gradient(135deg,#ea580c,#c2410c);font-size:1rem;font-weight:700;color:#fff;text-decoration:none;box-shadow:0 4px 20px rgba(234,88,12,0.3);transition:transform 0.2s,box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(234,88,12,0.38)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 20px rgba(234,88,12,0.3)'">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                Vendor Portal
-            </a>
-            <a href="{{ route('web.driver.login') }}" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.9rem 2rem;border-radius:14px;background:#f0f9ff;border:1.5px solid #bae6fd;font-size:1rem;font-weight:700;color:#0369a1;text-decoration:none;transition:transform 0.2s,background 0.2s;" onmouseover="this.style.transform='translateY(-2px)';this.style.background='#e0f2fe'" onmouseout="this.style.transform='translateY(0)';this.style.background='#f0f9ff'">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></svg>
-                Driver Portal
-            </a>
-        </div>
-    </div>
-</section>
-
-{{-- ================================================================
-     STATS BAR
-================================================================ --}}
-<section style="padding:0 1.5rem 4.5rem;background:#f8fafc;">
-    <div style="max-width:860px;margin:0 auto;">
-        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.75rem 2rem;display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;text-align:center;box-shadow:0 1px 8px rgba(0,0,0,0.06);">
-            <div style="padding:0.5rem 0;border-right:1px solid #e2e8f0;">
-                <p style="font-size:clamp(1.75rem,4vw,2.5rem);font-weight:800;color:#ea580c;margin:0;letter-spacing:-0.02em;">50K+</p>
-                <p style="font-size:0.8rem;font-weight:500;color:#94a3b8;margin:0.25rem 0 0;">Parcels Delivered</p>
-            </div>
-            <div style="padding:0.5rem 0;border-right:1px solid #e2e8f0;">
-                <p style="font-size:clamp(1.75rem,4vw,2.5rem);font-weight:800;color:#ea580c;margin:0;letter-spacing:-0.02em;">1,200+</p>
-                <p style="font-size:0.8rem;font-weight:500;color:#94a3b8;margin:0.25rem 0 0;">Active Vendors</p>
-            </div>
-            <div style="padding:0.5rem 0;">
-                <p style="font-size:clamp(1.75rem,4vw,2.5rem);font-weight:800;color:#ea580c;margin:0;letter-spacing:-0.02em;">98.5%</p>
-                <p style="font-size:0.8rem;font-weight:500;color:#94a3b8;margin:0.25rem 0 0;">On-time Delivery Rate</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-{{-- ================================================================
-     FEATURES
-================================================================ --}}
-<section id="features" style="padding:4rem 1.5rem 5rem;background:#fff;">
-    <div style="max-width:1120px;margin:0 auto;">
-
-        <div style="text-align:center;margin-bottom:3.5rem;">
-            <span style="display:inline-block;padding:0.3rem 0.875rem;border-radius:100px;background:#fff7ed;border:1px solid #fed7aa;font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c2410c;margin-bottom:1rem;">Platform Features</span>
-            <h2 style="font-size:clamp(1.875rem,4vw,2.75rem);font-weight:800;color:#0f172a;margin:0 0 1rem;letter-spacing:-0.02em;">Everything you need to<br>run your logistics</h2>
-            <p style="font-size:1rem;color:#64748b;max-width:520px;margin:0 auto;line-height:1.75;">From the moment a vendor books a pickup to the instant a parcel is delivered, Parcelman handles every step.</p>
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.25rem;">
-            @php
-            $features = [
-                ['#ea580c','#fff7ed','#fed7aa','M12 4v16m8-8H4','Instant Shipment Booking','Vendors create and submit shipments in seconds. Specify items, dimensions, destination and get a pickup scheduled.'],
-                ['#0ea5e9','#f0f9ff','#bae6fd','M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7','Real-Time Tracking','Follow every parcel at every stage — from pickup through warehouse sorting to last-mile delivery.'],
-                ['#8b5cf6','#f5f3ff','#ddd6fe','M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z','Payment Tracking','Track parcel charges, payouts, and payment status without slowing down operations.'],
-                ['#10b981','#f0fdf4','#bbf7d0','M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0','Driver Management','Assign drivers to pickups and transport runs, track their status, and notify them instantly via push.'],
-                ['#f59e0b','#fffbeb','#fde68a','M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9','Push Notifications','Vendors and drivers get instant push notifications for every status change — no delays, fully real-time.'],
-                ['#ec4899','#fdf2f8','#fbcfe8','M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z','Operations Dashboard','Admins get a powerful dashboard with delivery runs, transport manifests, sort batches, and live ops visibility.'],
-            ];
-            @endphp
-
-            @foreach($features as $f)
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.75rem;transition:border-color 0.2s,box-shadow 0.2s;" onmouseover="this.style.borderColor='#cbd5e1';this.style.boxShadow='0 4px 20px rgba(0,0,0,0.08)'" onmouseout="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
-                <div style="width:48px;height:48px;border-radius:14px;background:{{ $f[1] }};border:1px solid {{ $f[2] }};display:flex;align-items:center;justify-content:center;margin-bottom:1.125rem;">
-                    <svg width="22" height="22" fill="none" stroke="{{ $f[0] }}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="{{ $f[3] }}"/></svg>
-                </div>
-                <h3 style="font-size:1rem;font-weight:700;color:#0f172a;margin:0 0 0.5rem;">{{ $f[4] }}</h3>
-                <p style="font-size:0.875rem;color:#64748b;margin:0;line-height:1.7;">{{ $f[5] }}</p>
-            </div>
+        <div class="pm-service-grid">
+            @foreach([
+                ['Store pickup', 'Request parcel pickup from your shop, home office, or selling point.'],
+                ['Customer delivery', 'Send orders to customers with clearer status updates from pickup to delivery.'],
+                ['Bulk parcel movement', 'Move multiple customer packages without losing track of what belongs where.'],
+                ['App tracking', 'Follow each parcel from your phone and reduce repeated customer calls.'],
+                ['Delivery records', 'Keep a cleaner history of requests, destinations, charges and delivery status.'],
+                ['Vendor support', 'Get a delivery flow that works for small shops, online sellers and growing businesses.'],
+            ] as $service)
+                <article class="pm-service-card">
+                    <span></span>
+                    <h3>{{ $service[0] }}</h3>
+                    <p>{{ $service[1] }}</p>
+                </article>
             @endforeach
         </div>
-    </div>
-</section>
+    </section>
 
-{{-- ================================================================
-     HOW IT WORKS
-================================================================ --}}
-<section id="how-it-works" style="padding:5rem 1.5rem 5.5rem;background:#f8fafc;">
-    <div style="max-width:1080px;margin:0 auto;">
-
-        <div style="text-align:center;margin-bottom:3.5rem;">
-            <span style="display:inline-block;padding:0.3rem 0.875rem;border-radius:100px;background:#fff7ed;border:1px solid #fed7aa;font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c2410c;margin-bottom:1rem;">How it Works</span>
-            <h2 style="font-size:clamp(1.875rem,4vw,2.75rem);font-weight:800;color:#0f172a;margin:0 0 1rem;letter-spacing:-0.02em;">From booking to delivery<br>in four simple steps</h2>
+    <section class="pm-section pm-why">
+        <div class="pm-why-image">
+            <img src="https://images.unsplash.com/photo-1586880244406-556ebe35f282?auto=format&fit=crop&w=1500&q=85" alt="Packages prepared for delivery">
         </div>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:2rem;">
-            @php
-            $howSteps = [
-                ['01','#ea580c','#fff7ed','#fed7aa','Book a Shipment','Vendor logs in, fills in parcel details and destination, and submits a new shipment request.'],
-                ['02','#0ea5e9','#f0f9ff','#bae6fd','Driver Assigned','Admin assigns a driver. The driver gets an instant push notification with pickup details.'],
-                ['03','#8b5cf6','#f5f3ff','#ddd6fe','Warehouse & Sort','Parcel arrives at warehouse, gets received, sorted, and packed into a transport manifest.'],
-                ['04','#10b981','#f0fdf4','#bbf7d0','Last-Mile Delivery','Driver completes deliveries and recipient confirms with a secure OTP confirmation code.'],
-            ];
-            @endphp
-
-            @foreach($howSteps as $s)
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.75rem;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-                <div style="width:52px;height:52px;border-radius:50%;background:{{ $s[2] }};border:2px solid {{ $s[3] }};display:flex;align-items:center;justify-content:center;margin:0 auto 1.125rem;">
-                    <span style="font-size:1.125rem;font-weight:800;color:{{ $s[1] }};">{{ $s[0] }}</span>
-                </div>
-                <h3 style="font-size:1rem;font-weight:700;color:#0f172a;margin:0 0 0.5rem;">{{ $s[4] }}</h3>
-                <p style="font-size:0.85rem;color:#64748b;margin:0;line-height:1.7;">{{ $s[5] }}</p>
-            </div>
-            @endforeach
-        </div>
-    </div>
-</section>
-
-{{-- ================================================================
-     PORTALS SECTION
-================================================================ --}}
-<section id="portals" style="padding:5rem 1.5rem 5.5rem;background:#fff;">
-    <div style="max-width:1000px;margin:0 auto;">
-
-        <div style="text-align:center;margin-bottom:3rem;">
-            <span style="display:inline-block;padding:0.3rem 0.875rem;border-radius:100px;background:#fff7ed;border:1px solid #fed7aa;font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c2410c;margin-bottom:1rem;">Choose Your Portal</span>
-            <h2 style="font-size:clamp(1.875rem,4vw,2.75rem);font-weight:800;color:#0f172a;margin:0;letter-spacing:-0.02em;">Two portals. One platform.</h2>
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem;">
-
-            {{-- Vendor Card --}}
-            <a href="{{ route('web.vendor.login') }}" style="display:block;text-decoration:none;background:linear-gradient(145deg,#fff7ed 0%,#fff 60%);border:1.5px solid #fed7aa;border-radius:24px;padding:2.25rem;transition:transform 0.25s,border-color 0.25s,box-shadow 0.25s;" onmouseover="this.style.transform='translateY(-4px)';this.style.borderColor='#fb923c';this.style.boxShadow='0 12px 40px rgba(234,88,12,0.12)'" onmouseout="this.style.transform='translateY(0)';this.style.borderColor='#fed7aa';this.style.boxShadow='none'">
-                <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#ea580c,#c2410c);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;box-shadow:0 6px 20px rgba(234,88,12,0.3);">
-                    <svg width="24" height="24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                </div>
-                <p style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c2410c;margin:0 0 0.4rem;">Vendor Portal</p>
-                <h3 style="font-size:1.375rem;font-weight:800;color:#0f172a;margin:0 0 0.75rem;">I'm sending parcels</h3>
-                <p style="font-size:0.9rem;color:#64748b;line-height:1.75;margin:0 0 1.5rem;">Register or sign in with your phone number. Create shipments, track them live, and manage your business.</p>
-                <ul style="list-style:none;padding:0;margin:0 0 1.75rem;display:flex;flex-direction:column;gap:0.5rem;">
-                    @foreach(['OTP phone verification','Create & track shipments','Payment tracking','Real-time push notifications'] as $b)
-                    <li style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:#475569;">
-                        <svg width="16" height="16" fill="none" stroke="#ea580c" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                        {{ $b }}
-                    </li>
-                    @endforeach
-                </ul>
-                <div style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.9rem;font-weight:700;color:#ea580c;">
-                    Access Vendor Portal
-                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-                </div>
-            </a>
-
-            {{-- Driver Card --}}
-            <a href="{{ route('web.driver.login') }}" style="display:block;text-decoration:none;background:linear-gradient(145deg,#f0f9ff 0%,#fff 60%);border:1.5px solid #bae6fd;border-radius:24px;padding:2.25rem;transition:transform 0.25s,border-color 0.25s,box-shadow 0.25s;" onmouseover="this.style.transform='translateY(-4px)';this.style.borderColor='#7dd3fc';this.style.boxShadow='0 12px 40px rgba(14,165,233,0.1)'" onmouseout="this.style.transform='translateY(0)';this.style.borderColor='#bae6fd';this.style.boxShadow='none'">
-                <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#0ea5e9,#0369a1);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;box-shadow:0 6px 20px rgba(14,165,233,0.25);">
-                    <svg width="24" height="24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></svg>
-                </div>
-                <p style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#0369a1;margin:0 0 0.4rem;">Driver Portal</p>
-                <h3 style="font-size:1.375rem;font-weight:800;color:#0f172a;margin:0 0 0.75rem;">I'm delivering parcels</h3>
-                <p style="font-size:0.9rem;color:#64748b;line-height:1.75;margin:0 0 1.5rem;">Sign in with your credentials. Accept pickup assignments, manage transport manifests, and complete delivery runs seamlessly.</p>
-                <ul style="list-style:none;padding:0;margin:0 0 1.75rem;display:flex;flex-direction:column;gap:0.5rem;">
-                    @foreach(['Email & password login','Pickup assignments','Transport manifests','Delivery runs & OTP confirm'] as $b)
-                    <li style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:#475569;">
-                        <svg width="16" height="16" fill="none" stroke="#0ea5e9" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                        {{ $b }}
-                    </li>
-                    @endforeach
-                </ul>
-                <div style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.9rem;font-weight:700;color:#0369a1;">
-                    Access Driver Portal
-                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-                </div>
-            </a>
-
-        </div>
-    </div>
-</section>
-
-{{-- ================================================================
-     BOTTOM CTA BANNER
-================================================================ --}}
-<section style="padding:3rem 1.5rem 5rem;background:#f8fafc;">
-    <div style="max-width:900px;margin:0 auto;">
-        <div style="background:linear-gradient(135deg,#ea580c 0%,#c2410c 60%,#9a3412 100%);border-radius:28px;padding:4rem 2.5rem;text-align:center;position:relative;overflow:hidden;box-shadow:0 16px 60px rgba(234,88,12,0.3);">
-            <div style="position:absolute;top:-4rem;right:-4rem;width:14rem;height:14rem;border-radius:50%;background:rgba(255,255,255,0.06);pointer-events:none;"></div>
-            <div style="position:absolute;bottom:-5rem;left:-4rem;width:18rem;height:18rem;border-radius:50%;background:rgba(255,255,255,0.04);pointer-events:none;"></div>
-            <div style="position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,255,255,0.04) 1px,transparent 1px);background-size:22px 22px;pointer-events:none;opacity:0.6;"></div>
-            <div style="position:relative;z-index:1;">
-                <p style="font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:rgba(254,215,170,0.9);margin:0 0 1rem;">Get Started Today</p>
-                <h2 style="font-size:clamp(1.75rem,4vw,2.5rem);font-weight:800;color:#fff;margin:0 0 1rem;letter-spacing:-0.02em;">Ready to ship smarter?</h2>
-                <p style="font-size:1rem;color:rgba(254,215,170,0.8);max-width:460px;margin:0 auto 2rem;line-height:1.75;">Join hundreds of vendors already using Parcelman to streamline their parcel deliveries across Ghana.</p>
-                <div style="display:flex;flex-wrap:wrap;gap:0.875rem;justify-content:center;">
-                    <a href="{{ route('web.vendor.login') }}" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.875rem 2rem;border-radius:12px;background:#fff;font-size:0.95rem;font-weight:700;color:#c2410c;text-decoration:none;box-shadow:0 4px 16px rgba(0,0,0,0.15);transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-                        Register as Vendor
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-                    </a>
-                    <a href="{{ route('web.driver.login') }}" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.875rem 2rem;border-radius:12px;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.3);font-size:0.95rem;font-weight:700;color:#fff;text-decoration:none;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.22)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
-                        Driver Login
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-{{-- ================================================================
-     FOOTER
-================================================================ --}}
-<footer style="background:#0f172a;padding:3.5rem 1.5rem 2rem;">
-    <div style="max-width:1120px;margin:0 auto;">
-
-        <div class="footer-grid" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:2.5rem;margin-bottom:2.5rem;">
-
-            <div>
-                <a href="{{ route('web.landing') }}" style="display:inline-block;margin-bottom:1rem;text-decoration:none;">
-                    <img src="{{ asset('logo-2.png') }}" alt="Parcelman" style="height:38px;width:auto;filter:brightness(0) invert(1);">
-                </a>
-                <p style="font-size:0.85rem;color:rgba(148,163,184,0.7);line-height:1.75;max-width:270px;margin:0 0 1.25rem;">Your trusted logistics partner. Fast, reliable parcel delivery across Ghana with real-time tracking.</p>
-                <div style="display:flex;gap:0.625rem;">
-                    <a href="#" title="Facebook" style="width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;color:rgba(148,163,184,0.6);text-decoration:none;transition:background 0.2s,color 0.2s;" onmouseover="this.style.background='rgba(234,88,12,0.2)';this.style.color='#fb923c'" onmouseout="this.style.background='rgba(255,255,255,0.07)';this.style.color='rgba(148,163,184,0.6)'">
-                        <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                    </a>
-                    <a href="#" title="Instagram" style="width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;color:rgba(148,163,184,0.6);text-decoration:none;transition:background 0.2s,color 0.2s;" onmouseover="this.style.background='rgba(234,88,12,0.2)';this.style.color='#fb923c'" onmouseout="this.style.background='rgba(255,255,255,0.07)';this.style.color='rgba(148,163,184,0.6)'">
-                        <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
-                    </a>
-                </div>
-            </div>
-
-            <div>
-                <p style="font-size:0.75rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin:0 0 1rem;">Quick Links</p>
-                <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0.5rem;">
-                    @foreach([['Vendor Portal', route('web.vendor.login')], ['Driver Portal', route('web.driver.login')], ['Features','#features'], ['How it Works','#how-it-works']] as $l)
-                    <li><a href="{{ $l[1] }}" style="font-size:0.875rem;color:rgba(148,163,184,0.65);text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='#fb923c'" onmouseout="this.style.color='rgba(148,163,184,0.65)'">{{ $l[0] }}</a></li>
-                    @endforeach
-                </ul>
-            </div>
-
-            <div>
-                <p style="font-size:0.75rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin:0 0 1rem;">Company</p>
-                <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0.5rem;">
-                    @foreach(['About Us','Help Center','Privacy Policy','Terms of Service'] as $item)
-                    <li><a href="#" style="font-size:0.875rem;color:rgba(148,163,184,0.65);text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='#fb923c'" onmouseout="this.style.color='rgba(148,163,184,0.65)'">{{ $item }}</a></li>
-                    @endforeach
-                </ul>
-            </div>
-
-            <div>
-                <p style="font-size:0.75rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin:0 0 1rem;">Contact</p>
-                <div style="display:flex;flex-direction:column;gap:0.75rem;">
-                    <div style="display:flex;align-items:flex-start;gap:0.625rem;">
-                        <svg width="15" height="15" style="margin-top:2px;flex-shrink:0;" fill="none" stroke="#fb923c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        <span style="font-size:0.825rem;color:rgba(148,163,184,0.65);">Accra, Ghana</span>
-                    </div>
-                    <div style="display:flex;align-items:flex-start;gap:0.625rem;">
-                        <svg width="15" height="15" style="margin-top:2px;flex-shrink:0;" fill="none" stroke="#fb923c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                        <span style="font-size:0.825rem;color:rgba(148,163,184,0.65);">+233 20 000 0000</span>
-                    </div>
-                    <div style="display:flex;align-items:flex-start;gap:0.625rem;">
-                        <svg width="15" height="15" style="margin-top:2px;flex-shrink:0;" fill="none" stroke="#fb923c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                        <span style="font-size:0.825rem;color:rgba(148,163,184,0.65);">support@parcelman.com</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div style="height:1px;background:rgba(255,255,255,0.07);margin-bottom:1.75rem;"></div>
-
-        <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0.875rem;">
-            <p style="font-size:0.8rem;color:rgba(148,163,184,0.4);margin:0;">&copy; {{ date('Y') }} ParcelMan Express. All rights reserved.</p>
-            <p style="font-size:0.8rem;color:rgba(148,163,184,0.4);margin:0;">
-                Crafted with <span style="color:#ef4444;">&#10084;</span> by <a href="https://smartqix.com" target="_blank" rel="noopener noreferrer" style="color:#fb923c;font-weight:600;text-decoration:none;">Smartqix</a>
+        <div class="pm-why-copy">
+            <p class="pm-kicker">Why Parcelman</p>
+            <h2>Less delivery stress. More time to sell.</h2>
+            <p>
+                Customers expect quick answers after they pay. Parcelman gives your business a neater way to request delivery,
+                track orders, and confirm when packages reach the right person.
             </p>
+            <ul>
+                <li>Reduce follow-up calls about package location.</li>
+                <li>Keep parcel details and customer destinations organized.</li>
+                <li>Give customers a more professional delivery experience.</li>
+            </ul>
         </div>
-    </div>
-</footer>
+    </section>
 
-</div>{{-- /wrapper --}}
+    <section class="pm-section pm-how" id="how">
+        <div class="pm-section-head pm-section-head-narrow">
+            <p class="pm-kicker">How it works</p>
+            <h2>Simple enough for everyday orders.</h2>
+        </div>
+
+        <div class="pm-steps">
+            @foreach([
+                ['01', 'Request pickup', 'Add parcel details and pickup location from the Parcelman app.'],
+                ['02', 'Parcel collected', 'A pickup is arranged so the parcel can start moving.'],
+                ['03', 'Track progress', 'Follow delivery updates without repeatedly calling for status.'],
+                ['04', 'Customer receives', 'Delivery is completed with a clear record for your business.'],
+            ] as $step)
+                <article class="pm-step">
+                    <span>{{ $step[0] }}</span>
+                    <h3>{{ $step[1] }}</h3>
+                    <p>{{ $step[2] }}</p>
+                </article>
+            @endforeach
+        </div>
+    </section>
+
+    <section class="pm-section pm-app" id="app">
+        <div class="pm-app-copy">
+            <p class="pm-kicker">Mobile app</p>
+            <h2>Run parcel requests from your phone.</h2>
+            <p>The Parcelman app is where vendors request pickups, add package details, track delivery progress, and manage their parcel history.</p>
+            <a href="#" class="pm-button pm-button-primary">Get the app</a>
+        </div>
+
+        <div class="pm-phone-wrap" aria-label="Parcelman app preview">
+            <div class="pm-phone">
+                <div class="pm-phone-top"></div>
+                <div class="pm-phone-hero">
+                    <span>Hi, Vendor</span>
+                    <strong>Send Package</strong>
+                </div>
+                <div class="pm-phone-card">
+                    <small>Pickup location</small>
+                    <b>East Legon, Accra</b>
+                </div>
+                <div class="pm-phone-card">
+                    <small>Package photos</small>
+                    <b>3 items added</b>
+                </div>
+                <div class="pm-phone-row">
+                    <span></span><span></span><span></span>
+                </div>
+                <button type="button">Request pickup</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="pm-section pm-coverage" id="coverage">
+        <div class="pm-map-copy">
+            <p class="pm-kicker">Coverage</p>
+            <h2>Serving vendors across key Ghanaian delivery areas.</h2>
+            <p>
+                Parcelman is built for Ghanaian businesses that need reliable pickup and customer delivery across busy commercial areas.
+            </p>
+            <div class="pm-city-list">
+                <span>Accra</span>
+                <span>Tema</span>
+                <span>Kumasi</span>
+                <span>Takoradi</span>
+                <span>Expanding</span>
+            </div>
+        </div>
+
+        <div class="pm-map-card" aria-label="Parcelman Ghana coverage map using OpenStreetMap">
+            <div class="pm-map-tiles">
+                @foreach([
+                    [62, 61], [63, 61], [64, 61],
+                    [62, 62], [63, 62], [64, 62],
+                    [62, 63], [63, 63], [64, 63],
+                ] as $tile)
+                    <img src="https://tile.openstreetmap.org/7/{{ $tile[0] }}/{{ $tile[1] }}.png" alt="">
+                @endforeach
+                <span class="pm-map-marker pm-map-marker-accra">Accra</span>
+                <span class="pm-map-marker pm-map-marker-tema">Tema</span>
+                <span class="pm-map-marker pm-map-marker-kumasi">Kumasi</span>
+                <span class="pm-map-marker pm-map-marker-takoradi">Takoradi</span>
+                <small>&copy; OpenStreetMap contributors</small>
+            </div>
+        </div>
+    </section>
+
+    <section class="pm-section pm-contact" id="contact">
+        <div class="pm-contact-info">
+            <p class="pm-kicker">Contact us</p>
+            <h2>Talk to Parcelman about your delivery needs.</h2>
+            <p>Have a shop, online store, or business sending parcels often? Reach out and we will help you get started.</p>
+
+            <div class="pm-contact-list">
+                <a href="tel:+233200000000">+233 20 000 0000</a>
+                <a href="mailto:support@parcelman.com">support@parcelman.com</a>
+                <span>Accra, Ghana</span>
+            </div>
+        </div>
+
+        <form class="pm-contact-form">
+            <label>
+                <span>Name</span>
+                <input type="text" name="name" placeholder="Your name">
+            </label>
+            <label>
+                <span>Phone</span>
+                <input type="tel" name="phone" placeholder="024 000 0000">
+            </label>
+            <label>
+                <span>Business name</span>
+                <input type="text" name="business" placeholder="Your shop or company">
+            </label>
+            <label>
+                <span>Message</span>
+                <textarea name="message" rows="4" placeholder="Tell us what you need to deliver"></textarea>
+            </label>
+            <button type="button" class="pm-button pm-button-primary">Send message</button>
+        </form>
+    </section>
+
+    <section class="pm-newsletter">
+        <div>
+            <p class="pm-kicker">Vendor updates</p>
+            <h2>Get delivery tips and Parcelman announcements.</h2>
+        </div>
+        <form>
+            <input type="email" placeholder="Email address" aria-label="Email address">
+            <button type="button">Subscribe</button>
+        </form>
+    </section>
+
+    <section class="pm-section pm-faq" id="faq">
+        <div class="pm-section-head pm-section-head-narrow">
+            <p class="pm-kicker">FAQ</p>
+            <h2>Questions vendors usually ask.</h2>
+        </div>
+        <div class="pm-faq-grid">
+            @foreach([
+                ['Do I need the mobile app?', 'Yes. Parcelman is app-led so vendors can request pickup, track parcels and manage delivery records from their phone.'],
+                ['Can I use Parcelman for my shop?', 'Yes. Parcelman is designed for online vendors, retail shops and businesses that send customer orders.'],
+                ['Can customers receive delivery updates?', 'Parcelman helps keep delivery progress clear so vendors can answer customers with confidence.'],
+                ['Which areas do you cover?', 'Parcelman supports key Ghanaian delivery areas and continues expanding coverage as operations grow.'],
+            ] as $faq)
+                <article>
+                    <h3>{{ $faq[0] }}</h3>
+                    <p>{{ $faq[1] }}</p>
+                </article>
+            @endforeach
+        </div>
+    </section>
+
+    <footer class="pm-footer">
+        <div class="pm-footer-main">
+            <div class="pm-footer-brand">
+                <img src="{{ asset('logo-2.png') }}" alt="Parcelman">
+                <p>Reliable parcel delivery for Ghanaian vendors, shops and growing businesses.</p>
+                <a href="#" class="pm-footer-app">Get the app</a>
+            </div>
+
+            <div>
+                <h3>Services</h3>
+                <a href="#services">Store pickup</a>
+                <a href="#services">Customer delivery</a>
+                <a href="#services">Bulk parcels</a>
+                <a href="#services">App tracking</a>
+            </div>
+
+            <div>
+                <h3>Company</h3>
+                <a href="#how">How it works</a>
+                <a href="#coverage">Coverage</a>
+                <a href="#faq">FAQ</a>
+                <a href="#contact">Contact</a>
+            </div>
+
+            <div>
+                <h3>Contact</h3>
+                <a href="tel:+233200000000">+233 20 000 0000</a>
+                <a href="mailto:support@parcelman.com">support@parcelman.com</a>
+                <span>Accra, Ghana</span>
+            </div>
+
+            <div class="pm-footer-news">
+                <h3>Newsletter</h3>
+                <p>Useful delivery updates for vendors.</p>
+                <form>
+                    <input type="email" placeholder="Email address" aria-label="Footer email address">
+                    <button type="button">Join</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="pm-footer-bottom">
+            <span>&copy; {{ date('Y') }} Parcelman Express. All rights reserved.</span>
+            <span>Built for businesses moving parcels across Ghana.</span>
+        </div>
+    </footer>
+</main>
 
 <style>
-@@keyframes pulse-dot {
-    0%, 100% { opacity:1; transform:scale(1); }
-    50%       { opacity:0.6; transform:scale(0.82); }
-}
-@@media (min-width: 768px) {
-    .landing-desktop-nav { display:flex !important; }
-    .landing-mobile-btn  { display:none !important; }
-}
-@@media (max-width: 900px) {
-    .footer-grid { grid-template-columns:1fr 1fr !important; }
-}
-@@media (max-width: 560px) {
-    .footer-grid { grid-template-columns:1fr !important; }
-}
-</style>
+    :root {
+        --pm-ink: #111827;
+        --pm-dark: #121720;
+        --pm-muted: #647084;
+        --pm-line: #e8e1d9;
+        --pm-paper: #fffdf8;
+        --pm-warm: #f8f1e8;
+        --pm-orange: #f97316;
+        --pm-orange-dark: #c2410c;
+        --pm-green: #15803d;
+    }
 
+    [x-cloak] { display: none !important; }
+
+    .pm-page,
+    .pm-page * { box-sizing: border-box; }
+
+    .pm-page {
+        min-height: 100vh;
+        background: var(--pm-paper);
+        color: var(--pm-ink);
+        font-family: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .pm-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        min-height: 74px;
+        padding: 0.7rem clamp(1rem, 4vw, 3.5rem);
+        background: rgba(255, 253, 248, 0.9);
+        border-bottom: 1px solid rgba(232, 225, 217, 0.8);
+        backdrop-filter: blur(18px);
+    }
+
+    .pm-logo,
+    .pm-nav a,
+    .pm-header-cta,
+    .pm-mobile-nav a,
+    .pm-footer a {
+        text-decoration: none;
+    }
+
+    .pm-logo img {
+        display: block;
+        width: 92px;
+        height: auto;
+    }
+
+    .pm-nav {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+    }
+
+    .pm-nav a {
+        color: #263241;
+        font-size: 0.9rem;
+        font-weight: 900;
+    }
+
+    .pm-nav a:hover { color: var(--pm-orange-dark); }
+
+    .pm-header-cta {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0.75rem 1rem;
+        border-radius: 7px;
+        background: var(--pm-ink);
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 900;
+    }
+
+    .pm-menu {
+        display: none;
+        width: 42px;
+        height: 42px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--pm-line);
+        border-radius: 7px;
+        background: #fff;
+        color: var(--pm-ink);
+    }
+
+    .pm-mobile-nav {
+        position: absolute;
+        top: calc(100% + 0.5rem);
+        right: 1rem;
+        display: grid;
+        width: min(320px, calc(100vw - 2rem));
+        padding: 0.45rem;
+        border: 1px solid var(--pm-line);
+        border-radius: 9px;
+        background: #fff;
+        box-shadow: 0 24px 60px rgba(17, 24, 39, 0.16);
+    }
+
+    .pm-mobile-nav a {
+        padding: 0.85rem 0.9rem;
+        border-radius: 7px;
+        color: #263241;
+        font-weight: 900;
+    }
+
+    .pm-mobile-nav a:hover { background: var(--pm-warm); }
+
+    .pm-hero {
+        position: relative;
+        min-height: 100vh;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        padding: 8rem clamp(1rem, 5vw, 5rem) 5rem;
+        color: #fff;
+    }
+
+    .pm-hero-slide,
+    .pm-hero-slide img,
+    .pm-hero-shade {
+        position: absolute;
+        inset: 0;
+    }
+
+    .pm-hero-slide img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: saturate(0.95);
+    }
+
+    .pm-hero-shade {
+        background:
+            linear-gradient(90deg, rgba(6, 10, 18, 0.86) 0%, rgba(6, 10, 18, 0.66) 45%, rgba(6, 10, 18, 0.24) 100%),
+            linear-gradient(180deg, rgba(6, 10, 18, 0.35) 0%, rgba(6, 10, 18, 0.7) 100%);
+        z-index: 1;
+    }
+
+    .pm-hero-content {
+        position: relative;
+        z-index: 2;
+        max-width: 760px;
+        padding-top: 2rem;
+    }
+
+    .pm-kicker {
+        margin: 0 0 0.9rem;
+        color: var(--pm-orange);
+        font-size: 0.78rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        line-height: 1.4;
+        text-transform: uppercase;
+    }
+
+    .pm-hero h1,
+    .pm-section-head h2,
+    .pm-why-copy h2,
+    .pm-app-copy h2,
+    .pm-map-copy h2,
+    .pm-contact-info h2,
+    .pm-newsletter h2 {
+        margin: 0;
+        font-weight: 900;
+        letter-spacing: 0;
+    }
+
+    .pm-hero h1 {
+        font-size: clamp(3.4rem, 7vw, 6.9rem);
+        line-height: 0.94;
+        max-width: 820px;
+    }
+
+    .pm-hero-text {
+        max-width: 620px;
+        margin: 1.35rem 0 0;
+        color: rgba(255, 255, 255, 0.82);
+        font-size: clamp(1.05rem, 1.7vw, 1.24rem);
+        line-height: 1.75;
+    }
+
+    .pm-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.85rem;
+        margin-top: 2rem;
+    }
+
+    .pm-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0.9rem 1.25rem;
+        border-radius: 8px;
+        border: 0;
+        font: inherit;
+        font-size: 0.94rem;
+        font-weight: 900;
+        line-height: 1;
+        text-decoration: none;
+        transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+    }
+
+    .pm-button:hover { transform: translateY(-1px); }
+
+    .pm-button-primary {
+        background: var(--pm-orange);
+        color: #fff;
+        box-shadow: 0 18px 40px rgba(249, 115, 22, 0.28);
+    }
+
+    .pm-button-primary:hover { background: #ea580c; }
+
+    .pm-button-ghost {
+        border: 1px solid rgba(255, 255, 255, 0.42);
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        backdrop-filter: blur(14px);
+    }
+
+    .pm-hero-controls {
+        position: absolute;
+        left: clamp(1rem, 5vw, 5rem);
+        bottom: 2.2rem;
+        z-index: 3;
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+    }
+
+    .pm-hero-controls button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        backdrop-filter: blur(12px);
+    }
+
+    .pm-hero-controls .pm-dot {
+        width: 10px;
+        height: 10px;
+        min-height: 10px;
+        padding: 0;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.38);
+    }
+
+    .pm-hero-controls .pm-dot.is-active {
+        width: 28px;
+        background: var(--pm-orange);
+    }
+
+    .pm-hero-card {
+        position: absolute;
+        right: clamp(1rem, 5vw, 5rem);
+        bottom: 2.2rem;
+        z-index: 2;
+        max-width: 310px;
+        padding: 1.1rem;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.13);
+        backdrop-filter: blur(18px);
+    }
+
+    .pm-hero-card span {
+        color: rgba(255, 255, 255, 0.65);
+        font-size: 0.76rem;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
+
+    .pm-hero-card strong {
+        display: block;
+        margin-top: 0.35rem;
+        color: #fff;
+        font-size: 1.05rem;
+    }
+
+    .pm-hero-card p {
+        margin: 0.45rem 0 0;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 0.86rem;
+        line-height: 1.55;
+    }
+
+    .pm-trust {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        max-width: 1180px;
+        margin: -3.5rem auto 0;
+        position: relative;
+        z-index: 5;
+        padding: 0 clamp(1rem, 4vw, 2rem);
+    }
+
+    .pm-trust div {
+        min-height: 120px;
+        padding: 1.15rem;
+        border-top: 1px solid var(--pm-line);
+        border-bottom: 1px solid var(--pm-line);
+        border-left: 1px solid var(--pm-line);
+        background: rgba(255, 253, 248, 0.96);
+    }
+
+    .pm-trust div:first-child { border-radius: 10px 0 0 10px; }
+    .pm-trust div:last-child {
+        border-right: 1px solid var(--pm-line);
+        border-radius: 0 10px 10px 0;
+    }
+
+    .pm-trust strong {
+        display: block;
+        color: var(--pm-ink);
+        font-size: 1.02rem;
+        font-weight: 900;
+    }
+
+    .pm-trust span {
+        display: block;
+        margin-top: 0.45rem;
+        color: var(--pm-muted);
+        font-size: 0.88rem;
+        line-height: 1.55;
+    }
+
+    .pm-section {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: clamp(4rem, 8vw, 7rem) clamp(1rem, 4vw, 2rem);
+    }
+
+    .pm-section-head {
+        max-width: 900px;
+        margin-bottom: 2rem;
+    }
+
+    .pm-section-head-narrow {
+        max-width: 720px;
+    }
+
+    .pm-section-head h2,
+    .pm-why-copy h2,
+    .pm-app-copy h2,
+    .pm-map-copy h2,
+    .pm-contact-info h2,
+    .pm-newsletter h2 {
+        color: var(--pm-ink);
+        font-size: clamp(2rem, 4.6vw, 4rem);
+        line-height: 1.03;
+    }
+
+    .pm-section-head p:not(.pm-kicker),
+    .pm-why-copy p,
+    .pm-app-copy p,
+    .pm-map-copy p,
+    .pm-contact-info p {
+        margin: 1rem 0 0;
+        color: var(--pm-muted);
+        font-size: 1rem;
+        line-height: 1.8;
+    }
+
+    .pm-section-head p:not(.pm-kicker) {
+        max-width: 660px;
+    }
+
+    .pm-service-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .pm-service-card {
+        min-height: 250px;
+        padding: 1.25rem;
+        border: 1px solid var(--pm-line);
+        border-radius: 10px;
+        background: #fff;
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .pm-service-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 22px 50px rgba(17, 24, 39, 0.08);
+    }
+
+    .pm-service-card span {
+        display: block;
+        width: 38px;
+        height: 4px;
+        border-radius: 999px;
+        background: var(--pm-orange);
+    }
+
+    .pm-service-card h3,
+    .pm-step h3,
+    .pm-faq h3 {
+        margin: 0;
+        color: var(--pm-ink);
+        font-weight: 900;
+        letter-spacing: 0;
+    }
+
+    .pm-service-card h3 {
+        margin-top: 4.4rem;
+        font-size: 1.35rem;
+        line-height: 1.18;
+    }
+
+    .pm-service-card p,
+    .pm-step p,
+    .pm-faq p {
+        margin: 0.75rem 0 0;
+        color: var(--pm-muted);
+        font-size: 0.93rem;
+        line-height: 1.7;
+    }
+
+    .pm-why,
+    .pm-app,
+    .pm-coverage,
+    .pm-contact {
+        display: grid;
+        grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1fr);
+        gap: clamp(2rem, 6vw, 5rem);
+        align-items: center;
+    }
+
+    .pm-why-image {
+        overflow: hidden;
+        min-height: 520px;
+        border-radius: 12px;
+        background: var(--pm-warm);
+    }
+
+    .pm-why-image img {
+        width: 100%;
+        height: 100%;
+        min-height: 520px;
+        object-fit: cover;
+        display: block;
+    }
+
+    .pm-why-copy p,
+    .pm-app-copy p,
+    .pm-map-copy p,
+    .pm-contact-info p {
+        margin-top: 1rem;
+    }
+
+    .pm-why-copy ul {
+        list-style: none;
+        padding: 0;
+        margin: 1.5rem 0 0;
+        display: grid;
+        gap: 0.85rem;
+    }
+
+    .pm-why-copy li {
+        position: relative;
+        padding-left: 1.5rem;
+        color: #344054;
+        font-weight: 800;
+        line-height: 1.6;
+    }
+
+    .pm-why-copy li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.55rem;
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--pm-orange);
+    }
+
+    .pm-steps {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .pm-step {
+        min-height: 260px;
+        padding: 1.25rem;
+        border: 1px solid var(--pm-line);
+        border-radius: 10px;
+        background: var(--pm-warm);
+    }
+
+    .pm-step span {
+        display: inline-flex;
+        color: var(--pm-orange-dark);
+        font-size: 0.85rem;
+        font-weight: 900;
+    }
+
+    .pm-step h3 {
+        margin-top: 5rem;
+        font-size: 1.2rem;
+    }
+
+    .pm-app {
+        border-radius: 18px;
+        background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
+        color: #fff;
+        margin-top: 2rem;
+    }
+
+    .pm-app-copy h2,
+    .pm-app-copy p {
+        color: #fff;
+    }
+
+    .pm-app-copy p {
+        color: rgba(255, 255, 255, 0.72);
+        max-width: 560px;
+    }
+
+    .pm-app-copy .pm-button {
+        margin-top: 1.7rem;
+    }
+
+    .pm-phone-wrap {
+        display: flex;
+        justify-content: center;
+        min-height: 560px;
+    }
+
+    .pm-phone {
+        width: min(330px, 100%);
+        min-height: 610px;
+        padding: 0.9rem;
+        border: 9px solid #0b111b;
+        border-radius: 38px;
+        background: #f8fafc;
+        box-shadow: 0 35px 80px rgba(0, 0, 0, 0.3);
+    }
+
+    .pm-phone-top {
+        width: 88px;
+        height: 6px;
+        margin: 0 auto 1rem;
+        border-radius: 999px;
+        background: #111827;
+    }
+
+    .pm-phone-hero {
+        padding: 1.2rem;
+        border-radius: 24px;
+        background: linear-gradient(135deg, #7c2d12, #ea580c);
+        color: #fff;
+    }
+
+    .pm-phone-hero span,
+    .pm-phone-card small {
+        display: block;
+        font-size: 0.78rem;
+        font-weight: 800;
+        opacity: 0.74;
+    }
+
+    .pm-phone-hero strong {
+        display: block;
+        margin-top: 1.6rem;
+        font-size: 1.55rem;
+        line-height: 1.1;
+    }
+
+    .pm-phone-card {
+        margin-top: 0.85rem;
+        padding: 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        background: #fff;
+        color: var(--pm-ink);
+    }
+
+    .pm-phone-card b {
+        display: block;
+        margin-top: 0.35rem;
+        font-size: 1rem;
+    }
+
+    .pm-phone-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.55rem;
+        margin-top: 0.85rem;
+    }
+
+    .pm-phone-row span {
+        height: 78px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #fed7aa, #fff7ed);
+    }
+
+    .pm-phone button {
+        width: 100%;
+        min-height: 48px;
+        margin-top: 1rem;
+        border: 0;
+        border-radius: 999px;
+        background: var(--pm-orange);
+        color: #fff;
+        font-weight: 900;
+    }
+
+    .pm-city-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        margin-top: 1.5rem;
+    }
+
+    .pm-city-list span {
+        display: inline-flex;
+        padding: 0.6rem 0.8rem;
+        border: 1px solid var(--pm-line);
+        border-radius: 999px;
+        background: #fff;
+        color: #344054;
+        font-size: 0.84rem;
+        font-weight: 900;
+    }
+
+    .pm-map-card {
+        overflow: hidden;
+        min-height: 480px;
+        border: 1px solid var(--pm-line);
+        border-radius: 14px;
+        background: var(--pm-warm);
+    }
+
+    .pm-map-tiles {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        width: 100%;
+        height: 480px;
+        overflow: hidden;
+        background: #eadfce;
+    }
+
+    .pm-map-tiles img {
+        width: 100%;
+        height: 160px;
+        object-fit: cover;
+        display: block;
+        filter: saturate(0.86) contrast(0.98);
+    }
+
+    .pm-map-tiles::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(180deg, rgba(255, 253, 248, 0.08), rgba(255, 253, 248, 0.22));
+    }
+
+    .pm-map-marker {
+        position: absolute;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.45rem 0.62rem;
+        border-radius: 999px;
+        background: var(--pm-orange);
+        color: #fff;
+        font-size: 0.78rem;
+        font-weight: 900;
+        box-shadow: 0 12px 28px rgba(194, 65, 12, 0.28);
+    }
+
+    .pm-map-marker::before {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #fff;
+    }
+
+    .pm-map-marker-accra { left: 55%; top: 32%; }
+    .pm-map-marker-tema { left: 63%; top: 31%; }
+    .pm-map-marker-kumasi { left: 38%; top: 23%; }
+    .pm-map-marker-takoradi { left: 30%; top: 34%; }
+
+    .pm-map-tiles small {
+        position: absolute;
+        right: 0.75rem;
+        bottom: 0.65rem;
+        z-index: 2;
+        padding: 0.32rem 0.5rem;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.86);
+        color: #344054;
+        font-size: 0.7rem;
+        font-weight: 800;
+    }
+
+    .pm-contact {
+        align-items: start;
+        border-top: 1px solid var(--pm-line);
+    }
+
+    .pm-contact-list {
+        display: grid;
+        gap: 0.7rem;
+        margin-top: 1.5rem;
+    }
+
+    .pm-contact-list a,
+    .pm-contact-list span {
+        color: #344054;
+        font-weight: 900;
+        text-decoration: none;
+    }
+
+    .pm-contact-form {
+        display: grid;
+        gap: 0.9rem;
+        padding: 1.2rem;
+        border: 1px solid var(--pm-line);
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 22px 60px rgba(17, 24, 39, 0.07);
+    }
+
+    .pm-contact-form label {
+        display: grid;
+        gap: 0.4rem;
+    }
+
+    .pm-contact-form span {
+        color: #344054;
+        font-size: 0.84rem;
+        font-weight: 900;
+    }
+
+    .pm-contact-form input,
+    .pm-contact-form textarea,
+    .pm-newsletter input,
+    .pm-footer-news input {
+        width: 100%;
+        border: 1px solid #ddd6ce;
+        border-radius: 8px;
+        background: #fff;
+        color: var(--pm-ink);
+        font: inherit;
+        font-size: 0.95rem;
+        outline: none;
+    }
+
+    .pm-contact-form input {
+        min-height: 48px;
+        padding: 0 0.9rem;
+    }
+
+    .pm-contact-form textarea {
+        resize: vertical;
+        padding: 0.85rem 0.9rem;
+    }
+
+    .pm-newsletter {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 2rem;
+        padding: clamp(2rem, 5vw, 3rem) clamp(1rem, 4vw, 2rem);
+        border-radius: 18px;
+        background: var(--pm-orange);
+        color: #fff;
+    }
+
+    .pm-newsletter .pm-kicker,
+    .pm-newsletter h2 {
+        color: #fff;
+    }
+
+    .pm-newsletter h2 {
+        max-width: 640px;
+        font-size: clamp(1.8rem, 3.8vw, 3.2rem);
+    }
+
+    .pm-newsletter form {
+        display: flex;
+        gap: 0.65rem;
+        width: min(470px, 100%);
+    }
+
+    .pm-newsletter input {
+        min-height: 52px;
+        padding: 0 1rem;
+        border: 0;
+    }
+
+    .pm-newsletter button,
+    .pm-footer-news button {
+        min-height: 52px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--pm-ink);
+        color: #fff;
+        font: inherit;
+        font-weight: 900;
+        padding: 0 1rem;
+    }
+
+    .pm-faq-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .pm-faq article {
+        padding: 1.25rem;
+        border: 1px solid var(--pm-line);
+        border-radius: 10px;
+        background: #fff;
+    }
+
+    .pm-faq h3 {
+        font-size: 1.08rem;
+    }
+
+    .pm-footer {
+        margin-top: clamp(3rem, 7vw, 6rem);
+        background: #111827;
+        color: #fff;
+    }
+
+    .pm-footer-main {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1.35fr 0.7fr 0.7fr 0.85fr 1fr;
+        gap: 2rem;
+        padding: clamp(3rem, 7vw, 5rem) clamp(1rem, 4vw, 2rem);
+    }
+
+    .pm-footer img {
+        display: block;
+        width: 112px;
+        height: auto;
+        filter: brightness(0) invert(1);
+    }
+
+    .pm-footer p {
+        margin: 1rem 0 0;
+        color: rgba(255, 255, 255, 0.64);
+        font-size: 0.92rem;
+        line-height: 1.7;
+    }
+
+    .pm-footer h3 {
+        margin: 0 0 1rem;
+        color: #fff;
+        font-size: 0.86rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .pm-footer-main > div:not(.pm-footer-brand),
+    .pm-footer-news {
+        display: flex;
+        flex-direction: column;
+        gap: 0.62rem;
+    }
+
+    .pm-footer a,
+    .pm-footer span {
+        color: rgba(255, 255, 255, 0.66);
+        font-size: 0.9rem;
+    }
+
+    .pm-footer a:hover {
+        color: #fff;
+    }
+
+    .pm-footer-app {
+        display: inline-flex;
+        width: fit-content;
+        margin-top: 1.2rem;
+        padding: 0.78rem 1rem;
+        border-radius: 8px;
+        background: var(--pm-orange);
+        color: #fff !important;
+        font-weight: 900;
+    }
+
+    .pm-footer-news form {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.6rem;
+    }
+
+    .pm-footer-news input {
+        min-height: 44px;
+        padding: 0 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+    }
+
+    .pm-footer-news input::placeholder {
+        color: rgba(255, 255, 255, 0.52);
+    }
+
+    .pm-footer-news button {
+        min-height: 44px;
+        background: #fff;
+        color: var(--pm-ink);
+    }
+
+    .pm-footer-bottom {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1.4rem clamp(1rem, 4vw, 2rem);
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    @media (max-width: 1040px) {
+        .pm-service-grid,
+        .pm-steps {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .pm-trust {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .pm-trust div:first-child,
+        .pm-trust div:last-child {
+            border-radius: 0;
+        }
+
+        .pm-footer-main {
+            grid-template-columns: 1.3fr 1fr 1fr;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .pm-nav,
+        .pm-header-cta {
+            display: none;
+        }
+
+        .pm-menu {
+            display: inline-flex;
+        }
+
+        .pm-hero-card {
+            display: none;
+        }
+
+        .pm-why,
+        .pm-app,
+        .pm-coverage,
+        .pm-contact {
+            grid-template-columns: 1fr;
+        }
+
+        .pm-newsletter {
+            display: block;
+        }
+
+        .pm-newsletter form {
+            margin-top: 1.4rem;
+        }
+    }
+
+    @media (max-width: 680px) {
+        .pm-header {
+            min-height: 64px;
+        }
+
+        .pm-logo img {
+            width: 82px;
+        }
+
+        .pm-hero {
+            min-height: 92vh;
+            padding-top: 7rem;
+        }
+
+        .pm-hero h1 {
+            font-size: clamp(2.7rem, 14vw, 4.1rem);
+        }
+
+        .pm-actions .pm-button {
+            width: 100%;
+        }
+
+        .pm-hero-controls {
+            bottom: 1.2rem;
+        }
+
+        .pm-trust,
+        .pm-service-grid,
+        .pm-steps,
+        .pm-faq-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .pm-trust {
+            margin-top: 0;
+            padding-top: 1rem;
+        }
+
+        .pm-trust div,
+        .pm-trust div:last-child {
+            border-right: 1px solid var(--pm-line);
+        }
+
+        .pm-service-card h3,
+        .pm-step h3 {
+            margin-top: 2.5rem;
+        }
+
+        .pm-why-image,
+        .pm-why-image img {
+            min-height: 340px;
+        }
+
+        .pm-phone-wrap {
+            min-height: auto;
+        }
+
+        .pm-phone {
+            min-height: 560px;
+        }
+
+        .pm-map-card,
+        .pm-map-tiles {
+            min-height: 360px;
+            height: 360px;
+        }
+
+        .pm-map-tiles img {
+            height: 120px;
+        }
+
+        .pm-map-marker {
+            font-size: 0.68rem;
+            padding: 0.38rem 0.5rem;
+        }
+
+        .pm-newsletter form,
+        .pm-footer-news form {
+            display: grid;
+        }
+
+        .pm-footer-main {
+            grid-template-columns: 1fr;
+        }
+
+        .pm-footer-bottom {
+            display: grid;
+        }
+    }
+</style>
 @endsection

@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Warehouse;
 
 use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
+use App\Models\DeliveryDelayReason;
+use App\Models\DeliveryRunItem;
+use App\Models\Driver;
 use App\Models\ShipmentItem;
 use App\Models\PaymentWallet;
 use App\Models\OtpCode;
@@ -16,6 +19,7 @@ use App\Models\Warehouse;
 use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceiptItemPhoto;
 use App\Services\StorageService;
+use App\Services\DeliveryDelayService;
 use App\Services\WalkinShipmentService;
 use App\Services\Warehouse\BarcodeService;
 use App\Services\Warehouse\RecipientPaymentService;
@@ -31,6 +35,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 class PackageController extends Controller
@@ -44,6 +49,7 @@ class PackageController extends Controller
         private WalkinShipmentService $walkinShipmentService,
         private StorageService $storageService,
         private BarcodeService $barcodeService,
+        private DeliveryDelayService $deliveryDelayService,
     ) {
     }
 
@@ -96,6 +102,10 @@ class PackageController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
+        $drivers = Driver::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'phone']);
         $transferWarehouses = Warehouse::query()
             ->where('is_active', true)
             ->whereKeyNot($warehouse->id)
@@ -117,7 +127,10 @@ class PackageController extends Controller
             'forcedFilters' => $forcedFilters,
             'openBatches' => $openBatches,
             'warehouseUsers' => $warehouseUsers,
+            'drivers' => $drivers,
             'transferWarehouses' => $transferWarehouses,
+            'delayReasons' => $this->deliveryDelayService->activeReasons(),
+            'delayNoticeUrl' => route('warehouse.packages.delay-notice', ['warehouseReceiptItem' => '__ID__']),
         ]);
     }
 
@@ -245,8 +258,11 @@ class PackageController extends Controller
             'mark_paid_url' => route('warehouse.packages.mark-paid', ['warehouseReceiptItem' => $receiptItem]),
             'location_search_url' => route('warehouse.locations.search'),
             'payment_sessions_url' => route('warehouse.recipient-payments.sessions'),
+            'delay_notice_url' => route('warehouse.packages.delay-notice', ['warehouseReceiptItem' => $receiptItem]),
+            'delay_notice_item_url_template' => route('warehouse.deliveries.runs.items.delay-notice', ['run' => '__RUN__', 'item' => '__ITEM__']),
             'back_url' => route('warehouse.packages.index'),
             'current_user_id' => $user?->id,
+            'delay_reasons' => $this->deliveryDelayService->activeReasons(),
             'transfer_warehouses' => $transferWarehouses,
             'open_batches' => $openBatches->map(fn ($batch) => [
                 'id' => $batch->id,
@@ -264,6 +280,7 @@ class PackageController extends Controller
                 'can_assign_payments' => (bool) $user?->hasPermission('warehouse.recipient_payments.assign'),
                 'can_override_payments' => (bool) $user?->hasPermission('warehouse.recipient_payments.override'),
                 'can_manage_wallets' => (bool) $user?->hasPermission('warehouse.recipient_payments.manage_wallets'),
+                'can_send_delay_notices' => (bool) $user?->hasPermission('warehouse.delivery.assign'),
             ],
         ];
 
@@ -679,6 +696,75 @@ class PackageController extends Controller
         return response()->json($this->packageActionResponse($warehouseReceiptItem, $warehouse, $result['message'] ?? 'Recipient payment marked paid.'));
     }
 
+    public function sendDelayNotice(Request $request, WarehouseReceiptItem $warehouseReceiptItem): JsonResponse
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+        $this->ensureWarehouseReceiptItem($warehouseReceiptItem, $warehouse->id);
+
+        $validated = $request->validate([
+            'reason_id' => ['required', 'integer', 'exists:delivery_delay_reasons,id'],
+            'revised_eta' => ['nullable', 'date', 'after:now'],
+            'notify_recipient' => ['nullable', 'boolean'],
+            'notify_vendor' => ['nullable', 'boolean'],
+            'notify_vendor_sms' => ['nullable', 'boolean'],
+            'message' => ['nullable', 'string', 'max:500'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $notifyRecipient = filter_var($validated['notify_recipient'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        $notifyVendor = filter_var($validated['notify_vendor'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        $notifyVendorSms = filter_var($validated['notify_vendor_sms'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        if (!$notifyRecipient && !$notifyVendor && !$notifyVendorSms) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Select at least one person to notify.',
+            ], 422);
+        }
+
+        $reason = DeliveryDelayReason::query()
+            ->where('is_active', true)
+            ->find((int) $validated['reason_id']);
+
+        if (!$reason) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Select an active delivery delay reason.',
+            ], 422);
+        }
+
+        $deliveryRunItem = $this->latestDeliveryRunItemFor($warehouseReceiptItem);
+        if (!$deliveryRunItem) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This package is not linked to an active delivery item yet.',
+            ], 422);
+        }
+
+        $delay = $this->deliveryDelayService->snapshot($deliveryRunItem);
+        if (!($delay['can_notify'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Delay notices can only be sent for active delivery packages.',
+            ], 422);
+        }
+
+        $this->deliveryDelayService->sendAdminNotice(
+            item: $deliveryRunItem,
+            admin: Auth::guard('admin')->user(),
+            reason: $reason,
+            revisedEta: !empty($validated['revised_eta']) ? Carbon::parse($validated['revised_eta']) : null,
+            notifyRecipient: $notifyRecipient,
+            notifyVendor: $notifyVendor,
+            notifyVendorSms: $notifyVendorSms,
+            message: $validated['message'] ?? null,
+            notes: $validated['notes'] ?? null,
+        );
+
+        return response()->json($this->packageActionResponse($warehouseReceiptItem, $warehouse, 'Delay notice recorded.'));
+    }
+
     private function packageActionResponse(WarehouseReceiptItem $warehouseReceiptItem, Warehouse $warehouse, string $message): array
     {
         $fresh = $this->ledgerService->query($warehouse)
@@ -690,6 +776,29 @@ class PackageController extends Controller
             'message' => $message,
             'data' => $this->packageDetailPayload($fresh, $warehouse),
         ];
+    }
+
+    private function latestDeliveryRunItemFor(WarehouseReceiptItem $warehouseReceiptItem): ?DeliveryRunItem
+    {
+        $shipmentItemId = $warehouseReceiptItem->shipment_item_id ?: $warehouseReceiptItem->shipmentItem?->id;
+
+        if (!$shipmentItemId || !Schema::hasTable('delivery_run_items')) {
+            return null;
+        }
+
+        return DeliveryRunItem::query()
+            ->with([
+                'run.assignedDriver:id,name,phone',
+                'stop',
+                'shipmentItem.shipment.vendor:id,name,business_name,phone,fcm_token',
+                'busHandoffConfirmation',
+                'delayEvents.actorDriver:id,name,phone',
+                'delayEvents.actorUser:id,name',
+                'delayEvents.reason:id,label',
+            ])
+            ->where('shipment_item_id', $shipmentItemId)
+            ->latest('id')
+            ->first();
     }
 
     private function paymentTaskForPackage(WarehouseReceiptItem $warehouseReceiptItem, Warehouse $warehouse): ?RecipientPaymentTask
@@ -822,6 +931,8 @@ class PackageController extends Controller
                 'assigned_at' => $this->humanDate($run?->assigned_at),
                 'dispatched_at' => $this->humanDate($run?->dispatched_at),
                 'completed_at' => $this->humanDate($run?->completed_at),
+                'eta' => $this->deliveryDelayService->snapshot($item),
+                'delay_history' => $this->deliveryDelayService->history($item),
                 'stop_status' => $this->statusLabel($stop?->status),
                 'stop_recipient' => $stop?->recipient_name,
                 'stop_phone' => $stop?->recipient_phone,
@@ -868,7 +979,9 @@ class PackageController extends Controller
                         : null,
                     'handoff_owner' => $handoffConfirmation?->handoffDriver
                         ? collect([$handoffConfirmation->handoffDriver->name, $handoffConfirmation->handoffDriver->phone])->filter()->join(' / ')
-                        : null,
+                        : ($run?->assignedDriver
+                            ? collect([$run->assignedDriver->name, $run->assignedDriver->phone])->filter()->join(' / ')
+                            : null),
                     'confirmed_by' => $handoffConfirmation?->confirmedByDriver?->name ?: $handoffConfirmation?->confirmedByAdmin?->name,
                     'confirmed_at' => $this->humanDate($handoffConfirmation?->confirmed_at),
                     'reason' => $handoffConfirmation?->reason_label ?: $handoffConfirmation?->reason?->label,
@@ -912,7 +1025,9 @@ class PackageController extends Controller
             ->merge($deliveryHistory->map(fn ($entry) => [
                 'label' => $entry['bus_handoff'] ? 'Bus/courier handoff' : 'Delivery run',
                 'at' => $entry['bus_handoff']['handoff_at'] ?? $entry['delivered_at'] ?? $entry['dispatched_at'],
-                'actor' => $entry['confirmed_by'] ?: $entry['driver'],
+                'actor' => $entry['bus_handoff']
+                    ? ($entry['bus_handoff']['handoff_owner'] ?? $entry['driver'])
+                    : ($entry['confirmed_by'] ?: $entry['driver']),
                 'detail' => $entry['bus_handoff']['bus_station'] ?? $entry['number'],
                 'tone' => $entry['bus_handoff'] ? 'amber' : 'orange',
             ]))

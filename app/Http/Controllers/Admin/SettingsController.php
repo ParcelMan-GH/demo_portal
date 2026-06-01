@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
+use App\Models\DeliveryDelayReason;
 use App\Models\DeliveryFailureReason;
 use App\Models\BusStation;
 use App\Models\EmailTemplate;
@@ -44,6 +45,7 @@ class SettingsController extends Controller
         'pickup-vehicles' => ['label' => 'Pickup Vehicles', 'icon' => 'truck'],
         'bus-stations' => ['label' => 'Bus Stations', 'icon' => 'map'],
         'delivery-failure-reasons' => ['label' => 'Delivery Failure Reasons', 'icon' => 'chat'],
+        'delivery-delay-reasons' => ['label' => 'Delivery Delay Reasons', 'icon' => 'clock'],
         'pricing' => ['label' => 'Vendor Commissions', 'icon' => 'cash'],
         'push' => ['label' => 'Push Notifications', 'icon' => 'bell'],
         'health' => ['label' => 'System Health', 'icon' => 'heart'],
@@ -110,6 +112,8 @@ class SettingsController extends Controller
             'delivery' => [
                 'delivery.allow_skip_verification' => ['label' => 'Allow Drivers to Skip OTP Verification', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, drivers can skip OTP verification during delivery with a reason. The delivery will be flagged for review.'],
                 'delivery.show_otp_to_vendor' => ['label' => 'Show OTP Code to Vendor', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, vendors can see the delivery OTP code in their shipment details. This allows recipients to call the vendor for the code if SMS fails.'],
+                'delivery_eta_grace_minutes' => ['label' => 'ETA Grace Period (minutes)', 'type' => 'number', 'default' => '30', 'help' => 'How long after a package ETA before it is flagged as overdue.'],
+                'delivery_no_eta_threshold_hours' => ['label' => 'No ETA Threshold (hours)', 'type' => 'number', 'default' => '4', 'help' => 'How long after dispatch before active packages without ETA are flagged for follow-up.'],
                 'contact_queue.auto_queue_on_transport_receive' => ['label' => 'Auto-Queue on Transport Manifest Receive', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, items from incoming transport manifests are automatically added to the contact queue when received at the warehouse.'],
                 'transport.scan_issue_auto_accept' => ['label' => 'Auto-Accept Transport Scan Issues', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, driver scan issue reports with proof photos immediately mark the selected load group or package as loaded. When disabled, admins must review them first.'],
             ],
@@ -153,6 +157,7 @@ class SettingsController extends Controller
             'pickup-vehicles' => $this->getPickupVehiclesMeta(),
             'bus-stations' => $this->getBusStationsMeta(),
             'delivery-failure-reasons' => $this->getDeliveryFailureReasonsMeta(),
+            'delivery-delay-reasons' => $this->getDeliveryDelayReasonsMeta(),
             default => [],
         };
     }
@@ -195,6 +200,17 @@ class SettingsController extends Controller
                 ->map(fn (DeliveryFailureReason $reason) => $this->deliveryFailureReasonPayload($reason))
                 ->values(),
             'types' => DeliveryFailureReason::types(),
+        ];
+    }
+
+    protected function getDeliveryDelayReasonsMeta(): array
+    {
+        return [
+            'reasons' => DeliveryDelayReason::query()
+                ->latest('id')
+                ->get()
+                ->map(fn (DeliveryDelayReason $reason) => $this->deliveryDelayReasonPayload($reason))
+                ->values(),
         ];
     }
 
@@ -733,6 +749,90 @@ class SettingsController extends Controller
             'slug' => $reason->slug,
             'type' => $reason->type,
             'type_label' => Str::of($reason->type)->replace('_', ' ')->title()->toString(),
+            'sort_order' => $reason->sort_order,
+            'is_active' => $reason->is_active,
+        ];
+    }
+
+    public function storeDeliveryDelayReason(Request $request): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $validated = $request->validate([
+            'label' => ['required', 'string', 'max:120', 'unique:delivery_delay_reasons,label'],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $reason = DeliveryDelayReason::create([
+            'label' => $validated['label'],
+            'slug' => Str::slug($validated['label']),
+            'sort_order' => $validated['sort_order'] ?? ((DeliveryDelayReason::max('sort_order') ?? 0) + 1),
+            'is_active' => $validated['is_active'] ?? true,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delivery delay reason created.',
+            'reason' => $this->deliveryDelayReasonPayload($reason),
+        ], 201);
+    }
+
+    public function updateDeliveryDelayReason(Request $request, DeliveryDelayReason $deliveryDelayReason): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $validated = $request->validate([
+            'label' => ['required', 'string', 'max:120', Rule::unique('delivery_delay_reasons', 'label')->ignore($deliveryDelayReason->id)],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $deliveryDelayReason->update([
+            'label' => $validated['label'],
+            'slug' => Str::slug($validated['label']),
+            'sort_order' => $validated['sort_order'] ?? $deliveryDelayReason->sort_order,
+            'is_active' => $validated['is_active'] ?? $deliveryDelayReason->is_active,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delivery delay reason updated.',
+            'reason' => $this->deliveryDelayReasonPayload($deliveryDelayReason->fresh()),
+        ]);
+    }
+
+    public function toggleDeliveryDelayReason(DeliveryDelayReason $deliveryDelayReason): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $deliveryDelayReason->update(['is_active' => !$deliveryDelayReason->is_active]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delivery delay reason status updated.',
+            'reason' => $this->deliveryDelayReasonPayload($deliveryDelayReason->fresh()),
+        ]);
+    }
+
+    public function deleteDeliveryDelayReason(DeliveryDelayReason $deliveryDelayReason): JsonResponse
+    {
+        $this->authorizeSettingsEdit();
+
+        $deliveryDelayReason->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delivery delay reason deleted.',
+        ]);
+    }
+
+    private function deliveryDelayReasonPayload(DeliveryDelayReason $reason): array
+    {
+        return [
+            'id' => $reason->id,
+            'label' => $reason->label,
+            'slug' => $reason->slug,
             'sort_order' => $reason->sort_order,
             'is_active' => $reason->is_active,
         ];

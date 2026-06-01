@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\DeliveryDelayReason;
 use App\Models\DeliveryRun;
+use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
+use App\Services\DeliveryDelayService;
 use App\Services\DriverDeliveryService;
 use App\Services\Warehouse\WarehouseDeliveryService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,7 +18,8 @@ class DriverDeliveryController extends Controller
 {
     public function __construct(
         private DriverDeliveryService $driverDeliveryService,
-        private WarehouseDeliveryService $warehouseDeliveryService
+        private WarehouseDeliveryService $warehouseDeliveryService,
+        private DeliveryDelayService $deliveryDelayService,
     ) {
     }
 
@@ -136,6 +141,58 @@ class DriverDeliveryController extends Controller
         );
 
         return $this->deliveryActionResponse($driver, $run, $result, 400);
+    }
+
+    public function updateItemEta(Request $request, DeliveryRunItem $deliveryRunItem): JsonResponse
+    {
+        $driver = $request->user();
+
+        if (!$this->deliveryDelayService->canDriverUpdate($deliveryRunItem, $driver)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only update ETA for active packages assigned to you.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'expected_delivery_at' => ['required', 'date', 'after:now'],
+            'reason_id' => ['nullable', 'integer', 'exists:delivery_delay_reasons,id'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $reason = null;
+        if (!empty($validated['reason_id'])) {
+            $reason = DeliveryDelayReason::query()
+                ->where('is_active', true)
+                ->find($validated['reason_id']);
+
+            if (!$reason) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Select an active delay reason.',
+                ], 422);
+            }
+        }
+
+        $item = $this->deliveryDelayService->setEta(
+            item: $deliveryRunItem,
+            expectedDeliveryAt: Carbon::parse($validated['expected_delivery_at']),
+            reason: $reason,
+            notes: $validated['notes'] ?? null,
+            source: \App\Models\DeliveryDelayEvent::SOURCE_RIDER_ETA,
+            driver: $driver,
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delivery ETA updated.',
+            'data' => [
+                'item' => [
+                    'id' => $item->id,
+                    'eta' => $this->deliveryDelayService->snapshot($item),
+                ],
+            ],
+        ]);
     }
 
     public function confirmHandoff(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse

@@ -420,6 +420,15 @@
             return map[outcome] || 'bg-slate-100 text-slate-700 border-slate-200';
         },
 
+        deliveryMarkerBadgeClass(type) {
+            const map = {
+                rider: 'bg-blue-50 text-blue-700 border-blue-200',
+                agent: 'bg-orange-50 text-orange-700 border-orange-200',
+                public: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+            };
+            return map[type] || 'bg-slate-100 text-slate-600 border-slate-200';
+        },
+
         formatStatus(s) {
             return s ? s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '-';
         },
@@ -692,6 +701,7 @@
                             <th class="text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider pb-3 px-3">Status</th>
                             <th class="text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider pb-3 px-3">Attempts</th>
                             <th class="text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider pb-3 px-3">Outcome</th>
+                            <th class="text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider pb-3 px-3">Delivered By</th>
                             <th class="text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider pb-3 px-3">Actions</th>
                         </tr>
                     </thead>
@@ -699,7 +709,7 @@
                         <!-- Loading -->
                         <template x-if="loading">
                             <tr>
-                                <td colspan="10" class="py-16 text-center">
+                                <td colspan="11" class="py-16 text-center">
                                     <div class="flex flex-col items-center gap-3">
                                         <svg class="w-8 h-8 text-slate-300 animate-spin" fill="none" viewBox="0 0 24 24">
                                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -714,7 +724,7 @@
                         <!-- Empty State -->
                         <template x-if="!loading && tasks.length === 0">
                             <tr>
-                                <td colspan="10" class="py-16 text-center">
+                                <td colspan="11" class="py-16 text-center">
                                     <div class="flex flex-col items-center gap-3">
                                         <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
                                             <svg class="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -791,6 +801,26 @@
                                               x-text="formatStatus(task.outcome)"></span>
                                     </template>
                                     <template x-if="!task.outcome">
+                                        <span class="text-xs text-slate-400">-</span>
+                                    </template>
+                                </td>
+                                <!-- Delivered By -->
+                                <td class="py-3 px-3 min-w-[150px]">
+                                    <template x-if="task.delivered_by">
+                                        <div class="space-y-1">
+                                            <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                                                  :class="deliveryMarkerBadgeClass(task.delivered_by.type)"
+                                                  x-text="task.delivered_by.type_label"></span>
+                                            <p class="text-sm font-semibold text-slate-900" x-text="task.delivered_by.name || '-'"></p>
+                                            <template x-if="task.delivered_by.phone">
+                                                <p class="text-[11px] text-slate-500" x-text="task.delivered_by.phone"></p>
+                                            </template>
+                                            <template x-if="task.delivered_by.at">
+                                                <p class="text-[11px] text-slate-400" x-text="task.delivered_by.at"></p>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    <template x-if="!task.delivered_by">
                                         <span class="text-xs text-slate-400">-</span>
                                     </template>
                                 </td>

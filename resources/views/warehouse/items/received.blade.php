@@ -9,6 +9,7 @@
         'endpoint' => $dataEndpoint ?? route('warehouse.packages.data'),
         'update_url' => route('warehouse.packages.update', ['warehouseReceiptItem' => '__ITEM__']),
         'print_label_url' => route('warehouse.packages.print-label', ['warehouseReceiptItem' => '__ITEM__']),
+        'delay_notice_url' => $delayNoticeUrl ?? route('warehouse.packages.delay-notice', ['warehouseReceiptItem' => '__ITEM__']),
         'location_search_url' => route('warehouse.locations.search'),
         'page_title' => $pageTitle ?? 'Warehouse Packages',
         'page_subtitle' => $pageSubtitle ?? 'Every package that has passed through',
@@ -24,6 +25,12 @@
             'id' => $user->id,
             'name' => $user->name,
         ])->values(),
+        'drivers' => ($drivers ?? collect())->map(fn ($driver) => [
+            'id' => $driver->id,
+            'name' => $driver->name,
+            'phone' => $driver->phone,
+        ])->values(),
+        'delay_reasons' => $delayReasons ?? [],
         'statuses' => \App\Enums\ItemStatus::toArray(),
         'manifest_statuses' => [
             ['value' => 'none', 'label' => 'No manifest'],
@@ -212,6 +219,25 @@
                         </select>
                     </div>
                     <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">ETA / Delay</label>
+                        <select x-model="filters.eta_status" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All ETA states</option>
+                            <option value="eta_set">ETA set</option>
+                            <option value="no_eta">No ETA</option>
+                            <option value="overdue">ETA overdue</option>
+                            <option value="no_eta_overdue">No ETA past threshold</option>
+                            <option value="delay_notified">Delay notice sent</option>
+                            <option value="delay_not_notified">No delay notice sent</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Rider</label>
+                        <select x-model="filters.rider_id" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All riders</option>
+                            <template x-for="driver in drivers" :key="driver.id"><option :value="driver.id" x-text="driver.name"></option></template>
+                        </select>
+                    </div>
+                    <div>
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Delivery Staff</label>
                         <select x-model="filters.delivery_staff_id" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                             <option value="">All staff</option>
@@ -328,8 +354,16 @@
                                         <div x-show="row.delivery_run_url" class="inline-flex flex-col items-start gap-1">
                                             <a :href="row.delivery_run_url" class="font-semibold leading-none text-emerald-700 hover:underline" x-text="row.delivery_run?.number"></a>
                                             <span x-show="row.delivery_run?.status || row.delivery_run?.stop_status" class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200" x-text="row.delivery_run?.status || row.delivery_run?.stop_status"></span>
+                                            <span x-show="row.delivery_run?.driver" class="text-[10px] font-semibold text-slate-400" x-text="row.delivery_run?.driver"></span>
                                         </div>
                                         <span x-show="!row.delivery_run_url" class="text-slate-400">-</span>
+                                    </td>
+                                    <td x-show="visibleColumns.eta" class="whitespace-nowrap px-4 py-3">
+                                        <div class="inline-flex flex-col items-start gap-1">
+                                            <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ring-1" :class="delayClass(row.eta?.tone)" x-text="row.eta?.label || '-'"></span>
+                                            <span x-show="row.eta?.expected_delivery_at" class="text-[10px] font-semibold text-slate-500" x-text="row.eta?.expected_delivery_at"></span>
+                                            <span x-show="row.eta?.last_notice_at" class="text-[10px] font-semibold text-amber-600" x-text="'Notice: ' + row.eta.last_notice_at"></span>
+                                        </div>
                                     </td>
                                     <td x-show="visibleColumns.payment" class="min-w-[150px] whitespace-nowrap px-4 py-3 text-left align-middle">
                                         <template x-if="row.payment?.status === 'no_fee'">
@@ -362,6 +396,10 @@
                                             <button type="button" @@click="openPrintModal(row)" class="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-slate-700">
                                                 <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-12 0v4h12v-4H6z"/></svg>
                                                 Print
+                                            </button>
+                                            <button type="button" x-show="row.eta?.can_notify" @@click="openDelayModal(row)" class="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-100">
+                                                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0Z"/></svg>
+                                                Delay
                                             </button>
                                         </div>
                                     </td>
@@ -635,6 +673,60 @@
                 <button type="button" @@click="closePrintModal()" :disabled="printLoading" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-base font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm">Cancel</button>
                 <button type="button" @@click="printLabel()" :disabled="printLoading || !Number(printForm.label_count || 0)" class="rounded-xl border-2 border-slate-900 bg-slate-900 px-5 py-3 text-base font-black text-white shadow-lg shadow-slate-900/15 transition hover:border-slate-800 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm">
                     <span x-text="printLoading ? 'Printing...' : 'Print Labels'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="delayModalOpen" x-cloak x-transition.opacity @@keydown.window.escape="closeDelayModal()" class="fixed inset-0 z-50 flex min-h-screen items-center justify-center bg-black/55 px-4 py-6 backdrop-blur-sm sm:p-4" style="display:none">
+        <div @@click.stop class="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div class="flex items-start justify-between gap-4 border-b border-slate-100 p-5">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0Z"/></svg>
+                    </span>
+                    <div class="min-w-0">
+                        <h3 class="text-lg font-extrabold text-slate-900">Send Delay Notice</h3>
+                        <p class="mt-1 truncate text-sm text-slate-500" x-text="activeRow?.tracking_code || activeRow?.shipment_number || 'Package delay'"></p>
+                    </div>
+                </div>
+                <button type="button" @@click="closeDelayModal()" :disabled="delayLoading" class="shrink-0 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="space-y-4 p-5">
+                <div>
+                    <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-600">Delay reason</label>
+                    <select x-model="delayForm.reason_id" @@change="updateDelayMessage()" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                        <option value="">Select reason</option>
+                        <template x-for="reason in delayReasons" :key="reason.id"><option :value="reason.id" x-text="reason.label"></option></template>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-600">Revised ETA optional</label>
+                    <input type="text" x-ref="delayEtaInput" readonly placeholder="Select date and time" class="w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                </div>
+                <div class="grid gap-2 sm:grid-cols-3">
+                    <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700"><input type="checkbox" x-model="delayForm.notify_recipient" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500"> Recipient SMS</label>
+                    <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700"><input type="checkbox" x-model="delayForm.notify_vendor" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500"> Vendor app</label>
+                    <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700"><input type="checkbox" x-model="delayForm.notify_vendor_sms" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500"> Vendor SMS</label>
+                </div>
+                <div>
+                    <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-600">Notes</label>
+                    <textarea x-model="delayForm.notes" rows="3" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Internal note"></textarea>
+                </div>
+                <div>
+                    <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-600">Message</label>
+                    <textarea x-model="delayForm.message" @@input="delayForm.message_touched = true" rows="4" class="w-full rounded-xl border-2 border-amber-200 bg-amber-50 px-3 py-3 text-sm font-semibold leading-6 text-amber-950 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Message to send"></textarea>
+                    <p class="mt-1 text-xs font-semibold text-slate-400">You can adjust this message before sending.</p>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 p-4">
+                <button type="button" @@click="closeDelayModal()" :disabled="delayLoading" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-base font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm">Cancel</button>
+                <button type="button" @@click="sendDelayNotice()" :disabled="delayLoading || !delayForm.reason_id" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-base font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm">
+                    <span x-text="delayLoading ? 'Sending...' : 'Send Notice'"></span>
                 </button>
             </div>
         </div>

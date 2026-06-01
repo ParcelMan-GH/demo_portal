@@ -6,14 +6,17 @@ use App\Models\DeliveryRun;
 use App\Models\Driver;
 use App\Models\PlatformSetting;
 use App\Models\ShipmentCharge;
+use App\Services\DeliveryDelayService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
 class DriverDeliveryService
 {
     public function __construct(
-        private StorageService $storageService
+        private StorageService $storageService,
+        private ?DeliveryDelayService $deliveryDelayService = null,
     ) {
     }
 
@@ -44,9 +47,15 @@ class DriverDeliveryService
             ->with([
                 'warehouse:id,name,code,address,latitude,longitude,contact_phone',
                 'stops:id,delivery_run_id,recipient_name,recipient_phone,status,delivery_method,total_packages,town,landmark,gh_post_address,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,proof_photo_path,failure_reason,failure_notes,delivery_notes,handoff_courier_name,handoff_courier_phone,handoff_vehicle_number,bus_station_name,handoff_at',
-            'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status',
+            'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status,notes,delivered_at,expected_delivery_at,expected_delivery_set_at,expected_delivery_set_by_driver_id,expected_delivery_set_by_user_id',
             'items.busHandoffConfirmation:id,delivery_run_item_id,status,source,target_type,target_phone,confirmation_code_sent_at,confirmed_at,reason_id',
             'items.busHandoffConfirmation.reason:id,label,type',
+            'items.expectedDeliverySetByDriver:id,name,phone',
+            'items.expectedDeliverySetByUser:id,name',
+            'items.delayEvents:id,delivery_run_item_id,delivery_delay_reason_id,reason_label,source,actor_driver_id,actor_user_id,old_expected_delivery_at,new_expected_delivery_at,created_at',
+            'items.delayEvents.reason:id,label',
+            'items.delayEvents.actorDriver:id,name,phone',
+            'items.delayEvents.actorUser:id,name',
             'items.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
                 'items.shipmentItem.shipment:id,shipment_number,delivery_recipient_name,delivery_recipient_phone,delivery_town',
             ]);
@@ -115,9 +124,15 @@ class DriverDeliveryService
             'stops:id,delivery_run_id,recipient_name,recipient_phone,status,delivery_method,total_packages,region_id,district_id,town,latitude,longitude,gh_post_address,landmark,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped,verification_skip_reason,verification_skipped_at,arrived_at,delivered_at,delivery_latitude,delivery_longitude,proof_photo_path,failure_reason,failure_notes,delivery_notes,handoff_courier_name,handoff_courier_phone,handoff_vehicle_number,bus_station_name,handoff_at',
             'stops.region:id,name',
             'stops.district:id,name',
-            'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status,notes,delivered_at',
+            'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status,notes,delivered_at,expected_delivery_at,expected_delivery_set_at,expected_delivery_set_by_driver_id,expected_delivery_set_by_user_id',
             'items.busHandoffConfirmation:id,delivery_run_item_id,status,source,target_type,target_phone,confirmation_code_sent_at,confirmed_at,reason_id',
             'items.busHandoffConfirmation.reason:id,label,type',
+            'items.expectedDeliverySetByDriver:id,name,phone',
+            'items.expectedDeliverySetByUser:id,name',
+            'items.delayEvents:id,delivery_run_item_id,delivery_delay_reason_id,reason_label,source,actor_driver_id,actor_user_id,old_expected_delivery_at,new_expected_delivery_at,created_at',
+            'items.delayEvents.reason:id,label',
+            'items.delayEvents.actorDriver:id,name,phone',
+            'items.delayEvents.actorUser:id,name',
             'items.shipmentItem:id,shipment_id,description,tracking_code,delivery_recipient_name,delivery_recipient_phone,delivery_town',
             'items.shipmentItem.shipment:id,shipment_number,vendor_id,delivery_recipient_name,delivery_recipient_phone,delivery_town',
             'items.shipmentItem.shipment.vendor:id,name,phone,business_name',
@@ -213,7 +228,7 @@ class DriverDeliveryService
                         $vendor = $item->shipmentItem?->shipment?->vendor;
                         $si = $item->shipmentItem;
                         $shipment = $si?->shipment;
-                        $confirmation = $item->busHandoffConfirmation;
+                        $confirmation = Schema::hasTable('bus_handoff_confirmations') ? $item->busHandoffConfirmation : null;
                         return [
                             'id' => $item->id,
                             'delivery_run_item_id' => $item->id,
@@ -226,6 +241,7 @@ class DriverDeliveryService
                             'status' => $item->status,
                             'notes' => $item->notes,
                             'delivered_at' => $item->delivered_at,
+                            'eta' => $this->delayService()->snapshot($item),
                             'recipient_name' => $si?->delivery_recipient_name ?? $shipment?->delivery_recipient_name,
                             'recipient_phone' => $si?->delivery_recipient_phone ?? $shipment?->delivery_recipient_phone,
                             'delivery_town' => $si?->delivery_town ?? $shipment?->delivery_town,
@@ -409,5 +425,10 @@ class DriverDeliveryService
         }
 
         return $this->storageService->getUrl($stop->proof_photo_path);
+    }
+
+    private function delayService(): DeliveryDelayService
+    {
+        return $this->deliveryDelayService ??= app(DeliveryDelayService::class);
     }
 }

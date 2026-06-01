@@ -259,7 +259,7 @@ class RiderTeamHandoverService
             throw ValidationException::withMessages(['barcodes' => 'Select at least one package label.']);
         }
 
-        return DB::transaction(function () use ($handover, $member, $barcodes) {
+        $result = DB::transaction(function () use ($handover, $member, $barcodes) {
             $items = $this->handoverItemsForBarcodes($handover, $barcodes);
             $allocated = 0;
 
@@ -292,6 +292,63 @@ class RiderTeamHandoverService
             $this->refreshHandoverCounts($handover);
 
             return ['allocated' => $allocated];
+        });
+
+        if (($result['allocated'] ?? 0) > 0) {
+            app(PushNotificationService::class)->sendToDriver(
+                $member,
+                'Packages assigned to you',
+                ($receiver->name ?: 'Your team leader') . ' assigned ' . $result['allocated'] . ' package' . ($result['allocated'] === 1 ? '' : 's') . ' from ' . ($handover->team?->name ?: 'your rider team') . '.',
+                [
+                    'handover_id' => $handover->id,
+                    'handover_number' => $handover->handover_number,
+                    'team_id' => $handover->team?->id,
+                    'team_name' => $handover->team?->name,
+                    'assigned_by_driver_id' => $receiver->id,
+                    'assigned_by_name' => $receiver->name,
+                    'package_count' => $result['allocated'],
+                    'screen' => 'my_packages',
+                ],
+                'rider_team_package_assigned'
+            );
+        }
+
+        return $result;
+    }
+
+    public function releaseUnallocatedLabels(RiderTeamHandover $handover, array $barcodes, ?User $releasedBy = null, ?string $notes = null): array
+    {
+        $barcodes = collect($barcodes)->map(fn ($barcode) => trim((string) $barcode))->filter()->unique()->values();
+        if ($barcodes->isEmpty()) {
+            throw ValidationException::withMessages(['barcodes' => 'Select at least one package label to release.']);
+        }
+
+        return DB::transaction(function () use ($handover, $barcodes, $releasedBy, $notes) {
+            $items = $this->handoverItemsForBarcodes($handover, $barcodes);
+            $released = 0;
+
+            foreach ($items as $item) {
+                if ($item->allocated_to_driver_id || ! in_array($item->status, [
+                    RiderTeamHandoverItem::STATUS_ASSIGNED_TO_LEADER,
+                    RiderTeamHandoverItem::STATUS_LEADER_RECEIVED,
+                ], true)) {
+                    throw ValidationException::withMessages(['barcodes' => "{$item->label?->barcode_value} has already been assigned to a rider and cannot be released here."]);
+                }
+
+                LabelCustodyEvent::create([
+                    'warehouse_receipt_item_label_id' => $item->warehouse_receipt_item_label_id,
+                    'event_type' => LabelCustodyEvent::TYPE_RETURNED_TO_WAREHOUSE,
+                    'scanned_by_user_id' => $releasedBy?->id,
+                    'notes' => $notes ?: 'Removed from rider team handover before rider allocation.',
+                ]);
+
+                $item->delete();
+                $released++;
+            }
+
+            $this->refreshHandoverCounts($handover);
+
+            return ['released' => $released];
         });
     }
 
@@ -479,7 +536,7 @@ class RiderTeamHandoverService
             'failed_count' => $failed,
             'status' => $status,
             'assigned_at' => $assigned > 0 ? ($handover->assigned_at ?? now()) : null,
-            'received_at' => $received === $assigned && $assigned > 0 ? ($handover->received_at ?? now()) : $handover->received_at,
+            'received_at' => $assigned === 0 ? null : ($received === $assigned ? ($handover->received_at ?? now()) : $handover->received_at),
         ]);
 
         return $handover->fresh();

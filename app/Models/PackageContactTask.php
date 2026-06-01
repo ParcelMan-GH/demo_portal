@@ -34,6 +34,7 @@ class PackageContactTask extends Model
         'notes',
         'attempts_count',
         'resolved_at',
+        'resolved_by_user_id',
         'confirmation_code',
         'confirmation_code_sent_at',
         'confirmation_code_expires_at',
@@ -75,6 +76,11 @@ class PackageContactTask extends Model
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
+
+    public function resolvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'resolved_by_user_id');
     }
 
     public function attempts(): HasMany

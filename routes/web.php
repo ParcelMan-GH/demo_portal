@@ -382,6 +382,7 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::post('rider-team-handovers', [RiderTeamController::class, 'storeHandover'])->name('rider-teams.handovers.store');
         Route::get('rider-team-handovers/{handover}', [RiderTeamController::class, 'showHandover'])->name('rider-teams.handovers.show');
         Route::post('rider-team-handovers/{handover}/labels', [RiderTeamController::class, 'assignLabels'])->name('rider-teams.handovers.labels.store');
+        Route::post('rider-team-handovers/{handover}/labels/release', [RiderTeamController::class, 'releaseLabels'])->name('rider-teams.handovers.labels.release');
         Route::post('rider-team-handovers/{handover}/recall', [RiderTeamController::class, 'recallLabels'])->name('rider-teams.handovers.recall');
         Route::get('rider-team-handovers/{handover}/print', [RiderTeamController::class, 'printHandover'])->name('rider-teams.handovers.print');
 
@@ -577,6 +578,10 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::put('settings/delivery-failure-reasons/{deliveryFailureReason}', [SettingsController::class, 'updateDeliveryFailureReason'])->name('settings.delivery-failure-reasons.update');
         Route::patch('settings/delivery-failure-reasons/{deliveryFailureReason}/toggle', [SettingsController::class, 'toggleDeliveryFailureReason'])->name('settings.delivery-failure-reasons.toggle');
         Route::delete('settings/delivery-failure-reasons/{deliveryFailureReason}', [SettingsController::class, 'deleteDeliveryFailureReason'])->name('settings.delivery-failure-reasons.delete');
+        Route::post('settings/delivery-delay-reasons', [SettingsController::class, 'storeDeliveryDelayReason'])->name('settings.delivery-delay-reasons.store');
+        Route::put('settings/delivery-delay-reasons/{deliveryDelayReason}', [SettingsController::class, 'updateDeliveryDelayReason'])->name('settings.delivery-delay-reasons.update');
+        Route::patch('settings/delivery-delay-reasons/{deliveryDelayReason}/toggle', [SettingsController::class, 'toggleDeliveryDelayReason'])->name('settings.delivery-delay-reasons.toggle');
+        Route::delete('settings/delivery-delay-reasons/{deliveryDelayReason}', [SettingsController::class, 'deleteDeliveryDelayReason'])->name('settings.delivery-delay-reasons.delete');
         Route::post('settings/email-templates', [SettingsController::class, 'storeEmailTemplate'])->name('settings.email-templates.store');
         Route::put('settings/email-templates/{emailTemplate}', [SettingsController::class, 'updateEmailTemplate'])->name('settings.email-templates.update');
         Route::patch('settings/email-templates/{emailTemplate}/toggle', [SettingsController::class, 'toggleEmailTemplate'])->name('settings.email-templates.toggle');
@@ -679,6 +684,7 @@ Route::prefix(config('backoffice.prefix', 'admin') . '/operations')
         Route::post('packages/{warehouseReceiptItem}/print-label', [WarehousePackageController::class, 'printLabel'])->name('packages.print-label');
         Route::post('packages/{warehouseReceiptItem}/delivery-fee', [WarehousePackageController::class, 'setDeliveryFee'])->name('packages.delivery-fee');
         Route::post('packages/{warehouseReceiptItem}/mark-paid', [WarehousePackageController::class, 'markDeliveryPaid'])->name('packages.mark-paid');
+        Route::post('packages/{warehouseReceiptItem}/delay-notice', [WarehousePackageController::class, 'sendDelayNotice'])->name('packages.delay-notice');
         Route::get('items/received', [WarehousePackageController::class, 'legacyIndex'])->name('items.received.index');
         Route::get('items/received-data', [WarehousePackageController::class, 'data'])->name('items.received.data');
         Route::get('items/received/{warehouseReceiptItem}', [WarehousePackageController::class, 'show'])->name('items.received.show');
@@ -760,6 +766,7 @@ Route::prefix(config('backoffice.prefix', 'admin') . '/operations')
         Route::patch('deliveries/runs/{run}/stops/{stop}/delivery-method', [WarehouseDeliveryRunController::class, 'updateStopDeliveryMethod'])->name('deliveries.runs.stops.update-delivery-method');
         Route::post('deliveries/runs/{run}/stops/{stop}/confirm-handoff', [WarehouseDeliveryRunController::class, 'adminConfirmHandoff'])->name('deliveries.runs.stops.confirm-handoff');
         Route::post('deliveries/runs/{run}/stops/{stop}/items/{item}/confirm-handoff', [WarehouseDeliveryRunController::class, 'confirmHandoffItem'])->name('deliveries.runs.stops.items.confirm-handoff');
+        Route::post('deliveries/runs/{run}/items/{item}/delay-notice', [WarehouseDeliveryRunController::class, 'sendItemDelayNotice'])->name('deliveries.runs.items.delay-notice');
         Route::get('deliveries/pending-confirmations', [WarehouseDeliveryRunController::class, 'pendingConfirmations'])->name('deliveries.pending-confirmations');
         Route::get('deliveries/pending-confirmations-data', [WarehouseDeliveryRunController::class, 'pendingConfirmationsData'])->name('deliveries.pending-confirmations-data');
         Route::get('deliveries/runs/{run}', [WarehouseDeliveryRunController::class, 'show'])->name('deliveries.runs.show');

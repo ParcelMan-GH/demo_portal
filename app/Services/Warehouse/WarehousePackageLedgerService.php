@@ -16,6 +16,7 @@ use App\Models\TransportManifest;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
+use App\Services\DeliveryDelayService;
 use App\Services\StorageService;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -97,6 +98,12 @@ class WarehousePackageLedgerService
             $relations[] = 'shipmentItem.deliveryRunItems.stop.district:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.stop.confirmedBy:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.stop.verificationAttempts.driver:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.expectedDeliverySetByDriver:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.expectedDeliverySetByUser:id,name';
+            $relations[] = 'shipmentItem.deliveryRunItems.delayEvents:id,delivery_run_item_id,delivery_delay_reason_id,reason_label,source,actor_driver_id,actor_user_id,old_expected_delivery_at,new_expected_delivery_at,recipient_sms_sent,vendor_notification_sent,vendor_sms_sent,created_at';
+            $relations[] = 'shipmentItem.deliveryRunItems.delayEvents.reason:id,label';
+            $relations[] = 'shipmentItem.deliveryRunItems.delayEvents.actorDriver:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.delayEvents.actorUser:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.reason:id,label,type';
             $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.handoffDriver:id,name,phone';
             $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByDriver:id,name,phone';
@@ -190,6 +197,7 @@ class WarehousePackageLedgerService
         $this->applyPaymentFilter($query, $request);
         $this->applyStaffFilters($query, $request);
         $this->applyDeliveryFeeRange($query, $request);
+        $this->applyEtaFilters($query, $request);
 
         return $query;
     }
@@ -244,6 +252,7 @@ class WarehousePackageLedgerService
             : null;
         $deliveryRun = $deliveryRunItem?->run ?: $sortBatchDeliveryRun;
         $deliveryStop = $deliveryRunItem?->stop;
+        $delay = app(DeliveryDelayService::class)->snapshot($deliveryRunItem);
         $payment = $this->paymentSnapshot($sortBatchItem, $shipmentItem);
         $custody = $this->custodySnapshot($receiptItem, $deliveryRunItem, $deliveryStop, $deliveryRun);
         $stage = $this->stageSnapshot($shipmentItem, $sortBatch, $manifest, $deliveryRunItem, $deliveryStop);
@@ -310,8 +319,12 @@ class WarehousePackageLedgerService
                 'number' => $deliveryRun->run_number,
                 'status' => $this->formatStatus($deliveryRun->status),
                 'driver' => $deliveryRun->assignedDriver?->name,
+                'driver_phone' => $deliveryRun->assignedDriver?->phone,
+                'dispatched_at' => $this->formatDateTime($deliveryRun->dispatched_at),
                 'stop_status' => $this->formatStatus($deliveryStop?->status),
             ] : null,
+            'eta' => $delay,
+            'delay_status' => $delay,
             'payment' => $payment,
             'photos' => $photos,
             'forward_to_warehouse_id' => $sortBatch?->dispatch_mode === SortBatch::DISPATCH_TRANSFER ? $sortBatch->destination_warehouse_id : null,
@@ -589,6 +602,68 @@ class WarehousePackageLedgerService
                 if ($max !== null && $max !== '') $groupQuery->where('amount', '<=', (float) $max);
             });
         });
+    }
+
+    private function applyEtaFilters(Builder $query, Request $request): void
+    {
+        if (!$this->hasDeliveryTables()) {
+            if ($request->filled('eta_status') || $request->filled('rider_id')) {
+                $query->whereRaw('1 = 0');
+            }
+            return;
+        }
+
+        if (($riderId = (int) $request->input('rider_id')) > 0) {
+            $query->whereHas('shipmentItem.deliveryRunItems.run', fn (Builder $q) => $q->where('assigned_driver_id', $riderId));
+        }
+
+        $status = trim((string) $request->input('eta_status'));
+        if ($status === '') {
+            return;
+        }
+
+        $graceMinutes = max(0, (int) \App\Models\PlatformSetting::getValue('delivery_eta_grace_minutes', 30));
+        $thresholdHours = max(1, (int) \App\Models\PlatformSetting::getValue('delivery_no_eta_threshold_hours', 4));
+        $overdueCutoff = now()->subMinutes($graceMinutes);
+        $noEtaCutoff = now()->subHours($thresholdHours);
+
+        if ($status === 'eta_set') {
+            $query->whereHas('shipmentItem.deliveryRunItems', fn (Builder $q) => $q->whereNotNull('expected_delivery_at'));
+            return;
+        }
+
+        if ($status === 'no_eta') {
+            $query->whereHas('shipmentItem.deliveryRunItems', fn (Builder $q) => $q->whereNull('expected_delivery_at'));
+            return;
+        }
+
+        if ($status === 'overdue') {
+            $query->whereHas('shipmentItem.deliveryRunItems', fn (Builder $q) => $q
+                ->whereNotIn('status', [DeliveryRunItem::STATUS_DELIVERED, DeliveryRunItem::STATUS_FAILED])
+                ->whereNotNull('expected_delivery_at')
+                ->where('expected_delivery_at', '<', $overdueCutoff));
+            return;
+        }
+
+        if ($status === 'no_eta_overdue') {
+            $query->whereHas('shipmentItem.deliveryRunItems', fn (Builder $q) => $q
+                ->whereNotIn('status', [DeliveryRunItem::STATUS_DELIVERED, DeliveryRunItem::STATUS_FAILED])
+                ->whereNull('expected_delivery_at')
+                ->whereHas('run', fn (Builder $runQuery) => $runQuery
+                    ->whereNotNull('dispatched_at')
+                    ->where('dispatched_at', '<', $noEtaCutoff)));
+            return;
+        }
+
+        if ($status === 'delay_notified') {
+            $query->whereHas('shipmentItem.deliveryRunItems.delayEvents', fn (Builder $q) => $q->where('source', \App\Models\DeliveryDelayEvent::SOURCE_ADMIN_DELAY_NOTICE));
+            return;
+        }
+
+        if ($status === 'delay_not_notified') {
+            $query->whereHas('shipmentItem.deliveryRunItems')
+                ->whereDoesntHave('shipmentItem.deliveryRunItems.delayEvents', fn (Builder $q) => $q->where('source', \App\Models\DeliveryDelayEvent::SOURCE_ADMIN_DELAY_NOTICE));
+        }
     }
 
     private function recipientSnapshot(?ShipmentItem $shipmentItem): array

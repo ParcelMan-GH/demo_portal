@@ -129,6 +129,7 @@ Route::prefix('v1/driver')->group(function () {
         Route::post('deliveries/{run}/stops/{stop}/confirm-packages', [DriverDeliveryController::class, 'confirmStopPackages']);
         Route::post('deliveries/{run}/stops/{stop}/confirm-handoff', [DriverDeliveryController::class, 'confirmHandoff']);
         Route::post('deliveries/{run}/stops/{stop}/fail', [DriverDeliveryController::class, 'failStop']);
+        Route::patch('delivery-items/{deliveryRunItem}/eta', [DriverDeliveryController::class, 'updateItemEta']);
 
         // Notification endpoints
         Route::get('notifications', [DriverNotificationController::class, 'index']);

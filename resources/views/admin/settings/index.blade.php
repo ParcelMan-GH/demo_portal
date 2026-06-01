@@ -7,12 +7,12 @@
 @section('content')
 @php
     $tabGroups = [
-        'General' => ['platform', 'delivery', 'pickup-vehicles', 'bus-stations', 'delivery-failure-reasons', 'pricing'],
+        'General' => ['platform', 'delivery', 'pickup-vehicles', 'bus-stations', 'delivery-failure-reasons', 'delivery-delay-reasons', 'pricing'],
         'Communication' => ['sms', 'mail', 'push', 'email-templates'],
         'Logs' => ['email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'notification-logs'],
         'System' => ['health', 'logs'],
     ];
-    $readOnlyTabs = ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates', 'notification-logs', 'pickup-vehicles', 'bus-stations', 'delivery-failure-reasons'];
+    $readOnlyTabs = ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates', 'notification-logs', 'pickup-vehicles', 'bus-stations', 'delivery-failure-reasons', 'delivery-delay-reasons'];
     $activeGroup = collect($tabGroups)->filter(fn ($keys) => in_array($activeTab, $keys, true))->keys()->first() ?? 'General';
     $canEditSettings = auth('admin')->user()?->hasPermission('settings.edit') ?? false;
 @endphp
@@ -125,6 +125,8 @@
                                 Manage bus stations riders can choose during courier handoff.
                             @elseif($activeTab === 'delivery-failure-reasons')
                                 Manage reusable reasons for failed deliveries, not-received reports, and delivery issues.
+                            @elseif($activeTab === 'delivery-delay-reasons')
+                                Manage reasons used when delivery ETAs slip or delay notices are sent.
                             @else
                                 Configure values used across the platform.
                             @endif
@@ -164,6 +166,15 @@
                         @if($canEditSettings)
                             <button type="button"
                                     @@click="$dispatch('delivery-failure-reason-create')"
+                                    class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Add Reason
+                            </button>
+                        @endif
+                    @elseif($activeTab === 'delivery-delay-reasons')
+                        @if($canEditSettings)
+                            <button type="button"
+                                    @@click="$dispatch('delivery-delay-reason-create')"
                                     class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 Add Reason
@@ -246,6 +257,10 @@ window.settingsConfig = {
     deliveryFailureReasonsUpdateEndpoint: @json(route('admin.settings.delivery-failure-reasons.update', ['deliveryFailureReason' => '__ID__'])),
     deliveryFailureReasonsToggleEndpoint: @json(route('admin.settings.delivery-failure-reasons.toggle', ['deliveryFailureReason' => '__ID__'])),
     deliveryFailureReasonsDeleteEndpoint: @json(route('admin.settings.delivery-failure-reasons.delete', ['deliveryFailureReason' => '__ID__'])),
+    deliveryDelayReasonsStoreEndpoint: @json(route('admin.settings.delivery-delay-reasons.store')),
+    deliveryDelayReasonsUpdateEndpoint: @json(route('admin.settings.delivery-delay-reasons.update', ['deliveryDelayReason' => '__ID__'])),
+    deliveryDelayReasonsToggleEndpoint: @json(route('admin.settings.delivery-delay-reasons.toggle', ['deliveryDelayReason' => '__ID__'])),
+    deliveryDelayReasonsDeleteEndpoint: @json(route('admin.settings.delivery-delay-reasons.delete', ['deliveryDelayReason' => '__ID__'])),
     testEmailEndpoint: @json(route('admin.settings.test-email')),
     testSmsEndpoint: @json(route('admin.settings.test-sms')),
     clearCacheEndpoint: @json(route('admin.settings.clear-cache')),

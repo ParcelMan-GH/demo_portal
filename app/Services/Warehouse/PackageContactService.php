@@ -4,6 +4,7 @@ namespace App\Services\Warehouse;
 
 use App\Enums\FulfillmentType;
 use App\Enums\ItemStatus;
+use App\Models\DeliveryRunItem;
 use App\Models\PackageContactAttempt;
 use App\Models\PackageContactTask;
 use App\Models\ShipmentCollection;
@@ -147,7 +148,7 @@ class PackageContactService
             'notes' => $task->notes ?: 'Closed automatically because the package is already delivered.',
         ]);
 
-        return $task->fresh(['assignedTo', 'shipmentItem', 'shipment']);
+        return $task->fresh(['assignedTo', 'resolvedBy', 'shipmentItem', 'shipment']);
     }
 
     public function isPackageDelivered(PackageContactTask $task): bool
@@ -230,6 +231,7 @@ class PackageContactService
         ?string $notes = null,
         ?\DateTime $callbackAt = null,
         ?string $confirmationCode = null,
+        ?User $resolvedBy = null,
     ): array {
         $task = $this->syncWithPackageState($task);
         if ($this->isPackageDelivered($task)) {
@@ -247,6 +249,9 @@ class PackageContactService
             'outcome' => $outcome,
             'notes' => $notes,
             'resolved_at' => $outcome === PackageContactTask::OUTCOME_CALLBACK ? null : now(),
+            'resolved_by_user_id' => $outcome === PackageContactTask::OUTCOME_CALLBACK
+                ? null
+                : $resolvedBy?->id,
             'status' => $outcome === PackageContactTask::OUTCOME_CALLBACK
                 ? PackageContactTask::STATUS_IN_PROGRESS
                 : PackageContactTask::STATUS_RESOLVED,
@@ -275,6 +280,84 @@ class PackageContactService
         }
 
         return ['success' => true, 'message' => 'Task resolved.'];
+    }
+
+    public function deliveryMarkerFor(PackageContactTask $task): ?array
+    {
+        $task->loadMissing([
+            'assignedTo',
+            'resolvedBy',
+            'shipmentItem.deliveryRunItems.run.assignedDriver',
+            'shipmentItem.deliveryRunItems.stop.confirmedBy',
+            'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByDriver',
+            'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByAdmin',
+        ]);
+
+        $runItem = $task->shipmentItem?->deliveryRunItems
+            ?->filter(fn (DeliveryRunItem $item) => $item->status === DeliveryRunItem::STATUS_DELIVERED || filled($item->delivered_at))
+            ->sortByDesc(fn (DeliveryRunItem $item) => $item->delivered_at?->getTimestamp() ?? $item->stop?->delivered_at?->getTimestamp() ?? 0)
+            ->first();
+
+        if ($runItem) {
+            $handoff = $runItem->busHandoffConfirmation;
+            if ($handoff && in_array($handoff->status, ['confirmed', 'admin_confirmed'], true)) {
+                if ($handoff->confirmedByAdmin) {
+                    return $this->markerPayload('agent', $handoff->confirmedByAdmin->name, null, $handoff->confirmed_at, 'Bus handoff confirmed by agent');
+                }
+
+                if ($handoff->confirmedByDriver) {
+                    return $this->markerPayload('rider', $handoff->confirmedByDriver->name, $handoff->confirmedByDriver->phone, $handoff->confirmed_at, 'Bus handoff confirmed by rider');
+                }
+
+                if ($handoff->public_confirmed_at) {
+                    $label = $handoff->target_type === 'vendor' ? 'Vendor' : 'Recipient';
+                    $name = $handoff->target_name ?: $label;
+
+                    return $this->markerPayload('public', $name, $handoff->target_phone, $handoff->public_confirmed_at, "{$label} confirmed by link");
+                }
+            }
+
+            if ($runItem->stop?->confirmedBy) {
+                return $this->markerPayload('agent', $runItem->stop->confirmedBy->name, null, $runItem->stop->confirmed_at ?? $runItem->delivered_at, 'Marked delivered by agent');
+            }
+
+            if ($runItem->run?->assignedDriver) {
+                return $this->markerPayload('rider', $runItem->run->assignedDriver->name, $runItem->run->assignedDriver->phone, $runItem->delivered_at ?? $runItem->stop?->delivered_at, 'Delivered by rider');
+            }
+        }
+
+        if ($task->outcome === PackageContactTask::OUTCOME_DELIVER && $task->resolved_at) {
+            if ($task->resolvedBy) {
+                return $this->markerPayload('agent', $task->resolvedBy->name, null, $task->resolved_at, 'Marked delivered by agent');
+            }
+
+            if ($task->assignedTo) {
+                return $this->markerPayload('agent', $task->assignedTo->name, null, $task->resolved_at, 'Marked delivered by assigned agent');
+            }
+
+            return $this->markerPayload('agent', 'Agent', null, $task->resolved_at, 'Marked delivered by agent');
+        }
+
+        return null;
+    }
+
+    private function markerPayload(string $type, ?string $name, ?string $phone, mixed $at, string $label): array
+    {
+        $typeLabel = match ($type) {
+            'rider' => 'Rider',
+            'agent' => 'Agent',
+            'public' => 'Recipient/Vendor',
+            default => str($type)->headline()->toString(),
+        };
+
+        return [
+            'type' => $type,
+            'type_label' => $typeLabel,
+            'name' => $name,
+            'phone' => $phone,
+            'at' => $at?->format('M d, H:i'),
+            'label' => $label,
+        ];
     }
 
     private function deliveredAtFor(PackageContactTask $task): mixed

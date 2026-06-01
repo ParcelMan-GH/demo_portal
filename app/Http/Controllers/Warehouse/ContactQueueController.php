@@ -63,7 +63,16 @@ class ContactQueueController extends Controller
         $query = PackageContactTask::where('warehouse_id', $warehouse->id)
             ->with([
                 'assignedTo:id,name',
+                'resolvedBy:id,name',
                 'shipmentItem:id,shipment_id,tracking_code,description,quantity,status',
+                'shipmentItem.deliveryRunItems:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,status,delivered_at',
+                'shipmentItem.deliveryRunItems.run:id,run_number,assigned_driver_id',
+                'shipmentItem.deliveryRunItems.run.assignedDriver:id,name,phone',
+                'shipmentItem.deliveryRunItems.stop:id,delivery_run_id,status,delivery_method,delivered_at,confirmed_at,confirmed_by_admin_id,bus_station_name',
+                'shipmentItem.deliveryRunItems.stop.confirmedBy:id,name',
+                'shipmentItem.deliveryRunItems.busHandoffConfirmation:id,delivery_run_item_id,status,source,target_type,target_name,target_phone,confirmed_at,confirmed_by_driver_id,confirmed_by_admin_id,public_confirmed_at',
+                'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByDriver:id,name,phone',
+                'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByAdmin:id,name',
                 'shipment:id,shipment_number,fulfillment_type,delivery_recipient_name,delivery_recipient_phone',
                 'shipment.collection:id,shipment_id,warehouse_id,status,ready_at,collected_at,collected_by_name,collected_by_phone,handed_over_by_user_id',
                 'shipment.collection.handedOverBy:id,name',
@@ -107,7 +116,16 @@ class ContactQueueController extends Controller
         return response()->json([
             'data' => $tasks->map(function ($task) {
                 $task = $this->contactService->syncWithPackageState($task);
+                $task->loadMissing([
+                    'assignedTo:id,name',
+                    'resolvedBy:id,name',
+                    'shipmentItem.deliveryRunItems.run.assignedDriver:id,name,phone',
+                    'shipmentItem.deliveryRunItems.stop.confirmedBy:id,name',
+                    'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByDriver:id,name,phone',
+                    'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByAdmin:id,name',
+                ]);
                 $itemStatus = $task->shipmentItem?->status;
+                $deliveryMarker = $this->contactService->deliveryMarkerFor($task);
 
                 return [
                 'id' => $task->id,
@@ -129,11 +147,17 @@ class ContactQueueController extends Controller
                 'assigned_to' => $task->assignedTo?->name,
                 'assigned_to_id' => $task->assigned_to_user_id,
                 'assigned_at' => $task->assigned_at?->format('M d, H:i'),
+                'resolved_by' => $task->resolvedBy?->name,
+                'resolved_by_id' => $task->resolved_by_user_id,
                 'callback_at' => $task->callback_at?->format('M d, H:i'),
                 'is_callback_due' => $task->outcome === PackageContactTask::OUTCOME_CALLBACK
                     && $task->callback_at?->lte(now()),
                 'attempts_count' => $task->attempts_count,
                 'resolved_at' => $task->resolved_at?->format('M d, H:i'),
+                'delivered_by' => $deliveryMarker,
+                'delivered_by_type' => $deliveryMarker['type'] ?? null,
+                'delivered_by_name' => $deliveryMarker['name'] ?? null,
+                'delivered_by_at' => $deliveryMarker['at'] ?? null,
                 'notes' => $task->notes,
                 'created_at' => $task->created_at?->format('M d, H:i'),
                 ];
@@ -304,6 +328,7 @@ class ContactQueueController extends Controller
             $validated['notes'] ?? null,
             $callbackAt,
             $validated['confirmation_code'] ?? null,
+            Auth::guard('admin')->user(),
         );
 
         if (!($result['success'] ?? false)) {

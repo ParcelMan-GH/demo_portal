@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\DeliveryRun;
 use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
+use App\Models\DeliveryDelayReason;
 use App\Models\Driver;
 use App\Models\SortBatch;
+use App\Services\DeliveryDelayService;
 use App\Services\Warehouse\WarehouseDeliveryService;
 use App\Services\Warehouse\WarehousePortalService;
 use App\Services\Warehouse\WarehouseSortingService;
@@ -15,6 +17,7 @@ use App\Services\BusHandoffConfirmationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use App\Models\OtpCode;
 use Illuminate\View\View;
@@ -25,7 +28,8 @@ class DeliveryRunController extends Controller
         private WarehousePortalService $portalService,
         private WarehouseDeliveryService $deliveryService,
         private WarehouseSortingService $sortingService,
-        private BusHandoffConfirmationService $busHandoffConfirmationService
+        private BusHandoffConfirmationService $busHandoffConfirmationService,
+        private DeliveryDelayService $deliveryDelayService
     ) {
     }
 
@@ -384,9 +388,20 @@ class DeliveryRunController extends Controller
             'stops.district',
             'stops.confirmedBy',
             'stops.items.shipmentItem.shipment',
+            'stops.items.shipmentItem.warehouseReceiptItems.photos',
+            'stops.items.expectedDeliverySetByDriver',
+            'stops.items.expectedDeliverySetByUser',
+            'stops.items.delayEvents.actorDriver',
+            'stops.items.delayEvents.actorUser',
+            'stops.items.delayEvents.reason',
             'stops.verificationAttempts',
             'items.shipmentItem.shipment',
             'items.stop',
+            'items.expectedDeliverySetByDriver',
+            'items.expectedDeliverySetByUser',
+            'items.delayEvents.actorDriver',
+            'items.delayEvents.actorUser',
+            'items.delayEvents.reason',
         ]);
 
         $deliveryDrivers = Driver::query()
@@ -409,6 +424,7 @@ class DeliveryRunController extends Controller
             'updateStopDeliveryMethodUrlTemplate' => route('warehouse.deliveries.runs.stops.update-delivery-method', ['run' => $run->id, 'stop' => '__STOP__']),
             'confirmHandoffStopUrlTemplate' => route('warehouse.deliveries.runs.stops.confirm-handoff', ['run' => $run->id, 'stop' => '__STOP__']),
             'confirmHandoffItemUrlTemplate' => route('warehouse.deliveries.runs.stops.items.confirm-handoff', ['run' => $run->id, 'stop' => '__STOP__', 'item' => '__ITEM__']),
+            'delayNoticeItemUrlTemplate' => route('warehouse.deliveries.runs.items.delay-notice', ['run' => $run->id, 'item' => '__ITEM__']),
             'canResetCodes' => (bool) $user?->hasPermission('warehouse.delivery.code.reset'),
         ];
 
@@ -440,6 +456,103 @@ class DeliveryRunController extends Controller
             'deliveryRunRoutes' => $deliveryRunRoutes,
             'hideRunWarehouseMeta' => true,
             'localDeliveryBatches' => $localDeliveryBatches,
+            'delayReasons' => $this->deliveryDelayService->activeReasons(),
+            'deliveryDelayService' => $this->deliveryDelayService,
+        ]);
+    }
+
+    public function sendItemDelayNotice(Request $request, DeliveryRun $run, DeliveryRunItem $item): JsonResponse
+    {
+        $this->authorizePermission('warehouse.delivery.assign');
+        $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+
+        if ((int) $run->warehouse_id !== (int) $warehouse->id) {
+            return response()->json(['success' => false, 'message' => 'Run not found.'], 404);
+        }
+
+        if ((int) $item->delivery_run_id !== (int) $run->id) {
+            return response()->json(['success' => false, 'message' => 'Package is not part of this delivery run.'], 404);
+        }
+
+        $validated = $request->validate([
+            'reason_id' => ['required', 'integer', 'exists:delivery_delay_reasons,id'],
+            'revised_eta' => ['nullable', 'date', 'after:now'],
+            'notify_recipient' => ['nullable', 'boolean'],
+            'notify_vendor' => ['nullable', 'boolean'],
+            'notify_vendor_sms' => ['nullable', 'boolean'],
+            'message' => ['nullable', 'string', 'max:500'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $notifyRecipient = filter_var($validated['notify_recipient'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        $notifyVendor = filter_var($validated['notify_vendor'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        $notifyVendorSms = filter_var($validated['notify_vendor_sms'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        if (!$notifyRecipient && !$notifyVendor && !$notifyVendorSms) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Select at least one person to notify.',
+            ], 422);
+        }
+
+        $reason = DeliveryDelayReason::query()
+            ->where('is_active', true)
+            ->find((int) $validated['reason_id']);
+
+        if (!$reason) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Select an active delivery delay reason.',
+            ], 422);
+        }
+
+        $item->loadMissing([
+            'run.assignedDriver',
+            'stop',
+            'shipmentItem.shipment.vendor',
+            'busHandoffConfirmation',
+            'delayEvents.actorDriver',
+            'delayEvents.actorUser',
+            'delayEvents.reason',
+        ]);
+
+        $delay = $this->deliveryDelayService->snapshot($item);
+        if (!($delay['can_notify'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Delay notices can only be sent for active delivery packages.',
+            ], 422);
+        }
+
+        $this->deliveryDelayService->sendAdminNotice(
+            item: $item,
+            admin: Auth::guard('admin')->user(),
+            reason: $reason,
+            revisedEta: !empty($validated['revised_eta']) ? Carbon::parse($validated['revised_eta']) : null,
+            notifyRecipient: $notifyRecipient,
+            notifyVendor: $notifyVendor,
+            notifyVendorSms: $notifyVendorSms,
+            message: $validated['message'] ?? null,
+            notes: $validated['notes'] ?? null,
+        );
+
+        $fresh = $item->fresh([
+            'run.assignedDriver',
+            'stop',
+            'shipmentItem.shipment.vendor',
+            'busHandoffConfirmation',
+            'delayEvents.actorDriver',
+            'delayEvents.actorUser',
+            'delayEvents.reason',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delay notice recorded.',
+            'data' => [
+                'eta' => $this->deliveryDelayService->snapshot($fresh),
+                'delay_history' => $this->deliveryDelayService->history($fresh),
+            ],
         ]);
     }
 

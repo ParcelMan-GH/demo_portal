@@ -6,6 +6,8 @@
 
 @php
 use App\Models\Driver;
+$deliveryDelayService = $deliveryDelayService ?? app(\App\Services\DeliveryDelayService::class);
+$delayReasons = collect($delayReasons ?? $deliveryDelayService->activeReasons())->values();
 $deliveryDrivers = $deliveryDrivers ?? Driver::where('is_active', true)->orderBy('name')->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']);
 $deliveryDriverOptions = $deliveryDrivers->map(fn ($driver) => [
     'id' => $driver->id,
@@ -112,14 +114,31 @@ $itemStatusColors = [
         data-eligible-items-url="{{ $deliveryRunRoutes['eligibleItemsUrl'] ?? '' }}"
         data-add-items-url="{{ $deliveryRunRoutes['addItemsUrl'] ?? '' }}"
         data-attach-sort-batch-url="{{ $deliveryRunRoutes['attachSortBatchUrl'] ?? '' }}"
+        data-delay-notice-url-template="{{ $deliveryRunRoutes['delayNoticeItemUrlTemplate'] ?? '' }}"
+        data-delay-reasons='@json($delayReasons)'
         data-driver-options='@json($deliveryDriverOptions)'
         data-local-delivery-batches='@json($localDeliveryBatches ?? [])'
         x-data="{
             actionLoading: false,
+            delayLoading: false,
+            delayModalOpen: false,
             showAssignModal: false,
             showDispatchConfirm: false,
             showNotesModal: false,
             showHandoffActionModal: false,
+            delayTarget: null,
+            delayReasons: [],
+            delayForm: {
+                reason_id: '',
+                revised_eta: '',
+                revised_eta_display: '',
+                notify_recipient: true,
+                notify_vendor: true,
+                notify_vendor_sms: false,
+                message: '',
+                message_touched: false,
+                notes: '',
+            },
             handoffActionType: 'delivered',
             handoffActionStop: null,
             handoffActionNotes: '',
@@ -158,6 +177,11 @@ $itemStatusColors = [
                     this.localDeliveryBatches = JSON.parse(this.$root.dataset.localDeliveryBatches || '[]');
                 } catch (error) {
                     this.localDeliveryBatches = [];
+                }
+                try {
+                    this.delayReasons = JSON.parse(this.$root.dataset.delayReasons || '[]');
+                } catch (error) {
+                    this.delayReasons = [];
                 }
             },
             csrfToken() {
@@ -417,6 +441,152 @@ $itemStatusColors = [
                 this.handoffActionStop = null;
                 this.handoffActionNotes = '';
                 this.handoffActionType = 'delivered';
+            },
+            delayClass(tone) {
+                return {
+                    rose: 'bg-rose-50 text-rose-700 ring-rose-200',
+                    amber: 'bg-amber-50 text-amber-700 ring-amber-200',
+                    blue: 'bg-blue-50 text-blue-700 ring-blue-200',
+                    emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                    slate: 'bg-slate-100 text-slate-600 ring-slate-200',
+                }[tone || 'slate'] || 'bg-slate-100 text-slate-600 ring-slate-200';
+            },
+            openDelayModal(item) {
+                this.delayTarget = item;
+                this.delayForm = {
+                    reason_id: this.delayReasons[0]?.id || '',
+                    revised_eta: '',
+                    revised_eta_display: '',
+                    notify_recipient: true,
+                    notify_vendor: true,
+                    notify_vendor_sms: false,
+                    message: '',
+                    message_touched: false,
+                    notes: '',
+                };
+                this.delayModalOpen = true;
+                this.$nextTick(() => {
+                    this.resetDelayEtaPicker();
+                    this.ensureDelayDatePicker(() => {
+                        this.initDelayEtaPicker();
+                        this.updateDelayMessage(true);
+                    });
+                });
+            },
+            closeDelayModal() {
+                if (!this.delayLoading) this.delayModalOpen = false;
+            },
+            delayPreview() {
+                const reason = this.delayReasons.find((item) => String(item.id) === String(this.delayForm.reason_id))?.label || 'selected reason';
+                const tracking = this.delayTarget?.tracking_code || this.delayTarget?.package_name || 'this package';
+                const eta = this.delayForm.revised_eta_display ? ` New expected delivery: ${this.delayForm.revised_eta_display}.` : '';
+                return `Delivery for package ${tracking} is delayed. Reason: ${reason}.${eta} We will update you if anything changes.`;
+            },
+            updateDelayMessage(force = false) {
+                if (!force && this.delayForm.message_touched) return;
+                this.delayForm.message = this.delayPreview();
+            },
+            ensureDelayDatePicker(callback) {
+                const setup = () => callback?.();
+                if (window.$ && window.moment && window.$.fn?.daterangepicker) {
+                    setup();
+                    return;
+                }
+                if (!document.getElementById('daterangepicker-css')) {
+                    const link = document.createElement('link');
+                    link.id = 'daterangepicker-css';
+                    link.rel = 'stylesheet';
+                    link.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
+                    document.head.appendChild(link);
+                }
+                const loadScript = (id, src) => new Promise((resolve) => {
+                    if (document.getElementById(id)) return resolve();
+                    const script = document.createElement('script');
+                    script.id = id;
+                    script.src = src;
+                    script.onload = () => resolve();
+                    document.body.appendChild(script);
+                });
+                loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
+                    .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
+                    .then(() => loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js'))
+                    .then(setup);
+            },
+            initDelayEtaPicker() {
+                if (!this.$refs.delayEtaInput || !window.$ || !window.moment || !window.$.fn?.daterangepicker) return;
+                const input = window.$(this.$refs.delayEtaInput);
+                if (input.data('daterangepicker')) return;
+                input.daterangepicker({
+                    singleDatePicker: true,
+                    autoUpdateInput: false,
+                    timePicker: true,
+                    timePicker24Hour: false,
+                    timePickerIncrement: 5,
+                    minDate: window.moment(),
+                    opens: 'left',
+                    locale: { format: 'DD MMM YYYY, h:mm A', cancelLabel: 'Clear' },
+                });
+                input.on('apply.daterangepicker', (event, picker) => {
+                    this.delayForm.revised_eta = picker.startDate.format('YYYY-MM-DD HH:mm:ss');
+                    this.delayForm.revised_eta_display = picker.startDate.format('DD MMM YYYY, h:mm A');
+                    input.val(this.delayForm.revised_eta_display);
+                    this.updateDelayMessage();
+                });
+                input.on('cancel.daterangepicker', () => {
+                    this.delayForm.revised_eta = '';
+                    this.delayForm.revised_eta_display = '';
+                    input.val('');
+                    this.updateDelayMessage();
+                });
+            },
+            resetDelayEtaPicker() {
+                if (!this.$refs.delayEtaInput) return;
+                const input = window.$ ? window.$(this.$refs.delayEtaInput) : null;
+                if (input?.data('daterangepicker')) {
+                    input.data('daterangepicker').remove();
+                }
+                this.$refs.delayEtaInput.value = '';
+            },
+            async sendDelayNotice() {
+                if (!this.delayTarget || !this.delayForm.reason_id) return;
+                const template = this.$root.dataset.delayNoticeUrlTemplate || '';
+                if (!template) {
+                    window.showToast?.('Delay notice endpoint is unavailable on this page.', 'error');
+                    return;
+                }
+                this.delayLoading = true;
+                try {
+                    const response = await fetch(template.replace('__ITEM__', this.delayTarget.id), {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': this.csrfToken(),
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            reason_id: this.delayForm.reason_id,
+                            revised_eta: this.delayForm.revised_eta,
+                            notify_recipient: this.delayForm.notify_recipient,
+                            notify_vendor: this.delayForm.notify_vendor,
+                            notify_vendor_sms: this.delayForm.notify_vendor_sms,
+                            message: this.delayForm.message,
+                            notes: this.delayForm.notes,
+                        }),
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok || result.success === false) {
+                        throw new Error(result.message || 'Unable to send delay notice.');
+                    }
+                    window.showToast?.(result.message || 'Delay notice recorded.', 'success');
+                    this.delayModalOpen = false;
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Unable to send delay notice.', 'error');
+                } finally {
+                    this.delayLoading = false;
+                }
             },
             handoffActionTitle() {
                 if (this.handoffActionType === 'failed') return 'Mark Handoff Failed';
@@ -1203,18 +1373,28 @@ $itemStatusColors = [
                         <div class="px-4 pb-4 sm:px-5">
                             <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Packages ({{ $stop->items->count() }})</p>
                             <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                                <div class="min-w-[640px]">
+                                <div class="min-w-[900px]">
                                     <div class="grid grid-cols-12 gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-                                    <span class="col-span-6">Package</span>
+                                    <span class="col-span-4">Package</span>
                                     <span class="col-span-2">Tracking</span>
                                     <span class="col-span-1">Qty</span>
-                                    <span class="col-span-2">Status</span>
-                                    <span class="col-span-1 text-right">Photos</span>
+                                    <span class="col-span-1">Status</span>
+                                    <span class="col-span-2">ETA</span>
+                                    <span class="col-span-2 text-right">Actions</span>
                                     </div>
                                     @foreach($stop->items as $item)
                                     @php
                                         $itemBadgeClass = $itemStatusColors[$item->status] ?? 'bg-slate-100 text-slate-600';
                                         $confirmHandoffItemUrl = str_replace(['__STOP__', '__ITEM__'], [$stop->id, $item->id], $deliveryRunRoutes['confirmHandoffItemUrlTemplate']);
+                                        $delaySnapshot = $deliveryDelayService->snapshot($item);
+                                        $delayHistory = $deliveryDelayService->history($item);
+                                        $delayToneClasses = match($delaySnapshot['tone'] ?? 'slate') {
+                                            'rose' => 'bg-rose-50 text-rose-700 ring-rose-200',
+                                            'amber' => 'bg-amber-50 text-amber-700 ring-amber-200',
+                                            'blue' => 'bg-blue-50 text-blue-700 ring-blue-200',
+                                            'emerald' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                                            default => 'bg-slate-100 text-slate-600 ring-slate-200',
+                                        };
                                         $itemStatusLabel = match($item->status) {
                                         'pending'   => 'Pending',
                                         'delivered' => 'Delivered',
@@ -1249,10 +1429,16 @@ $itemStatusColors = [
                                     $itemPhotos = $vendorPhotos->isNotEmpty()
                                         ? $vendorPhotos
                                         : ($driverPhotos->isNotEmpty() ? $driverPhotos : $receiptPhotos);
+                                    $delayNoticePayload = [
+                                        'id' => $item->id,
+                                        'package_name' => $itemLabel,
+                                        'tracking_code' => $itemTrackingCode,
+                                        'eta' => $delaySnapshot,
+                                    ];
                                     @endphp
                                     <div class="px-4 py-3 border-b border-slate-100 last:border-b-0">
                                         <div class="grid grid-cols-12 gap-3 items-center">
-                                        <div class="col-span-12 min-w-0 sm:col-span-6">
+                                        <div class="col-span-12 min-w-0 sm:col-span-4">
                                             <p class="truncate text-sm font-black text-slate-900 leading-snug">{{ $itemLabel }}</p>
                                         </div>
                                         <div class="col-span-12 sm:col-span-2">
@@ -1267,12 +1453,31 @@ $itemStatusColors = [
                                         <div class="col-span-12 sm:col-span-1 min-w-0">
                                             <p class="truncate text-xs font-semibold text-slate-700">{{ $item->delivered_quantity ?? 0 }}/{{ $item->expected_quantity }}</p>
                                         </div>
-                                        <div class="col-span-12 sm:col-span-2 min-w-0">
+                                        <div class="col-span-12 sm:col-span-1 min-w-0">
                                             <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold {{ $itemBadgeClass }}">
                                                 {{ $itemStatusLabel }}
                                             </span>
                                         </div>
-                                        <div class="col-span-12 sm:col-span-1 sm:text-right min-w-0">
+                                        <div class="col-span-12 sm:col-span-2 min-w-0">
+                                            <span class="inline-flex max-w-full items-center rounded-full px-2.5 py-1 text-[10px] font-black ring-1 {{ $delayToneClasses }}">
+                                                <span class="truncate">{{ $delaySnapshot['label'] ?? 'No ETA' }}</span>
+                                            </span>
+                                            @if($delaySnapshot['expected_delivery_at'] ?? null)
+                                                <p class="mt-1 truncate text-[11px] font-semibold text-slate-500">{{ $delaySnapshot['expected_delivery_at'] }}</p>
+                                            @endif
+                                            @if($delaySnapshot['last_notice_at'] ?? null)
+                                                <p class="mt-1 truncate text-[10px] font-bold text-amber-700">Notice {{ $delaySnapshot['last_notice_at'] }}</p>
+                                            @endif
+                                        </div>
+                                        <div class="col-span-12 flex flex-wrap items-center justify-end gap-2 sm:col-span-2 min-w-0">
+                                            @if(($delaySnapshot['can_notify'] ?? false) && !empty($deliveryRunRoutes['delayNoticeItemUrlTemplate']))
+                                                <button
+                                                    type="button"
+                                                    @@click.prevent="openDelayModal({{ \Illuminate\Support\Js::from($delayNoticePayload) }})"
+                                                    class="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-black text-amber-700 transition hover:bg-amber-100">
+                                                    Delay
+                                                </button>
+                                            @endif
                                             @if($itemPhotos->isNotEmpty())
                                                 <button
                                                     type="button"
@@ -1283,16 +1488,24 @@ $itemStatusColors = [
                                                         stopNumber: @js($index + 1),
                                                         photos: @js($itemPhotos->pluck('url')->values()->toArray())
                                                     })"
-                                                    class="inline-flex items-center text-xs font-semibold whitespace-nowrap text-orange-700 transition hover:text-orange-900 hover:underline">
+                                                    class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-700 transition hover:bg-slate-50">
                                                     View photos
                                                 </button>
                                             @else
-                                                <span class="text-xs font-medium text-slate-400">No photos</span>
+                                                <span class="text-[11px] font-medium text-slate-400">No photos</span>
                                             @endif
                                         </div>
                                     </div>
                                     @if($item->notes)
                                         <p class="mt-3 text-[11px] font-semibold text-slate-500">Note: {{ $item->notes }}</p>
+                                    @endif
+                                    @if(!empty($delayHistory))
+                                        <div class="mt-3 rounded-xl bg-slate-50 p-3 text-[11px] font-semibold text-slate-600">
+                                            <p class="font-black uppercase tracking-[0.14em] text-slate-400">Latest delay activity</p>
+                                            @foreach(collect($delayHistory)->take(2) as $event)
+                                                <p class="mt-1">{{ collect([$event['source_label'] ?? null, $event['reason'] ?? null, $event['new_eta'] ?? null, $event['actor'] ?? null, $event['created_at'] ?? null])->filter()->implode(' / ') }}</p>
+                                            @endforeach
+                                        </div>
                                     @endif
                                     </div>
                                     @endforeach
@@ -1375,6 +1588,70 @@ $itemStatusColors = [
             </div>
         @endif
     </section>
+
+    <div x-show="delayModalOpen" x-cloak x-transition.opacity
+         class="fixed inset-0 z-[220] flex min-h-dvh w-screen items-center justify-center overflow-y-auto p-3 sm:p-4"
+         @@keydown.escape.window="closeDelayModal()">
+        <div class="fixed inset-0 min-h-dvh bg-slate-950/60 backdrop-blur-sm" @@click="closeDelayModal()"></div>
+        <div @@click.stop class="relative my-auto flex max-h-[88dvh] w-full max-w-lg flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+            <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-6">
+                <div class="flex min-w-0 items-start gap-4">
+                    <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                        <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6v6l4 2m5-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                        </svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 class="text-2xl font-black leading-tight text-slate-950">Send Delay Notice</h3>
+                        <p class="mt-1 truncate text-sm font-semibold text-slate-500" x-text="delayTarget?.tracking_code || delayTarget?.package_name || 'Package delay'"></p>
+                    </div>
+                </div>
+                <button type="button" @@click="closeDelayModal()" :disabled="delayLoading"
+                    class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5 sm:px-6">
+                <div>
+                    <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-600">Delay reason</label>
+                    <select x-model="delayForm.reason_id" @@change="updateDelayMessage()" class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-4 text-base font-black text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                        <option value="">Select reason</option>
+                        <template x-for="reason in delayReasons" :key="reason.id">
+                            <option :value="reason.id" x-text="reason.label"></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-600">Revised ETA <span class="font-semibold normal-case tracking-normal text-slate-400">(optional)</span></label>
+                    <input type="text" x-ref="delayEtaInput" readonly placeholder="Select date and time" class="w-full cursor-pointer rounded-2xl border-2 border-slate-200 bg-white px-4 py-4 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                </div>
+                <div class="grid gap-2 sm:grid-cols-3">
+                    <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700"><input type="checkbox" x-model="delayForm.notify_recipient" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500"> Recipient SMS</label>
+                    <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700"><input type="checkbox" x-model="delayForm.notify_vendor" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500"> Vendor app</label>
+                    <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700"><input type="checkbox" x-model="delayForm.notify_vendor_sms" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500"> Vendor SMS</label>
+                </div>
+                <div>
+                    <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-600">Notes</label>
+                    <textarea x-model="delayForm.notes" rows="3" class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-4 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Internal note"></textarea>
+                </div>
+                <div>
+                    <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-600">Message</label>
+                    <textarea x-model="delayForm.message" @@input="delayForm.message_touched = true" rows="4" class="w-full rounded-2xl border-2 border-amber-200 bg-amber-50 px-4 py-4 text-base font-semibold leading-7 text-amber-950 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Message to send"></textarea>
+                    <p class="mt-1 text-xs font-semibold text-slate-400">You can adjust this message before sending.</p>
+                </div>
+            </div>
+
+            <div class="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6">
+                <button type="button" @@click="closeDelayModal()" :disabled="delayLoading" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Cancel</button>
+                <button type="button" @@click="sendDelayNotice()" :disabled="delayLoading || !delayForm.reason_id" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">
+                    <span x-text="delayLoading ? 'Sending...' : 'Send Notice'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     {{-- Proof Photo Viewer Modal --}}
     <template x-teleport="body">

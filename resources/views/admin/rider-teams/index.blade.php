@@ -20,6 +20,7 @@
         'storeHandoverUrl' => route('admin.rider-teams.handovers.store'),
         'showHandoverUrl' => route('admin.rider-teams.handovers.show', ['handover' => '__HANDOVER__']),
         'assignLabelsUrl' => route('admin.rider-teams.handovers.labels.store', ['handover' => '__HANDOVER__']),
+        'releaseLabelsUrl' => route('admin.rider-teams.handovers.labels.release', ['handover' => '__HANDOVER__']),
         'recallUrl' => route('admin.rider-teams.handovers.recall', ['handover' => '__HANDOVER__']),
         'csrfToken' => csrf_token(),
     ];
@@ -698,21 +699,33 @@
                                     <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">Package</th>
                                     <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">Allocated Rider</th>
                                     <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">Status</th>
+                                    <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-wider text-slate-500">Action</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
                                 <template x-if="(detailsModal.handover?.items || []).length === 0">
-                                    <tr><td colspan="4" class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No labels attached to this handover.</td></tr>
+                                    <tr><td colspan="5" class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No labels attached to this handover.</td></tr>
                                 </template>
                                 <template x-for="item in detailsModal.handover?.items || []" :key="item.id">
                                     <tr>
                                         <td class="px-4 py-3 font-mono font-black text-slate-900" x-text="item.barcode"></td>
                                         <td class="px-4 py-3">
                                             <p class="font-bold text-slate-900" x-text="item.package?.description || '-'"></p>
-                                            <p class="text-xs font-semibold text-slate-500" x-text="item.package?.tracking_code || ''"></p>
+                                            <p class="text-xs font-semibold text-slate-500" x-text="[item.package?.recipient_name, item.package?.recipient_phone, item.package?.delivery_town].filter(Boolean).join(' / ') || item.package?.tracking_code || ''"></p>
                                         </td>
                                         <td class="px-4 py-3 font-semibold text-slate-700" x-text="item.allocated_to?.name || '-'"></td>
                                         <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black uppercase text-slate-700" x-text="formatStatus(item.status)"></span></td>
+                                        <td class="px-4 py-3 text-right">
+                                            <button
+                                                type="button"
+                                                x-show="item.can_release"
+                                                @@click="releaseHandoverLabel(item)"
+                                                class="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50"
+                                            >
+                                                Remove
+                                            </button>
+                                            <span x-show="!item.can_release" class="text-xs font-semibold text-slate-400">-</span>
+                                        </td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -986,6 +999,30 @@ function riderTeamsPage(config, warehouses, drivers) {
                 this.detailsModal.open = true;
             } catch (error) {
                 alert(error.message || 'Could not open handover.');
+            }
+        },
+
+        async releaseHandoverLabel(item) {
+            const handover = this.detailsModal.handover;
+            if (!handover || !item?.barcode) return;
+
+            if (!confirm(`Remove ${item.barcode} from this rider team handover? Only labels not assigned to a rider can be removed.`)) {
+                return;
+            }
+
+            try {
+                await this.request(this.url(this.config.releaseLabelsUrl, {'__HANDOVER__': handover.id}), {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        barcodes: [item.barcode],
+                        notes: 'Removed from rider team handover by admin.',
+                    }),
+                });
+                await this.loadHandovers();
+                const data = await this.request(this.url(this.config.showHandoverUrl, {'__HANDOVER__': handover.id}));
+                this.detailsModal.handover = data.data.handover;
+            } catch (error) {
+                alert(error.message || 'Could not remove label from handover.');
             }
         },
 

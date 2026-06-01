@@ -49,7 +49,7 @@ class AdminContactQueueController extends Controller
     {
         $this->authorizePermission('shipments.view');
 
-        $query = PackageContactTask::with(['assignedTo:id,name', 'shipmentItem:id,tracking_code,description', 'shipment:id,shipment_number', 'warehouse:id,name']);
+        $query = PackageContactTask::with($this->taskRelations());
 
         if ($status = $request->get('status')) {
             if ($status === 'callbacks_due') {
@@ -83,7 +83,12 @@ class AdminContactQueueController extends Controller
         $tasks = $query->latest('created_at')->skip(($page - 1) * $perPage)->take($perPage)->get();
 
         return response()->json([
-            'data' => $tasks->map(fn ($task) => $this->transformTask($task))->values(),
+            'data' => $tasks->map(function (PackageContactTask $task) {
+                $task = $this->contactService->syncWithPackageState($task);
+                $task->loadMissing($this->taskRelations());
+
+                return $this->transformTask($task);
+            })->values(),
             'meta' => [
                 'total' => $total,
                 'per_page' => $perPage,
@@ -118,12 +123,12 @@ class AdminContactQueueController extends Controller
         $worker = User::findOrFail((int) ($validated['user_id'] ?? $validated['worker_id']));
         $this->contactService->assignToWorker($task, $worker);
 
-        $task->loadMissing(['assignedTo:id,name', 'shipmentItem:id,tracking_code,description', 'shipment:id,shipment_number', 'warehouse:id,name']);
+        $task->loadMissing($this->taskRelations());
 
         return response()->json([
             'success' => true,
             'message' => "Assigned to {$worker->name}.",
-            'task' => $this->transformTask($task->fresh(['assignedTo:id,name', 'shipmentItem:id,tracking_code,description', 'shipment:id,shipment_number', 'warehouse:id,name'])),
+            'task' => $this->transformTask($task->fresh($this->taskRelations())),
         ]);
     }
 
@@ -159,6 +164,7 @@ class AdminContactQueueController extends Controller
             'confirmation_code' => ['nullable', 'string', 'max:10'],
         ]);
         $callbackAt = !empty($validated['callback_at']) ? new \DateTime($validated['callback_at']) : null;
+        $admin = Auth::guard('admin')->user();
 
         $result = $this->contactService->resolveTask(
             $task,
@@ -166,6 +172,7 @@ class AdminContactQueueController extends Controller
             $validated['notes'] ?? null,
             $callbackAt,
             $validated['confirmation_code'] ?? null,
+            $admin,
         );
 
         if (!($result['success'] ?? false)) {
@@ -249,6 +256,7 @@ class AdminContactQueueController extends Controller
     {
         $isCallbackDue = $task->outcome === PackageContactTask::OUTCOME_CALLBACK
             && $task->callback_at?->lte(now());
+        $deliveryMarker = $this->contactService->deliveryMarkerFor($task);
 
         return [
             'id' => $task->id,
@@ -268,12 +276,38 @@ class AdminContactQueueController extends Controller
             'assigned_to_name' => $task->assignedTo?->name,
             'assigned_to_id' => $task->assigned_to_user_id,
             'assigned_at' => $task->assigned_at?->format('M d, H:i'),
+            'resolved_by' => $task->resolvedBy?->name,
+            'resolved_by_id' => $task->resolved_by_user_id,
             'callback_at' => $task->callback_at?->format('M d, H:i'),
             'attempts_count' => $task->attempts_count,
             'resolved_at' => $task->resolved_at?->format('M d, H:i'),
+            'delivered_by' => $deliveryMarker,
+            'delivered_by_type' => $deliveryMarker['type'] ?? null,
+            'delivered_by_name' => $deliveryMarker['name'] ?? null,
+            'delivered_by_at' => $deliveryMarker['at'] ?? null,
             'notes' => $task->notes,
             'created_at' => $task->created_at?->format('M d, H:i'),
             'is_callback_due' => (bool) $isCallbackDue,
         ];
     }
+
+    private function taskRelations(): array
+    {
+        return [
+            'assignedTo:id,name',
+            'resolvedBy:id,name',
+            'shipment:id,shipment_number',
+            'warehouse:id,name',
+            'shipmentItem:id,shipment_id,tracking_code,description,status',
+            'shipmentItem.deliveryRunItems:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,status,delivered_at',
+            'shipmentItem.deliveryRunItems.run:id,run_number,assigned_driver_id',
+            'shipmentItem.deliveryRunItems.run.assignedDriver:id,name,phone',
+            'shipmentItem.deliveryRunItems.stop:id,delivery_run_id,status,delivery_method,delivered_at,confirmed_at,confirmed_by_admin_id,bus_station_name',
+            'shipmentItem.deliveryRunItems.stop.confirmedBy:id,name',
+            'shipmentItem.deliveryRunItems.busHandoffConfirmation:id,delivery_run_item_id,status,source,target_type,target_name,target_phone,confirmed_at,confirmed_by_driver_id,confirmed_by_admin_id,public_confirmed_at',
+            'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByDriver:id,name,phone',
+            'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByAdmin:id,name',
+        ];
+    }
+
 }

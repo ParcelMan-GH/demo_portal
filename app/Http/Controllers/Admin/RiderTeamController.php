@@ -336,6 +336,31 @@ class RiderTeamController extends Controller
         return response()->json(['success' => true, 'message' => $result['assigned'] . ' label(s) assigned.', 'data' => $result]);
     }
 
+    public function releaseLabels(Request $request, RiderTeamHandover $handover): JsonResponse
+    {
+        $this->authorizeRiderTeamManage();
+        $this->assertHandoverAccess($handover);
+
+        $validated = $request->validate([
+            'barcodes' => ['required', 'array', 'min:1'],
+            'barcodes.*' => ['required', 'string', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $result = $this->service->releaseUnallocatedLabels(
+            $handover,
+            $validated['barcodes'],
+            Auth::guard('admin')->user(),
+            $validated['notes'] ?? null
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['released'] . ' label(s) released from handover.',
+            'data' => $result,
+        ]);
+    }
+
     public function recallLabels(Request $request, RiderTeamHandover $handover): JsonResponse
     {
         $this->authorizeRiderTeamManage();
@@ -479,11 +504,16 @@ class RiderTeamController extends Controller
             'id' => $item->id,
             'barcode' => $item->label?->barcode_value,
             'status' => $item->status,
+            'can_release' => ! $item->allocated_to_driver_id && in_array($item->status, [
+                RiderTeamHandoverItem::STATUS_ASSIGNED_TO_LEADER,
+                RiderTeamHandoverItem::STATUS_LEADER_RECEIVED,
+            ], true),
             'allocated_to' => $item->allocatedTo ? ['id' => $item->allocatedTo->id, 'name' => $item->allocatedTo->name, 'phone' => $item->allocatedTo->phone] : null,
             'package' => [
                 'tracking_code' => $shipmentItem?->tracking_code,
                 'description' => $shipmentItem?->description,
                 'recipient_name' => $shipmentItem?->delivery_recipient_name,
+                'recipient_phone' => $shipmentItem?->delivery_recipient_phone,
                 'delivery_town' => $shipmentItem?->delivery_town,
             ],
         ];

@@ -12,7 +12,7 @@ function csrfToken() {
 }
 
 function withItem(urlTemplate, itemId) {
-    return (urlTemplate || '').replace('__ITEM__', String(itemId));
+    return (urlTemplate || '').replace('__ITEM__', String(itemId)).replace('__ID__', String(itemId));
 }
 
 function registerWarehousePackagesPage() {
@@ -38,6 +38,7 @@ function registerWarehousePackagesPage() {
             { key: 'sort_batch', label: 'Sort Batch', sortable: false },
             { key: 'manifest', label: 'Manifest', sortable: false },
             { key: 'delivery', label: 'Delivery', sortable: false },
+            { key: 'eta', label: 'ETA / Delay', sortable: false },
             { key: 'payment', label: 'Payment', sortable: false },
             { key: 'received', label: 'Received', sortable: false },
             { key: 'actions', label: 'Actions', sortable: false },
@@ -74,6 +75,8 @@ function registerWarehousePackagesPage() {
                 delivery_status: '',
                 delivery_method: '',
                 payment_status: '',
+                eta_status: '',
+                rider_id: '',
                 delivery_staff_id: '',
                 payment_staff_id: '',
                 amount_min: '',
@@ -84,7 +87,21 @@ function registerWarehousePackagesPage() {
             manifestStatuses: Array.isArray(config.manifest_statuses) ? config.manifest_statuses : [],
             openBatches: Array.isArray(config.open_batches) ? config.open_batches : [],
             warehouseUsers: Array.isArray(config.warehouse_users) ? config.warehouse_users : [],
+            drivers: Array.isArray(config.drivers) ? config.drivers : [],
+            delayReasons: Array.isArray(config.delay_reasons) ? config.delay_reasons : [],
             transferWarehouses: Array.isArray(config.transfer_warehouses) ? config.transfer_warehouses : [],
+            delayModalOpen: false,
+            delayLoading: false,
+            delayForm: {
+                reason_id: '',
+                revised_eta: '',
+                notify_recipient: true,
+                notify_vendor: true,
+                notify_vendor_sms: false,
+                message: '',
+                message_touched: false,
+                notes: '',
+            },
             editModalOpen: false,
             printModalOpen: false,
             modalLoading: false,
@@ -214,6 +231,8 @@ function registerWarehousePackagesPage() {
                     delivery_status: 'Delivery',
                     delivery_method: 'Method',
                     payment_status: 'Payment',
+                    eta_status: 'ETA',
+                    rider_id: 'Rider',
                     delivery_staff_id: 'Delivery staff',
                     payment_staff_id: 'Payment staff',
                     amount_min: 'Min fee',
@@ -229,8 +248,89 @@ function registerWarehousePackagesPage() {
                 if (key === 'status') return this.statuses.find((item) => item.value === value)?.label || value;
                 if (key === 'manifest_status') return this.manifestStatuses.find((item) => item.value === value)?.label || value;
                 if (key === 'sort_batch_id') return this.openBatches.find((item) => String(item.id) === String(value))?.batch_number || value;
+                if (key === 'rider_id') return this.drivers.find((item) => String(item.id) === String(value))?.name || value;
                 if (key === 'delivery_staff_id' || key === 'payment_staff_id') return this.warehouseUsers.find((item) => String(item.id) === String(value))?.name || value;
                 return String(value).replace(/_/g, ' ');
+            },
+
+            delayClass(tone) {
+                return {
+                    rose: 'bg-rose-50 text-rose-700 ring-rose-200',
+                    amber: 'bg-amber-50 text-amber-700 ring-amber-200',
+                    blue: 'bg-blue-50 text-blue-700 ring-blue-200',
+                    emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                    slate: 'bg-slate-100 text-slate-600 ring-slate-200',
+                }[tone || 'slate'] || 'bg-slate-100 text-slate-600 ring-slate-200';
+            },
+
+            openDelayModal(row) {
+                this.activeRow = row;
+                this.delayForm = {
+                    reason_id: this.delayReasons[0]?.id || '',
+                    revised_eta: '',
+                    notify_recipient: true,
+                    notify_vendor: true,
+                    notify_vendor_sms: false,
+                    message: '',
+                    message_touched: false,
+                    notes: '',
+                };
+                this.delayModalOpen = true;
+                this.$nextTick(() => {
+                    this.resetDelayEtaPicker();
+                    this.initDelayEtaPicker();
+                    this.updateDelayMessage(true);
+                });
+            },
+
+            closeDelayModal() {
+                if (!this.delayLoading) this.delayModalOpen = false;
+            },
+
+            delayPreview() {
+                const reason = this.delayReasons.find((item) => String(item.id) === String(this.delayForm.reason_id))?.label || 'selected reason';
+                const tracking = this.activeRow?.tracking_code || this.activeRow?.shipment_number || 'this package';
+                const eta = this.delayForm.revised_eta_display ? ` New expected delivery: ${this.delayForm.revised_eta_display}.` : '';
+                return `Delivery for package ${tracking} is delayed. Reason: ${reason}.${eta} We will update you if anything changes.`;
+            },
+
+            updateDelayMessage(force = false) {
+                if (!force && this.delayForm.message_touched) return;
+                this.delayForm.message = this.delayPreview();
+            },
+
+            async sendDelayNotice() {
+                if (!this.activeRow) return;
+                this.delayLoading = true;
+                try {
+                    const response = await fetch(withItem(config.delay_notice_url, this.activeRow.id), {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken(),
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify({
+                            reason_id: this.delayForm.reason_id,
+                            revised_eta: this.delayForm.revised_eta,
+                            notify_recipient: this.delayForm.notify_recipient,
+                            notify_vendor: this.delayForm.notify_vendor,
+                            notify_vendor_sms: this.delayForm.notify_vendor_sms,
+                            message: this.delayForm.message,
+                            notes: this.delayForm.notes,
+                        }),
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok || result.success === false) throw new Error(result.message || 'Unable to send delay notice.');
+                    this.delayModalOpen = false;
+                    window.showToast?.(result.message || 'Delay notice recorded.', 'success');
+                    await this.loadData();
+                } catch (error) {
+                    window.showToast?.(error.message || 'Unable to send delay notice.', 'error');
+                } finally {
+                    this.delayLoading = false;
+                }
             },
 
             openEditModal(row) {
@@ -594,6 +694,7 @@ function registerWarehousePackagesPage() {
                 const setupPickers = () => {
                     setupPicker('dateRange', 'date_from', 'date_to');
                     setupPicker('deliveredDateRange', 'delivered_date_from', 'delivered_date_to');
+                    this.initDelayEtaPicker();
                 };
                 if (window.$ && window.moment && window.$.fn.daterangepicker) {
                     setupPickers();
@@ -624,6 +725,48 @@ function registerWarehousePackagesPage() {
                     })
                     .then(setupPickers);
             },
+
+            initDelayEtaPicker() {
+                if (!this.$refs.delayEtaInput) return;
+                if (!window.$ || !window.moment || !window.$.fn.daterangepicker) return;
+
+                const $input = window.$(this.$refs.delayEtaInput);
+                if ($input.data('daterangepicker')) return;
+
+                $input.daterangepicker({
+                    singleDatePicker: true,
+                    autoUpdateInput: false,
+                    timePicker: true,
+                    timePicker24Hour: false,
+                    timePickerIncrement: 5,
+                    minDate: window.moment(),
+                    opens: 'left',
+                    locale: {
+                        format: 'DD MMM YYYY, h:mm A',
+                        cancelLabel: 'Clear',
+                    },
+                });
+
+                $input.on('apply.daterangepicker', (ev, picker) => {
+                    this.delayForm.revised_eta = picker.startDate.format('YYYY-MM-DD HH:mm:ss');
+                    this.delayForm.revised_eta_display = picker.startDate.format('DD MMM YYYY, h:mm A');
+                    $input.val(this.delayForm.revised_eta_display);
+                    this.updateDelayMessage();
+                });
+
+                $input.on('cancel.daterangepicker', () => {
+                    this.delayForm.revised_eta = '';
+                    this.delayForm.revised_eta_display = '';
+                    $input.val('');
+                    this.updateDelayMessage();
+                });
+            },
+
+            resetDelayEtaPicker() {
+                if (!this.$refs.delayEtaInput) return;
+                this.$refs.delayEtaInput.value = '';
+                this.delayForm.revised_eta_display = '';
+            },
         };
     });
 }
@@ -648,12 +791,27 @@ function registerWarehousePackageShowPage() {
         modalLoading: false,
         printLoading: false,
         paymentLoading: false,
+        delayModalOpen: false,
+        delayLoading: false,
         paymentWalletChanging: false,
         editForm: {},
         photoUploadFiles: [],
         removePhotoIds: [],
         printForm: { label_count: 1 },
         paymentForm: { amount: '', payment_wallet_id: '', payment_reference: '', outcome: 'answered', payment_receipt_name: '', notes: '' },
+        delayReasons: Array.isArray(detailConfig.delay_reasons) ? detailConfig.delay_reasons : [],
+        delayTarget: null,
+        delayForm: {
+            reason_id: '',
+            revised_eta: '',
+            revised_eta_display: '',
+            notify_recipient: true,
+            notify_vendor: true,
+            notify_vendor_sms: false,
+            message: '',
+            message_touched: false,
+            notes: '',
+        },
         photoPreviewUrls: [],
         activePhotoIndex: 0,
 
@@ -722,6 +880,165 @@ function registerWarehousePackageShowPage() {
         canSubmitPayment() {
             const amount = Number(this.paymentForm.amount || 0);
             return Boolean(this.canSavePaymentDetails() && Number.isFinite(amount) && amount > 0 && this.paymentForm.outcome && this.selectedPaymentWallet() && this.selectedWalletHasOpenSession());
+        },
+
+        delayClass(tone) {
+            return {
+                rose: 'bg-rose-50 text-rose-700 ring-rose-200',
+                amber: 'bg-amber-50 text-amber-700 ring-amber-200',
+                blue: 'bg-blue-50 text-blue-700 ring-blue-200',
+                emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                slate: 'bg-slate-100 text-slate-600 ring-slate-200',
+            }[tone || 'slate'] || 'bg-slate-100 text-slate-600 ring-slate-200';
+        },
+
+        openDelayModal(delivery = null) {
+            this.delayTarget = delivery || (Array.isArray(this.pkg.histories?.deliveries) ? this.pkg.histories.deliveries[0] : null);
+            this.delayForm = {
+                reason_id: this.delayReasons[0]?.id || '',
+                revised_eta: '',
+                revised_eta_display: '',
+                notify_recipient: true,
+                notify_vendor: true,
+                notify_vendor_sms: false,
+                message: '',
+                message_touched: false,
+                notes: '',
+            };
+            this.delayModalOpen = true;
+            this.$nextTick(() => {
+                this.resetDelayEtaPicker();
+                this.ensureDelayDatePicker(() => {
+                    this.initDelayEtaPicker();
+                    this.updateDelayMessage(true);
+                });
+            });
+        },
+
+        closeDelayModal() {
+            if (!this.delayLoading) this.delayModalOpen = false;
+        },
+
+        delayPreview() {
+            const reason = this.delayReasons.find((item) => String(item.id) === String(this.delayForm.reason_id))?.label || 'selected reason';
+            const tracking = this.pkg?.tracking_code || this.pkg?.shipment_number || this.delayTarget?.number || 'this package';
+            const eta = this.delayForm.revised_eta_display ? ` New expected delivery: ${this.delayForm.revised_eta_display}.` : '';
+            return `Delivery for package ${tracking} is delayed. Reason: ${reason}.${eta} We will update you if anything changes.`;
+        },
+
+        updateDelayMessage(force = false) {
+            if (!force && this.delayForm.message_touched) return;
+            this.delayForm.message = this.delayPreview();
+        },
+
+        ensureDelayDatePicker(callback) {
+            const setup = () => callback?.();
+            if (window.$ && window.moment && window.$.fn?.daterangepicker) {
+                setup();
+                return;
+            }
+            if (!document.getElementById('daterangepicker-css')) {
+                const link = document.createElement('link');
+                link.id = 'daterangepicker-css';
+                link.rel = 'stylesheet';
+                link.href = 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css';
+                document.head.appendChild(link);
+            }
+            const loadScript = (id, src) => new Promise((resolve) => {
+                if (document.getElementById(id)) return resolve();
+                const script = document.createElement('script');
+                script.id = id;
+                script.src = src;
+                script.onload = () => resolve();
+                document.body.appendChild(script);
+            });
+            loadScript('jquery-cdn', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js')
+                .then(() => loadScript('moment-cdn', 'https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js'))
+                .then(() => loadScript('daterangepicker-cdn', 'https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js'))
+                .then(setup);
+        },
+
+        initDelayEtaPicker() {
+            if (!this.$refs.delayEtaInput || !window.$ || !window.moment || !window.$.fn?.daterangepicker) return;
+
+            const $input = window.$(this.$refs.delayEtaInput);
+            if ($input.data('daterangepicker')) return;
+
+            $input.daterangepicker({
+                singleDatePicker: true,
+                autoUpdateInput: false,
+                timePicker: true,
+                timePicker24Hour: false,
+                timePickerIncrement: 5,
+                minDate: window.moment(),
+                opens: 'left',
+                locale: {
+                    format: 'DD MMM YYYY, h:mm A',
+                    cancelLabel: 'Clear',
+                },
+            });
+
+            $input.on('apply.daterangepicker', (ev, picker) => {
+                this.delayForm.revised_eta = picker.startDate.format('YYYY-MM-DD HH:mm:ss');
+                this.delayForm.revised_eta_display = picker.startDate.format('DD MMM YYYY, h:mm A');
+                $input.val(this.delayForm.revised_eta_display);
+                this.updateDelayMessage();
+            });
+
+            $input.on('cancel.daterangepicker', () => {
+                this.delayForm.revised_eta = '';
+                this.delayForm.revised_eta_display = '';
+                $input.val('');
+                this.updateDelayMessage();
+            });
+        },
+
+        resetDelayEtaPicker() {
+            if (!this.$refs.delayEtaInput) return;
+            const $input = window.$ ? window.$(this.$refs.delayEtaInput) : null;
+            if ($input?.data('daterangepicker')) {
+                $input.data('daterangepicker').remove();
+            }
+            this.$refs.delayEtaInput.value = '';
+            this.delayForm.revised_eta_display = '';
+        },
+
+        async sendDelayNotice() {
+            if (!this.config.delay_notice_url || !this.delayForm.reason_id) return;
+            this.delayLoading = true;
+            try {
+                const itemUrl = this.config.delay_notice_item_url_template && this.delayTarget?.id && this.delayTarget?.run_id
+                    ? this.config.delay_notice_item_url_template
+                        .replace('__RUN__', String(this.delayTarget.run_id))
+                        .replace('__ITEM__', String(this.delayTarget.id))
+                    : null;
+                const response = await fetch(itemUrl || this.config.delay_notice_url, {
+                    method: 'POST',
+                    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrfToken() },
+                    body: JSON.stringify({
+                        reason_id: this.delayForm.reason_id,
+                        revised_eta: this.delayForm.revised_eta,
+                        notify_recipient: this.delayForm.notify_recipient,
+                        notify_vendor: this.delayForm.notify_vendor,
+                        notify_vendor_sms: this.delayForm.notify_vendor_sms,
+                        message: this.delayForm.message,
+                        notes: this.delayForm.notes,
+                    }),
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || result.success === false) throw new Error(result.message || 'Unable to send delay notice.');
+                if (result.data) {
+                    this.pkg = result.data;
+                    this.activeRow = this.pkg;
+                }
+                this.delayModalOpen = false;
+                window.showToast?.(result.message || 'Delay notice recorded.', 'success');
+            } catch (error) {
+                console.error(error);
+                window.showToast?.(error.message || 'Unable to send delay notice.', 'error');
+            } finally {
+                this.delayLoading = false;
+            }
         },
 
         paymentSessionMessage() {

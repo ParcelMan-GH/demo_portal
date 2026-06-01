@@ -16,6 +16,12 @@ function buildAdminContactQueueAssignmentSchema(): void
 {
     foreach ([
         'package_contact_tasks',
+        'bus_handoff_confirmations',
+        'delivery_run_items',
+        'delivery_run_stops',
+        'delivery_runs',
+        'drivers',
+        'shipment_collections',
         'shipment_items',
         'shipments',
         'warehouses',
@@ -61,6 +67,67 @@ function buildAdminContactQueueAssignmentSchema(): void
         $table->timestamps();
     });
 
+    Schema::create('shipment_collections', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('shipment_id')->nullable();
+        $table->unsignedBigInteger('warehouse_id')->nullable();
+        $table->string('status')->nullable();
+        $table->timestamp('ready_at')->nullable();
+        $table->timestamp('collected_at')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('drivers', function (Blueprint $table) {
+        $table->id();
+        $table->string('name');
+        $table->string('phone')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('delivery_runs', function (Blueprint $table) {
+        $table->id();
+        $table->string('run_number')->nullable();
+        $table->unsignedBigInteger('assigned_driver_id')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('delivery_run_stops', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('delivery_run_id')->nullable();
+        $table->string('status')->nullable();
+        $table->string('delivery_method')->nullable();
+        $table->timestamp('delivered_at')->nullable();
+        $table->timestamp('confirmed_at')->nullable();
+        $table->unsignedBigInteger('confirmed_by_admin_id')->nullable();
+        $table->string('bus_station_name')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('delivery_run_items', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('delivery_run_id')->nullable();
+        $table->unsignedBigInteger('delivery_run_stop_id')->nullable();
+        $table->unsignedBigInteger('shipment_item_id')->nullable();
+        $table->string('status')->nullable();
+        $table->timestamp('delivered_at')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('bus_handoff_confirmations', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('delivery_run_item_id')->nullable();
+        $table->string('status')->nullable();
+        $table->string('source')->nullable();
+        $table->string('target_type')->nullable();
+        $table->string('target_name')->nullable();
+        $table->string('target_phone')->nullable();
+        $table->timestamp('confirmed_at')->nullable();
+        $table->unsignedBigInteger('confirmed_by_driver_id')->nullable();
+        $table->unsignedBigInteger('confirmed_by_admin_id')->nullable();
+        $table->timestamp('public_confirmed_at')->nullable();
+        $table->timestamps();
+    });
+
     Schema::create('package_contact_tasks', function (Blueprint $table) {
         $table->id();
         $table->unsignedBigInteger('shipment_item_id')->nullable();
@@ -77,6 +144,7 @@ function buildAdminContactQueueAssignmentSchema(): void
         $table->text('notes')->nullable();
         $table->unsignedInteger('attempts_count')->default(0);
         $table->timestamp('resolved_at')->nullable();
+        $table->unsignedBigInteger('resolved_by_user_id')->nullable();
         $table->string('confirmation_code')->nullable();
         $table->timestamp('confirmation_code_sent_at')->nullable();
         $table->timestamp('confirmation_code_expires_at')->nullable();

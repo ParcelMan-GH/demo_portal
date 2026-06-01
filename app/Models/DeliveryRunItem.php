@@ -25,12 +25,18 @@ class DeliveryRunItem extends Model
         'status',
         'notes',
         'delivered_at',
+        'expected_delivery_at',
+        'expected_delivery_set_at',
+        'expected_delivery_set_by_driver_id',
+        'expected_delivery_set_by_user_id',
     ];
 
     protected $casts = [
         'expected_quantity' => 'integer',
         'delivered_quantity' => 'integer',
         'delivered_at' => 'datetime',
+        'expected_delivery_at' => 'datetime',
+        'expected_delivery_set_at' => 'datetime',
     ];
 
     public function run(): BelongsTo
@@ -51,5 +57,20 @@ class DeliveryRunItem extends Model
     public function busHandoffConfirmation(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(BusHandoffConfirmation::class, 'delivery_run_item_id');
+    }
+
+    public function expectedDeliverySetByDriver(): BelongsTo
+    {
+        return $this->belongsTo(Driver::class, 'expected_delivery_set_by_driver_id');
+    }
+
+    public function expectedDeliverySetByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'expected_delivery_set_by_user_id');
+    }
+
+    public function delayEvents(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(DeliveryDelayEvent::class, 'delivery_run_item_id')->latest();
     }
 }

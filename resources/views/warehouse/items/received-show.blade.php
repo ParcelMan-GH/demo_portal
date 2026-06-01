@@ -193,11 +193,17 @@
                         </template>
                         <template x-for="delivery in pkg.histories.deliveries" :key="'d' + delivery.id">
                             <div class="p-5">
-                                <a :href="delivery.url" class="text-sm font-black text-emerald-700 underline decoration-emerald-200 underline-offset-4" x-text="delivery.number || '-'"></a>
-                                <p class="mt-1 text-xs font-bold text-slate-500" x-text="[delivery.status, delivery.stop_status, delivery.driver, delivery.delivery_method].filter(Boolean).join(' · ')"></p>
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <a :href="delivery.url" class="text-sm font-black text-emerald-700 underline decoration-emerald-200 underline-offset-4" x-text="delivery.number || '-'"></a>
+                                        <p class="mt-1 text-xs font-bold text-slate-500" x-text="[delivery.status, delivery.stop_status, delivery.driver, delivery.delivery_method].filter(Boolean).join(' · ')"></p>
+                                    </div>
+                                    <button type="button" x-show="permissions.can_send_delay_notices && delivery.eta?.can_notify" @@click="openDelayModal(delivery)" class="inline-flex shrink-0 items-center rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100">Send Delay Notice</button>
+                                </div>
                                 <div class="mt-3 grid gap-2 text-xs sm:grid-cols-2">
                                     <p><span class="font-black uppercase tracking-wide text-slate-400">Assigned</span><br><span class="font-bold text-slate-700" x-text="[delivery.driver, delivery.driver_phone].filter(Boolean).join(' / ') || '-'"></span></p>
                                     <p><span class="font-black uppercase tracking-wide text-slate-400">Dispatched</span><br><span class="font-bold text-slate-700" x-text="delivery.dispatched_at || '-'"></span></p>
+                                    <p><span class="font-black uppercase tracking-wide text-slate-400">ETA / delay</span><br><span class="font-bold text-slate-700" x-text="[delivery.eta?.label, delivery.eta?.expected_delivery_at].filter(Boolean).join(' / ') || '-'"></span></p>
                                     <p><span class="font-black uppercase tracking-wide text-slate-400">Arrived</span><br><span class="font-bold text-slate-700" x-text="delivery.arrived_at || '-'"></span></p>
                                     <p><span class="font-black uppercase tracking-wide text-slate-400">Delivered / closed</span><br><span class="font-bold text-slate-700" x-text="delivery.delivered_at || delivery.completed_at || '-'"></span></p>
                                     <p class="sm:col-span-2"><span class="font-black uppercase tracking-wide text-slate-400">Stop location</span><br><span class="font-bold text-slate-700" x-text="[delivery.stop_location, delivery.stop_landmark, delivery.gh_post_address].filter(Boolean).join(' / ') || '-'"></span></p>
@@ -218,6 +224,14 @@
                                     <p x-text="delivery.bus_handoff?.bus_station || 'Bus station / courier handoff'"></p>
                                     <p class="mt-1 text-amber-700" x-text="[delivery.bus_handoff?.courier_name, delivery.bus_handoff?.courier_phone, delivery.bus_handoff?.vehicle_number].filter(Boolean).join(' / ')"></p>
                                     <p class="mt-1 text-amber-700" x-show="delivery.bus_handoff?.handoff_at" x-text="'Handed off ' + delivery.bus_handoff.handoff_at"></p>
+                                    <p class="mt-1 text-amber-700" x-show="delivery.bus_handoff?.handoff_owner" x-text="'Handoff recorded by ' + delivery.bus_handoff.handoff_owner"></p>
+                                    <p class="mt-1 text-amber-700" x-show="delivery.bus_handoff?.confirmed_by || delivery.bus_handoff?.confirmation_source" x-text="'Delivery confirmation: ' + [delivery.bus_handoff?.confirmation_status, delivery.bus_handoff?.confirmation_source, delivery.bus_handoff?.confirmed_by, delivery.bus_handoff?.confirmed_at].filter(Boolean).join(' / ')"></p>
+                                </div>
+                                <div x-show="delivery.delay_history?.length" class="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-700">
+                                    <p class="font-black uppercase tracking-wide text-slate-400">Delay history</p>
+                                    <template x-for="event in delivery.delay_history" :key="event.id">
+                                        <p class="mt-1" x-text="[event.source_label, event.reason, event.new_eta, event.actor, event.created_at].filter(Boolean).join(' / ')"></p>
+                                    </template>
                                 </div>
                                 <a x-show="delivery.proof_photo_url" :href="delivery.proof_photo_url" target="_blank" class="mt-3 inline-flex rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700">View delivery proof</a>
                             </div>
@@ -428,6 +442,62 @@
                 <button type="button" @@click="markPaid()" :disabled="!canSubmitPayment()" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 disabled:opacity-40" x-text="paymentLoading ? 'Saving...' : 'Save Payment'"></button>
             </div>
         </div>
+        </div>
+    </div>
+
+    <div x-show="delayModalOpen" x-cloak x-transition.opacity @@keydown.window.escape="closeDelayModal()" class="fixed inset-0 z-[9998] h-[100dvh] w-[100vw] overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm sm:p-6" style="display:none">
+        <div class="flex min-h-full items-center justify-center">
+            <div @@click.stop class="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-2xl sm:max-h-[calc(100dvh-3rem)]">
+                <div class="shrink-0 border-b border-slate-100 px-4 py-4 sm:px-6 sm:py-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                                <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6v6l4 2m5-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                            </div>
+                            <div class="min-w-0">
+                                <h3 class="text-xl font-black leading-tight text-slate-900">Send Delay Notice</h3>
+                                <p class="mt-1 truncate text-sm font-semibold text-slate-500" x-text="pkg.tracking_code || pkg.shipment_number || 'Package delay'"></p>
+                            </div>
+                        </div>
+                        <button type="button" @@click="closeDelayModal()" :disabled="delayLoading" class="shrink-0 rounded-xl border border-slate-200 bg-white p-2 text-slate-400 shadow-sm transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-4 py-5 sm:px-6">
+                    <div>
+                        <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">Delay reason</label>
+                        <select x-model="delayForm.reason_id" @@change="updateDelayMessage()" class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-4 text-base font-black text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">Select reason</option>
+                            <template x-for="reason in delayReasons" :key="reason.id">
+                                <option :value="reason.id" x-text="reason.label"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">Revised ETA <span class="font-semibold normal-case tracking-normal text-slate-400">(optional)</span></label>
+                        <input type="text" x-ref="delayEtaInput" readonly placeholder="Select date and time" class="w-full cursor-pointer rounded-2xl border-2 border-slate-200 bg-white px-4 py-4 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                    </div>
+                    <div class="grid gap-2 sm:grid-cols-3">
+                        <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700"><input type="checkbox" x-model="delayForm.notify_recipient" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500"> Recipient SMS</label>
+                        <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700"><input type="checkbox" x-model="delayForm.notify_vendor" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500"> Vendor app</label>
+                        <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700"><input type="checkbox" x-model="delayForm.notify_vendor_sms" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500"> Vendor SMS</label>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">Notes</label>
+                        <textarea x-model="delayForm.notes" rows="3" class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-4 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Internal note"></textarea>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">Message</label>
+                        <textarea x-model="delayForm.message" @@input="delayForm.message_touched = true" rows="4" class="w-full rounded-2xl border-2 border-amber-200 bg-amber-50 px-4 py-4 text-base font-semibold leading-7 text-amber-950 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Message to send"></textarea>
+                        <p class="mt-1 text-xs font-semibold text-slate-400">You can adjust this message before sending.</p>
+                    </div>
+                </div>
+                <div class="flex shrink-0 items-center justify-end gap-3 border-t border-slate-200/60 bg-slate-50 px-4 py-4 sm:px-6">
+                    <button type="button" @@click="closeDelayModal()" :disabled="delayLoading" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 disabled:opacity-40">Cancel</button>
+                    <button type="button" @@click="sendDelayNotice()" :disabled="delayLoading || !delayForm.reason_id" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 disabled:opacity-40" x-text="delayLoading ? 'Sending...' : 'Send Notice'"></button>
+                </div>
+            </div>
         </div>
     </div>
 
