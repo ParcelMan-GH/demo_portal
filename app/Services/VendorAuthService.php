@@ -43,8 +43,15 @@ class VendorAuthService
             ];
         }
 
-        // Always send OTP regardless of whether vendor exists
-        $this->otpService->generate($phone, 'login');
+        // Always send OTP regardless of whether vendor exists, but report provider failures.
+        $code = $this->otpService->generate($phone, 'login');
+
+        if (!$code) {
+            return [
+                'success' => false,
+                'message' => 'Unable to send OTP right now. Please try again shortly.',
+            ];
+        }
 
         // Log activity if vendor exists
         $vendor = Vendor::where('phone', $phone)->first();

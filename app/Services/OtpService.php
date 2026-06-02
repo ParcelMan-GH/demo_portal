@@ -29,7 +29,7 @@ class OtpService
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         // Store OTP with 5-minute expiry
-        OtpCode::create([
+        $otp = OtpCode::create([
             'phone' => $phone,
             'code' => $code,
             'purpose' => $purpose,
@@ -40,6 +40,12 @@ class OtpService
         // Send SMS
         $message = "Your Parcelman code is {$code}";
         $sent = $this->smsService->send($phone, $message);
+
+        if (!$sent) {
+            $otp->delete();
+
+            return null;
+        }
 
         return $code;
     }

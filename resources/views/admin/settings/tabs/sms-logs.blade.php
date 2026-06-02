@@ -50,19 +50,21 @@
     <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div x-show="loading" x-transition.opacity class="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px]" style="display:none"></div>
         <div class="overflow-x-auto">
-            <table class="min-w-[900px] w-full divide-y divide-slate-200/50 text-xs">
+            <table class="min-w-[1200px] w-full divide-y divide-slate-200/50 text-xs">
                 <thead class="bg-slate-50/70">
                     <tr>
                         <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Recipient</th>
                         <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Message</th>
                         <th class="px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                        <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Provider</th>
+                        <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Provider Error</th>
                         <th class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Sent At</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100/50">
                     <template x-if="!loading && logs.length === 0">
                         <tr>
-                            <td colspan="4" class="px-4 py-10 text-center">
+                            <td colspan="6" class="px-4 py-10 text-center">
                                 <div class="flex flex-col items-center gap-2">
                                     <div class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
                                         <svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
@@ -77,6 +79,14 @@
                             <td class="px-4 py-3 text-sm font-semibold text-slate-900" x-text="log.recipient || '-'"></td>
                             <td class="px-4 py-3 text-sm text-slate-600" x-text="log.message || '-'"></td>
                             <td class="px-4 py-3 text-center"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold" :class="statusClass(log.status)" x-text="log.status || '-'"></span></td>
+                            <td class="px-4 py-3 text-xs font-semibold text-slate-600">
+                                <span x-text="log.provider || '-'"></span>
+                                <span x-show="log.sender" class="mt-1 block text-[11px] text-slate-400" x-text="log.sender"></span>
+                            </td>
+                            <td class="max-w-sm px-4 py-3 text-xs font-semibold text-rose-700">
+                                <span x-show="log.status_code" class="mr-1 rounded bg-rose-50 px-1.5 py-0.5" x-text="log.status_code"></span>
+                                <span x-text="log.error || '-'"></span>
+                            </td>
                             <td class="px-4 py-3 text-sm text-slate-500" x-text="log.sent_at || '-'"></td>
                         </tr>
                     </template>

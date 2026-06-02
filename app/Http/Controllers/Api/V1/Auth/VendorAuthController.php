@@ -27,7 +27,7 @@ class VendorAuthController extends Controller
     {
         $result = $this->authService->sendOtp($request->phone, $request);
 
-        return response()->json($result);
+        return response()->json($result, $result['success'] ? 200 : 422);
     }
 
     /**

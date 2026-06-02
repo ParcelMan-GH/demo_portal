@@ -1200,6 +1200,10 @@ class SettingsController extends Controller
                     'recipient' => $log->recipient,
                     'message' => Str::limit($log->message, 180),
                     'status' => $log->status,
+                    'provider' => $log->provider,
+                    'sender' => $log->sender,
+                    'status_code' => $log->status_code,
+                    'error' => Str::limit($log->error ?: $this->smsLogResponseSummary($log), 220),
                     'sent_at' => $log->sent_at?->format('Y-m-d H:i:s') ?? $log->created_at?->format('Y-m-d H:i:s'),
                 ];
             }),
@@ -1212,6 +1216,23 @@ class SettingsController extends Controller
                 'to' => $logs->lastItem() ?? 0,
             ],
         ]);
+    }
+
+    private function smsLogResponseSummary(SmsLog $log): ?string
+    {
+        if (!$log->response) {
+            return null;
+        }
+
+        $response = $log->response;
+
+        foreach (['message', 'error', 'detail', 'description', 'status'] as $key) {
+            if (isset($response[$key]) && is_scalar($response[$key])) {
+                return (string) $response[$key];
+            }
+        }
+
+        return json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: null;
     }
 
     /**
