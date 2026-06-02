@@ -25,8 +25,14 @@ class DatabaseSeeder extends Seeder
             WarehouseSeeder::class,
             DriversSeeder::class,
             ShipmentSettingsSeeder::class,
+            PickupVehicleTypeSeeder::class,
+            DeliveryFailureReasonSeeder::class,
             DeliveryDelayReasonSeeder::class,
+            DeliveryDelaySettingsSeeder::class,
             EmailTemplateSeeder::class,
         ]);
+
+        // IncomingTransportManifestSeeder is fixture/demo data and is intentionally
+        // not part of the default production seed path.
     }
 }
