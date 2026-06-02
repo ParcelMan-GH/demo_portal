@@ -23,8 +23,28 @@ class SuperAdminSeeder extends Seeder
 
         $existing = User::where('email', 'admin@parcelman.com')->first();
         if ($existing) {
-            if (!$existing->warehouse_id && $hqWarehouse) {
-                $existing->update(['warehouse_id' => $hqWarehouse->id]);
+            $assignedWarehouse = $existing->warehouse()->first();
+            $updates = [];
+
+            if (!$existing->is_active) {
+                $updates['is_active'] = true;
+            }
+
+            if (
+                $hqWarehouse
+                && (
+                    !$existing->warehouse_id
+                    || !$assignedWarehouse
+                    || !$assignedWarehouse->is_active
+                    || !$assignedWarehouse->is_hq
+                    || !$assignedWarehouse->can_administer_system
+                )
+            ) {
+                $updates['warehouse_id'] = $hqWarehouse->id;
+            }
+
+            if ($updates !== []) {
+                $existing->update($updates);
             }
 
             $administratorRole = Role::where('slug', 'administrator')->first();

@@ -29,6 +29,10 @@ class EnsureBackOfficeUser
         $warehouse = $this->access->warehouseFor($user);
 
         if (!$warehouse) {
+            Auth::guard('admin')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
             if ($request->expectsJson()) {
                 return response()->json(['message' => 'A warehouse context is required for back-office access.'], 403);
             }
