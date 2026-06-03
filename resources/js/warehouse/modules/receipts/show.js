@@ -812,10 +812,11 @@ function registerWarehouseReceiptShowPage() {
             this.saving = true;
             try {
                 const formData = new FormData();
-                formData.append('received_quantity', String(item.received_quantity ?? 0));
-                formData.append('damaged_quantity', String(item.damaged_quantity ?? 0));
-                formData.append('condition_status', item.condition_status || 'ok');
-                formData.append('notes', item.notes || '');
+	                formData.append('received_quantity', String(item.received_quantity ?? 0));
+	                formData.append('damaged_quantity', String(item.damaged_quantity ?? 0));
+	                formData.append('condition_status', item.condition_status || 'ok');
+	                formData.append('description', item.description || '');
+	                formData.append('notes', item.notes || '');
                 formData.append('delivery_method', item.delivery_method || 'direct');
                 if (this.isPerItemMode()) {
                     formData.append('delivery_recipient_name', item.delivery_recipient_name || '');

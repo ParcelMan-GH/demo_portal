@@ -30,7 +30,8 @@ class WarehouseTransportReceivingService
         int $receivedQuantity,
         ?string $lineStatus = null,
         ?string $notes = null,
-        ?string $scannedLabelBarcode = null
+        ?string $scannedLabelBarcode = null,
+        ?string $description = null
     ): array {
         if ((int) $manifest->destination_warehouse_id !== (int) $warehouse->id) {
             return ['success' => false, 'message' => 'Cannot receive items for another warehouse manifest.'];
@@ -44,7 +45,7 @@ class WarehouseTransportReceivingService
             return ['success' => false, 'message' => 'Received quantity must be zero or greater.'];
         }
 
-        return DB::transaction(function () use ($manifest, $shipmentItem, $warehouse, $user, $receivedQuantity, $lineStatus, $notes, $scannedLabelBarcode) {
+        return DB::transaction(function () use ($manifest, $shipmentItem, $warehouse, $user, $receivedQuantity, $lineStatus, $notes, $scannedLabelBarcode, $description) {
             $line = TransportManifestItem::query()
                 ->where('transport_manifest_id', $manifest->id)
                 ->where('shipment_item_id', $shipmentItem->id)
@@ -101,6 +102,12 @@ class WarehouseTransportReceivingService
                 && blank($notes)
             ) {
                 return ['success' => false, 'message' => 'Add discrepancy notes before saving this receiving line.'];
+            }
+
+            if ($description !== null) {
+                $shipmentItem->update([
+                    'description' => filled($description) ? trim($description) : null,
+                ]);
             }
 
             $line->update([

@@ -589,6 +589,7 @@ class WarehouseReceivingService
             'discrepancy_type' => $item->discrepancy_type,
             'condition_status' => $item->condition_status,
             'notes' => $item->notes,
+            'description' => $shipmentItem?->description,
             'delivery_recipient_name' => $shipmentItem?->delivery_recipient_name ?: $shipment?->delivery_recipient_name,
             'delivery_recipient_phone' => $shipmentItem?->delivery_recipient_phone ?: $shipment?->delivery_recipient_phone,
             'delivery_region_id' => $shipmentItem?->delivery_region_id ?: $shipment?->delivery_region_id,

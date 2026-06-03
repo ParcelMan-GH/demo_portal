@@ -1104,6 +1104,7 @@ class TransportManifestController extends Controller
         }
 
         $validated = $request->validate([
+            'description' => ['nullable', 'string', 'max:500'],
             'received_quantity' => ['required', 'integer', 'min:0'],
             'line_status' => ['nullable', 'in:pending,loaded,received,short,excess,damaged'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -1118,7 +1119,8 @@ class TransportManifestController extends Controller
             receivedQuantity: (int) $validated['received_quantity'],
             lineStatus: $validated['line_status'] ?? null,
             notes: $validated['notes'] ?? null,
-            scannedLabelBarcode: $validated['scanned_label_barcode'] ?? null
+            scannedLabelBarcode: $validated['scanned_label_barcode'] ?? null,
+            description: $validated['description'] ?? null
         );
 
         return response()->json($result, $result['success'] ? 200 : 422);

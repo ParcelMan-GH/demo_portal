@@ -83,12 +83,13 @@ function registerWarehouseIncomingManifestsPage() {
             loading: false,
             receiveComplete: false,
             receiveScanMode: true,
-            receiveModal: { open: false, itemId: null, itemIndex: -1 },
-            receiveDraft: {
-                received_quantity: 0,
-                line_status: 'received',
-                notes: '',
-                scanned_label_barcode: null,
+	            receiveModal: { open: false, itemId: null, itemIndex: -1 },
+	            receiveDraft: {
+	                description: '',
+	                received_quantity: 0,
+	                line_status: 'received',
+	                notes: '',
+	                scanned_label_barcode: null,
             },
             statCards: [
                 { key: 'total', label: 'Total', icon: 'truck', iconClass: 'bg-slate-100 text-slate-700 ring-slate-200' },
@@ -192,14 +193,15 @@ function registerWarehouseIncomingManifestsPage() {
             },
 
             receiveDraftRow() {
-                const row = this.items[this.receiveModal.itemIndex] || {};
+	                const row = this.items[this.receiveModal.itemIndex] || {};
 
-                return {
-                    ...row,
-                    received_quantity: Number(this.receiveDraft.received_quantity ?? 0),
-                    line_status: this.receiveDraft.line_status || row.line_status || 'pending',
-                    notes: this.receiveDraft.notes ?? '',
-                    scanned_label_barcode: this.receiveDraft.scanned_label_barcode || row.scanned_label_barcode || null,
+	                return {
+	                    ...row,
+	                    description: this.receiveDraft.description ?? row.description ?? '',
+	                    received_quantity: Number(this.receiveDraft.received_quantity ?? 0),
+	                    line_status: this.receiveDraft.line_status || row.line_status || 'pending',
+	                    notes: this.receiveDraft.notes ?? '',
+	                    scanned_label_barcode: this.receiveDraft.scanned_label_barcode || row.scanned_label_barcode || null,
                 };
             },
 
@@ -263,14 +265,15 @@ function registerWarehouseIncomingManifestsPage() {
             openReceiveModal(itemId, options = {}) {
                 const idx = this.items.findIndex((item) => Number(item.shipment_item_id) === Number(itemId));
                 if (idx < 0) return;
-                const row = this.items[idx];
-                const isNewReceipt = !row.received_at;
-                const scannedQuantity = Number(row.received_quantity || 1);
-                this.receiveDraft = {
-                    received_quantity: Number(row.scan_mode === 'label' ? scannedQuantity : (isNewReceipt ? row.expected_quantity || 0 : row.received_quantity || 0)),
-                    line_status: isNewReceipt || row.scan_mode === 'label' ? 'received' : row.line_status || 'received',
-                    notes: isNewReceipt || row.scan_mode === 'label' ? '' : row.notes || '',
-                    scanned_label_barcode: row.scanned_label_barcode || null,
+	                const row = this.items[idx];
+	                const isNewReceipt = !row.received_at;
+	                const scannedQuantity = Number(row.received_quantity || 1);
+	                this.receiveDraft = {
+	                    description: row.description || '',
+	                    received_quantity: Number(row.scan_mode === 'label' ? scannedQuantity : (isNewReceipt ? row.expected_quantity || 0 : row.received_quantity || 0)),
+	                    line_status: isNewReceipt || row.scan_mode === 'label' ? 'received' : row.line_status || 'received',
+	                    notes: isNewReceipt || row.scan_mode === 'label' ? '' : row.notes || '',
+	                    scanned_label_barcode: row.scanned_label_barcode || null,
                 };
                 this.receiveComplete = false;
                 this.receiveScanMode = Boolean(options.scanMode ?? true);
@@ -302,14 +305,15 @@ function registerWarehouseIncomingManifestsPage() {
             },
 
             closeReceiveModal() {
-                this.receiveComplete = false;
-                this.receiveScanMode = true;
-                this.receiveModal = { open: false, itemId: null, itemIndex: -1 };
-                this.receiveDraft = {
-                    received_quantity: 0,
-                    line_status: 'received',
-                    notes: '',
-                    scanned_label_barcode: null,
+	                this.receiveComplete = false;
+	                this.receiveScanMode = true;
+	                this.receiveModal = { open: false, itemId: null, itemIndex: -1 };
+	                this.receiveDraft = {
+	                    description: '',
+	                    received_quantity: 0,
+	                    line_status: 'received',
+	                    notes: '',
+	                    scanned_label_barcode: null,
                 };
             },
 
@@ -326,12 +330,13 @@ function registerWarehouseIncomingManifestsPage() {
             },
 
             markExpected(itemId) {
-                const row = this.items.find((item) => Number(item.shipment_item_id) === Number(itemId));
-                if (!row) return;
-                this.receiveDraft.received_quantity = Number(row.expected_quantity || 0);
-                this.receiveDraft.line_status = 'received';
-                this.receiveDraft.notes = '';
-                this.saveItem(itemId);
+	                const row = this.items.find((item) => Number(item.shipment_item_id) === Number(itemId));
+	                if (!row) return;
+	                this.receiveDraft.received_quantity = Number(row.expected_quantity || 0);
+	                this.receiveDraft.line_status = 'received';
+	                this.receiveDraft.notes = '';
+	                this.receiveDraft.description = row.description || '';
+	                this.saveItem(itemId);
             },
 
             async saveItem(itemId) {
@@ -363,23 +368,25 @@ function registerWarehouseIncomingManifestsPage() {
                             'X-Requested-With': 'XMLHttpRequest',
                             'X-CSRF-TOKEN': csrfToken(),
                             'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            received_quantity: Number(draft.received_quantity ?? 0),
-                            line_status: draft.line_status || null,
-                            notes: draft.notes || null,
-                            scanned_label_barcode: draft.scanned_label_barcode || null,
-                        }),
+	                        },
+	                        body: JSON.stringify({
+	                            received_quantity: Number(draft.received_quantity ?? 0),
+	                            line_status: draft.line_status || null,
+	                            description: draft.description || null,
+	                            notes: draft.notes || null,
+	                            scanned_label_barcode: draft.scanned_label_barcode || null,
+	                        }),
                     });
                     const result = await response.json();
                     if (!response.ok || !result.success) {
                         throw new Error(result.message || 'Failed to save receiving line.');
                     }
 
-                    const updatedLine = result?.data?.line;
-                    if (updatedLine) {
-                        row.received_quantity = Number(updatedLine.received_quantity ?? row.received_quantity ?? 0);
-                        row.line_status = updatedLine.line_status || row.line_status;
+	                    const updatedLine = result?.data?.line;
+	                    if (updatedLine) {
+	                        row.received_quantity = Number(updatedLine.received_quantity ?? row.received_quantity ?? 0);
+	                        row.description = updatedLine.shipment_item?.description ?? updatedLine.shipmentItem?.description ?? row.description;
+	                        row.line_status = updatedLine.line_status || row.line_status;
                         row.notes = updatedLine.notes ?? row.notes;
                         row.received_at = updatedLine.received_at || row.received_at;
                     }

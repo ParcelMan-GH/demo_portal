@@ -445,11 +445,21 @@
                                 </div>
                             </div>
 
-                            {{-- Modal Body (scrollable) --}}
-                            <div class="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+	                            {{-- Modal Body (scrollable) --}}
+	                            <div class="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
 
-                                {{-- Qty inputs --}}
-                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+	                                <div>
+	                                    <label class="mb-2 block text-sm font-bold text-slate-800">Description</label>
+	                                    <input
+	                                        type="text"
+	                                        x-model="items[receiveModal.itemIndex].description"
+	                                        class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+	                                        placeholder="What's inside?"
+	                                    >
+	                                </div>
+
+	                                {{-- Qty inputs --}}
+	                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div>
                                         <label class="block text-xs font-bold text-slate-700 mb-2">Received Qty <span class="text-rose-400">*</span></label>
                                         <input

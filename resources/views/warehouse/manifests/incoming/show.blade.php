@@ -489,13 +489,23 @@
                             </div>
                         </div>
 
-                        <div class="space-y-5">
-                            <div>
-                                <label class="mb-2 block text-sm font-bold text-slate-800">Received Quantity</label>
+	                        <div class="space-y-5">
+	                            <div>
+	                                <label class="mb-2 block text-sm font-bold text-slate-800">Description</label>
+	                                <input
+	                                    type="text"
+	                                    x-model="receiveDraft.description"
+	                                    class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+	                                    placeholder="What's inside?"
+	                                >
+	                            </div>
+
+	                            <div>
+	                                <label class="mb-2 block text-sm font-bold text-slate-800">Received Quantity</label>
                                 <input
                                     type="number"
                                     min="0"
-                                    x-model.number="items[receiveModal.itemIndex].received_quantity"
+	                                    x-model.number="receiveDraft.received_quantity"
                                     class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-lg font-black text-slate-900 outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
                                     placeholder="0"
                                 >
@@ -504,7 +514,7 @@
                             <div>
                                 <label class="mb-2 block text-sm font-bold text-slate-800">Receipt Status</label>
                                 <select
-                                    x-model="items[receiveModal.itemIndex].line_status"
+	                                    x-model="receiveDraft.line_status"
                                     class="h-14 w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
                                 >
                                     <option value="received">Received</option>
@@ -519,7 +529,7 @@
                                 <label class="mb-2 block text-sm font-bold text-slate-800">Notes</label>
                                 <textarea
                                     rows="4"
-                                    x-model="items[receiveModal.itemIndex].notes"
+	                                    x-model="receiveDraft.notes"
                                     class="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
                                     placeholder="Shortage, damage, or receiving notes..."
                                 ></textarea>
@@ -1161,52 +1171,60 @@
                             </div>
                         </div>
 
-                        {{-- Modal Body --}}
-                        <div class="px-6 py-5 space-y-5 max-h-[50vh] overflow-y-auto">
+	                        {{-- Modal Body --}}
+	                        <div class="px-6 py-5 space-y-5 max-h-[50vh] overflow-y-auto">
 
-                            {{-- Received Quantity --}}
-                            <div>
+	                            <div>
+	                                <label class="block text-sm font-semibold text-slate-700 mb-2">Description</label>
+	                                <input type="text"
+	                                    x-model="receiveDraft.description"
+	                                    class="w-full rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+	                                    placeholder="What's inside?">
+	                            </div>
+
+	                            {{-- Received Quantity --}}
+	                            <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-2">Received Item Quantity</label>
                                 <input type="number" min="0"
-                                    x-model.number="items[receiveModal.itemIndex].received_quantity"
+	                                    x-model.number="receiveDraft.received_quantity"
                                     class="w-full rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                                     placeholder="0">
                                 <p class="mt-1.5 text-xs text-slate-500" x-text="'Enter the item quantity inside the physical package(s), not the number of labels.'"></p>
                             </div>
 
                             {{-- Line Status --}}
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Line Status</label>
-                                <div class="grid grid-cols-3 gap-2">
-                                    <button type="button" @@click="items[receiveModal.itemIndex].line_status = 'received'"
-                                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all"
-                                        :class="items[receiveModal.itemIndex]?.line_status === 'received' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
+	                            <div>
+	                                <label class="block text-sm font-semibold text-slate-700 mb-2">Line Status</label>
+	                                <div class="grid grid-cols-3 gap-2">
+	                                    <button type="button" @@click="receiveDraft.line_status = 'received'"
+	                                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all"
+	                                        :class="receiveDraft.line_status === 'received' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                         Received
                                     </button>
-                                    <button type="button" @@click="items[receiveModal.itemIndex].line_status = 'short'"
-                                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all"
-                                        :class="items[receiveModal.itemIndex]?.line_status === 'short' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
+	                                    <button type="button" @@click="receiveDraft.line_status = 'short'"
+	                                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all"
+	                                        :class="receiveDraft.line_status === 'short' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.999L13.732 4.001c-.77-1.333-2.694-1.333-3.464 0L3.34 16.001C2.57 17.334 3.536 19 5.072 19z"/></svg>
                                         Short
                                     </button>
-                                    <button type="button" @@click="items[receiveModal.itemIndex].line_status = 'excess'"
-                                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all"
-                                        :class="items[receiveModal.itemIndex]?.line_status === 'excess' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
+	                                    <button type="button" @@click="receiveDraft.line_status = 'excess'"
+	                                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all"
+	                                        :class="receiveDraft.line_status === 'excess' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                                         Excess
                                     </button>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2 mt-2">
-                                    <button type="button" @@click="items[receiveModal.itemIndex].line_status = 'damaged'"
-                                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all"
-                                        :class="items[receiveModal.itemIndex]?.line_status === 'damaged' ? 'border-rose-500 bg-rose-50 text-rose-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
+	                                    <button type="button" @@click="receiveDraft.line_status = 'damaged'"
+	                                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all"
+	                                        :class="receiveDraft.line_status === 'damaged' ? 'border-rose-500 bg-rose-50 text-rose-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
                                         Damaged
                                     </button>
-                                    <button type="button" @@click="items[receiveModal.itemIndex].line_status = 'pending'"
-                                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all"
-                                        :class="(!items[receiveModal.itemIndex]?.line_status || items[receiveModal.itemIndex]?.line_status === 'pending') ? 'border-slate-500 bg-slate-50 text-slate-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
+	                                    <button type="button" @@click="receiveDraft.line_status = 'pending'"
+	                                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all"
+	                                        :class="(!receiveDraft.line_status || receiveDraft.line_status === 'pending') ? 'border-slate-500 bg-slate-50 text-slate-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                         Pending
                                     </button>
@@ -1217,7 +1235,7 @@
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-2">Notes</label>
                                 <textarea rows="3"
-                                    x-model="items[receiveModal.itemIndex].notes"
+	                                    x-model="receiveDraft.notes"
                                     class="w-full rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                                     placeholder="Any notes about this item..."></textarea>
                             </div>

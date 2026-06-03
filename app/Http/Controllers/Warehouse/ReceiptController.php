@@ -281,6 +281,7 @@ class ReceiptController extends AdminShipmentController
         }
 
         $validated = $request->validate([
+            'description' => ['nullable', 'string', 'max:500'],
             'received_quantity' => ['required', 'integer', 'min:0'],
             'damaged_quantity' => ['nullable', 'integer', 'min:0'],
             'condition_status' => ['nullable', 'in:ok,damaged,partial'],
@@ -304,6 +305,12 @@ class ReceiptController extends AdminShipmentController
         $shipment = $shipmentItem->shipment()->first();
         $isPerItemMode = ($shipment?->destination_mode?->value ?? (string) $shipment?->destination_mode) === ShipmentDestinationMode::PER_ITEM->value;
         $shipmentItemUpdates = [];
+
+        if (array_key_exists('description', $validated)) {
+            $shipmentItemUpdates['description'] = filled($validated['description'])
+                ? trim($validated['description'])
+                : null;
+        }
 
         if ($isPerItemMode) {
             foreach ([
