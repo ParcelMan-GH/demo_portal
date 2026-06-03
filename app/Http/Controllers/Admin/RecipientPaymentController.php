@@ -29,7 +29,6 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
@@ -39,6 +38,7 @@ class RecipientPaymentController extends Controller
     public function __construct(
         private RecipientPaymentService $recipientPayments,
         private WarehousePortalService $portalService,
+        private StorageService $storageService,
     ) {}
 
     public function index(Request $request): View
@@ -597,7 +597,10 @@ class RecipientPaymentController extends Controller
         ]);
 
         $tasks = $this->scopedGroupTasks($request, $validated['task_ids']);
-        $receiptPath = $request->file('payment_receipt')?->store('recipient-payment-receipts', 'public');
+        $receiptPath = null;
+        if ($request->hasFile('payment_receipt')) {
+            $receiptPath = $this->storageService->upload($request->file('payment_receipt'), 'recipient-payment-receipts')['path'];
+        }
 
         if (!empty($validated['recipient_phone']) || array_key_exists('delivery_town', $validated)) {
             $this->recipientPayments->updateRecipientDetails(
@@ -886,7 +889,7 @@ class RecipientPaymentController extends Controller
 
         return [
             'path' => $path,
-            'url' => Storage::disk('public')->url($path),
+            'url' => $this->storageService->getUrl($path),
             'name' => basename($path),
         ];
     }
@@ -1507,7 +1510,7 @@ class RecipientPaymentController extends Controller
             'payment_status_label' => $this->reportPaymentStatusLabel($task),
             'wallet_phone' => $task->paymentWallet?->phone_number,
             'receipt_path' => $data['payment_receipt_path'] ?: $entry?->receipt_path,
-            'receipt_url' => $data['payment_receipt_url'] ?: ($entry?->receipt_path ? Storage::disk('public')->url($entry->receipt_path) : null),
+            'receipt_url' => $data['payment_receipt_url'] ?: ($entry?->receipt_path ? $this->storageService->getUrl($entry->receipt_path) : null),
             'has_receipt' => (bool) ($data['payment_receipt_path'] ?: $entry?->receipt_path),
             'session' => $session ? 'Session #' . $session->id : null,
             'session_status' => $session?->status,

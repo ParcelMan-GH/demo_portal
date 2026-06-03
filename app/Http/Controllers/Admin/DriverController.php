@@ -6,11 +6,11 @@ use App\Exports\DriversExport;
 use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
+use App\Services\StorageService;
 use App\Support\GenericPdfExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -105,7 +105,7 @@ class DriverController extends Controller
                     'id' => $driver->id,
                     'name' => $driver->name,
                     'avatar' => strtoupper(substr($driver->name, 0, 1)),
-                    'photo_url' => $driver->photo_path ? Storage::disk('public')->url($driver->photo_path) : null,
+                    'photo_url' => $driver->photo_path ? app(StorageService::class)->getUrl($driver->photo_path) : null,
                     'email' => $driver->email,
                     'phone' => $driver->phone,
                     'vehicle_type' => $driver->vehicle_type,
@@ -206,7 +206,9 @@ class DriverController extends Controller
         $driver->name = $validated['name'];
         $driver->email = $validated['email'] ?? null;
         $driver->phone = $phone;
-        $driver->photo_path = $request->file('profile_photo')?->store('driver-photos', 'public');
+        if ($request->hasFile('profile_photo')) {
+            $driver->photo_path = app(StorageService::class)->upload($request->file('profile_photo'), 'driver-photos')['path'];
+        }
         $driver->password = Hash::make($validated['password']);
         $driver->vehicle_type = $validated['vehicle_type'] ?? 'motorcycle';
         $driver->vehicle_number = $validated['vehicle_number'] ?? null;
@@ -266,10 +268,10 @@ class DriverController extends Controller
 
         if ($request->hasFile('profile_photo')) {
             if ($driver->photo_path) {
-                Storage::disk('public')->delete($driver->photo_path);
+                app(StorageService::class)->delete($driver->photo_path);
             }
 
-            $driver->photo_path = $request->file('profile_photo')->store('driver-photos', 'public');
+            $driver->photo_path = app(StorageService::class)->upload($request->file('profile_photo'), 'driver-photos')['path'];
         }
 
         $driver->save();
@@ -783,7 +785,7 @@ class DriverController extends Controller
             'id' => $driver->id,
             'name' => $driver->name,
             'avatar' => strtoupper(substr($driver->name, 0, 1)),
-            'photo_url' => $driver->photo_path ? Storage::disk('public')->url($driver->photo_path) : null,
+            'photo_url' => $driver->photo_path ? app(StorageService::class)->getUrl($driver->photo_path) : null,
             'email' => $driver->email,
             'phone' => $driver->phone,
             'vehicle_type' => $driver->vehicle_type,

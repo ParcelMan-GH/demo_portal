@@ -12,7 +12,6 @@ use App\Services\RiderTeamHandoverService;
 use App\Services\StorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class DriverRiderTeamHandoverController extends Controller
 {
@@ -281,10 +280,6 @@ class DriverRiderTeamHandoverController extends Controller
     {
         $storage = app(StorageService::class);
         $url = $storage->getUrl($photo->path);
-
-        if (! $storage->exists($photo->path) && Storage::disk('public')->exists($photo->path)) {
-            $url = url(Storage::disk('public')->url($photo->path));
-        }
 
         return [
             'id' => $photo->id,

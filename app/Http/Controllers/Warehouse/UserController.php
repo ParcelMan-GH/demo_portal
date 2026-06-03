@@ -27,6 +27,7 @@ use App\Models\WarehouseCapability;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceiptItemPhoto;
+use App\Services\StorageService;
 use App\Services\Warehouse\WarehousePortalService;
 use App\Support\GenericPdfExporter;
 use Illuminate\Database\Eloquent\Model;
@@ -36,7 +37,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -44,7 +44,10 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class UserController extends Controller
 {
-    public function __construct(private WarehousePortalService $portalService)
+    public function __construct(
+        private WarehousePortalService $portalService,
+        private StorageService $storageService
+    )
     {
     }
 
@@ -189,7 +192,7 @@ class UserController extends Controller
                 'phone' => $user->phone,
                 'phone_input' => PhoneHelper::toLocal((string) $user->phone) ?: $user->phone,
                 'avatar' => strtoupper(substr($user->name, 0, 1)),
-                'photo_url' => $user->photo_path ? Storage::disk('public')->url($user->photo_path) : null,
+                'photo_url' => $user->photo_path ? $this->storageService->getUrl($user->photo_path) : null,
                 'roles' => $user->roles->map(fn ($role) => ['id' => $role->id, 'name' => $role->name])->values(),
                 'warehouse' => $user->warehouse ? [
                     'id' => $user->warehouse->id,
@@ -266,7 +269,9 @@ class UserController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'] ?? null,
             'phone' => PhoneHelper::format($validated['phone']),
-            'photo_path' => $request->file('profile_photo')?->store('user-photos', 'public'),
+            'photo_path' => $request->hasFile('profile_photo')
+                ? $this->storageService->upload($request->file('profile_photo'), 'user-photos')['path']
+                : null,
             'password' => Hash::make($validated['password']),
             'warehouse_id' => $warehouse->id,
             'created_by_user_id' => $actor->id,
@@ -346,10 +351,10 @@ class UserController extends Controller
 
         if ($request->hasFile('profile_photo')) {
             if ($user->photo_path) {
-                Storage::disk('public')->delete($user->photo_path);
+                $this->storageService->delete($user->photo_path);
             }
 
-            $payload['photo_path'] = $request->file('profile_photo')->store('user-photos', 'public');
+            $payload['photo_path'] = $this->storageService->upload($request->file('profile_photo'), 'user-photos')['path'];
         }
 
         $user->update($payload);

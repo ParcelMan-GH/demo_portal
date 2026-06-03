@@ -49,6 +49,13 @@ class ShipmentSettingsSeeder extends Seeder
         );
 
         PlatformSetting::setValue(
+            'storage.s3.region',
+            'us-east-1',
+            encrypt: false,
+            description: 'S3/Storj signing region'
+        );
+
+        PlatformSetting::setValue(
             'storage.s3.env',
             'demo',
             encrypt: false,

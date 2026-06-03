@@ -5,7 +5,7 @@
 @section('breadcrumb-current', $driver->name)
 
 @php
-$driverPhotoUrl = $driver->photo_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($driver->photo_path) : null;
+$driverPhotoUrl = $driver->photo_path ? app(\App\Services\StorageService::class)->getUrl($driver->photo_path) : null;
 $driverConfig = [
     'driver' => array_merge($driver->toArray(), [
         'avatar' => strtoupper(substr($driver->name, 0, 1)),

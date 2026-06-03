@@ -16,12 +16,28 @@ class StorageService
     private ?Filesystem $s3Disk = null;
     private ?array $s3Config = null;
 
+    private ?Filesystem $publicDisk = null;
+
     /**
      * Get the current storage driver from platform settings.
      */
     public function getDriver(): string
     {
         return $this->driver ??= PlatformSetting::getValue('storage.driver', 'local');
+    }
+
+    /**
+     * Check whether S3-compatible storage has enough config to sign and upload files.
+     */
+    public function hasCompleteS3Config(): bool
+    {
+        $config = $this->getS3Config();
+
+        return filled($config['key'])
+            && filled($config['secret'])
+            && filled($config['bucket'])
+            && filled($config['endpoint'])
+            && filled($config['region']);
     }
 
     /**
@@ -39,7 +55,7 @@ class StorageService
             return $this->disk = $this->getS3Disk();
         }
 
-        return $this->disk = Storage::disk('local');
+        return $this->disk = Storage::disk('public');
     }
 
     /**
@@ -68,7 +84,7 @@ class StorageService
             'driver' => 's3',
             'key' => PlatformSetting::getValue('storage.s3.access_key', ''),
             'secret' => PlatformSetting::getValue('storage.s3.secret_key', ''),
-            'region' => 'us-east-1',
+            'region' => PlatformSetting::getValue('storage.s3.region', 'us-east-1'),
             'bucket' => PlatformSetting::getValue('storage.s3.bucket', ''),
             'endpoint' => PlatformSetting::getValue('storage.s3.endpoint', ''),
             'use_path_style_endpoint' => true,
@@ -85,7 +101,7 @@ class StorageService
 
             $this->s3Client = new S3Client([
                 'version' => 'latest',
-                'region' => 'us-east-1',
+                'region' => $config['region'],
                 'endpoint' => $config['endpoint'],
                 'use_path_style_endpoint' => true,
                 'credentials' => [
@@ -116,6 +132,11 @@ class StorageService
     public function upload(UploadedFile $file, string $path): array
     {
         $driver = $this->getDriver();
+
+        if ($driver === 's3' && ! $this->hasCompleteS3Config()) {
+            throw new \RuntimeException('S3/Storj storage is selected but access key, secret key, bucket, endpoint, and region are not configured.');
+        }
+
         $disk = $this->getDisk();
 
         // Generate unique filename
@@ -137,17 +158,64 @@ class StorageService
     }
 
     /**
+     * Compatibility alias for older controllers.
+     *
+     * @param UploadedFile $file
+     * @param string $path Path within storage.
+     * @return array{path: string, original_name: string, size: int}
+     */
+    public function uploadFile(UploadedFile $file, string $path): array
+    {
+        return $this->upload($file, $path);
+    }
+
+    /**
+     * Store generated content using the active storage driver.
+     *
+     * @return array{path: string, size: int}
+     */
+    public function putContent(string $path, string $contents): array
+    {
+        $driver = $this->getDriver();
+
+        if ($driver === 's3' && ! $this->hasCompleteS3Config()) {
+            throw new \RuntimeException('S3/Storj storage is selected but access key, secret key, bucket, endpoint, and region are not configured.');
+        }
+
+        $fullPath = $driver === 's3'
+            ? $this->getEnvPrefix() . '/' . ltrim($path, '/')
+            : ltrim($path, '/');
+
+        $this->getDisk()->put($fullPath, $contents);
+
+        return [
+            'path' => $fullPath,
+            'size' => strlen($contents),
+        ];
+    }
+
+    /**
      * Delete a file from storage.
      */
     public function delete(string $path): bool
     {
+        $deleted = false;
+
+        if ($this->publicDisk()->exists($path)) {
+            $deleted = (bool) $this->publicDisk()->delete($path);
+        }
+
+        if ($this->getDriver() === 's3' && ! $this->hasCompleteS3Config()) {
+            return $deleted;
+        }
+
         $disk = $this->getDisk();
 
         if ($disk->exists($path)) {
-            return $disk->delete($path);
+            $deleted = (bool) $disk->delete($path) || $deleted;
         }
 
-        return false;
+        return $deleted;
     }
 
     /**
@@ -156,22 +224,21 @@ class StorageService
      */
     public function getUrl(string $path): string
     {
+        if ($publicUrl = $this->getPublicUrlIfExists($path)) {
+            return $publicUrl;
+        }
+
         $driver = $this->getDriver();
-        $disk = $this->getDisk();
 
         if ($driver === 's3') {
+            if (! $this->hasCompleteS3Config()) {
+                return '';
+            }
+
             return $this->getSignedUrl($path);
         }
 
-        // Local/private files are served through signed temporary URLs.
-        if (method_exists($disk, 'temporaryUrl')) {
-            try {
-                $expiry = (int) PlatformSetting::getValue('storage.local.signed_url_expiry', 60);
-                return $disk->temporaryUrl($path, now()->addMinutes($expiry));
-            } catch (\Throwable) {
-                // Fallback below if temporary URLs are unavailable in current environment.
-            }
-        }
+        $disk = $this->getDisk();
 
         return url($disk->url($path));
     }
@@ -181,6 +248,10 @@ class StorageService
      */
     public function getSignedUrl(string $path, ?int $expiryMinutes = null): string
     {
+        if (! $this->hasCompleteS3Config()) {
+            return '';
+        }
+
         if ($expiryMinutes === null) {
             $expiryMinutes = (int) PlatformSetting::getValue('storage.s3.signed_url_expiry', 60);
         }
@@ -203,6 +274,14 @@ class StorageService
      */
     public function exists(string $path): bool
     {
+        if ($this->publicDisk()->exists($path)) {
+            return true;
+        }
+
+        if ($this->getDriver() === 's3' && ! $this->hasCompleteS3Config()) {
+            return false;
+        }
+
         return $this->getDisk()->exists($path);
     }
 
@@ -211,6 +290,24 @@ class StorageService
      */
     public function size(string $path): int
     {
+        if ($this->publicDisk()->exists($path)) {
+            return $this->publicDisk()->size($path);
+        }
+
         return $this->getDisk()->size($path);
+    }
+
+    private function publicDisk(): Filesystem
+    {
+        return $this->publicDisk ??= Storage::disk('public');
+    }
+
+    private function getPublicUrlIfExists(string $path): ?string
+    {
+        if ($path === '' || ! $this->publicDisk()->exists($path)) {
+            return null;
+        }
+
+        return url($this->publicDisk()->url($path));
     }
 }

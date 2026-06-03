@@ -6,7 +6,6 @@ use App\Helpers\PhoneHelper;
 use App\Models\Driver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 
 class DriverAuthService
 {
@@ -141,7 +140,7 @@ class DriverAuthService
             'name' => $driver->name,
             'email' => $driver->email,
             'avatar' => strtoupper(substr($driver->name, 0, 1)),
-            'photo_url' => $driver->photo_path ? Storage::disk('public')->url($driver->photo_path) : null,
+            'photo_url' => $driver->photo_path ? app(StorageService::class)->getUrl($driver->photo_path) : null,
             'phone' => $driver->phone,
             'vehicle_type' => $driver->vehicle_type,
             'vehicle_number' => $driver->vehicle_number,

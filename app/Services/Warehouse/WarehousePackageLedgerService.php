@@ -22,7 +22,6 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
 
 class WarehousePackageLedgerService
 {
@@ -860,10 +859,6 @@ class WarehousePackageLedgerService
     {
         $storage = app(StorageService::class);
         $url = $storage->getUrl($photo->path);
-
-        if (!$storage->exists($photo->path) && Storage::disk('public')->exists($photo->path)) {
-            $url = url(Storage::disk('public')->url($photo->path));
-        }
 
         return [
             'id' => $photo->id,

@@ -15,13 +15,13 @@ use App\Models\PlatformSetting;
 use App\Models\SmsLog;
 use App\Services\EmailTemplateService;
 use App\Services\SmsService;
+use App\Services\StorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -35,6 +35,7 @@ class SettingsController extends Controller
         'platform' => ['label' => 'Platform Info', 'icon' => 'building'],
         'sms' => ['label' => 'SMS Config', 'icon' => 'chat'],
         'mail' => ['label' => 'Mail Config', 'icon' => 'envelope'],
+        'storage' => ['label' => 'Storage Config', 'icon' => 'storage'],
         'email-templates' => ['label' => 'Email Templates', 'icon' => 'template'],
         'email-logs' => ['label' => 'Email Logs', 'icon' => 'inbox'],
         'sms-logs' => ['label' => 'SMS Logs', 'icon' => 'phone'],
@@ -130,6 +131,16 @@ class SettingsController extends Controller
                 'firebase_app_id' => ['label' => 'Web App ID', 'type' => 'text', 'default' => ''],
                 'firebase_vapid_key' => ['label' => 'VAPID Key', 'type' => 'text', 'default' => ''],
             ],
+            'storage' => [
+                'storage.driver' => ['label' => 'Storage Driver', 'type' => 'select', 'options' => ['local' => 'Local Public Storage', 's3' => 'S3 / Storj Bucket'], 'default' => 'local', 'help' => 'Choose where uploaded package photos and proof files are stored. Local uses storage/app/public and the /storage link.'],
+                'storage.s3.access_key' => ['label' => 'Access Key', 'type' => 'password', 'encrypted' => true, 'default' => '', 'help' => 'Required for S3-compatible signing. A blank key causes malformed signed URLs.'],
+                'storage.s3.secret_key' => ['label' => 'Secret Key', 'type' => 'password', 'encrypted' => true, 'default' => '', 'help' => 'Required for uploading and signing private file links.'],
+                'storage.s3.bucket' => ['label' => 'Bucket', 'type' => 'text', 'default' => '', 'help' => 'Example: shaxi'],
+                'storage.s3.endpoint' => ['label' => 'Endpoint URL', 'type' => 'text', 'default' => '', 'help' => 'Example: https://gateway.storjshare.io'],
+                'storage.s3.region' => ['label' => 'Region', 'type' => 'text', 'default' => 'us-east-1', 'help' => 'Storj gateway signing commonly uses us-east-1.'],
+                'storage.s3.env' => ['label' => 'Folder Prefix', 'type' => 'text', 'default' => 'demo', 'help' => 'Files are stored under this prefix, for example demo or prod.'],
+                'storage.s3.signed_url_expiry' => ['label' => 'S3 Signed URL Expiry (minutes)', 'type' => 'number', 'default' => '60', 'help' => 'How long generated private image links remain valid.'],
+            ],
         ];
 
         $config = $settingsMap[$tab] ?? [];
@@ -158,8 +169,33 @@ class SettingsController extends Controller
             'bus-stations' => $this->getBusStationsMeta(),
             'delivery-failure-reasons' => $this->getDeliveryFailureReasonsMeta(),
             'delivery-delay-reasons' => $this->getDeliveryDelayReasonsMeta(),
+            'storage' => $this->getStorageMeta(),
             default => [],
         };
+    }
+
+    protected function getStorageMeta(): array
+    {
+        $s3Keys = [
+            'storage.s3.access_key' => 'Access key',
+            'storage.s3.secret_key' => 'Secret key',
+            'storage.s3.bucket' => 'Bucket',
+            'storage.s3.endpoint' => 'Endpoint',
+            'storage.s3.region' => 'Region',
+        ];
+
+        $missing = collect($s3Keys)
+            ->filter(fn (string $label, string $key) => blank(PlatformSetting::getValue($key, $key === 'storage.s3.region' ? 'us-east-1' : '')))
+            ->values()
+            ->all();
+
+        return [
+            'driver' => PlatformSetting::getValue('storage.driver', 'local'),
+            's3_configured' => empty($missing),
+            'missing_s3_fields' => $missing,
+            'local_path' => storage_path('app/public'),
+            'public_linked' => is_link(public_path('storage')) || file_exists(public_path('storage')),
+        ];
     }
 
     protected function getPickupVehiclesMeta(): array
@@ -856,14 +892,15 @@ class SettingsController extends Controller
         $file = $request->file('file');
         $key = $request->input('key');
 
-        $filename = $key . '_' . time() . '.' . $file->getClientOriginalExtension();
-        $path = $file->storeAs('branding', $filename, 'public');
+        $storedFile = app(StorageService::class)->upload($file, 'branding');
+        $path = $storedFile['path'];
 
-        PlatformSetting::setValue($key, '/storage/' . $path);
+        PlatformSetting::setValue($key, $path);
 
         return response()->json([
             'success' => true,
-            'path' => '/storage/' . $path,
+            'path' => $path,
+            'url' => app(StorageService::class)->getUrl($path),
             'message' => 'File uploaded successfully.',
         ]);
     }

@@ -1102,7 +1102,7 @@ $itemStatusColors = [
     $deliveryCoordinates = $stop->delivery_latitude && $stop->delivery_longitude ? $stop->delivery_latitude . ', ' . $stop->delivery_longitude : null;
     $plannedCoordinatesUrl = $plannedCoordinates ? ('https://www.google.com/maps/search/?api=1&query=' . urlencode($plannedCoordinates)) : null;
     $deliveryCoordinatesUrl = $deliveryCoordinates ? ('https://www.google.com/maps/search/?api=1&query=' . urlencode($deliveryCoordinates)) : null;
-    $proofPhotoUrl = $stop->proof_photo_path ? \Illuminate\Support\Facades\Storage::url($stop->proof_photo_path) : null;
+    $proofPhotoUrl = $stop->proof_photo_path ? app(\App\Services\StorageService::class)->getUrl($stop->proof_photo_path) : null;
                     $deliveryMethodLabel = ($stop->delivery_method ?? 'direct') === 'bus_handoff' ? 'Bus Station Handoff' : 'Direct Delivery';
                     $locationParts = collect([$stop->town, $stop->district?->name, $stop->region?->name])->filter()->implode(', ');
                     $verificationSkippedAt = $stop->verification_skipped_at ? \Illuminate\Support\Carbon::parse($stop->verification_skipped_at) : null;
@@ -1420,7 +1420,7 @@ $itemStatusColors = [
                                     $receiptPhotos = collect($item->shipmentItem?->warehouseReceiptItems ?? [])
                                         ->flatMap(fn($receiptItem) => collect($receiptItem->photos ?? []))
                                         ->map(fn($photo) => [
-                                            'url' => \Illuminate\Support\Facades\Storage::url($photo->path),
+                                            'url' => app(\App\Services\StorageService::class)->getUrl($photo->path),
                                             'title' => 'Receipt photo',
                                         ])
                                         ->filter(fn($photo) => !empty($photo['url']))

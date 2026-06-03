@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
+use App\Services\StorageService;
 
 class TransportLoadingException extends Model
 {
@@ -72,6 +72,6 @@ class TransportLoadingException extends Model
 
     public function getProofPhotoUrlAttribute(): ?string
     {
-        return $this->proof_photo_path ? Storage::disk('public')->url($this->proof_photo_path) : null;
+        return $this->proof_photo_path ? app(StorageService::class)->getUrl($this->proof_photo_path) : null;
     }
 }

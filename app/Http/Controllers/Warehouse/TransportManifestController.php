@@ -21,7 +21,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class TransportManifestController extends Controller
@@ -1211,10 +1210,6 @@ class TransportManifestController extends Controller
     {
         $storageService = app(\App\Services\StorageService::class);
         $url = $storageService->getUrl($photo->path);
-
-        if (!$storageService->exists($photo->path) && Storage::disk('public')->exists($photo->path)) {
-            $url = url(Storage::disk('public')->url($photo->path));
-        }
 
         return [
             'id' => $photo->id,

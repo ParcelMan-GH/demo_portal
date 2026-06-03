@@ -25,6 +25,10 @@ use Illuminate\Support\Facades\View;
 
 class WalkinShipmentService
 {
+    public function __construct(private StorageService $storageService)
+    {
+    }
+
     public function lookupVendor(string $phone): ?Vendor
     {
         $formatted = PhoneHelper::format($phone);
@@ -170,12 +174,12 @@ class WalkinShipmentService
                         continue;
                     }
 
-                    $path = $photo->store('warehouse-receipts/' . $receipt->id, 'public');
+                    $storedPhoto = $this->storageService->upload($photo, 'warehouse-receipts/' . $receipt->id);
                     WarehouseReceiptItemPhoto::create([
                         'warehouse_receipt_item_id' => $receiptItem->id,
-                        'path' => $path,
-                        'original_name' => $photo->getClientOriginalName(),
-                        'size' => $photo->getSize(),
+                        'path' => $storedPhoto['path'],
+                        'original_name' => $storedPhoto['original_name'],
+                        'size' => $storedPhoto['size'],
                         'photo_type' => 'proof',
                         'created_by_user_id' => $data['created_by_user_id'],
                     ]);

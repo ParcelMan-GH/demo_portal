@@ -36,7 +36,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
@@ -445,9 +444,6 @@ class PackageController extends Controller
 
                     foreach ($photosToDelete as $photo) {
                         $this->storageService->delete($photo->path);
-                        if (Storage::disk('public')->exists($photo->path)) {
-                            Storage::disk('public')->delete($photo->path);
-                        }
                         $photo->delete();
                     }
                 }
@@ -685,7 +681,10 @@ class PackageController extends Controller
             return response()->json($result, 422);
         }
 
-        $receiptPath = $request->file('payment_receipt')?->store('recipient-payment-receipts', 'public');
+        $receiptPath = null;
+        if ($request->hasFile('payment_receipt')) {
+            $receiptPath = $this->storageService->upload($request->file('payment_receipt'), 'recipient-payment-receipts')['path'];
+        }
         if ($receiptPath) {
             $entry = RecipientPaymentSessionEntry::query()
                 ->where('recipient_payment_task_id', $task->id)

@@ -17,12 +17,12 @@ use App\Models\Warehouse;
 use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceiptItemPhoto;
 use App\Services\ChargesService;
+use App\Services\StorageService;
 use App\Services\WalkinShipmentService;
 use App\Services\Warehouse\WarehouseSortingService;
 use App\Services\Warehouse\WarehouseTransportService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 class IncomingTransportManifestSeeder extends Seeder
@@ -250,7 +250,7 @@ class IncomingTransportManifestSeeder extends Seeder
                 $base = $this->photoSlug($tag . '-' . $shipmentItem->tracking_code);
 
                 if ($index % 3 !== 1 && !$shipmentItem->images()->exists()) {
-                    $path = $this->writeFixturePhoto(
+                    $photo = $this->writeFixturePhoto(
                         path: "incoming-fixtures/vendor-{$base}.svg",
                         title: $shipmentItem->description ?: 'Package',
                         subtitle: $shipmentItem->tracking_code ?: 'Vendor photo',
@@ -259,15 +259,15 @@ class IncomingTransportManifestSeeder extends Seeder
 
                     ShipmentItemImage::query()->create([
                         'shipment_item_id' => $shipmentItem->id,
-                        'path' => $path,
+                        'path' => $photo['path'],
                         'original_name' => 'vendor-package-photo.svg',
-                        'size' => Storage::disk('public')->size($path),
+                        'size' => $photo['size'],
                         'sort_order' => 1,
                     ]);
                 }
 
                 if (!$receiptItem->photos()->exists()) {
-                    $path = $this->writeFixturePhoto(
+                    $photo = $this->writeFixturePhoto(
                         path: "incoming-fixtures/receipt-{$base}.svg",
                         title: 'Receipt Check',
                         subtitle: $shipmentItem->tracking_code ?: 'Receipt photo',
@@ -276,9 +276,9 @@ class IncomingTransportManifestSeeder extends Seeder
 
                     WarehouseReceiptItemPhoto::query()->create([
                         'warehouse_receipt_item_id' => $receiptItem->id,
-                        'path' => $path,
+                        'path' => $photo['path'],
                         'original_name' => 'receipt-package-photo.svg',
-                        'size' => Storage::disk('public')->size($path),
+                        'size' => $photo['size'],
                         'photo_type' => 'proof',
                         'created_by_user_id' => $user->id,
                     ]);
@@ -286,10 +286,18 @@ class IncomingTransportManifestSeeder extends Seeder
             });
     }
 
-    private function writeFixturePhoto(string $path, string $title, string $subtitle, string $color): string
+    /**
+     * @return array{path: string, size: int}
+     */
+    private function writeFixturePhoto(string $path, string $title, string $subtitle, string $color): array
     {
-        if (Storage::disk('public')->exists($path)) {
-            return $path;
+        $storage = app(StorageService::class);
+
+        if ($storage->exists($path)) {
+            return [
+                'path' => $path,
+                'size' => $storage->size($path),
+            ];
         }
 
         $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
@@ -308,9 +316,7 @@ class IncomingTransportManifestSeeder extends Seeder
 </svg>
 SVG;
 
-        Storage::disk('public')->put($path, $svg);
-
-        return $path;
+        return $storage->putContent($path, $svg);
     }
 
     private function photoSlug(string $value): string

@@ -21,6 +21,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItemLabel;
+use App\Services\StorageService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -28,7 +29,10 @@ use Illuminate\Support\Facades\DB;
 
 class WarehouseTransportService
 {
-    public function __construct(private RecipientPaymentService $recipientPaymentService) {}
+    public function __construct(
+        private RecipientPaymentService $recipientPaymentService,
+        private StorageService $storageService
+    ) {}
 
     public function outboundQuery(Warehouse $warehouse): Builder
     {
@@ -929,7 +933,8 @@ class WarehouseTransportService
             }
 
             $autoAccept = (bool) PlatformSetting::getValue('transport.scan_issue_auto_accept', false);
-            $path = $proofPhoto->store('transport-loading-exceptions/' . $lockedManifest->id, 'public');
+            $storedPhoto = $this->storageService->upload($proofPhoto, 'transport-loading-exceptions/' . $lockedManifest->id);
+            $path = $storedPhoto['path'];
             $now = now();
 
             $exception = TransportLoadingException::query()->create([

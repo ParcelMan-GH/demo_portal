@@ -10,7 +10,7 @@
         'General' => ['platform', 'delivery', 'pickup-vehicles', 'bus-stations', 'delivery-failure-reasons', 'delivery-delay-reasons', 'pricing'],
         'Communication' => ['sms', 'mail', 'push', 'email-templates'],
         'Logs' => ['email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'notification-logs'],
-        'System' => ['health', 'logs'],
+        'System' => ['storage', 'health', 'logs'],
     ];
     $readOnlyTabs = ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates', 'notification-logs', 'pickup-vehicles', 'bus-stations', 'delivery-failure-reasons', 'delivery-delay-reasons'];
     $activeGroup = collect($tabGroups)->filter(fn ($keys) => in_array($activeTab, $keys, true))->keys()->first() ?? 'General';
@@ -117,6 +117,8 @@
                                 Inspect application logs and clear old entries.
                             @elseif($activeTab === 'email-templates')
                                 Review available system email templates.
+                            @elseif($activeTab === 'storage')
+                                Choose local storage or an S3-compatible bucket.
                             @elseif($activeTab === 'pricing')
                                 Manage vendor commission and payout rules.
                             @elseif($activeTab === 'pickup-vehicles')
@@ -419,7 +421,11 @@ document.addEventListener('alpine:init', () => {
                 const result = await response.json();
 
                 if (response.ok) {
-                    this.settings[key] = result.path;
+                    if (this.settings[key] && typeof this.settings[key] === 'object') {
+                        this.settings[key].value = result.path;
+                    } else {
+                        this.settings[key] = result.path;
+                    }
                     this.message = result.message || 'File uploaded successfully.';
                     this.messageType = 'success';
                 } else {

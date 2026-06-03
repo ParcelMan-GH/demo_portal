@@ -10,10 +10,6 @@
     $photoPayload = function ($photo, string $source) use ($storageService) {
         $url = $storageService->getUrl($photo->path);
 
-        if (!$storageService->exists($photo->path) && \Illuminate\Support\Facades\Storage::disk('public')->exists($photo->path)) {
-            $url = url(\Illuminate\Support\Facades\Storage::disk('public')->url($photo->path));
-        }
-
         return [
             'id' => $photo->id,
             'url' => $url,

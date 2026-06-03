@@ -5,7 +5,7 @@
     $isSelf = $currentAdmin?->id === $admin->id;
     $roleNames = $admin->roles->pluck('name')->values();
     $primaryRole = $roleNames->first() ?: 'No role assigned';
-    $photoUrl = $admin->photo_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($admin->photo_path) : null;
+    $photoUrl = $admin->photo_path ? app(\App\Services\StorageService::class)->getUrl($admin->photo_path) : null;
     $activityTotal = array_sum($tabCounts ?? []);
     $packageTotal = ($tabCounts['incoming-packages'] ?? 0) + ($tabCounts['warehouse-packages'] ?? 0);
     $phone = $admin->phone ?: '-';
