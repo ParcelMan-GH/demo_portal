@@ -98,6 +98,14 @@ function registerWarehouseReceiptShowPage() {
 
         receiveModal: { open: false, itemId: null, itemIndex: -1 },
         photoModal: { open: false, title: '', photos: [], index: 0 },
+        printLabelModal: {
+            open: false,
+            itemId: null,
+            trackingCode: '',
+            receivedQuantity: 1,
+            labelCount: 1,
+            printing: false,
+        },
 
         init() {
             this.items = this.items.map((item) => this.prepareReceivingTownState(item));
@@ -863,16 +871,71 @@ function registerWarehouseReceiptShowPage() {
             }
         },
 
-        async printLabel(itemId) {
+        defaultPrintLabelCount(item) {
+            const received = Number(item?.received_quantity || 0);
+            const expected = Number(item?.expected_quantity || 0);
+            const fallback = Number(item?.quantity || 0);
+            const count = received || expected || fallback || 1;
+            return Math.max(1, Math.min(500, count));
+        },
+
+        setPrintLabelCount(value) {
+            const count = Number(value);
+            this.printLabelModal.labelCount = Number.isFinite(count) ? Math.max(1, Math.min(500, count)) : 1;
+        },
+
+        openPrintLabelModal(item) {
+            if (!item?.shipment_item_id) return;
+
+            const labelCount = this.defaultPrintLabelCount(item);
+            this.printLabelModal = {
+                open: true,
+                itemId: Number(item.shipment_item_id),
+                trackingCode: item.tracking_code || item.barcode_value || item.description || 'Package labels',
+                receivedQuantity: labelCount,
+                labelCount,
+                printing: false,
+            };
+        },
+
+        closePrintLabelModal() {
+            if (this.printLabelModal.printing) return;
+
+            this.printLabelModal = {
+                open: false,
+                itemId: null,
+                trackingCode: '',
+                receivedQuantity: 1,
+                labelCount: 1,
+                printing: false,
+            };
+        },
+
+        async printLabelFromModal() {
+            if (!this.printLabelModal.itemId || this.printLabelModal.printing) return;
+
+            this.setPrintLabelCount(this.printLabelModal.labelCount);
+            this.printLabelModal.printing = true;
+            const success = await this.printLabel(this.printLabelModal.itemId, this.printLabelModal.labelCount);
+            this.printLabelModal.printing = false;
+
+            if (success) {
+                this.closePrintLabelModal();
+            }
+        },
+
+        async printLabel(itemId, labelCount = 1) {
             this.saving = true;
             try {
                 const response = await fetch(endpointWithItem(config.print_label_url, itemId), {
                     method: 'POST',
                     headers: {
                         Accept: 'application/json',
+                        'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
                         'X-CSRF-TOKEN': csrfToken(),
                     },
+                    body: JSON.stringify({ label_count: Math.max(1, Math.min(500, Number(labelCount || 1))) }),
                 });
 
                 const result = await response.json();
@@ -897,13 +960,16 @@ function registerWarehouseReceiptShowPage() {
                 const item = this.items.find((row) => Number(row.shipment_item_id) === Number(itemId));
                 if (item) {
                     item.barcode_value = result?.data?.barcode_value || item.barcode_value;
+                    item.label_count = Number(result?.data?.label_count || item.label_count || labelCount || 1);
                     item.barcode_print_count = Number(result?.data?.print_count || item.barcode_print_count || 0);
                 }
 
                 window.showToast?.(result.message || 'Label generated.', 'success');
+                return true;
             } catch (error) {
                 console.error(error);
                 window.showToast?.(error.message || 'Unable to print label.', 'error');
+                return false;
             } finally {
                 this.saving = false;
             }

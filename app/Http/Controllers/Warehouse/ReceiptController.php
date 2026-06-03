@@ -599,7 +599,7 @@ class ReceiptController extends AdminShipmentController
         ]);
     }
 
-    public function printPendingItemLabel(PickupAssignment $pickupAssignment, ShipmentItem $shipmentItem): JsonResponse
+    public function printPendingItemLabel(Request $request, PickupAssignment $pickupAssignment, ShipmentItem $shipmentItem): JsonResponse
     {
         $this->authorizePermission('warehouse.receiving.manage');
 
@@ -608,11 +608,19 @@ class ReceiptController extends AdminShipmentController
             abort(404);
         }
 
-        $result = $this->warehouseReceivingService->printItemLabel(
+        $validated = $request->validate([
+            'label_count' => ['nullable', 'integer', 'min:1', 'max:500'],
+        ]);
+
+        $labelCount = max(1, min(500, (int) ($validated['label_count'] ?? 1)));
+
+        $result = $this->warehouseReceivingService->generateLabels(
             assignment: $pickupAssignment,
             shipmentItem: $shipmentItem,
             warehouse: $warehouse,
-            user: Auth::guard('admin')->user()
+            user: Auth::guard('admin')->user(),
+            labelCount: $labelCount,
+            labelType: $labelCount === 1 ? 'sealed' : 'unit'
         );
 
         return response()->json($result, $result['success'] ? 200 : 422);

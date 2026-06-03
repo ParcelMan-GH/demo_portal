@@ -260,7 +260,7 @@
         'detailsClick' => 'openReceivingPackageModal(pkg, 1)',
         'receiveClick' => 'openReceivingPackageModal(pkg, 1)',
         'photosClick' => 'openReceivingPhotosModal(pkg)',
-        'printClick' => 'printLabel(pkg.shipment_item_id)',
+        'printClick' => 'openPrintLabelModal(pkg)',
         'finalizeClick' => 'openFinalizeConfirm()',
         'finalizeDisabled' => 'isFinalized() || items.length === 0 || saving',
         'finalizeLabelExpr' => "isFinalized() ? 'Finalized' : 'Finalize Receipt'",
@@ -667,6 +667,60 @@
                                 </div>
                             </div>
 
+                        </div>
+                    </div>
+                </template>
+
+                <template x-teleport="body">
+                    <div x-show="printLabelModal.open" x-transition.opacity class="fixed inset-0 z-[190] flex min-h-dvh w-screen items-end justify-center bg-black/55 px-4 py-6 backdrop-blur-sm sm:items-center sm:p-4" style="display:none">
+                        <div @@click.stop class="relative flex max-h-[calc(100dvh-3rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                            <div class="shrink-0 border-b border-slate-100 bg-white p-5">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div class="flex items-start gap-4">
+                                        <span class="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-600 to-orange-700 text-white shadow-lg shadow-orange-500/25">
+                                            <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6.75 7.5V6A2.25 2.25 0 019 3.75h6A2.25 2.25 0 0117.25 6v1.5m-10.5 0h10.5m-10.5 0A2.25 2.25 0 004.5 9.75v3A2.25 2.25 0 006.75 15h.75m9.75-7.5A2.25 2.25 0 0119.5 9.75v3A2.25 2.25 0 0117.25 15h-.75m-9 0v5.25h9V15m-9 0h9"/></svg>
+                                        </span>
+                                        <div class="min-w-0">
+                                            <h3 class="text-lg font-extrabold text-slate-950">Print Labels</h3>
+                                            <p class="mt-1 text-sm leading-relaxed text-slate-500">Choose how many package labels to print.</p>
+                                            <p class="mt-2 truncate font-mono text-xs font-black text-slate-500" x-text="printLabelModal.trackingCode"></p>
+                                        </div>
+                                    </div>
+                                    <button type="button" @@click="closePrintLabelModal()" :disabled="printLabelModal.printing" class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+                                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18 18 6M6 6l12 12"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex-1 space-y-4 overflow-y-auto px-5 py-5 sm:px-6">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button type="button" @@click="setPrintLabelCount(1)" class="rounded-2xl border px-4 py-4 text-left transition" :class="Number(printLabelModal.labelCount) === 1 ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'">
+                                        <span class="block text-sm font-black">1 label</span>
+                                        <span class="mt-1 block text-xs font-semibold text-slate-500">Single package</span>
+                                    </button>
+                                    <button type="button" x-show="Number(printLabelModal.receivedQuantity || 0) > 1" @@click="setPrintLabelCount(printLabelModal.receivedQuantity)" class="rounded-2xl border px-4 py-4 text-left transition" :class="Number(printLabelModal.labelCount) === Number(printLabelModal.receivedQuantity || 1) ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'" style="display:none">
+                                        <span class="block text-sm font-black"><span x-text="printLabelModal.receivedQuantity"></span> labels</span>
+                                        <span class="mt-1 block text-xs font-semibold text-slate-500">One per unit</span>
+                                    </button>
+                                </div>
+                                <div class="rounded-2xl border border-orange-100 bg-orange-50/50 p-4">
+                                    <label class="mb-3 block text-xs font-black uppercase tracking-wide text-slate-600">Labels to print</label>
+                                    <div class="flex items-center justify-center gap-3">
+                                        <button type="button" @@click="setPrintLabelCount(Number(printLabelModal.labelCount || 1) - 1)" :disabled="printLabelModal.printing || Number(printLabelModal.labelCount || 1) <= 1" class="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-xl font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">-</button>
+                                        <input type="number" min="1" max="500" x-model.number="printLabelModal.labelCount" @@input="setPrintLabelCount(printLabelModal.labelCount)" :disabled="printLabelModal.printing" class="h-12 w-28 rounded-2xl border-2 border-slate-200 bg-white text-center text-lg font-black text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-slate-50">
+                                        <button type="button" @@click="setPrintLabelCount(Number(printLabelModal.labelCount || 1) + 1)" :disabled="printLabelModal.printing || Number(printLabelModal.labelCount || 1) >= 500" class="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-xl font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">+</button>
+                                    </div>
+                                    <p class="mt-3 text-center text-xs font-semibold text-slate-400">Printed codes will use the package label format, like <span class="font-mono">TR...-001</span>.</p>
+                                </div>
+                            </div>
+                            <div class="shrink-0 rounded-b-3xl border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6">
+                                <div class="flex items-center justify-end gap-3">
+                                    <button type="button" @@click="closePrintLabelModal()" :disabled="printLabelModal.printing" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">Cancel</button>
+                                    <button type="button" @@click="printLabelFromModal()" :disabled="printLabelModal.printing || !Number(printLabelModal.labelCount || 0)" class="inline-flex min-w-36 items-center justify-center gap-2 rounded-2xl bg-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
+                                        <svg x-show="printLabelModal.printing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" style="display:none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                        <span x-text="printLabelModal.printing ? 'Printing...' : 'Print Labels'"></span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </template>
