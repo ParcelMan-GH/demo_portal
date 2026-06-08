@@ -28,7 +28,7 @@
     <h2>1. Acceptance of these Terms</h2>
     <p>
         By creating an account or using the Services, you agree to these Terms and to our
-        <a href="{{ route('web.privacy') }}">Privacy Policy</a>. If you do not agree, do not use the Services.
+        <a href="{{ route('web.privacy') }}{{ request()->boolean('app') ? '?app=1' : '' }}">Privacy Policy</a>. If you do not agree, do not use the Services.
         If you use the Services on behalf of a business, you confirm you are authorised to bind that business.
     </p>
 

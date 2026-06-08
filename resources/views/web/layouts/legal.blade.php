@@ -10,7 +10,9 @@
 @extends('web.layouts.portal')
 
 @section('content')
-<main class="legal-page">
+@php($embedded = request()->boolean('app'))
+<main class="legal-page {{ $embedded ? 'is-embedded' : '' }}">
+    @unless($embedded)
     <header class="legal-header">
         <a href="{{ route('web.landing') }}" class="legal-logo" aria-label="Parcelman home">
             <img src="{{ asset('logo-2.png') }}" alt="Parcelman">
@@ -22,6 +24,7 @@
             Back to home
         </a>
     </header>
+    @endunless
 
     <article class="legal-wrap">
         <p class="legal-kicker">@yield('legal_kicker', 'Legal')</p>
@@ -33,6 +36,7 @@
         </div>
     </article>
 
+    @unless($embedded)
     <footer class="legal-footer">
         <span>&copy; {{ date('Y') }} Parcelman Express. All rights reserved.</span>
         <nav class="legal-footer-links" aria-label="Legal">
@@ -40,6 +44,7 @@
             <a href="{{ route('web.terms') }}">Terms of Service</a>
         </nav>
     </footer>
+    @endunless
 </main>
 
 <style>
@@ -90,6 +95,11 @@
         max-width: 880px;
         margin: 0 auto;
         padding: clamp(2.5rem, 6vw, 4rem) clamp(1rem, 4vw, 2rem);
+    }
+
+    /* Embedded in the mobile app's in-app WebView (no web header/footer chrome). */
+    .legal-page.is-embedded .legal-wrap {
+        padding-top: clamp(1.5rem, 5vw, 2rem);
     }
 
     .legal-kicker {
