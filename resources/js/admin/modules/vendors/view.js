@@ -208,6 +208,8 @@ function vendorShow() {
             this.canManage = this.config.canManage;
             this.statuses = this.config.statuses;
             this.payouts.summary = this.config.payoutSummary || this.payouts.summary;
+            const params = new URLSearchParams(window.location.search);
+            this.payouts.search = params.get('search') || this.payouts.search;
             this.activeTab = this.validTabFromUrl();
             this.loadTab(this.activeTab);
             this.$nextTick(() => this.initDateRanges());

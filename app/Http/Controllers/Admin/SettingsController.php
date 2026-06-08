@@ -4,15 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
+use App\Models\BusStation;
 use App\Models\DeliveryDelayReason;
 use App\Models\DeliveryFailureReason;
-use App\Models\BusStation;
 use App\Models\EmailTemplate;
-use App\Models\NotificationLog;
 use App\Models\OtpCode;
 use App\Models\PickupVehicleType;
 use App\Models\PlatformSetting;
 use App\Models\SmsLog;
+use App\Services\BackOfficeAccess;
 use App\Services\EmailTemplateService;
 use App\Services\SmsService;
 use App\Services\StorageService;
@@ -65,7 +65,7 @@ class SettingsController extends Controller
         }
 
         // Validate tab exists
-        if (!array_key_exists($activeTab, $this->tabs)) {
+        if (! array_key_exists($activeTab, $this->tabs)) {
             $activeTab = 'platform';
         }
 
@@ -147,9 +147,13 @@ class SettingsController extends Controller
         $result = [];
 
         foreach ($config as $key => $meta) {
+            $value = PlatformSetting::getValue($key, $meta['default']);
+            $isEncrypted = (bool) ($meta['encrypted'] ?? false);
+
             $result[$key] = array_merge($meta, [
-                'value' => PlatformSetting::getValue($key, $meta['default']),
+                'value' => $isEncrypted ? '' : $value,
                 'key' => $key,
+                'configured' => $isEncrypted && filled($value),
             ]);
         }
 
@@ -176,18 +180,9 @@ class SettingsController extends Controller
 
     protected function getStorageMeta(): array
     {
-        $s3Keys = [
-            'storage.s3.access_key' => 'Access key',
-            'storage.s3.secret_key' => 'Secret key',
-            'storage.s3.bucket' => 'Bucket',
-            'storage.s3.endpoint' => 'Endpoint',
-            'storage.s3.region' => 'Region',
-        ];
-
-        $missing = collect($s3Keys)
-            ->filter(fn (string $label, string $key) => blank(PlatformSetting::getValue($key, $key === 'storage.s3.region' ? 'us-east-1' : '')))
-            ->values()
-            ->all();
+        $storage = app(StorageService::class);
+        $missing = $storage->missingS3ConfigFields();
+        $connectionStatus = $storage->connectionStatus();
 
         return [
             'driver' => PlatformSetting::getValue('storage.driver', 'local'),
@@ -195,6 +190,7 @@ class SettingsController extends Controller
             'missing_s3_fields' => $missing,
             'local_path' => storage_path('app/public'),
             'public_linked' => is_link(public_path('storage')) || file_exists(public_path('storage')),
+            'connection_status' => $connectionStatus,
         ];
     }
 
@@ -326,9 +322,9 @@ class SettingsController extends Controller
         $usedPercent = round((($totalSpace - $freeSpace) / $totalSpace) * 100, 1);
         $checks['disk'] = [
             'label' => 'Disk Space',
-            'value' => $this->formatBytes($freeSpace) . ' free',
+            'value' => $this->formatBytes($freeSpace).' free',
             'status' => $usedPercent < 80 ? 'ok' : ($usedPercent < 90 ? 'warning' : 'error'),
-            'message' => $usedPercent . '% used',
+            'message' => $usedPercent.'% used',
         ];
 
         // Memory
@@ -452,7 +448,7 @@ class SettingsController extends Controller
 
     public function toggleEmailTemplate(EmailTemplate $emailTemplate): JsonResponse
     {
-        $emailTemplate->update(['is_enabled' => !$emailTemplate->is_enabled]);
+        $emailTemplate->update(['is_enabled' => ! $emailTemplate->is_enabled]);
 
         return response()->json([
             'success' => true,
@@ -493,6 +489,8 @@ class SettingsController extends Controller
      */
     public function save(Request $request): JsonResponse
     {
+        $this->authorizeSettingsEdit();
+
         $tab = $request->input('tab');
         $settings = $request->input('settings', []);
 
@@ -578,7 +576,7 @@ class SettingsController extends Controller
     {
         $this->authorizeSettingsEdit();
 
-        $pickupVehicleType->update(['is_active' => !$pickupVehicleType->is_active]);
+        $pickupVehicleType->update(['is_active' => ! $pickupVehicleType->is_active]);
 
         return response()->json([
             'success' => true,
@@ -667,7 +665,7 @@ class SettingsController extends Controller
     {
         $this->authorizeSettingsEdit();
 
-        $busStation->update(['is_active' => !$busStation->is_active]);
+        $busStation->update(['is_active' => ! $busStation->is_active]);
 
         return response()->json([
             'success' => true,
@@ -756,7 +754,7 @@ class SettingsController extends Controller
     {
         $this->authorizeSettingsEdit();
 
-        $deliveryFailureReason->update(['is_active' => !$deliveryFailureReason->is_active]);
+        $deliveryFailureReason->update(['is_active' => ! $deliveryFailureReason->is_active]);
 
         return response()->json([
             'success' => true,
@@ -842,7 +840,7 @@ class SettingsController extends Controller
     {
         $this->authorizeSettingsEdit();
 
-        $deliveryDelayReason->update(['is_active' => !$deliveryDelayReason->is_active]);
+        $deliveryDelayReason->update(['is_active' => ! $deliveryDelayReason->is_active]);
 
         return response()->json([
             'success' => true,
@@ -876,7 +874,9 @@ class SettingsController extends Controller
 
     private function authorizeSettingsEdit(): void
     {
-        abort_unless(auth('admin')->user()?->hasPermission('settings.edit'), 403);
+        $user = auth('admin')->user();
+
+        abort_unless($user && app(BackOfficeAccess::class)->canUsePermission($user, 'settings.edit'), 403);
     }
 
     /**
@@ -884,6 +884,8 @@ class SettingsController extends Controller
      */
     public function uploadFile(Request $request): JsonResponse
     {
+        $this->authorizeSettingsEdit();
+
         $request->validate([
             'file' => 'required|file|mimes:jpg,jpeg,png,gif,ico,svg|max:2048',
             'key' => 'required|string',
@@ -912,11 +914,11 @@ class SettingsController extends Controller
     {
         $user = \Illuminate\Support\Facades\Auth::guard('admin')->user();
 
-        if (!$user->fcm_token) {
+        if (! $user->fcm_token) {
             return response()->json([
-                'success'     => false,
+                'success' => false,
                 'needs_token' => true,
-                'message'     => 'No FCM token found for your account.',
+                'message' => 'No FCM token found for your account.',
             ]);
         }
 
@@ -938,7 +940,7 @@ class SettingsController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage(),
+                'message' => 'Error: '.$e->getMessage(),
             ]);
         }
     }
@@ -956,7 +958,7 @@ class SettingsController extends Controller
         $content = file_get_contents($file->getRealPath());
         $json = json_decode($content, true);
 
-        if (!$json || !isset($json['project_id'], $json['private_key'], $json['client_email'])) {
+        if (! $json || ! isset($json['project_id'], $json['private_key'], $json['client_email'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid service account JSON. Must contain project_id, private_key, and client_email.',
@@ -964,11 +966,11 @@ class SettingsController extends Controller
         }
 
         $dir = storage_path('app/firebase');
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             mkdir($dir, 0755, true);
         }
 
-        file_put_contents($dir . '/firestore.json', $content);
+        file_put_contents($dir.'/firestore.json', $content);
 
         PlatformSetting::setValue('firebase_project_id', $json['project_id']);
         PlatformSetting::setValue('firebase_credentials_uploaded_at', now()->toIso8601String());
@@ -978,7 +980,7 @@ class SettingsController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Firebase credentials uploaded successfully. Project: ' . $json['project_id'],
+            'message' => 'Firebase credentials uploaded successfully. Project: '.$json['project_id'],
         ]);
     }
 
@@ -989,7 +991,7 @@ class SettingsController extends Controller
     {
         $logFile = storage_path('logs/laravel.log');
 
-        if (!File::exists($logFile)) {
+        if (! File::exists($logFile)) {
             return response()->json([
                 'data' => [],
                 'meta' => [
@@ -1008,14 +1010,13 @@ class SettingsController extends Controller
 
         // Filter by level
         if ($level = $request->input('level')) {
-            $logs = array_filter($logs, fn($log) => strtolower($log['level']) === strtolower($level));
+            $logs = array_filter($logs, fn ($log) => strtolower($log['level']) === strtolower($level));
             $logs = array_values($logs);
         }
 
         // Filter by search
         if ($search = $request->input('search')) {
-            $logs = array_filter($logs, fn($log) =>
-                stripos($log['message'], $search) !== false ||
+            $logs = array_filter($logs, fn ($log) => stripos($log['message'], $search) !== false ||
                 stripos($log['context'], $search) !== false
             );
             $logs = array_values($logs);
@@ -1023,18 +1024,19 @@ class SettingsController extends Controller
 
         // Filter by date
         if ($dateFrom = $request->input('date_from')) {
-            $logs = array_filter($logs, fn($log) => $log['date'] >= $dateFrom);
+            $logs = array_filter($logs, fn ($log) => $log['date'] >= $dateFrom);
             $logs = array_values($logs);
         }
         if ($dateTo = $request->input('date_to')) {
-            $logs = array_filter($logs, fn($log) => $log['date'] <= $dateTo . ' 23:59:59');
+            $logs = array_filter($logs, fn ($log) => $log['date'] <= $dateTo.' 23:59:59');
             $logs = array_values($logs);
         }
 
         // Sort (newest first by default)
         $sortDirection = $request->input('direction', 'desc');
-        usort($logs, function($a, $b) use ($sortDirection) {
+        usort($logs, function ($a, $b) use ($sortDirection) {
             $cmp = strcmp($b['date'], $a['date']);
+
             return $sortDirection === 'asc' ? -$cmp : $cmp;
         });
 
@@ -1047,8 +1049,9 @@ class SettingsController extends Controller
         $paginatedLogs = array_slice($logs, $offset, $perPage);
 
         // Add IDs for frontend
-        $paginatedLogs = array_map(function($log, $index) use ($offset) {
+        $paginatedLogs = array_map(function ($log, $index) use ($offset) {
             $log['id'] = $offset + $index + 1;
+
             return $log;
         }, $paginatedLogs, array_keys($paginatedLogs));
 
@@ -1072,7 +1075,7 @@ class SettingsController extends Controller
     {
         $logFile = storage_path('logs/laravel.log');
 
-        if (!File::exists($logFile)) {
+        if (! File::exists($logFile)) {
             return response()->json(['error' => 'Log file not found'], 404);
         }
 
@@ -1080,9 +1083,9 @@ class SettingsController extends Controller
         $logs = $this->parseLogFile($content);
 
         // Sort newest first
-        usort($logs, fn($a, $b) => strcmp($b['date'], $a['date']));
+        usort($logs, fn ($a, $b) => strcmp($b['date'], $a['date']));
 
-        if (!isset($logs[$index - 1])) {
+        if (! isset($logs[$index - 1])) {
             return response()->json(['error' => 'Log entry not found'], 404);
         }
 
@@ -1116,7 +1119,7 @@ class SettingsController extends Controller
     {
         $logFile = storage_path('logs/laravel.log');
 
-        if (!File::exists($logFile)) {
+        if (! File::exists($logFile)) {
             return response()->json(['error' => 'Log file not found'], 404);
         }
 
@@ -1125,18 +1128,18 @@ class SettingsController extends Controller
 
         if ($format === 'json') {
             $logs = $this->parseLogFile($content);
-            usort($logs, fn($a, $b) => strcmp($b['date'], $a['date']));
+            usort($logs, fn ($a, $b) => strcmp($b['date'], $a['date']));
 
             return response()->json($logs)
-                ->header('Content-Disposition', 'attachment; filename="logs_' . date('Y-m-d_His') . '.json"');
+                ->header('Content-Disposition', 'attachment; filename="logs_'.date('Y-m-d_His').'.json"');
         }
 
         // Default: raw log file
-        $filename = 'laravel_' . date('Y-m-d_His') . '.log';
+        $filename = 'laravel_'.date('Y-m-d_His').'.log';
 
         return response($content)
             ->header('Content-Type', 'text/plain')
-            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+            ->header('Content-Disposition', 'attachment; filename="'.$filename.'"');
     }
 
     /**
@@ -1257,7 +1260,7 @@ class SettingsController extends Controller
 
     private function smsLogResponseSummary(SmsLog $log): ?string
     {
-        if (!$log->response) {
+        if (! $log->response) {
             return null;
         }
 
@@ -1408,21 +1411,21 @@ class SettingsController extends Controller
             ->values()
             ->toArray();
 
-        $filenameBase = 'admin_audit_logs_' . date('Y-m-d_His');
+        $filenameBase = 'admin_audit_logs_'.date('Y-m-d_His');
 
         if ($format === 'csv') {
             $headers = [
                 'Content-Type' => 'text/csv',
-                'Content-Disposition' => 'attachment; filename="' . $filenameBase . '.csv"',
+                'Content-Disposition' => 'attachment; filename="'.$filenameBase.'.csv"',
             ];
 
             $callback = function () use ($rows): void {
                 $output = fopen('php://output', 'w');
-                if (!$output) {
+                if (! $output) {
                     return;
                 }
 
-                if (!empty($rows)) {
+                if (! empty($rows)) {
                     fputcsv($output, array_keys($rows[0]));
                 }
 
@@ -1437,7 +1440,7 @@ class SettingsController extends Controller
         }
 
         return response()->json($rows)
-            ->header('Content-Disposition', 'attachment; filename="' . $filenameBase . '.json"');
+            ->header('Content-Disposition', 'attachment; filename="'.$filenameBase.'.json"');
     }
 
     /**
@@ -1450,7 +1453,7 @@ class SettingsController extends Controller
         ]);
 
         try {
-            \Illuminate\Support\Facades\Mail::raw('This is a test email from Parcelman Express.', function($message) use ($request) {
+            \Illuminate\Support\Facades\Mail::raw('This is a test email from Parcelman Express.', function ($message) use ($request) {
                 $message->to($request->email)
                     ->subject('Test Email - Parcelman Express');
             });
@@ -1462,7 +1465,7 @@ class SettingsController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to send test email: ' . $e->getMessage(),
+                'message' => 'Failed to send test email: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -1491,7 +1494,7 @@ class SettingsController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to send test SMS: ' . $e->getMessage(),
+                'message' => 'Failed to send test SMS: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -1514,7 +1517,7 @@ class SettingsController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to clear cache: ' . $e->getMessage(),
+                'message' => 'Failed to clear cache: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -1529,6 +1532,8 @@ class SettingsController extends Controller
             'twilio_sid',
             'twilio_token',
             'mail_password',
+            'storage.s3.access_key',
+            'storage.s3.secret_key',
         ];
 
         return in_array($key, $encryptedKeys);
@@ -1545,7 +1550,8 @@ class SettingsController extends Controller
             $bytes /= 1024;
             $i++;
         }
-        return round($bytes, 2) . ' ' . $units[$i];
+
+        return round($bytes, 2).' '.$units[$i];
     }
 
     /**
@@ -1636,7 +1642,7 @@ class SettingsController extends Controller
         $sortOrder = strtolower((string) $request->get('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc';
         $allowedSorts = ['created_at', 'action_type', 'method', 'status_code', 'duration_ms'];
 
-        if (!in_array($sortBy, $allowedSorts, true)) {
+        if (! in_array($sortBy, $allowedSorts, true)) {
             $sortBy = 'created_at';
         }
 

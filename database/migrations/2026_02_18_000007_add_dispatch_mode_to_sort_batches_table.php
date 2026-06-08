@@ -15,7 +15,9 @@ return new class extends Migration
             }
         });
 
-        DB::statement('ALTER TABLE sort_batches MODIFY destination_warehouse_id BIGINT UNSIGNED NULL');
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE sort_batches MODIFY destination_warehouse_id BIGINT UNSIGNED NULL');
+        }
 
         Schema::table('sort_batches', function (Blueprint $table) {
             $table->foreign('destination_warehouse_id')
@@ -43,7 +45,9 @@ return new class extends Migration
             $table->dropForeign(['destination_warehouse_id']);
         });
 
-        DB::statement('ALTER TABLE sort_batches MODIFY destination_warehouse_id BIGINT UNSIGNED NOT NULL');
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE sort_batches MODIFY destination_warehouse_id BIGINT UNSIGNED NOT NULL');
+        }
 
         Schema::table('sort_batches', function (Blueprint $table) {
             $table->foreign('destination_warehouse_id')
@@ -53,4 +57,3 @@ return new class extends Migration
         });
     }
 };
-

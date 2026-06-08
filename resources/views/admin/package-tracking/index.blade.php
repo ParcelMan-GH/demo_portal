@@ -150,6 +150,9 @@ function packageTracking() {
         meta: { total: 0, per_page: 25, current_page: 1, last_page: 1 },
 
         init() {
+            const params = new URLSearchParams(window.location.search);
+            this.search = params.get('search') || '';
+            this.statusFilter = params.get('status') || '';
             this.loadData();
             this.initDateRange();
         },

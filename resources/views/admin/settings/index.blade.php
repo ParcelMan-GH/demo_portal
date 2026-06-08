@@ -14,7 +14,10 @@
     ];
     $readOnlyTabs = ['health', 'logs', 'email-logs', 'sms-logs', 'otp-logs', 'admin-audit-logs', 'email-templates', 'notification-logs', 'pickup-vehicles', 'bus-stations', 'delivery-failure-reasons', 'delivery-delay-reasons'];
     $activeGroup = collect($tabGroups)->filter(fn ($keys) => in_array($activeTab, $keys, true))->keys()->first() ?? 'General';
-    $canEditSettings = auth('admin')->user()?->hasPermission('settings.edit') ?? false;
+    $settingsUser = auth('admin')->user();
+    $canEditSettings = $settingsUser
+        ? app(\App\Services\BackOfficeAccess::class)->canUsePermission($settingsUser, 'settings.edit')
+        : false;
 @endphp
 
 <div class="space-y-5" x-data="settingsManager()">
@@ -208,7 +211,7 @@
                             </div>
                         </div>
                         <span class="inline-flex items-center rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700" x-text="($store.notifLogs?.total || 0) + ' logs'"></span>
-                    @elseif(!in_array($activeTab, $readOnlyTabs, true))
+                    @elseif($canEditSettings && !in_array($activeTab, $readOnlyTabs, true))
                         <button type="button"
                                 @@click="saveSettings()"
                                 :disabled="saving"

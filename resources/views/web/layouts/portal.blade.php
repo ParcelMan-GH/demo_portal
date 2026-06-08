@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="description" content="@yield('meta_description', 'Parcelman is an app-led parcel pickup and delivery service for Ghanaian vendors, shops, and growing businesses.')">
+    <meta name="keywords" content="@yield('meta_keywords', 'Parcelman Ghana, parcel delivery Ghana, vendor delivery Ghana, pickup request app Ghana, delivery app for Ghanaian vendors')">
     <title>@yield('title', 'Parcelman Portal')</title>
     <link rel="icon" type="image/jpeg" href="{{ asset('favicon.jpg') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,4 +25,3 @@
     </div>
 </body>
 </html>
-

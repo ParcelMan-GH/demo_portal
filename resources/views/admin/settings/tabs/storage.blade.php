@@ -2,6 +2,7 @@
     $driver = $settings['storage.driver']['value'] ?? 'local';
     $s3Configured = $tabData['s3_configured'] ?? false;
     $missingFields = $tabData['missing_s3_fields'] ?? [];
+    $connectionStatus = $tabData['connection_status'] ?? [];
 @endphp
 
 <div class="space-y-6"
@@ -15,7 +16,10 @@
         ],
         missingS3Fields() {
             return this.requiredS3Fields
-                .filter((field) => !String(this.settings[field.key]?.value || '').trim())
+                .filter((field) => {
+                    const setting = this.settings[field.key] || {};
+                    return !String(setting.value || '').trim() && !setting.configured;
+                })
                 .map((field) => field.label);
         },
         s3Ready() {
@@ -58,7 +62,7 @@
 
     <input type="hidden" x-model="settings['storage.driver'].value">
 
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <div class="rounded-2xl border border-slate-200 bg-white p-4">
             <p class="text-xs font-black uppercase tracking-wide text-slate-400">Active Driver</p>
             <p class="mt-2 text-2xl font-black text-slate-950" x-text="settings['storage.driver'].value === 's3' ? 'S3 / Storj' : 'Local'"></p>
@@ -76,7 +80,48 @@
             <p class="mt-2 break-all font-mono text-sm font-black text-slate-800">{{ $tabData['local_path'] ?? storage_path('app/public') }}</p>
             <p class="mt-2 text-sm font-semibold text-slate-500">Local files are served by the public storage link.</p>
         </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <p class="text-xs font-black uppercase tracking-wide text-slate-400">Connection</p>
+            <p class="mt-2 text-2xl font-black {{ ($connectionStatus['reachable'] ?? false) ? 'text-emerald-700' : 'text-amber-700' }}">
+                {{ ($connectionStatus['reachable'] ?? false) ? 'Reachable' : 'Needs Check' }}
+            </p>
+            <p class="mt-2 text-sm font-semibold leading-5 text-slate-500">{{ $connectionStatus['message'] ?? 'Storage connection has not been checked.' }}</p>
+        </div>
     </div>
+
+    @if (($connectionStatus['driver'] ?? null) === 's3')
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-6">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-wide text-slate-400">Bucket</p>
+                    <p class="mt-1 break-all font-mono font-bold text-slate-800">{{ $connectionStatus['bucket'] ?: 'Not set' }}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-black uppercase tracking-wide text-slate-400">Endpoint</p>
+                    <p class="mt-1 break-all font-mono font-bold text-slate-800">{{ $connectionStatus['endpoint'] ?: 'Not set' }}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-black uppercase tracking-wide text-slate-400">Region</p>
+                    <p class="mt-1 font-mono font-bold text-slate-800">{{ $connectionStatus['region'] ?: 'Not set' }}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-black uppercase tracking-wide text-slate-400">Prefix</p>
+                    <p class="mt-1 font-mono font-bold text-slate-800">{{ $connectionStatus['prefix'] ?: 'Not set' }}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-black uppercase tracking-wide text-slate-400">Credentials</p>
+                    <p class="mt-1 font-bold text-slate-800">
+                        {{ ($connectionStatus['access_key_configured'] ?? false) && ($connectionStatus['secret_key_configured'] ?? false) ? 'Saved' : 'Incomplete' }}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-xs font-black uppercase tracking-wide text-slate-400">URL Expiry</p>
+                    <p class="mt-1 font-mono font-bold text-slate-800">{{ $connectionStatus['signed_url_expiry'] ?? 60 }} min</p>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <template x-if="settings['storage.driver'].value === 's3' && !s3Ready()">
         <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">

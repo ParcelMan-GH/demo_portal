@@ -491,6 +491,8 @@ function vendorPayoutsPage(config) {
         savingConfirm: false,
 
         init() {
+            const params = new URLSearchParams(window.location.search);
+            this.search = params.get('search') || '';
             this.loadVendors();
         },
         async request(url, options = {}) {

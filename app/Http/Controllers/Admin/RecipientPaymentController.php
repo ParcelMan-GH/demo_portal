@@ -1325,6 +1325,7 @@ class RecipientPaymentController extends Controller
                 $q->where('recipient_name', 'like', "%{$search}%")
                     ->orWhere('recipient_phone', 'like', "%{$search}%")
                     ->orWhere('delivery_town', 'like', "%{$search}%")
+                    ->orWhere('payment_reference', 'like', "%{$search}%")
                     ->orWhereHas('shipmentItem', fn (Builder $itemQuery) => $itemQuery
                         ->where('tracking_code', 'like', "%{$search}%")
                         ->orWhere('description', 'like', "%{$search}%"))

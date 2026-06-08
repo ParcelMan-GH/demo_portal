@@ -278,31 +278,52 @@
                     </nav>
                 </div>
 
-                <div class="hidden md:flex flex-1 justify-center px-8"
-                     x-data="{ query: '', results: {}, searching: false, open: false, _timer: null, search() { clearTimeout(this._timer); if (this.query.length < 2) { this.results = {}; this.open = false; return; } this._timer = setTimeout(async () => { this.searching = true; try { const r = await fetch(@js(route('admin.search')) + '?q=' + encodeURIComponent(this.query), { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } }); this.results = (await r.json()).data || {}; this.open = true; } catch(e) {} this.searching = false; }, 300); }, close() { this.open = false; this.query = ''; this.results = {}; } }"
-                     @keydown.escape.window="close()"
-                     @click.away="open = false">
-                    <div class="relative w-full max-w-md">
+                <div class="flex flex-1 justify-end md:justify-center px-2 md:px-8"
+                     x-data="adminGlobalSearch(@js(route('admin.search')))"
+                     x-init="init()"
+                     @keydown.escape.window="close()">
+                    <div class="hidden md:block relative w-full max-w-md" @click.away="open = false">
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                             <svg x-show="!searching" class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                             <svg x-show="searching" x-cloak class="w-4 h-4 text-orange-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                         </div>
-                        <input type="text" x-model="query" @input="search()" @focus="if(query.length >= 2) open = true" placeholder="Search orders, vendors, drivers..." class="w-full h-9 pl-10 pr-16 text-[13px] bg-slate-50/80 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 focus:bg-white transition-all placeholder-slate-400">
+                        <input
+                            x-ref="desktopInput"
+                            id="admin-global-search-input"
+                            type="text"
+                            x-model="query"
+                            @input="search()"
+                            @focus="if (query.length >= 2) open = true"
+                            @keydown.arrow-down.prevent="next()"
+                            @keydown.arrow-up.prevent="previous()"
+                            @keydown.enter.prevent="openActive()"
+                            role="combobox"
+                            aria-autocomplete="list"
+                            aria-controls="admin-global-search-results"
+                            :aria-expanded="open ? 'true' : 'false'"
+                            placeholder="Search shipments, packages, payments, vendors..."
+                            class="w-full h-9 pl-10 pr-16 text-[13px] bg-slate-50/80 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 focus:bg-white transition-all placeholder-slate-400">
                         <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
                             <span class="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded-md border border-slate-200/60 font-medium tracking-wide">⌘K</span>
                         </div>
-                        <div x-show="open" x-cloak x-transition class="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-xl rounded-xl shadow-xl shadow-slate-200/60 border border-slate-100/80 z-50 max-h-[420px] overflow-y-auto">
-                            <template x-for="group in ['shipments', 'vendors', 'drivers']" :key="group">
+                        <div x-show="open" x-cloak x-transition id="admin-global-search-results" role="listbox" class="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-xl rounded-xl shadow-xl shadow-slate-200/60 border border-slate-100/80 z-50 max-h-[420px] overflow-y-auto">
+                            <template x-if="error">
+                                <div class="px-4 py-3 text-[12px] text-red-600 bg-red-50 border-b border-red-100" x-text="error"></div>
+                            </template>
+                            <template x-for="group in groups" :key="group">
                                 <template x-if="results[group] && results[group].length">
                                     <div>
-                                        <div class="px-3 pt-2 pb-1"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider" x-text="group"></span></div>
-                                        <template x-for="item in results[group]" :key="group + item.id">
-                                            <a :href="item.url" @click="close()" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors">
+                                        <div class="px-3 pt-2 pb-1"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider" x-text="groupLabels[group]"></span></div>
+                                        <template x-for="(item, index) in results[group]" :key="group + item.id">
+                                            <a :href="item.url" @click="close()" role="option" :aria-selected="isActive(group, index) ? 'true' : 'false'" :class="isActive(group, index) ? 'bg-orange-50' : ''" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors">
                                                 <div class="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0 text-orange-600">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                                 </div>
                                                 <div class="flex-1 min-w-0">
-                                                    <p class="text-[12px] font-semibold text-slate-800 truncate" x-text="item.label"></p>
+                                                    <div class="flex items-center gap-2 min-w-0">
+                                                        <p class="text-[12px] font-semibold text-slate-800 truncate" x-text="item.label"></p>
+                                                        <span x-show="item.status" class="text-[10px] text-slate-400 flex-shrink-0" x-text="item.status"></span>
+                                                    </div>
                                                     <p class="text-[11px] text-slate-400 truncate" x-text="item.sub"></p>
                                                 </div>
                                             </a>
@@ -310,8 +331,63 @@
                                     </div>
                                 </template>
                             </template>
-                            <template x-if="open && !searching && !results.shipments?.length && !results.vendors?.length && !results.drivers?.length">
+                            <template x-if="open && !searching && !error && !hasResults()">
                                 <div class="px-4 py-6 text-center"><p class="text-[12px] text-slate-400">No results for "<span x-text="query"></span>"</p></div>
+                            </template>
+                        </div>
+                    </div>
+                    <button type="button" @click="openMobile()" class="md:hidden w-9 h-9 rounded-xl border border-slate-200/70 bg-slate-50/80 text-slate-500 flex items-center justify-center hover:bg-white hover:text-orange-600 transition-colors" aria-label="Open search">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </button>
+                    <div x-show="mobileOpen" x-cloak class="fixed inset-0 z-[60] md:hidden bg-slate-950/35" @click="close()"></div>
+                    <div x-show="mobileOpen" x-cloak x-transition class="fixed left-3 right-3 top-3 z-[70] md:hidden bg-white rounded-2xl border border-slate-100 shadow-2xl shadow-slate-900/20 overflow-hidden">
+                        <div class="relative border-b border-slate-100">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                <svg x-show="!searching" class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                <svg x-show="searching" x-cloak class="w-4 h-4 text-orange-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            </div>
+                            <input
+                                x-ref="mobileInput"
+                                type="text"
+                                x-model="query"
+                                @input="search()"
+                                @keydown.arrow-down.prevent="next()"
+                                @keydown.arrow-up.prevent="previous()"
+                                @keydown.enter.prevent="openActive()"
+                                role="combobox"
+                                aria-autocomplete="list"
+                                aria-controls="admin-global-search-mobile-results"
+                                :aria-expanded="mobileOpen ? 'true' : 'false'"
+                                placeholder="Search shipments, packages, payments, vendors..."
+                                class="w-full h-12 pl-10 pr-12 text-[14px] bg-white focus:outline-none placeholder-slate-400">
+                            <button type="button" @click="close()" class="absolute inset-y-0 right-0 px-4 text-slate-400 hover:text-slate-700" aria-label="Close search">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <div id="admin-global-search-mobile-results" role="listbox" class="max-h-[70vh] overflow-y-auto">
+                            <template x-if="error">
+                                <div class="px-4 py-3 text-[12px] text-red-600 bg-red-50 border-b border-red-100" x-text="error"></div>
+                            </template>
+                            <template x-for="group in groups" :key="group">
+                                <template x-if="results[group] && results[group].length">
+                                    <div>
+                                        <div class="px-4 pt-3 pb-1"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider" x-text="groupLabels[group]"></span></div>
+                                        <template x-for="(item, index) in results[group]" :key="'mobile-' + group + item.id">
+                                            <a :href="item.url" @click="close()" role="option" :aria-selected="isActive(group, index) ? 'true' : 'false'" :class="isActive(group, index) ? 'bg-orange-50' : ''" class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                                <div class="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0 text-orange-600">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <p class="text-[13px] font-semibold text-slate-800 truncate" x-text="item.label"></p>
+                                                    <p class="text-[11px] text-slate-400 truncate" x-text="item.sub"></p>
+                                                </div>
+                                            </a>
+                                        </template>
+                                    </div>
+                                </template>
+                            </template>
+                            <template x-if="mobileOpen && !searching && !error && query.length >= 2 && !hasResults()">
+                                <div class="px-4 py-8 text-center"><p class="text-[12px] text-slate-400">No results for "<span x-text="query"></span>"</p></div>
                             </template>
                         </div>
                     </div>

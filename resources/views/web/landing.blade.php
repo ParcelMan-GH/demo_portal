@@ -1,8 +1,26 @@
 @extends('web.layouts.portal')
 
-@section('title', 'Parcelman | Delivery for Ghanaian businesses')
+@section('title', 'Parcelman Ghana | Parcel pickup and delivery for vendors')
+@section('meta_description', 'Parcelman Ghana helps vendors, shops, and social sellers request parcel pickups, track delivery progress, and manage parcel history from a mobile app.')
+@section('meta_keywords', 'Parcelman Ghana, parcel delivery Ghana, vendor delivery Ghana, pickup request app Ghana, delivery app for Ghanaian vendors, parcel pickup Ghana')
 
 @section('content')
+@php
+    $parcelmanFaqs = [
+        ['Do I need the mobile app?', 'Yes. Parcelman is app-led so vendors can request pickup, track parcels and manage delivery records from their phone.'],
+        ['Can I use Parcelman for my shop or social store?', 'Yes. Parcelman is designed for online vendors, retail shops, and businesses that send customer orders.'],
+        ['What details do I add to a pickup request?', 'You can add pickup location, destination, parcel notes, photos, and delivery preferences so the request is easier to review.'],
+        ['Can I choose the kind of vehicle I need?', 'The app supports vehicle request options such as motorbike, aboboyaa, van, and truck when a parcel needs a specific pickup type.'],
+        ['Can customers receive delivery updates?', 'Parcelman helps keep delivery progress clearer so vendors can answer customers with more confidence.'],
+        ['Which areas do you cover?', 'Parcelman starts with supported Ghanaian delivery areas. Confirm availability for your pickup and delivery location before your first request.'],
+        ['Do you support payment on delivery or same-day delivery?', 'Those options should be confirmed during onboarding because availability can depend on the service area and current operations.'],
+    ];
+    $hasPlatformSettings = \Illuminate\Support\Facades\Schema::hasTable('platform_settings');
+    $platformPhone = $hasPlatformSettings ? trim((string) \App\Models\PlatformSetting::getValue('platform_phone', '')) : '';
+    $platformEmail = $hasPlatformSettings ? trim((string) \App\Models\PlatformSetting::getValue('platform_email', '')) : '';
+    $platformAddress = $hasPlatformSettings ? trim((string) \App\Models\PlatformSetting::getValue('platform_address', '')) : '';
+@endphp
+
 <main
     class="pm-page"
     x-data="{
@@ -11,21 +29,21 @@
         slides: [
             {
                 image: 'https://images.unsplash.com/photo-1566576721346-d4a3b4eaeb55?auto=format&fit=crop&w=2400&q=85',
-                kicker: 'Parcelman Express',
-                title: 'Fast parcel delivery for Ghanaian businesses.',
-                text: 'Book pickups, follow every order, and keep customers updated from one simple mobile experience.'
+                kicker: 'Parcelman Ghana',
+                title: 'Parcel pickup and delivery for Ghanaian vendors.',
+                text: 'Request pickups, track delivery progress, and manage parcel history from your phone.'
             },
             {
                 image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=2400&q=85',
-                kicker: 'Built for vendors',
-                title: 'Move more orders with less back-and-forth.',
-                text: 'From online sellers to growing shops, Parcelman helps you send packages without chasing updates all day.'
+                kicker: 'Built for shops and social sellers',
+                title: 'Keep parcel requests out of scattered chats.',
+                text: 'Turn pickup details, package notes, and delivery records into a cleaner app-led workflow.'
             },
             {
                 image: 'https://images.unsplash.com/photo-1605902711622-cfb43c4437d5?auto=format&fit=crop&w=2400&q=85',
-                kicker: 'Reliable customer delivery',
-                title: 'Give your customers clearer delivery confidence.',
-                text: 'Simple status updates and confirmed delivery records make every order easier to manage.'
+                kicker: 'Clearer delivery communication',
+                title: 'Answer customers with more confidence.',
+                text: 'Track requests and delivery progress so every customer order is easier to follow.'
             }
         ],
         next() { this.slide = (this.slide + 1) % this.slides.length },
@@ -46,7 +64,7 @@
             <a href="#contact">Contact</a>
         </nav>
 
-        <a href="#" class="pm-header-cta">Get the app</a>
+        <a href="#app" class="pm-header-cta">Get the app</a>
 
         <button type="button" class="pm-menu" @@click="mobileOpen = ! mobileOpen" aria-label="Toggle navigation">
             <svg x-show="!mobileOpen" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -62,7 +80,7 @@
             <a href="#how" @@click="mobileOpen = false">How it works</a>
             <a href="#coverage" @@click="mobileOpen = false">Coverage</a>
             <a href="#contact" @@click="mobileOpen = false">Contact</a>
-            <a href="#" @@click="mobileOpen = false">Get the app</a>
+            <a href="#app" @@click="mobileOpen = false">Get the app</a>
         </div>
     </header>
 
@@ -79,8 +97,8 @@
             <h1 x-text="slides[slide].title"></h1>
             <p class="pm-hero-text" x-text="slides[slide].text"></p>
             <div class="pm-actions">
-                <a href="#" class="pm-button pm-button-primary">Get the app</a>
-                <a href="#services" class="pm-button pm-button-ghost">Explore services</a>
+                <a href="#app" class="pm-button pm-button-primary">Get the app</a>
+                <a href="#how" class="pm-button pm-button-ghost">See how it works</a>
             </div>
         </div>
 
@@ -103,44 +121,44 @@
         <div class="pm-hero-card">
             <span>Today with Parcelman</span>
             <strong>Pickup requested</strong>
-            <p>Vendor gets clear delivery progress without calling around for updates.</p>
+            <p>A vendor adds pickup details, package notes, and follows the request from the app.</p>
         </div>
     </section>
 
     <section class="pm-trust" aria-label="Parcelman trust points">
         <div>
-            <strong>Same-day pickup</strong>
-            <span>Available in supported areas</span>
+            <strong>Pickup requests</strong>
+            <span>Start delivery requests from the app</span>
         </div>
         <div>
-            <strong>Business-friendly delivery</strong>
-            <span>Made for vendors and shops</span>
+            <strong>Parcel tracking</strong>
+            <span>Follow delivery progress clearly</span>
         </div>
         <div>
-            <strong>Clear order updates</strong>
-            <span>Know what is happening</span>
+            <strong>Delivery history</strong>
+            <span>Keep cleaner records after each order</span>
         </div>
         <div>
-            <strong>Ghana-focused coverage</strong>
-            <span>Built around local delivery needs</span>
+            <strong>Built for Ghana vendors</strong>
+            <span>Designed around local delivery realities</span>
         </div>
     </section>
 
     <section class="pm-section pm-services" id="services">
         <div class="pm-section-head">
             <p class="pm-kicker">Services</p>
-            <h2>Delivery support for businesses that send parcels every day.</h2>
-            <p>Parcelman helps vendors handle customer orders with cleaner pickup requests, better tracking, and dependable delivery communication.</p>
+            <h2>Delivery support for vendors that send customer parcels.</h2>
+            <p>Parcelman helps Ghanaian sellers turn pickup requests, package details, and delivery progress into one organized workflow.</p>
         </div>
 
         <div class="pm-service-grid">
             @foreach([
-                ['Store pickup', 'Request parcel pickup from your shop, home office, or selling point.'],
-                ['Customer delivery', 'Send orders to customers with clearer status updates from pickup to delivery.'],
-                ['Bulk parcel movement', 'Move multiple customer packages without losing track of what belongs where.'],
-                ['App tracking', 'Follow each parcel from your phone and reduce repeated customer calls.'],
-                ['Delivery records', 'Keep a cleaner history of requests, destinations, charges and delivery status.'],
-                ['Vendor support', 'Get a delivery flow that works for small shops, online sellers and growing businesses.'],
+                ['Store and home pickup', 'Request parcel pickup from your shop, home office, pop-up stand, or selling point.'],
+                ['Customer delivery', 'Send customer orders with a clearer record from pickup request to delivery progress.'],
+                ['Bulk parcel movement', 'Organize multiple customer parcels without losing track of package notes and destinations.'],
+                ['App-led tracking', 'Follow each parcel from your phone and reduce repeated status calls.'],
+                ['Delivery records', 'Keep parcel history, request details, and delivery status easier to review.'],
+                ['Vendor workflow', 'Give small shops, online sellers, and growing businesses a neater delivery process.'],
             ] as $service)
                 <article class="pm-service-card">
                     <span></span>
@@ -156,16 +174,17 @@
             <img src="https://images.unsplash.com/photo-1586880244406-556ebe35f282?auto=format&fit=crop&w=1500&q=85" alt="Packages prepared for delivery">
         </div>
         <div class="pm-why-copy">
-            <p class="pm-kicker">Why Parcelman</p>
-            <h2>Less delivery stress. More time to sell.</h2>
+            <p class="pm-kicker">Vendor problems solved</p>
+            <h2>Less chasing. More time to sell.</h2>
             <p>
-                Customers expect quick answers after they pay. Parcelman gives your business a neater way to request delivery,
-                track orders, and confirm when packages reach the right person.
+                Ghanaian vendors already sell through WhatsApp, Instagram, calls, and walk-ins. Parcelman gives the delivery side
+                a calmer place to live, so package details do not disappear inside busy chats.
             </p>
             <ul>
-                <li>Reduce follow-up calls about package location.</li>
-                <li>Keep parcel details and customer destinations organized.</li>
-                <li>Give customers a more professional delivery experience.</li>
+                <li>Customers keep asking where their package is.</li>
+                <li>Pickup details get scattered across WhatsApp and calls.</li>
+                <li>You need delivery records after each customer order.</li>
+                <li>Parcelman keeps requests, tracking, and history in one app.</li>
             </ul>
         </div>
     </section>
@@ -173,15 +192,15 @@
     <section class="pm-section pm-how" id="how">
         <div class="pm-section-head pm-section-head-narrow">
             <p class="pm-kicker">How it works</p>
-            <h2>Simple enough for everyday orders.</h2>
+            <h2>From pickup request to delivery record.</h2>
         </div>
 
         <div class="pm-steps">
             @foreach([
-                ['01', 'Request pickup', 'Add parcel details and pickup location from the Parcelman app.'],
-                ['02', 'Parcel collected', 'A pickup is arranged so the parcel can start moving.'],
-                ['03', 'Track progress', 'Follow delivery updates without repeatedly calling for status.'],
-                ['04', 'Customer receives', 'Delivery is completed with a clear record for your business.'],
+                ['01', 'Request pickup', 'Add pickup location, customer destination, and parcel notes from the Parcelman app.'],
+                ['02', 'Choose delivery needs', 'Add photos and vehicle preferences such as motorbike, aboboyaa, van, or truck when needed.'],
+                ['03', 'Track progress', 'Follow the request as the parcel moves through pickup and delivery steps.'],
+                ['04', 'Review the record', 'Keep a delivery history your business can return to after the order is complete.'],
             ] as $step)
                 <article class="pm-step">
                     <span>{{ $step[0] }}</span>
@@ -196,46 +215,32 @@
         <div class="pm-app-copy">
             <p class="pm-kicker">Mobile app</p>
             <h2>Run parcel requests from your phone.</h2>
-            <p>The Parcelman app is where vendors request pickups, add package details, track delivery progress, and manage their parcel history.</p>
-            <a href="#" class="pm-button pm-button-primary">Get the app</a>
+            <p>The Parcelman app is where vendors enter pickup locations the way customers describe them, request the right vehicle, add parcel photos, review details, and manage parcel history.</p>
+            <a href="#contact" class="pm-button pm-button-primary">Request access</a>
         </div>
 
         <div class="pm-phone-wrap" aria-label="Parcelman app preview">
-            <div class="pm-phone">
-                <div class="pm-phone-top"></div>
-                <div class="pm-phone-hero">
-                    <span>Hi, Vendor</span>
-                    <strong>Send Package</strong>
-                </div>
-                <div class="pm-phone-card">
-                    <small>Pickup location</small>
-                    <b>East Legon, Accra</b>
-                </div>
-                <div class="pm-phone-card">
-                    <small>Package photos</small>
-                    <b>3 items added</b>
-                </div>
-                <div class="pm-phone-row">
-                    <span></span><span></span><span></span>
-                </div>
-                <button type="button">Request pickup</button>
-            </div>
+            <img
+                src="{{ asset('images/parcelman-mobile-preview.jpeg') }}"
+                alt="Parcelman mobile app send package screen"
+                class="pm-phone-preview"
+            >
         </div>
     </section>
 
     <section class="pm-section pm-coverage" id="coverage">
         <div class="pm-map-copy">
             <p class="pm-kicker">Coverage</p>
-            <h2>Serving vendors across key Ghanaian delivery areas.</h2>
+            <h2>Starting with supported Ghanaian delivery areas.</h2>
             <p>
-                Parcelman is built for Ghanaian businesses that need reliable pickup and customer delivery across busy commercial areas.
+                Parcelman is built for Ghanaian businesses that need organized pickup and customer delivery across busy commercial areas. Confirm your pickup and delivery area before sending your first parcel.
             </p>
             <div class="pm-city-list">
                 <span>Accra</span>
                 <span>Tema</span>
                 <span>Kumasi</span>
                 <span>Takoradi</span>
-                <span>Expanding</span>
+                <span>Confirm availability</span>
             </div>
         </div>
 
@@ -261,40 +266,45 @@
         <div class="pm-contact-info">
             <p class="pm-kicker">Contact us</p>
             <h2>Talk to Parcelman about your delivery needs.</h2>
-            <p>Have a shop, online store, or business sending parcels often? Reach out and we will help you get started.</p>
+            <p>Have a shop, online store, or social selling business sending parcels often? Share your pickup area, delivery volume, and customer delivery needs so Parcelman can guide your setup.</p>
 
             <div class="pm-contact-list">
-                <a href="tel:+233200000000">+233 20 000 0000</a>
-                <a href="mailto:support@parcelman.com">support@parcelman.com</a>
-                <span>Accra, Ghana</span>
+                <a href="#app">Mobile app workflow</a>
+                <a href="#coverage">Supported Ghanaian areas</a>
+                <span>For vendors, shops, and social sellers</span>
             </div>
         </div>
 
-        <form class="pm-contact-form">
-            <label>
-                <span>Name</span>
-                <input type="text" name="name" placeholder="Your name">
-            </label>
-            <label>
-                <span>Phone</span>
-                <input type="tel" name="phone" placeholder="024 000 0000">
-            </label>
-            <label>
-                <span>Business name</span>
-                <input type="text" name="business" placeholder="Your shop or company">
-            </label>
-            <label>
-                <span>Message</span>
-                <textarea name="message" rows="4" placeholder="Tell us what you need to deliver"></textarea>
-            </label>
-            <button type="button" class="pm-button pm-button-primary">Send message</button>
-        </form>
+        <div class="pm-contact-form">
+            <div class="pm-contact-card-head">
+                <span>Onboarding channels</span>
+                <h3>Confirm your first pickup before launch.</h3>
+                <p>Verified phone, WhatsApp, or email contact details will be published here once they are configured.</p>
+            </div>
+
+            <div class="pm-contact-list pm-contact-list-panel">
+                @if($platformPhone)
+                    <a href="tel:{{ preg_replace('/\s+/', '', $platformPhone) }}">{{ $platformPhone }}</a>
+                @endif
+                @if($platformEmail)
+                    <a href="mailto:{{ $platformEmail }}">{{ $platformEmail }}</a>
+                @endif
+                @if($platformAddress)
+                    <span>{{ $platformAddress }}</span>
+                @endif
+                @unless($platformPhone || $platformEmail || $platformAddress)
+                    <span>Verified Parcelman contact details are not configured yet.</span>
+                @endunless
+            </div>
+
+            <a href="#app" class="pm-button pm-button-primary">Review app workflow</a>
+        </div>
     </section>
 
     <section class="pm-newsletter">
         <div>
             <p class="pm-kicker">Vendor updates</p>
-            <h2>Get delivery tips and Parcelman announcements.</h2>
+            <h2>Get delivery tips and Parcelman Ghana updates.</h2>
         </div>
         <form>
             <input type="email" placeholder="Email address" aria-label="Email address">
@@ -308,12 +318,7 @@
             <h2>Questions vendors usually ask.</h2>
         </div>
         <div class="pm-faq-grid">
-            @foreach([
-                ['Do I need the mobile app?', 'Yes. Parcelman is app-led so vendors can request pickup, track parcels and manage delivery records from their phone.'],
-                ['Can I use Parcelman for my shop?', 'Yes. Parcelman is designed for online vendors, retail shops and businesses that send customer orders.'],
-                ['Can customers receive delivery updates?', 'Parcelman helps keep delivery progress clear so vendors can answer customers with confidence.'],
-                ['Which areas do you cover?', 'Parcelman supports key Ghanaian delivery areas and continues expanding coverage as operations grow.'],
-            ] as $faq)
+            @foreach($parcelmanFaqs as $faq)
                 <article>
                     <h3>{{ $faq[0] }}</h3>
                     <p>{{ $faq[1] }}</p>
@@ -322,12 +327,27 @@
         </div>
     </section>
 
+    <script type="application/ld+json">
+        {!! json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => 'FAQPage',
+            'mainEntity' => array_map(fn ($faq) => [
+                '@type' => 'Question',
+                'name' => $faq[0],
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text' => $faq[1],
+                ],
+            ], $parcelmanFaqs),
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
+    </script>
+
     <footer class="pm-footer">
         <div class="pm-footer-main">
             <div class="pm-footer-brand">
                 <img src="{{ asset('logo-2.png') }}" alt="Parcelman">
-                <p>Reliable parcel delivery for Ghanaian vendors, shops and growing businesses.</p>
-                <a href="#" class="pm-footer-app">Get the app</a>
+                <p>App-led parcel pickup and delivery for Ghanaian vendors, shops, and growing businesses.</p>
+                <a href="#app" class="pm-footer-app">Get the app</a>
             </div>
 
             <div>
@@ -342,20 +362,31 @@
                 <h3>Company</h3>
                 <a href="#how">How it works</a>
                 <a href="#coverage">Coverage</a>
+                <a href="{{ route('web.vendor.login') }}">Vendor Portal</a>
+                <a href="{{ route('web.driver.login') }}">Driver Login</a>
                 <a href="#faq">FAQ</a>
                 <a href="#contact">Contact</a>
             </div>
 
             <div>
                 <h3>Contact</h3>
-                <a href="tel:+233200000000">+233 20 000 0000</a>
-                <a href="mailto:support@parcelman.com">support@parcelman.com</a>
-                <span>Accra, Ghana</span>
+                @if($platformPhone)
+                    <a href="tel:{{ preg_replace('/\s+/', '', $platformPhone) }}">{{ $platformPhone }}</a>
+                @else
+                    <a href="#contact">Request onboarding</a>
+                @endif
+                @if($platformEmail)
+                    <a href="mailto:{{ $platformEmail }}">{{ $platformEmail }}</a>
+                @else
+                    <span>Verified contact details pending</span>
+                @endif
+                <a href="#coverage">Check service area</a>
+                <span>Ghana-focused delivery support</span>
             </div>
 
             <div class="pm-footer-news">
                 <h3>Newsletter</h3>
-                <p>Useful delivery updates for vendors.</p>
+                <p>Useful delivery updates for Ghanaian vendors.</p>
                 <form>
                     <input type="email" placeholder="Email address" aria-label="Footer email address">
                     <button type="button">Join</button>
@@ -365,6 +396,10 @@
 
         <div class="pm-footer-bottom">
             <span>&copy; {{ date('Y') }} Parcelman Express. All rights reserved.</span>
+            <nav class="pm-footer-legal" aria-label="Legal">
+                <a href="{{ route('web.privacy') }}">Privacy Policy</a>
+                <a href="{{ route('web.terms') }}">Terms of Service</a>
+            </nav>
             <span>Built for businesses moving parcels across Ghana.</span>
         </div>
     </footer>
@@ -917,83 +952,15 @@
         min-height: 560px;
     }
 
-    .pm-phone {
+    .pm-phone-preview {
         width: min(330px, 100%);
-        min-height: 610px;
-        padding: 0.9rem;
+        height: auto;
         border: 9px solid #0b111b;
         border-radius: 38px;
         background: #f8fafc;
         box-shadow: 0 35px 80px rgba(0, 0, 0, 0.3);
-    }
-
-    .pm-phone-top {
-        width: 88px;
-        height: 6px;
-        margin: 0 auto 1rem;
-        border-radius: 999px;
-        background: #111827;
-    }
-
-    .pm-phone-hero {
-        padding: 1.2rem;
-        border-radius: 24px;
-        background: linear-gradient(135deg, #7c2d12, #ea580c);
-        color: #fff;
-    }
-
-    .pm-phone-hero span,
-    .pm-phone-card small {
         display: block;
-        font-size: 0.78rem;
-        font-weight: 800;
-        opacity: 0.74;
-    }
-
-    .pm-phone-hero strong {
-        display: block;
-        margin-top: 1.6rem;
-        font-size: 1.55rem;
-        line-height: 1.1;
-    }
-
-    .pm-phone-card {
-        margin-top: 0.85rem;
-        padding: 1rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 18px;
-        background: #fff;
-        color: var(--pm-ink);
-    }
-
-    .pm-phone-card b {
-        display: block;
-        margin-top: 0.35rem;
-        font-size: 1rem;
-    }
-
-    .pm-phone-row {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.55rem;
-        margin-top: 0.85rem;
-    }
-
-    .pm-phone-row span {
-        height: 78px;
-        border-radius: 16px;
-        background: linear-gradient(135deg, #fed7aa, #fff7ed);
-    }
-
-    .pm-phone button {
-        width: 100%;
-        min-height: 48px;
-        margin-top: 1rem;
-        border: 0;
-        border-radius: 999px;
-        background: var(--pm-orange);
-        color: #fff;
-        font-weight: 900;
+        object-fit: cover;
     }
 
     .pm-city-list {
@@ -1122,10 +1089,34 @@
         gap: 0.4rem;
     }
 
+    .pm-contact-card-head {
+        display: grid;
+        gap: 0.45rem;
+    }
+
     .pm-contact-form span {
         color: #344054;
         font-size: 0.84rem;
         font-weight: 900;
+    }
+
+    .pm-contact-card-head h3 {
+        margin: 0;
+        color: var(--pm-ink);
+        font-size: clamp(1.55rem, 2vw, 2.1rem);
+        line-height: 1.1;
+    }
+
+    .pm-contact-card-head p {
+        margin: 0;
+        color: #667085;
+        line-height: 1.75;
+    }
+
+    .pm-contact-list-panel {
+        margin-top: 0.25rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--pm-line);
     }
 
     .pm-contact-form input,
@@ -1316,6 +1307,15 @@
         border-top: 1px solid rgba(255, 255, 255, 0.1);
     }
 
+    .pm-footer-legal {
+        display: flex;
+        gap: 1.25rem;
+    }
+
+    .pm-footer-legal a {
+        font-weight: 800;
+    }
+
     @media (max-width: 1040px) {
         .pm-service-grid,
         .pm-steps {
@@ -1423,8 +1423,8 @@
             min-height: auto;
         }
 
-        .pm-phone {
-            min-height: 560px;
+        .pm-phone-preview {
+            width: min(300px, 100%);
         }
 
         .pm-map-card,

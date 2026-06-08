@@ -1816,6 +1816,8 @@ function recipientPaymentsPage() {
             };
             document.addEventListener('click', this._walletAgentClickHandler, true);
             this.refreshWalletOptions();
+            const params = new URLSearchParams(window.location.search);
+            this.search = params.get('search') || this.search;
             this.activeTab = this.resolveInitialTab();
             this.loadActiveTab();
         },

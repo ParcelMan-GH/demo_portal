@@ -23,6 +23,18 @@ return new class extends Migration
         });
 
         if (Schema::hasTable('delivery_failure_reasons')) {
+            if (DB::getDriverName() === 'sqlite') {
+                DB::table('bus_handoff_confirmations')
+                    ->whereNotNull('reason_id')
+                    ->whereNull('reason_label')
+                    ->update([
+                        'reason_label' => DB::raw('(SELECT label FROM delivery_failure_reasons WHERE delivery_failure_reasons.id = bus_handoff_confirmations.reason_id LIMIT 1)'),
+                        'reason_type' => DB::raw('(SELECT type FROM delivery_failure_reasons WHERE delivery_failure_reasons.id = bus_handoff_confirmations.reason_id LIMIT 1)'),
+                    ]);
+
+                return;
+            }
+
             DB::table('bus_handoff_confirmations')
                 ->leftJoin('delivery_failure_reasons', 'bus_handoff_confirmations.reason_id', '=', 'delivery_failure_reasons.id')
                 ->whereNotNull('bus_handoff_confirmations.reason_id')

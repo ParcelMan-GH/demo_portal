@@ -312,8 +312,8 @@
                     &copy; {{ date('Y') }} <span>ParcelMan Express</span>. Delivering with speed & care.
                 </p>
                 <div class="vendor-footer-legal">
-                    <a href="#">Privacy Policy</a>
-                    <a href="#">Terms of Service</a>
+                    <a href="{{ route('web.privacy') }}">Privacy Policy</a>
+                    <a href="{{ route('web.terms') }}">Terms of Service</a>
                 </div>
             </div>
             <div class="vendor-footer-bottom-content" style="justify-content: center; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.1);">

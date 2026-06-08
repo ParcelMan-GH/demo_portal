@@ -146,9 +146,9 @@
                     </button>
                     <p class="text-center text-xs" style="color:#94a3b8;">
                         By continuing, you agree to our
-                        <a href="#" style="color:#ea580c;font-weight:600;" onmouseover="this.style.color='#f97316'" onmouseout="this.style.color='#ea580c'">Terms of Service</a>
+                        <a href="{{ route('web.terms') }}" style="color:#ea580c;font-weight:600;" onmouseover="this.style.color='#f97316'" onmouseout="this.style.color='#ea580c'">Terms of Service</a>
                         and
-                        <a href="#" style="color:#ea580c;font-weight:600;" onmouseover="this.style.color='#f97316'" onmouseout="this.style.color='#ea580c'">Privacy Policy</a>
+                        <a href="{{ route('web.privacy') }}" style="color:#ea580c;font-weight:600;" onmouseover="this.style.color='#f97316'" onmouseout="this.style.color='#ea580c'">Privacy Policy</a>
                     </p>
                 </form>
 
@@ -299,9 +299,9 @@
 
                     <p class="text-center text-xs" style="color:#94a3b8;">
                         By continuing, you agree to our
-                        <a href="#" style="color:#ea580c;font-weight:600;" onmouseover="this.style.color='#f97316'" onmouseout="this.style.color='#ea580c'">Terms of Service</a>
+                        <a href="{{ route('web.terms') }}" style="color:#ea580c;font-weight:600;" onmouseover="this.style.color='#f97316'" onmouseout="this.style.color='#ea580c'">Terms of Service</a>
                         and
-                        <a href="#" style="color:#ea580c;font-weight:600;" onmouseover="this.style.color='#f97316'" onmouseout="this.style.color='#ea580c'">Privacy Policy</a>
+                        <a href="{{ route('web.privacy') }}" style="color:#ea580c;font-weight:600;" onmouseover="this.style.color='#f97316'" onmouseout="this.style.color='#ea580c'">Privacy Policy</a>
                     </p>
                 </form>
 

@@ -21,6 +21,23 @@ return new class extends Migration
             }
         });
 
+        if (DB::getDriverName() === 'sqlite') {
+            DB::table('shipments')
+                ->whereNull('vendor_declared_quantity')
+                ->update([
+                    'vendor_declared_quantity' => DB::raw('COALESCE((SELECT SUM(quantity) FROM shipment_items WHERE shipment_items.shipment_id = shipments.id), 0)'),
+                ]);
+
+            DB::table('pickup_assignments')
+                ->whereNull('driver_picked_quantity')
+                ->whereNotNull('completed_at')
+                ->update([
+                    'driver_picked_quantity' => DB::raw('COALESCE((SELECT SUM(confirmed_quantity) FROM pickup_item_confirmations WHERE pickup_item_confirmations.pickup_assignment_id = pickup_assignments.id), 0)'),
+                ]);
+
+            return;
+        }
+
         DB::statement(<<<'SQL'
             UPDATE shipments s
             LEFT JOIN (

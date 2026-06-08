@@ -103,7 +103,10 @@ class VendorPayoutController extends Controller
                     ->orWhere('vendors.phone', 'like', "%{$search}%")
                     ->orWhere('vendors.business_name', 'like', "%{$search}%")
                     ->orWhere('vendors.payout_account_name', 'like', "%{$search}%")
-                    ->orWhere('vendors.payout_account_number', 'like', "%{$search}%");
+                    ->orWhere('vendors.payout_account_number', 'like', "%{$search}%")
+                    ->orWhereHas('payouts', fn ($payouts) => $payouts
+                        ->where('payment_reference', 'like', "%{$search}%")
+                        ->orWhere('payment_phone', 'like', "%{$search}%"));
             });
         }
 

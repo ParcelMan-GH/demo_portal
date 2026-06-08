@@ -10,10 +10,22 @@ use Illuminate\Support\Facades\Storage;
 
 class StorageService
 {
+    private const S3_REQUIRED_FIELDS = [
+        'key' => 'Access key',
+        'secret' => 'Secret key',
+        'bucket' => 'Bucket',
+        'endpoint' => 'Endpoint',
+        'region' => 'Region',
+    ];
+
     private ?S3Client $s3Client = null;
+
     private ?string $driver = null;
+
     private ?Filesystem $disk = null;
+
     private ?Filesystem $s3Disk = null;
+
     private ?array $s3Config = null;
 
     private ?Filesystem $publicDisk = null;
@@ -31,13 +43,22 @@ class StorageService
      */
     public function hasCompleteS3Config(): bool
     {
+        return $this->missingS3ConfigFields() === [];
+    }
+
+    /**
+     * List missing S3-compatible config labels without exposing stored secrets.
+     *
+     * @return array<int, string>
+     */
+    public function missingS3ConfigFields(): array
+    {
         $config = $this->getS3Config();
 
-        return filled($config['key'])
-            && filled($config['secret'])
-            && filled($config['bucket'])
-            && filled($config['endpoint'])
-            && filled($config['region']);
+        return collect(self::S3_REQUIRED_FIELDS)
+            ->filter(fn (string $label, string $key) => blank($config[$key] ?? null))
+            ->values()
+            ->all();
     }
 
     /**
@@ -104,6 +125,10 @@ class StorageService
                 'region' => $config['region'],
                 'endpoint' => $config['endpoint'],
                 'use_path_style_endpoint' => true,
+                'http' => [
+                    'connect_timeout' => 5,
+                    'timeout' => 10,
+                ],
                 'credentials' => [
                     'key' => $config['key'],
                     'secret' => $config['secret'],
@@ -119,14 +144,15 @@ class StorageService
      */
     private function getEnvPrefix(): string
     {
-        return PlatformSetting::getValue('storage.s3.env', 'demo');
+        $prefix = trim((string) PlatformSetting::getValue('storage.s3.env', 'demo'), '/');
+
+        return filled($prefix) ? $prefix : 'demo';
     }
 
     /**
      * Upload a file to storage.
      *
-     * @param UploadedFile $file
-     * @param string $path Path within storage (e.g., "shipments/1/items/1")
+     * @param  string  $path  Path within storage (e.g., "shipments/1/items/1")
      * @return array{path: string, original_name: string, size: int}
      */
     public function upload(UploadedFile $file, string $path): array
@@ -140,15 +166,14 @@ class StorageService
         $disk = $this->getDisk();
 
         // Generate unique filename
-        $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+        $filename = time().'_'.uniqid().'.'.$file->getClientOriginalExtension();
 
         // Add environment prefix for S3
         $fullPath = $driver === 's3'
-            ? $this->getEnvPrefix() . '/' . $path . '/' . $filename
-            : $path . '/' . $filename;
+            ? $this->getEnvPrefix().'/'.$path.'/'.$filename
+            : $path.'/'.$filename;
 
-        // Store the file
-        $disk->put($fullPath, file_get_contents($file->getRealPath()));
+        $this->writeToDisk($disk, $fullPath, file_get_contents($file->getRealPath()));
 
         return [
             'path' => $fullPath,
@@ -160,8 +185,7 @@ class StorageService
     /**
      * Compatibility alias for older controllers.
      *
-     * @param UploadedFile $file
-     * @param string $path Path within storage.
+     * @param  string  $path  Path within storage.
      * @return array{path: string, original_name: string, size: int}
      */
     public function uploadFile(UploadedFile $file, string $path): array
@@ -183,10 +207,10 @@ class StorageService
         }
 
         $fullPath = $driver === 's3'
-            ? $this->getEnvPrefix() . '/' . ltrim($path, '/')
+            ? $this->getEnvPrefix().'/'.ltrim($path, '/')
             : ltrim($path, '/');
 
-        $this->getDisk()->put($fullPath, $contents);
+        $this->writeToDisk($this->getDisk(), $fullPath, $contents);
 
         return [
             'path' => $fullPath,
@@ -286,6 +310,74 @@ class StorageService
     }
 
     /**
+     * Return a redacted storage health summary for the admin settings screen.
+     *
+     * @return array<string, mixed>
+     */
+    public function connectionStatus(): array
+    {
+        $driver = $this->getDriver();
+
+        if ($driver !== 's3') {
+            $localPath = storage_path('app/public');
+            $publicLink = public_path('storage');
+            $linked = is_link($publicLink) || file_exists($publicLink);
+            $writable = is_dir($localPath) && is_writable($localPath);
+
+            return [
+                'driver' => 'local',
+                'configured' => true,
+                'reachable' => $linked && $writable,
+                'message' => $linked && $writable
+                    ? 'Local public storage is linked and writable.'
+                    : 'Local public storage needs a writable directory and public storage link.',
+                'local_path' => $localPath,
+                'public_linked' => $linked,
+                'writable' => $writable,
+            ];
+        }
+
+        $config = $this->getS3Config();
+        $missing = $this->missingS3ConfigFields();
+
+        $status = [
+            'driver' => 's3',
+            'configured' => $missing === [],
+            'reachable' => false,
+            'message' => $missing === []
+                ? 'Storj configuration is complete; checking bucket reachability.'
+                : 'Storj configuration is incomplete: '.implode(', ', $missing).'.',
+            'bucket' => $config['bucket'],
+            'endpoint' => $config['endpoint'],
+            'region' => $config['region'],
+            'prefix' => $this->getEnvPrefix(),
+            'signed_url_expiry' => (int) PlatformSetting::getValue('storage.s3.signed_url_expiry', 60),
+            'access_key_configured' => filled($config['key']),
+            'secret_key_configured' => filled($config['secret']),
+            'missing_fields' => $missing,
+        ];
+
+        if ($missing !== []) {
+            return $status;
+        }
+
+        try {
+            $this->getS3Client()->listObjectsV2([
+                'Bucket' => $config['bucket'],
+                'Prefix' => trim($this->getEnvPrefix(), '/').'/',
+                'MaxKeys' => 1,
+            ]);
+
+            $status['reachable'] = true;
+            $status['message'] = 'Storj bucket is reachable with the saved database settings.';
+        } catch (\Throwable $e) {
+            $status['message'] = 'Storj bucket check failed: '.$this->sanitizeStorageError($e->getMessage());
+        }
+
+        return $status;
+    }
+
+    /**
      * Get file size.
      */
     public function size(string $path): int
@@ -300,6 +392,27 @@ class StorageService
     private function publicDisk(): Filesystem
     {
         return $this->publicDisk ??= Storage::disk('public');
+    }
+
+    private function writeToDisk(Filesystem $disk, string $path, string $contents): void
+    {
+        try {
+            $written = $disk->put($path, $contents);
+        } catch (\Throwable $e) {
+            throw new \RuntimeException('Unable to write file to configured storage disk.', previous: $e);
+        }
+
+        if ($written === false) {
+            throw new \RuntimeException('Unable to write file to configured storage disk.');
+        }
+    }
+
+    private function sanitizeStorageError(string $message): string
+    {
+        $message = preg_replace('/(Credential=)[^,\s&]+/', '$1REDACTED', $message) ?? $message;
+        $message = preg_replace('/(AWSAccessKeyId=)[^,\s&]+/', '$1REDACTED', $message) ?? $message;
+
+        return str($message)->limit(300)->toString();
     }
 
     private function getPublicUrlIfExists(string $path): ?string

@@ -48,6 +48,9 @@ Route::get('/', function () {
     return view('web.landing');
 })->name('web.landing');
 
+Route::get('privacy-policy', fn () => view('web.legal.privacy'))->name('web.privacy');
+Route::get('terms-of-service', fn () => view('web.legal.terms'))->name('web.terms');
+
 Route::get('h/{token}', [BusHandoffPublicController::class, 'show'])->name('bus-handoff.public.show');
 Route::post('h/{token}/confirm', [BusHandoffPublicController::class, 'confirm'])->name('bus-handoff.public.confirm');
 Route::post('h/{token}/issue', [BusHandoffPublicController::class, 'issue'])->name('bus-handoff.public.issue');
