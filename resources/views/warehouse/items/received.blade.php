@@ -152,7 +152,7 @@
                         <select x-model="filters.custody" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                             <option value="">All custody states</option>
                             <option value="at_warehouse">At warehouse</option>
-                            <option value="with_driver">With driver</option>
+                            <option value="with_driver">With rider</option>
                             <option value="bus_handoff">Bus/courier handoff</option>
                             <option value="delivered">Delivered</option>
                         </select>

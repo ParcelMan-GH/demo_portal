@@ -111,12 +111,12 @@ class SettingsController extends Controller
                 'mail_from_name' => ['label' => 'From Name', 'type' => 'text', 'default' => 'Parcelman Express'],
             ],
             'delivery' => [
-                'delivery.allow_skip_verification' => ['label' => 'Allow Drivers to Skip OTP Verification', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, drivers can skip OTP verification during delivery with a reason. The delivery will be flagged for review.'],
+                'delivery.allow_skip_verification' => ['label' => 'Allow Riders to Skip OTP Verification', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, riders can skip OTP verification during delivery with a reason. The delivery will be flagged for review.'],
                 'delivery.show_otp_to_vendor' => ['label' => 'Show OTP Code to Vendor', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, vendors can see the delivery OTP code in their shipment details. This allows recipients to call the vendor for the code if SMS fails.'],
                 'delivery_eta_grace_minutes' => ['label' => 'ETA Grace Period (minutes)', 'type' => 'number', 'default' => '30', 'help' => 'How long after a package ETA before it is flagged as overdue.'],
                 'delivery_no_eta_threshold_hours' => ['label' => 'No ETA Threshold (hours)', 'type' => 'number', 'default' => '4', 'help' => 'How long after dispatch before active packages without ETA are flagged for follow-up.'],
                 'contact_queue.auto_queue_on_transport_receive' => ['label' => 'Auto-Queue on Transport Manifest Receive', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, items from incoming transport manifests are automatically added to the contact queue when received at the warehouse.'],
-                'transport.scan_issue_auto_accept' => ['label' => 'Auto-Accept Transport Scan Issues', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, driver scan issue reports with proof photos immediately mark the selected load group or package as loaded. When disabled, admins must review them first.'],
+                'transport.scan_issue_auto_accept' => ['label' => 'Auto-Accept Transport Scan Issues', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, rider scan issue reports with proof photos immediately mark the selected load group or package as loaded. When disabled, admins must review them first.'],
             ],
             'pricing' => [
                 'vendor_commission.enabled' => ['label' => 'Enable Vendor Commission', 'type' => 'toggle', 'default' => '0', 'help' => 'When enabled, vendors earn a commission for each package delivered to their recipients. Can be overridden per vendor on their profile.'],

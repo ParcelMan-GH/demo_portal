@@ -43,7 +43,7 @@ function registerWarehouseIncomingManifestsPage() {
             { key: 'manifest_number', label: 'Manifest', exportLabel: 'Manifest Number' },
             { key: 'origin_warehouse', label: 'Origin', exportLabel: 'Origin', sortKey: 'origin_warehouse_id' },
             { key: 'status', label: 'Status' },
-            { key: 'driver_name', label: 'Driver', exportLabel: 'Driver', sortable: false },
+            { key: 'driver_name', label: 'Rider', exportLabel: 'Rider', sortable: false },
             { key: 'items_count', label: 'Items', exportLabel: 'Items' },
             { key: 'received_count', label: 'Received', exportLabel: 'Received', sortable: false },
             { key: 'arrived_at', label: 'Arrived At', exportLabel: 'Arrived At' },
@@ -794,7 +794,7 @@ function registerWarehouseIncomingManifestsPage() {
                 const labels = {
                     status: 'Status',
                     origin_warehouse_id: 'Origin',
-                    driver_id: 'Driver',
+                    driver_id: 'Rider',
                     date_from: 'Date from',
                     date_to: 'Date to',
                 };

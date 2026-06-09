@@ -138,7 +138,7 @@ class RoleSeeder extends Seeder
             [
                 'slug' => 'warehouse_dispatcher',
                 'name' => 'Warehouse Dispatcher',
-                'description' => 'Assigns transport and delivery drivers.',
+                'description' => 'Assigns transport and delivery riders.',
                 'assignable' => true,
                 'permissions' => $this->permissionIds([
                     'warehouse.dashboard.view',

@@ -39,7 +39,7 @@ class SendDriverAssignmentNotification
 
         // 2. Notify warehouse managers at the target warehouse
         if ($assignment->targetWarehouse) {
-            $driverName = $driver->name ?? 'A driver';
+            $driverName = $driver->name ?? 'A rider';
 
             $this->pushService->sendToWarehouseManagers(
                 warehouse: $assignment->targetWarehouse,

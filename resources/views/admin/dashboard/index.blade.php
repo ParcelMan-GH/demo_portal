@@ -92,7 +92,7 @@
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                             @php
                                 $dispatch = [
-                                    ['title' => 'Assign Pickup Driver', 'desc' => 'Pickup assignments', 'img' => 'assign-driver.svg', 'route' => route('admin.pickups.index')],
+                                    ['title' => 'Assign Pickup Rider', 'desc' => 'Pickup assignments', 'img' => 'assign-driver.svg', 'route' => route('admin.pickups.index')],
                                     ['title' => 'Sort Batch', 'desc' => 'Sort parcels', 'img' => 'sort-batch.svg', 'route' => route('admin.sort-batches.index')],
                                     ['title' => 'Delivery Run', 'desc' => 'Outbound runs', 'img' => 'delivery-run.svg', 'route' => route('admin.delivery-runs.index')],
                                     ['title' => 'Transport Manifest', 'desc' => 'Inter-warehouse', 'img' => 'transport-manifest.svg', 'route' => route('admin.transport-manifests.index')],
@@ -288,7 +288,7 @@
                         </div>
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-semibold text-slate-900">{{ $run->run_number }}</p>
-                            <p class="text-xs text-slate-400">{{ $run->assignedDriver?->name ?? 'No driver' }}</p>
+                            <p class="text-xs text-slate-400">{{ $run->assignedDriver?->name ?? 'No rider' }}</p>
                         </div>
                         <svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     </a>
@@ -324,7 +324,7 @@
                         </div>
                         <div>
                             <p class="text-sm font-bold">{{ number_format($totalDrivers) }}</p>
-                            <p class="text-[10px] text-slate-500">Drivers</p>
+                            <p class="text-[10px] text-slate-500">Riders</p>
                         </div>
                         <div>
                             <p class="text-sm font-bold">{{ number_format($totalLabels) }}</p>

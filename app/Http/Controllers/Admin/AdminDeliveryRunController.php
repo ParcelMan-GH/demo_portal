@@ -208,8 +208,8 @@ class AdminDeliveryRunController extends Controller
         $rows = $runs->map(fn(DeliveryRun $run) => [
             'Run #'          => $run->run_number,
             'Warehouse'      => $run->warehouse?->name ?? '—',
-            'Driver'         => $run->assignedDriver?->name ?? '—',
-            'Driver Phone'   => $run->assignedDriver?->phone ?? '—',
+            'Rider'          => $run->assignedDriver?->name ?? '—',
+            'Rider Phone'   => $run->assignedDriver?->phone ?? '—',
             'Stops'          => $run->stops_count,
             'Items'          => $run->items_count,
             'Status'         => $this->formatStatusLabel($run->status),
@@ -303,7 +303,7 @@ class AdminDeliveryRunController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Driver assigned to delivery run.',
+            'message' => 'Rider assigned to delivery run.',
             'data' => ['run' => $run->fresh()],
         ]);
     }

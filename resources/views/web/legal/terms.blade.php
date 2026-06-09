@@ -35,7 +35,7 @@
     <h2>2. Definitions</h2>
     <ul>
         <li><strong>Vendor</strong> — a shop, online seller, or business that requests parcel pickup and delivery.</li>
-        <li><strong>Driver</strong> — a rider or courier who picks up, transports, or delivers parcels.</li>
+        <li><strong>Rider</strong> — a rider or courier who picks up, transports, or delivers parcels.</li>
         <li><strong>Recipient</strong> — the person a vendor asks us to deliver a parcel to.</li>
         <li><strong>Parcel</strong> — the package(s) and contents submitted for pickup and delivery.</li>
     </ul>
@@ -51,7 +51,7 @@
     <h2>4. The Services</h2>
     <p>
         Parcelman is an app-led platform that lets vendors request parcel pickups and track delivery progress,
-        and coordinates pickup, transport, and delivery through our network of drivers and warehouses. Service
+        and coordinates pickup, transport, and delivery through our network of riders and warehouses. Service
         availability, coverage areas, and options (such as vehicle type or same-day delivery) may vary and are
         confirmed during onboarding or at the time of a request.
     </p>

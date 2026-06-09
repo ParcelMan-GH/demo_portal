@@ -940,11 +940,11 @@ class RecipientPaymentController extends Controller
         $pickupPhotos = $item->shipment?->pickupAssignment?->photos
             ?->filter(fn ($photo) => !$photo->shipment_item_id || (int) $photo->shipment_item_id === (int) $item->id)
             ->values()
-            ->map(fn ($photo) => $this->photoPayload($photo, 'Pickup driver photo'))
+            ->map(fn ($photo) => $this->photoPayload($photo, 'Pickup rider photo'))
             ?? collect();
 
         if ($pickupPhotos->isNotEmpty()) {
-            return ['source' => 'pickup_driver', 'source_label' => 'Pickup driver photos', 'photos' => $pickupPhotos];
+            return ['source' => 'pickup_driver', 'source_label' => 'Pickup rider photos', 'photos' => $pickupPhotos];
         }
 
         $receiptPhotos = $item->warehouseReceiptItems

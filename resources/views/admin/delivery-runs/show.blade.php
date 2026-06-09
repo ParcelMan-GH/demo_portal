@@ -1414,7 +1414,7 @@ $itemStatusColors = [
                                         ->values();
 
                                     $driverPhotos = $proofPhotoUrl ? collect([
-                                        ['url' => $proofPhotoUrl, 'title' => 'Driver photo'],
+                                        ['url' => $proofPhotoUrl, 'title' => 'Rider photo'],
                                     ]) : collect();
 
                                     $receiptPhotos = collect($item->shipmentItem?->warehouseReceiptItems ?? [])

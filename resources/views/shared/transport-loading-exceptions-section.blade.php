@@ -25,7 +25,7 @@
             </div>
             <div>
                 <h3 class="text-sm font-bold text-slate-900">Transport Scan Issues</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Driver-reported scan problems with proof photos.</p>
+                <p class="text-xs text-slate-500 mt-0.5">Rider-reported scan problems with proof photos.</p>
             </div>
         </div>
     </div>
@@ -38,7 +38,7 @@
                         <tr>
                             <th class="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Target</th>
                             <th class="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Reason</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Driver</th>
+                            <th class="px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Rider</th>
                             <th class="px-4 py-2.5 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Proof</th>
                             <th class="px-4 py-2.5 text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                             <th class="px-4 py-2.5 text-right text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Action</th>
@@ -66,7 +66,7 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-3">
-                                    <p class="text-xs font-medium text-slate-700">{{ $issue->driver?->name ?? 'Driver' }}</p>
+                                    <p class="text-xs font-medium text-slate-700">{{ $issue->driver?->name ?? 'Rider' }}</p>
                                     <p class="text-[10px] text-slate-400">{{ $issue->created_at?->format('M d, Y H:i') }}</p>
                                 </td>
                                 <td class="px-4 py-3 text-center">

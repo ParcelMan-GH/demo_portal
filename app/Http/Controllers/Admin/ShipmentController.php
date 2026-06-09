@@ -383,16 +383,16 @@ class ShipmentController extends Controller
         foreach ($shipment->pickupAssignments->sortBy('id') as $assignment) {
             if ($assignment->assigned_at) {
                 $ts = $assignment->assigned_at->format('Y-m-d H:i:s');
-                $label = 'Pickup Driver Assigned: '.($assignment->driver?->name ?? 'Unknown');
-                $timeline[] = ['status' => 'pickup_assigned', 'label' => $label, 'status_label' => 'Driver Assigned', 'timestamp' => $ts, 'created_at' => $ts];
+                $label = 'Pickup Rider Assigned: '.($assignment->driver?->name ?? 'Unknown');
+                $timeline[] = ['status' => 'pickup_assigned', 'label' => $label, 'status_label' => 'Rider Assigned', 'timestamp' => $ts, 'created_at' => $ts];
             }
             if ($assignment->en_route_at) {
                 $ts = $assignment->en_route_at->format('Y-m-d H:i:s');
-                $timeline[] = ['status' => 'en_route', 'label' => 'Driver En Route to Vendor', 'status_label' => 'En Route', 'timestamp' => $ts, 'created_at' => $ts];
+                $timeline[] = ['status' => 'en_route', 'label' => 'Rider En Route to Vendor', 'status_label' => 'En Route', 'timestamp' => $ts, 'created_at' => $ts];
             }
             if ($assignment->arrived_at) {
                 $ts = $assignment->arrived_at->format('Y-m-d H:i:s');
-                $timeline[] = ['status' => 'arrived', 'label' => 'Driver Arrived at Vendor', 'status_label' => 'Driver Arrived', 'timestamp' => $ts, 'created_at' => $ts];
+                $timeline[] = ['status' => 'arrived', 'label' => 'Rider Arrived at Vendor', 'status_label' => 'Rider Arrived', 'timestamp' => $ts, 'created_at' => $ts];
             }
             if ($assignment->picked_up_at) {
                 $ts = $assignment->picked_up_at->format('Y-m-d H:i:s');
@@ -401,7 +401,7 @@ class ShipmentController extends Controller
             if ($assignment->arrived_warehouse_at) {
                 $ts = $assignment->arrived_warehouse_at->format('Y-m-d H:i:s');
                 $location = $assignment->targetWarehouse?->name ?? $assignment->receivedWarehouse?->name;
-                $timeline[] = ['status' => 'arrived_warehouse', 'label' => 'Driver Arrived at Warehouse', 'status_label' => 'Arrived Warehouse', 'timestamp' => $ts, 'created_at' => $ts, 'location' => $location];
+                $timeline[] = ['status' => 'arrived_warehouse', 'label' => 'Rider Arrived at Warehouse', 'status_label' => 'Arrived Warehouse', 'timestamp' => $ts, 'created_at' => $ts, 'location' => $location];
             }
             if ($assignment->received_at) {
                 $ts = $assignment->received_at->format('Y-m-d H:i:s');
@@ -448,7 +448,7 @@ class ShipmentController extends Controller
                     'status_label' => 'In Transit',
                     'timestamp' => $ts, 'created_at' => $ts,
                     'location' => ($manifest->originWarehouse?->name ?? '?').' → '.($manifest->destinationWarehouse?->name ?? '?'),
-                    'description' => 'Driver: '.($manifest->assignedDriver?->name ?? 'Unknown'),
+                    'description' => 'Rider: '.($manifest->assignedDriver?->name ?? 'Unknown'),
                     'meta' => ['manifest_id' => $manifest->id, 'manifest_number' => $manifest->manifest_number],
                 ];
             }
@@ -486,7 +486,7 @@ class ShipmentController extends Controller
                     'status_label' => 'Out for Delivery',
                     'timestamp' => $ts, 'created_at' => $ts,
                     'location' => $run->warehouse?->name,
-                    'description' => 'Driver: '.($run->assignedDriver?->name ?? 'Unknown'),
+                    'description' => 'Rider: '.($run->assignedDriver?->name ?? 'Unknown'),
                     'meta' => ['run_id' => $run->id, 'run_number' => $run->run_number],
                 ];
             }
@@ -627,7 +627,7 @@ class ShipmentController extends Controller
                 'Order #' => $s->shipment_number,
                 'Vendor' => $s->vendor?->name,
                 'Pickup Contact' => trim(($s->pickup_contact_name ?: '-').' / '.($s->pickup_contact_phone ?: '-'), ' /'),
-                'Pickup Driver' => $assignment?->driver?->name,
+                'Pickup Rider' => $assignment?->driver?->name,
                 'Target Warehouse' => $assignment?->targetWarehouse?->name,
                 'Destination Mode' => $s->destination_mode?->label() ?? 'Single Destination',
                 'Destination Summary' => trim($summary['title'].' - '.$summary['subtitle'], ' -'),
@@ -1338,8 +1338,8 @@ class ShipmentController extends Controller
 
         $shipment->forceFill($updates)->save();
 
-        $title = 'Shipment request rejected';
-        $body = "{$shipment->shipment_number} was rejected: {$reason}";
+        $title = 'Parcel request rejected';
+        $body = "Your parcel request {$shipment->shipment_number} was rejected: {$reason}";
         $data = [
             'shipment_id' => (string) $shipment->id,
             'shipment_number' => $shipment->shipment_number,
@@ -1495,7 +1495,7 @@ class ShipmentController extends Controller
                     $shipment,
                     $assignment,
                     Auth::guard('admin')->user(),
-                    'Pickup auto-completed during warehouse receiving because the driver could not confirm pickup from mobile.'
+                    'Pickup auto-completed during warehouse receiving because the rider could not confirm pickup from mobile.'
                 );
                 $shipment = $this->reloadReceivingShipment($shipment->fresh());
                 $item = $shipment->items->firstWhere('id', $item->id) ?? $item->fresh();
@@ -2145,7 +2145,7 @@ class ShipmentController extends Controller
 
         $assignment = $shipment->pickupAssignment;
         if (! $this->canReceiveInAdminWorkspace($assignment)) {
-            return response()->json(['success' => false, 'message' => 'Assign a pickup driver and target warehouse before receiving packages.'], 422);
+            return response()->json(['success' => false, 'message' => 'Assign a pickup rider and target warehouse before receiving packages.'], 422);
         }
 
         $warehouse = $assignment->targetWarehouse;
@@ -2187,7 +2187,7 @@ class ShipmentController extends Controller
                 $shipment,
                 $assignment,
                 Auth::guard('admin')->user(),
-                'Pickup auto-completed during warehouse receiving because the driver could not confirm pickup from mobile.'
+                'Pickup auto-completed during warehouse receiving because the rider could not confirm pickup from mobile.'
             );
             $shipment = $this->reloadReceivingShipment($shipment->fresh());
             $item = $shipment->items->firstWhere('id', $item->id) ?? $item->fresh();
@@ -2753,7 +2753,7 @@ class ShipmentController extends Controller
         }
 
         if ($this->receiptItemHasActiveLabelCustody($receiptItem)) {
-            return 'This package has labels already claimed by a driver or delivered.';
+            return 'This package has labels already claimed by a rider or delivered.';
         }
 
         return null;
@@ -3096,7 +3096,7 @@ class ShipmentController extends Controller
 
                 return [
                     'driver_id' => $first['id'],
-                    'name' => $first['name'] ?: 'Unknown driver',
+                    'name' => $first['name'] ?: 'Unknown rider',
                     'phone' => $first['phone'] ?: '',
                     'count' => $driverLabels->count(),
                     'barcodes' => $driverLabels->pluck('barcode')->values()->all(),
@@ -3713,7 +3713,7 @@ class ShipmentController extends Controller
 
         if ($assignment?->assigned_at) {
             $events->push([
-                'label' => 'Pickup driver assigned',
+                'label' => 'Pickup rider assigned',
                 'status' => 'assigned',
                 'location' => $assignment->targetWarehouse?->name,
                 'notes' => trim(($assignment->driver?->name ?: '').' '.($assignment->driver?->phone ?: '')) ?: null,
@@ -3723,7 +3723,7 @@ class ShipmentController extends Controller
 
         if ($assignment?->picked_up_at || $assignment?->completed_at) {
             $events->push([
-                'label' => 'Picked up by driver',
+                'label' => 'Picked up by rider',
                 'status' => 'picked_up',
                 'location' => $shipment->pickup_town ?: $shipment->pickup_gh_post_address,
                 'notes' => trim(($assignment->driver?->name ?: '').' '.($assignment->driver?->phone ?: '')) ?: null,

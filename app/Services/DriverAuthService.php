@@ -63,7 +63,7 @@ class DriverAuthService
         $this->activityLogService->log(
             $driver->id,
             'driver_login',
-            'Driver logged in successfully',
+            'Rider logged in successfully',
             $request
         );
 
@@ -93,7 +93,7 @@ class DriverAuthService
         $this->activityLogService->log(
             $driver->id,
             'driver_logout',
-            'Driver logged out',
+            'Rider logged out',
             $request
         );
 

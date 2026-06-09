@@ -272,7 +272,7 @@
                                 'roles' => 'Roles',
                                 'vendors' => 'Vendors',
                                 'shipments' => 'Orders',
-                                'drivers' => 'Drivers',
+                                'drivers' => 'Riders',
                                 'warehouses' => 'Warehouses',
                                 'warehouse' => 'Warehouse Ops',
                                 'settings' => 'Settings',

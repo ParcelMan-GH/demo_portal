@@ -2,17 +2,27 @@
 
 use App\Http\Middleware\LogAdminAuditActivity;
 use App\Models\Driver;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Warehouse;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 
 function createDriverAdminUserForPhoneUpdateTest(): User
 {
+    $warehouse = Warehouse::create([
+        'name' => 'HQ Warehouse',
+        'code' => 'WH-HQ',
+        'is_active' => true,
+        'is_hq' => true,
+        'can_administer_system' => true,
+    ]);
+
     $user = User::factory()->create([
         'is_active' => true,
-        'warehouse_id' => null,
+        'warehouse_id' => $warehouse->id,
     ]);
 
     $role = Role::create([
@@ -23,10 +33,23 @@ function createDriverAdminUserForPhoneUpdateTest(): User
         'is_active' => true,
     ]);
 
+    $permission = Permission::create([
+        'module' => 'drivers',
+        'action' => 'edit',
+        'name' => 'drivers.edit',
+        'description' => 'Edit existing riders',
+        'sort_order' => 62,
+        'is_active' => true,
+    ]);
+
+    $role->permissions()->attach($permission->id);
+
     $user->roles()->attach($role->id, [
         'assigned_at' => now(),
         'assigned_by' => $user->id,
     ]);
+
+    $user->flushPermissionCache();
 
     return $user;
 }
@@ -36,9 +59,12 @@ function buildDriverPhoneUpdateTestSchema(): void
     Schema::disableForeignKeyConstraints();
     foreach ([
         'drivers',
+        'role_permissions',
+        'permissions',
         'user_roles',
         'roles',
         'users',
+        'warehouses',
     ] as $table) {
         Schema::dropIfExists($table);
     }
@@ -59,6 +85,17 @@ function buildDriverPhoneUpdateTestSchema(): void
         $table->timestamps();
     });
 
+    Schema::create('warehouses', function (Blueprint $table) {
+        $table->id();
+        $table->string('name');
+        $table->string('code')->unique();
+        $table->boolean('is_active')->default(true);
+        $table->boolean('is_hq')->default(false);
+        $table->boolean('can_administer_system')->default(false);
+        $table->timestamps();
+        $table->softDeletes();
+    });
+
     Schema::create('roles', function (Blueprint $table) {
         $table->id();
         $table->string('name')->unique();
@@ -66,6 +103,24 @@ function buildDriverPhoneUpdateTestSchema(): void
         $table->text('description')->nullable();
         $table->boolean('is_system_role')->default(false);
         $table->boolean('is_active')->default(true);
+        $table->timestamps();
+    });
+
+    Schema::create('permissions', function (Blueprint $table) {
+        $table->id();
+        $table->string('module');
+        $table->string('action');
+        $table->string('name')->unique();
+        $table->text('description')->nullable();
+        $table->integer('sort_order')->default(0);
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+    });
+
+    Schema::create('role_permissions', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('role_id')->constrained('roles')->cascadeOnDelete();
+        $table->foreignId('permission_id')->constrained('permissions')->cascadeOnDelete();
         $table->timestamps();
     });
 
@@ -99,7 +154,7 @@ function buildDriverPhoneUpdateTestSchema(): void
 function createDriverRecordForPhoneUpdateTest(array $overrides = []): Driver
 {
     return Driver::create(array_merge([
-        'name' => 'John Driver',
+        'name' => 'John Rider',
         'email' => 'driver@example.test',
         'phone' => '+233244111111',
         'password' => Hash::make('password123'),
@@ -122,7 +177,7 @@ test('admin can update a driver phone number from the driver management endpoint
     $driver = createDriverRecordForPhoneUpdateTest();
 
     $response = $this->putJson(route('admin.drivers.update', $driver), [
-        'name' => 'John Driver',
+        'name' => 'John Rider',
         'email' => 'driver@example.test',
         'phone' => '0541234567',
         'vehicle_type' => 'van',

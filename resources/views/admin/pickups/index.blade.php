@@ -32,7 +32,7 @@
                     </div>
                     <div>
                         <h2 class="text-lg font-semibold text-slate-900">Pickup Assignments</h2>
-                        <p class="mt-0.5 text-sm text-slate-500">Track driver pickup assignments and statuses</p>
+                        <p class="mt-0.5 text-sm text-slate-500">Track rider pickup assignments and statuses</p>
                     </div>
                 </div>
                 <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-violet-100 text-violet-700" x-text="meta.total + ' Total'">
@@ -50,7 +50,7 @@
                             type="text"
                             x-model="search"
                             @@input.debounce.500ms="loadData()"
-                            placeholder="Search shipment, driver, vendor..."
+                            placeholder="Search shipment, rider, vendor..."
                             class="w-full px-3 py-2 pr-10 border border-slate-200/70 rounded-xl bg-white/70 backdrop-blur-sm focus:ring-2 focus:ring-slate-400/50 focus:border-slate-300 text-sm text-slate-900 placeholder-slate-400 transition-colors"
                         >
                         <svg class="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -201,7 +201,7 @@
                             VENDOR
                         </th>
                         <th x-show="visibleColumns.driver" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            DRIVER
+                            RIDER
                         </th>
                         <th x-show="visibleColumns.warehouse" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             TARGET WAREHOUSE
@@ -438,13 +438,13 @@
         <div x-show="showEditModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" @@click.stop class="relative w-full max-w-md bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50">
             <div class="px-6 py-5 border-b border-slate-200/50">
                 <h3 class="text-lg font-bold text-slate-900">Edit Assignment</h3>
-                <p class="text-sm text-slate-500 mt-1">Change driver or target warehouse</p>
+                <p class="text-sm text-slate-500 mt-1">Change rider or target warehouse</p>
             </div>
             <form @@submit.prevent="saveEdit()">
                 <div class="space-y-5 px-6 py-6">
-                    <!-- Driver Select -->
+                    <!-- Rider Select -->
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Driver</label>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Rider</label>
                         <select x-model="editForm.driver_id" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white text-sm text-slate-900 focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all">
                             <template x-for="d in availableDrivers" :key="d.id">
                                 <option :value="d.id" x-text="d.name + ' (' + d.phone + ')'"></option>

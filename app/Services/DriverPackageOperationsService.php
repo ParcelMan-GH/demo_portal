@@ -288,7 +288,7 @@ class DriverPackageOperationsService
     public function pendingTransferForItem(int $shipmentItemId): ?RiderPackageTransfer
     {
         return RiderPackageTransfer::query()
-            ->with(['fromDriver:id,name,phone', 'toDriver:id,name,phone'])
+            ->with(['fromRider:id,name,phone', 'toRider:id,name,phone'])
             ->where('shipment_item_id', $shipmentItemId)
             ->where('status', RiderPackageTransfer::STATUS_PENDING)
             ->latest('requested_at')

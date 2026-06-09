@@ -31,7 +31,7 @@
 
     $timeline = [
         ['label' => 'Created', 'value' => $run->created_at, 'dot' => 'bg-slate-500'],
-        ['label' => 'Driver Assigned', 'value' => $run->assigned_at, 'dot' => 'bg-blue-500'],
+        ['label' => 'Rider Assigned', 'value' => $run->assigned_at, 'dot' => 'bg-blue-500'],
         ['label' => 'Dispatched', 'value' => $run->dispatched_at, 'dot' => 'bg-violet-500'],
         ['label' => 'Completed', 'value' => $run->completed_at, 'dot' => 'bg-emerald-500'],
     ];
@@ -363,7 +363,7 @@
                             </div>
                         </div>
 
-                        {{-- Widget: Driver Assignment --}}
+                        {{-- Widget: Rider Assignment --}}
                         <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200/80">
                             {{-- Gradient Header --}}
                             <div class="bg-gradient-to-br from-teal-500 to-emerald-600 px-5 py-4">
@@ -375,11 +375,11 @@
                                             </svg>
                                         </div>
                                         <div>
-                                            <h3 class="text-sm font-bold text-white leading-none">Driver Assignment</h3>
+                                            <h3 class="text-sm font-bold text-white leading-none">Rider Assignment</h3>
                                             @if($run->assignedDriver)
                                                 <p class="text-[11px] text-white/60 mt-0.5">{{ $run->assignedDriver->name }}</p>
                                             @else
-                                                <p class="text-[11px] text-white/50 mt-0.5">No driver assigned</p>
+                                                <p class="text-[11px] text-white/50 mt-0.5">No rider assigned</p>
                                             @endif
                                         </div>
                                     </div>
@@ -391,25 +391,25 @@
                             {{-- Body --}}
                             <div class="p-5">
                                 @if(!$run->assignedDriver)
-                                    {{-- No driver: show assign button that opens modal --}}
+                                    {{-- No rider: show assign button that opens modal --}}
                                     <div class="text-center py-4">
                                         <div class="w-11 h-11 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center mx-auto mb-3">
                                             <svg class="w-5 h-5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                             </svg>
                                         </div>
-                                        <p class="text-sm font-medium text-slate-500 mb-3">No driver assigned</p>
+                                        <p class="text-sm font-medium text-slate-500 mb-3">No rider assigned</p>
                                         @if($run->status === 'draft')
                                             <button @@click="showAssignModal = true"
                                                 class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white text-xs font-bold rounded-xl shadow-lg shadow-teal-500/25 transition-all">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                                Assign Driver
+                                                Assign Rider
                                             </button>
                                         @endif
                                     </div>
                                 @else
                                     {{-- Has driver --}}
-                                    {{-- Driver info --}}
+                                    {{-- Rider info --}}
                                     <div class="flex items-center gap-3 mb-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
                                         <div class="w-10 h-10 rounded-full ring-2 ring-teal-200 bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white font-black text-sm shadow-sm flex-shrink-0">
                                             {{ strtoupper(substr($run->assignedDriver->name, 0, 1)) }}
@@ -984,13 +984,13 @@
                     $totalCount = count($timeline);
                     $timelineDescriptions = [
                         'Created'          => 'Delivery run created from sorted batch',
-                        'Driver Assigned'  => 'Driver assigned for delivery',
-                        'Dispatched'       => 'Run dispatched, driver out for delivery',
+                        'Rider Assigned'  => 'Rider assigned for delivery',
+                        'Dispatched'       => 'Run dispatched, rider out for delivery',
                         'Completed'        => 'All deliveries completed',
                     ];
                     $timelineIcons = [
                         'Created'          => 'M12 4v16m8-8H4',
-                        'Driver Assigned'  => 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+                        'Rider Assigned'  => 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
                         'Dispatched'       => 'M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z',
                         'Completed'        => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
                     ];
@@ -1085,7 +1085,7 @@
         </div>
     </div>
 
-    {{-- Assign Driver Modal --}}
+    {{-- Assign Rider Modal --}}
     <div x-show="showAssignModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" @@keydown.escape.window="showAssignModal = false">
         <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @@click="showAssignModal = false"></div>
         <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden" @@click.stop>
@@ -1097,8 +1097,8 @@
                         </svg>
                     </div>
                     <div>
-                        <h3 class="text-base font-bold text-slate-900">{{ $run->assignedDriver ? 'Reassign Driver' : 'Assign Driver' }}</h3>
-                        <p class="text-xs text-slate-500">Select a delivery driver for this run</p>
+                        <h3 class="text-base font-bold text-slate-900">{{ $run->assignedDriver ? 'Reassign Rider' : 'Assign Rider' }}</h3>
+                        <p class="text-xs text-slate-500">Select a delivery rider for this run</p>
                     </div>
                 </div>
                 <button @@click="showAssignModal = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
@@ -1107,11 +1107,11 @@
             </div>
             <div class="px-6 py-5">
                 <div class="mb-4">
-                    <label class="block text-sm font-semibold text-slate-700 mb-2">Select Driver <span class="text-rose-500">*</span></label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Select Rider <span class="text-rose-500">*</span></label>
                     <div class="relative">
                         <select x-model="selectedDriverId"
                             class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-sm text-slate-900 transition-all cursor-pointer appearance-none">
-                            <option value="">Choose a driver...</option>
+                            <option value="">Choose a rider...</option>
                             @foreach($deliveryDrivers as $driver)
                                 <option value="{{ $driver->id }}">{{ $driver->name }} — {{ $driver->vehicle_type ?? '' }} {{ $driver->vehicle_number ?? '' }}</option>
                             @endforeach
@@ -1131,7 +1131,7 @@
                     :disabled="actionLoading || !selectedDriverId"
                     class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-teal-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                     <svg x-show="actionLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                    <span x-text="actionLoading ? 'Assigning...' : '{{ $run->assignedDriver ? 'Reassign Driver' : 'Assign Driver' }}'"></span>
+                    <span x-text="actionLoading ? 'Assigning...' : '{{ $run->assignedDriver ? 'Reassign Rider' : 'Assign Rider' }}'"></span>
                 </button>
             </div>
         </div>
@@ -1254,7 +1254,7 @@ document.addEventListener('alpine:init', () => {
 
             async assignDriver() {
                 if (!this.selectedDriverId) {
-                    window.showToast?.('Select a driver first.', 'warning');
+                    window.showToast?.('Select a rider first.', 'warning');
                     return;
                 }
                 this.actionLoading = true;
@@ -1270,13 +1270,13 @@ document.addEventListener('alpine:init', () => {
                         body: JSON.stringify({ driver_id: Number(this.selectedDriverId) }),
                     });
                     const result = await response.json();
-                    if (!response.ok || !result.success) throw new Error(result.message || 'Failed to assign driver.');
-                    window.showToast?.(result.message || 'Driver assigned successfully.', 'success');
+                    if (!response.ok || !result.success) throw new Error(result.message || 'Failed to assign rider.');
+                    window.showToast?.(result.message || 'Rider assigned successfully.', 'success');
                     this.showAssignModal = false;
                     window.location.reload();
                 } catch (error) {
                     console.error(error);
-                    window.showToast?.(error.message || 'Unable to assign driver.', 'error');
+                    window.showToast?.(error.message || 'Unable to assign rider.', 'error');
                 } finally {
                     this.actionLoading = false;
                 }

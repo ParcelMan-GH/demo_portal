@@ -39,7 +39,7 @@
                                 type="text"
                                 x-model="search"
                                 @@input.debounce.500ms="meta.current_page = 1; loadData()"
-                                placeholder="Search package, order, or driver..."
+                                placeholder="Search package, order, or rider..."
                                 class="h-14 w-full rounded-2xl border-2 border-slate-200 bg-white px-4 pl-11 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                             >
                             <svg class="absolute left-4 top-4 h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -163,7 +163,7 @@
 
                         <div class="mt-4 grid grid-cols-2 gap-3">
                             <div class="rounded-xl bg-slate-50 px-3 py-2">
-                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Driver</p>
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Rider</p>
                                 <p class="mt-1 truncate text-sm font-bold text-slate-800" x-text="row.driver_name || '-'"></p>
                             </div>
                             <div class="rounded-xl bg-slate-50 px-3 py-2">
@@ -192,8 +192,8 @@
                     <thead class="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-400">
                         <tr>
                             <th x-show="visibleColumns.shipment_number" @@click="sort('shipment_number')" class="cursor-pointer px-4 py-3">Order #</th>
-                            <th x-show="visibleColumns.driver_name" @@click="sort('driver_name')" class="cursor-pointer px-4 py-3">Driver</th>
-                            <th x-show="visibleColumns.driver_phone" class="px-4 py-3">Driver Phone</th>
+                            <th x-show="visibleColumns.driver_name" @@click="sort('driver_name')" class="cursor-pointer px-4 py-3">Rider</th>
+                            <th x-show="visibleColumns.driver_phone" class="px-4 py-3">Rider Phone</th>
                             <th x-show="visibleColumns.status" @@click="sort('status')" class="cursor-pointer px-4 py-3 text-center">Status</th>
                             <th x-show="visibleColumns.assigned_at" @@click="sort('assigned_at')" class="cursor-pointer px-4 py-3">Assigned At</th>
                             <th x-show="visibleColumns.arrived_warehouse_at" @@click="sort('arrived_warehouse_at')" class="cursor-pointer px-4 py-3">Arrived Warehouse At</th>

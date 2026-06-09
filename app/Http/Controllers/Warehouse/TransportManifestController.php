@@ -1146,7 +1146,7 @@ class TransportManifestController extends Controller
             ->values() ?? collect();
         $driverPhotos = $shipment?->pickupAssignment?->photos
             ?->filter(fn ($photo) => !$photo->shipment_item_id || (int) $photo->shipment_item_id === (int) $shipmentItem?->id)
-            ->map(fn ($photo) => $this->incomingReceivePhotoPayload($photo, 'Driver'))
+            ->map(fn ($photo) => $this->incomingReceivePhotoPayload($photo, 'Rider'))
             ->values() ?? collect();
         $receiptPhotos = $shipmentItem?->warehouseReceiptItems
             ?->flatMap(fn ($receiptItem) => $receiptItem->photos)
@@ -1196,7 +1196,7 @@ class TransportManifestController extends Controller
             'vendor_name' => $shipment?->vendor?->name,
             'photos' => [
                 'primary' => $primaryPhotos->values(),
-                'primary_source' => $vendorPhotos->isNotEmpty() ? 'Vendor' : ($driverPhotos->isNotEmpty() ? 'Driver' : 'Receipt'),
+                'primary_source' => $vendorPhotos->isNotEmpty() ? 'Vendor' : ($driverPhotos->isNotEmpty() ? 'Rider' : 'Receipt'),
                 'vendor' => $vendorPhotos,
                 'driver' => $driverPhotos,
                 'receipt' => $receiptPhotos,

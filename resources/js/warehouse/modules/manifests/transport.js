@@ -30,7 +30,7 @@ function registerWarehouseTransportManifestsPage() {
         { value: 'on_the_road', label: 'On the Road' },
         { value: 'arrived', label: 'Arrived' },
         { value: 'completed', label: 'Completed' },
-        { value: 'needs_driver', label: 'Needs Driver' },
+        { value: 'needs_driver', label: 'Needs Rider' },
         { value: 'cancelled', label: 'Cancelled' },
     ];
 
@@ -46,7 +46,7 @@ function registerWarehouseTransportManifestsPage() {
             { key: 'batch_number', label: 'Batch', exportLabel: 'Batch', sortKey: 'sort_batch_id', visible: false },
             { key: 'destination_warehouse', label: 'Destination', exportLabel: 'Destination', sortKey: 'destination_warehouse_id' },
             { key: 'status', label: 'Status' },
-            { key: 'driver_name', label: 'Driver', exportLabel: 'Driver', sortable: false },
+            { key: 'driver_name', label: 'Rider', exportLabel: 'Rider', sortable: false },
             { key: 'items_count', label: 'Items', exportLabel: 'Items' },
             { key: 'loaded_count', label: 'Loaded', exportLabel: 'Loaded', sortable: false },
             { key: 'created_at', label: 'Created At', exportLabel: 'Created At' },
@@ -75,7 +75,7 @@ function registerWarehouseTransportManifestsPage() {
                 { key: 'on_the_road', label: 'On the Road', icon: 'road', iconClass: 'bg-violet-50 text-violet-700 ring-violet-200' },
                 { key: 'arrived', label: 'Arrived', icon: 'pin', iconClass: 'bg-amber-50 text-amber-700 ring-amber-200' },
                 { key: 'completed', label: 'Completed', icon: 'check', iconClass: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-                { key: 'needs_driver', label: 'Needs Driver', icon: 'driver', iconClass: 'bg-rose-50 text-rose-700 ring-rose-200' },
+                { key: 'needs_driver', label: 'Needs Rider', icon: 'driver', iconClass: 'bg-rose-50 text-rose-700 ring-rose-200' },
             ],
             filters: {
                 status: '',
@@ -194,7 +194,7 @@ function registerWarehouseTransportManifestsPage() {
                 const labels = {
                     status: 'Status',
                     destination_warehouse_id: 'Destination',
-                    driver_id: 'Driver',
+                    driver_id: 'Rider',
                     assigned_state: 'Assignment',
                     date_from: 'Date from',
                     date_to: 'Date to',
@@ -209,7 +209,7 @@ function registerWarehouseTransportManifestsPage() {
                 if (key === 'status') return this.statuses.find((item) => item.value === value)?.label || value;
                 if (key === 'destination_warehouse_id') return this.destinationWarehouses.find((item) => String(item.id) === String(value))?.name || value;
                 if (key === 'driver_id') return this.transportDrivers.find((item) => String(item.id) === String(value))?.name || value;
-                if (key === 'assigned_state') return value === 'unassigned' ? 'Needs driver' : 'Assigned';
+                if (key === 'assigned_state') return value === 'unassigned' ? 'Needs rider' : 'Assigned';
                 return String(value).replace(/_/g, ' ');
             },
 

@@ -233,7 +233,7 @@ test('driver delivery stop handoff summary exposes station fee and proof photo',
         'status' => ShipmentCharge::STATUS_PAID,
         'delivery_run_stop_id' => $stop->id,
         'payment_method' => 'cash',
-        'notes' => 'Driver paid bus courier at handoff',
+        'notes' => 'Rider paid bus courier at handoff',
     ]);
 
     $shipment->setRelation('vendor', null);

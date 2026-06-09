@@ -171,7 +171,7 @@
                         <select x-model="createModal.form.recipient_type" class="w-full rounded-2xl border-2 border-slate-200 px-4 py-3 text-sm font-bold outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                             <option value="vendor">Vendor</option>
                             <option value="recipient">Recipient</option>
-                            <option value="driver">Driver</option>
+                            <option value="driver">Rider</option>
                             <option value="recipient_vendor">Recipient / Vendor</option>
                             <option value="platform_user">Platform User</option>
                         </select>

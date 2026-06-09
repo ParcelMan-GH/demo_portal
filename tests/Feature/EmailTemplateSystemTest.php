@@ -103,9 +103,9 @@ it('pickup assigned sends to the vendor and not an admin', function () {
     EmailTemplate::query()->where('key', EmailTemplate::PICKUP_ASSIGNED)->update(['is_enabled' => true]);
     $shipment = emailTemplateShipment();
     $driver = Driver::query()->create([
-        'name' => 'John Driver',
+        'name' => 'John Rider',
         'phone' => '+233244111111',
-        'email' => 'driver@example.com',
+        'email' => 'rider@example.com',
         'password' => bcrypt('password'),
         'license_number' => 'DRV-001',
         'is_active' => true,

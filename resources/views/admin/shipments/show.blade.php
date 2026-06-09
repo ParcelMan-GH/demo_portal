@@ -554,10 +554,10 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                         <div>
                                             <h3 class="text-sm font-bold text-white leading-none">Pickup Assignment</h3>
                                             <template x-if="assignment">
-                                                <p class="text-[11px] text-white/60 mt-0.5" x-text="assignment.driver?.name || 'Driver assigned'"></p>
+                                                <p class="text-[11px] text-white/60 mt-0.5" x-text="assignment.driver?.name || 'Rider assigned'"></p>
                                             </template>
                                             <template x-if="!assignment">
-                                                <p class="text-[11px] text-white/50 mt-0.5">No driver assigned</p>
+                                                <p class="text-[11px] text-white/50 mt-0.5">No rider assigned</p>
                                             </template>
                                         </div>
                                     </div>
@@ -587,7 +587,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                                                     </svg>
                                                 </div>
-                                                <p class="text-sm font-medium text-slate-500 mb-3">No driver assigned</p>
+                                                <p class="text-sm font-medium text-slate-500 mb-3">No rider assigned</p>
                                                 <button x-show="canManage" @@click="loadAssignmentDependencies(); assignDriverModalOpen = true" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-lg shadow-violet-500/25 transition-all">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                                     Assign Rider
@@ -607,13 +607,13 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                 <!-- Has assignment -->
                                 <template x-if="assignment">
                                     <div>
-                                        <!-- Driver info -->
+                                        <!-- Rider info -->
                                         <div class="flex items-center gap-3 mb-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
                                             <div class="w-10 h-10 rounded-full ring-2 ring-violet-200 bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-black text-sm shadow-sm flex-shrink-0">
                                                 <span x-text="(assignment.driver?.name || '?').charAt(0).toUpperCase()"></span>
                                             </div>
                                             <div class="flex-1 min-w-0">
-                                                <p class="text-sm font-bold text-slate-900 truncate leading-none" x-text="assignment.driver?.name || 'Unknown Driver'"></p>
+                                                <p class="text-sm font-bold text-slate-900 truncate leading-none" x-text="assignment.driver?.name || 'Unknown Rider'"></p>
                                                 <p class="text-xs text-slate-400 mt-0.5" x-text="assignment.driver?.phone || '—'"></p>
                                             </div>
                                         </div>
@@ -812,7 +812,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                             <span x-text="(assignment.driver?.name || '?').charAt(0).toUpperCase()"></span>
                                         </div>
                                         <div class="min-w-0">
-                                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">Driver</p>
+                                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">Rider</p>
                                             <p class="text-sm font-bold text-slate-900 truncate" x-text="assignment.driver?.name || 'Unknown'"></p>
                                             <p class="text-xs text-slate-500" x-text="assignment.driver?.phone || '—'"></p>
                                         </div>
@@ -953,7 +953,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                 <div class="space-y-3">
                     <template x-for="history in assignmentHistory" :key="history.id">
                         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                            <!-- Card Top Bar: Driver + Status -->
+                            <!-- Card Top Bar: Rider + Status -->
                             <div class="flex items-center gap-4 px-5 pt-5 pb-4">
                                 <!-- Avatar -->
                                 <div class="w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-base shadow-sm"
@@ -962,7 +962,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                 </div>
                                 <!-- Name + phone -->
                                 <div class="flex-1 min-w-0">
-                                    <p class="text-sm font-bold text-slate-900 truncate" x-text="history.driver_name || 'Unknown Driver'"></p>
+                                    <p class="text-sm font-bold text-slate-900 truncate" x-text="history.driver_name || 'Unknown Rider'"></p>
                                     <p class="text-xs text-slate-400" x-text="history.driver_phone || '—'"></p>
                                 </div>
                                 <!-- Status badge -->
@@ -1025,7 +1025,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                 </div>
                                 <div>
                                     <h3 class="text-base font-bold text-slate-900">Assign Rider</h3>
-                                    <p class="text-xs text-slate-500">Select driver and target warehouse</p>
+                                    <p class="text-xs text-slate-500">Select rider and target warehouse</p>
                                 </div>
                             </div>
                             <button @@click="assignDriverModalOpen = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
@@ -1035,10 +1035,10 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                         <div class="px-6 py-5">
                             <form @@submit.prevent="assignDriver()">
                                 <div class="mb-4">
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Select Driver <span class="text-rose-500">*</span></label>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Select Rider <span class="text-rose-500">*</span></label>
                                     <div class="relative">
                                         <select x-model="assignmentForm.driver_id" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-sm text-slate-900 transition-all cursor-pointer appearance-none" required>
-                                            <option value="">Choose a driver...</option>
+                                            <option value="">Choose a rider...</option>
                                             <template x-for="driver in availableDrivers" :key="driver.id">
                                                 <option :value="driver.id" x-text="driver.name + ' (' + driver.phone + ')'"></option>
                                             </template>
@@ -1048,10 +1048,10 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                         </div>
                                     </div>
                                     <template x-if="availableDrivers.length === 0 && !assignmentForm.loadingDrivers">
-                                        <p class="mt-1.5 text-xs text-amber-600">No available drivers right now</p>
+                                        <p class="mt-1.5 text-xs text-amber-600">No available riders right now</p>
                                     </template>
                                     <template x-if="assignmentForm.loadingDrivers">
-                                        <p class="mt-1.5 text-xs text-slate-400">Loading drivers...</p>
+                                        <p class="mt-1.5 text-xs text-slate-400">Loading riders...</p>
                                     </template>
                                 </div>
                                 <div class="mb-4">
@@ -1076,7 +1076,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                 </div>
                                 <div class="mb-6">
                                     <label class="block text-sm font-semibold text-slate-700 mb-2">Notes <span class="text-slate-400 font-normal">(optional)</span></label>
-                                    <textarea x-model="assignmentForm.notes" rows="3" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-sm text-slate-900 placeholder-slate-400 transition-all resize-none" placeholder="Optional pickup notes for the driver..."></textarea>
+                                    <textarea x-model="assignmentForm.notes" rows="3" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-sm text-slate-900 placeholder-slate-400 transition-all resize-none" placeholder="Optional pickup notes for the rider..."></textarea>
                                 </div>
                                 <div class="flex justify-end gap-3">
                                     <button type="button" @@click="assignDriverModalOpen = false" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
@@ -1108,7 +1108,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                 </div>
                                 <div>
                                     <h3 class="text-base font-bold text-slate-900">Edit Assignment</h3>
-                                    <p class="text-xs text-slate-500">Change driver or target warehouse</p>
+                                    <p class="text-xs text-slate-500">Change rider or target warehouse</p>
                                 </div>
                             </div>
                             <button @@click="editAssignmentOpen = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
@@ -1118,10 +1118,10 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                         <div class="px-6 py-5">
                             <form @@submit.prevent="updateAssignment()">
                                 <div class="mb-4">
-                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Driver</label>
+                                    <label class="block text-sm font-semibold text-slate-700 mb-2">Rider</label>
                                     <div class="relative">
                                         <select x-model="editAssignmentForm.driver_id" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm text-slate-900 transition-all cursor-pointer appearance-none">
-                                            <option value="">Choose a driver...</option>
+                                            <option value="">Choose a rider...</option>
                                             <template x-for="driver in availableDriversForEdit" :key="driver.id">
                                                 <option :value="driver.id" x-text="driver.name + ' (' + driver.phone + ')'"></option>
                                             </template>
@@ -1131,7 +1131,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                         </div>
                                     </div>
                                     <template x-if="editAssignmentForm.loadingDrivers">
-                                        <p class="mt-1.5 text-xs text-slate-400">Loading drivers...</p>
+                                        <p class="mt-1.5 text-xs text-slate-400">Loading riders...</p>
                                     </template>
                                 </div>
                                 <div class="mb-6">
@@ -1427,12 +1427,12 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                                         <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Declared</span>
                                                         <span class="text-xs font-bold text-slate-700" x-text="item.quantities.vendor_declared"></span>
                                                     </div>
-                                                    <!-- Driver confirmed -->
+                                                    <!-- Rider confirmed -->
                                                     <template x-if="item.quantities.driver_confirmed !== null">
                                                         <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border"
                                                              :class="item.quantities.driver_confirmed !== item.quantities.driver_expected ? 'bg-rose-50 border-rose-200' : 'bg-violet-50 border-violet-100'">
                                                             <span class="text-[9px] font-bold uppercase tracking-wide"
-                                                                  :class="item.quantities.driver_confirmed !== item.quantities.driver_expected ? 'text-rose-400' : 'text-violet-400'">Driver</span>
+                                                                  :class="item.quantities.driver_confirmed !== item.quantities.driver_expected ? 'text-rose-400' : 'text-violet-400'">Rider</span>
                                                             <span class="text-xs font-bold"
                                                                   :class="item.quantities.driver_confirmed !== item.quantities.driver_expected ? 'text-rose-700' : 'text-violet-700'"
                                                                   x-text="item.quantities.driver_confirmed + (item.quantities.driver_expected ? ' / ' + item.quantities.driver_expected : '')"></span>
@@ -1551,7 +1551,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                                         <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
                                                             <template x-if="item.transport_manifest.driver_name">
                                                                 <div class="flex justify-between items-center px-3 py-2 text-[11px]">
-                                                                    <span class="text-slate-400">Driver</span>
+                                                                    <span class="text-slate-400">Rider</span>
                                                                     <span class="font-semibold text-slate-700" x-text="item.transport_manifest.driver_name"></span>
                                                                 </div>
                                                             </template>
@@ -1601,7 +1601,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                                         <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
                                                             <template x-if="item.delivery_run.driver_name">
                                                                 <div class="flex justify-between items-center px-3 py-2 text-[11px]">
-                                                                    <span class="text-slate-400">Driver</span>
+                                                                    <span class="text-slate-400">Rider</span>
                                                                     <span class="font-semibold text-slate-700" x-text="item.delivery_run.driver_name"></span>
                                                                 </div>
                                                             </template>
@@ -1899,7 +1899,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                             </span>
                             <div>
                                 <h3 class="text-sm font-black text-slate-900">Pickup Details</h3>
-                                <p class="mt-0.5 text-xs text-slate-500">Pickup contact, driver, and warehouse handoff summary.</p>
+                                <p class="mt-0.5 text-xs text-slate-500">Pickup contact, rider, and warehouse handoff summary.</p>
                             </div>
                         </div>
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -1907,7 +1907,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                     x-show="assignmentHistory.length > 1"
                                     @@click="openAssignmentHistoryModal()"
                                     class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-all hover:bg-slate-50">
-                                Driver History
+                                Rider History
                             </button>
                             <button type="button"
                                     x-show="canManage"
@@ -1934,7 +1934,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                             <p class="min-w-0 font-semibold text-slate-900" x-text="pickupVehicleSummary()"></p>
                         </div>
                         <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
-                            <p class="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400 sm:w-36">Pickup Driver:</p>
+                            <p class="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400 sm:w-36">Pickup Rider:</p>
                             <p class="min-w-0 font-semibold text-slate-900">
                                 <span x-text="assignment ? (assignmentDriverName() + ', ' + assignmentDriverPhone()) : 'Unassigned'"></span>
                                 <button type="button"
@@ -1964,8 +1964,8 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                             <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                         </div>
                         <p class="text-sm font-bold text-slate-800">Waiting for Pickup</p>
-                        <p class="text-xs text-slate-500 mt-1">The driver hasn't confirmed pickup yet. If the packages have arrived, you can mark it as picked up manually.</p>
-                        <p x-show="!assignment" class="mt-3 text-xs font-semibold text-indigo-600">Assign a pickup driver before manually completing pickup.</p>
+                        <p class="text-xs text-slate-500 mt-1">The rider hasn't confirmed pickup yet. If the packages have arrived, you can mark it as picked up manually.</p>
+                        <p x-show="!assignment" class="mt-3 text-xs font-semibold text-indigo-600">Assign a pickup rider before manually completing pickup.</p>
                         <button x-show="assignment" @@click="adminCompletePickup()" :disabled="receiving.completingPickup"
                                 class="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-50 shadow-sm">
                             <svg x-show="receiving.completingPickup" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
@@ -1988,7 +1988,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                                 </span>
                                                 <div>
                                                     <h3 class="text-sm font-black text-slate-900">Pickup Details</h3>
-                                                    <p class="mt-0.5 text-xs text-slate-500">Pickup contact, driver, and warehouse handoff summary.</p>
+                                                    <p class="mt-0.5 text-xs text-slate-500">Pickup contact, rider, and warehouse handoff summary.</p>
                                                 </div>
                                             </div>
                                             <div class="flex flex-wrap gap-2 xl:justify-end">
@@ -1996,7 +1996,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                                         x-show="assignmentHistory.length > 1"
                                                         @@click="openAssignmentHistoryModal()"
                                                         class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-all hover:bg-slate-50">
-                                                    Driver History
+                                                    Rider History
                                                 </button>
                                                 <button type="button"
                                                         x-show="canManage"
@@ -2019,7 +2019,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                                 <p class="min-w-0 font-medium text-slate-700" x-text="shipment.pickup_instructions || '-'"></p>
                                             </div>
                                             <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
-                                                <p class="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400 sm:w-32">Pickup Driver:</p>
+                                                <p class="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400 sm:w-32">Pickup Rider:</p>
                                                 <p class="min-w-0 font-semibold text-slate-900">
                                                     <span x-text="assignment ? (assignmentDriverName() + ', ' + assignmentDriverPhone()) : 'Unassigned'"></span>
                                                     <button type="button"
@@ -2197,7 +2197,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 		                </template>
                 </div>
 
-		                {{-- Driver Assignment History Modal --}}
+		                {{-- Rider Assignment History Modal --}}
 		                <div x-show="assignmentHistoryModalOpen" @@click="assignmentHistoryModalOpen = false" x-transition.opacity class="fixed inset-0 z-[188] flex justify-end bg-black/55 backdrop-blur-sm" style="display:none">
 		                    <div @@click.stop x-transition:enter="transition ease-out duration-200"
 		                         x-transition:enter-start="translate-x-full"
@@ -2208,8 +2208,8 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 		                         class="flex h-full w-full max-w-xl flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl">
 	                        <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
 	                            <div>
-	                                <h3 class="text-lg font-bold text-slate-900">Driver Assignment History</h3>
-	                                <p class="mt-1 text-sm text-slate-500">Pickup driver assignment records for this order.</p>
+	                                <h3 class="text-lg font-bold text-slate-900">Rider Assignment History</h3>
+	                                <p class="mt-1 text-sm text-slate-500">Pickup rider assignment records for this order.</p>
 	                            </div>
 	                            <button type="button" @@click="assignmentHistoryModalOpen = false" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700">
 	                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -2219,7 +2219,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 		                            <table class="min-w-[760px] w-full divide-y divide-slate-100 text-left">
 	                                <thead class="bg-slate-50">
 	                                    <tr>
-	                                        <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Driver</th>
+	                                        <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Rider</th>
 	                                        <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Status</th>
 	                                        <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Target Warehouse</th>
 	                                        <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Assigned</th>
@@ -2236,7 +2236,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 	                                    <template x-for="history in assignmentHistory" :key="history.id">
 	                                        <tr class="align-top hover:bg-slate-50/60">
 	                                            <td class="px-4 py-4">
-	                                                <p class="text-[11px] font-bold text-slate-900" x-text="history.driver_name || 'Unknown Driver'"></p>
+	                                                <p class="text-[11px] font-bold text-slate-900" x-text="history.driver_name || 'Unknown Rider'"></p>
 	                                                <p class="mt-0.5 text-[10px] text-slate-500" x-text="history.driver_phone || '-'"></p>
 	                                            </td>
 	                                            <td class="px-4 py-4">
@@ -2403,7 +2403,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 		                                <div class="rounded-2xl border border-slate-200 bg-white p-4">
 		                                    <h4 class="text-xs font-black uppercase tracking-wide text-slate-500">Pickup & Custody</h4>
 		                                    <div class="mt-3 space-y-3 text-sm">
-		                                        <p class="font-semibold text-slate-800" x-text="'Pickup driver: ' + (packageDetailsModal.pkg.details?.pickup?.driver_name || '-') + (packageDetailsModal.pkg.details?.pickup?.driver_phone ? ' · ' + packageDetailsModal.pkg.details.pickup.driver_phone : '')"></p>
+		                                        <p class="font-semibold text-slate-800" x-text="'Pickup rider: ' + (packageDetailsModal.pkg.details?.pickup?.driver_name || '-') + (packageDetailsModal.pkg.details?.pickup?.driver_phone ? ' · ' + packageDetailsModal.pkg.details.pickup.driver_phone : '')"></p>
 		                                        <p class="font-semibold text-slate-800" x-text="'Current custody: ' + packageCustodySummary(packageDetailsModal.pkg)"></p>
 		                                        <p class="text-slate-600" x-text="'Pickup location: ' + packageDetailsLocation(packageDetailsModal.pkg.details?.pickup || {})"></p>
 		                                        <p x-show="packageDetailsModal.pkg.details?.pickup?.picked_up_at || packageDetailsModal.pkg.details?.pickup?.completed_at" class="text-xs font-semibold text-slate-500" x-text="'Picked up: ' + formatDateTime(packageDetailsModal.pkg.details?.pickup?.picked_up_at || packageDetailsModal.pkg.details?.pickup?.completed_at)"></p>
@@ -2425,7 +2425,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 		                                    <h4 class="text-xs font-black uppercase tracking-wide text-slate-500">Delivery Proof</h4>
 		                                    <div class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
 		                                        <p><span class="font-black text-slate-400">Run</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.delivery_proof?.run_number || '-'"></span></p>
-		                                        <p><span class="font-black text-slate-400">Driver</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.delivery_proof?.driver_name || '-'"></span></p>
+		                                        <p><span class="font-black text-slate-400">Rider</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.delivery_proof?.driver_name || '-'"></span></p>
 		                                        <p><span class="font-black text-slate-400">Delivered</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.delivery_proof?.delivered_at ? formatDateTime(packageDetailsModal.pkg.details.delivery_proof.delivered_at) : '-'"></span></p>
 		                                        <p><span class="font-black text-slate-400">Coordinates</span><br><span class="font-bold text-slate-900" x-text="packageDetailsModal.pkg.details?.delivery_proof?.latitude && packageDetailsModal.pkg.details?.delivery_proof?.longitude ? packageDetailsModal.pkg.details.delivery_proof.latitude + ', ' + packageDetailsModal.pkg.details.delivery_proof.longitude : '-'"></span></p>
 		                                    </div>
@@ -2518,7 +2518,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 		                                        <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
 		                                            <div class="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white" x-text="(driverGroup.name || 'U').charAt(0).toUpperCase()"></div>
 		                                            <div class="min-w-0 flex-1">
-		                                                <p class="text-[11px] font-bold text-slate-800" x-text="driverGroup.name || 'Unknown driver'"></p>
+		                                                <p class="text-[11px] font-bold text-slate-800" x-text="driverGroup.name || 'Unknown rider'"></p>
 		                                                <p class="text-[10px] text-slate-500" x-text="driverGroup.count + ' label' + (driverGroup.count === 1 ? '' : 's')"></p>
 		                                            </div>
 	                                            <button type="button"
@@ -2536,7 +2536,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 	                                            <tr>
 	                                                <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Label</th>
 	                                                <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Status</th>
-	                                                <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Driver</th>
+	                                                <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Rider</th>
 	                                                <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Claimed</th>
 	                                            </tr>
 	                                        </thead>
@@ -2660,7 +2660,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 	                                           class="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 disabled:cursor-not-allowed disabled:opacity-50">
 	                                    <span>
 	                                        <span class="block text-xs font-bold uppercase tracking-wide text-slate-700">Send via Bus Courier</span>
-	                                        <span class="mt-1 block text-xs text-slate-500">The driver will choose and record the station during handoff.</span>
+	                                        <span class="mt-1 block text-xs text-slate-500">The rider will choose and record the station during handoff.</span>
 	                                    </span>
 	                                </label>
 	                            </div>
@@ -2842,14 +2842,14 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 	                                               class="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500">
 	                                        <span>
 	                                            <span class="block text-xs font-bold uppercase tracking-wide text-slate-700">Send via Bus Courier</span>
-	                                            <span class="mt-1 block text-xs text-slate-500">The driver will choose and record the bus station during handoff.</span>
+	                                            <span class="mt-1 block text-xs text-slate-500">The rider will choose and record the bus station during handoff.</span>
 	                                        </span>
 	                                    </label>
 	                                    <div class="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
 	                                        <div class="flex flex-col gap-4">
 	                                            <div>
 	                                                <p class="text-xs font-bold uppercase tracking-wide text-slate-700">Delivery Fee</p>
-	                                                <p class="mt-1 text-xs text-slate-500">Package-level fee for this recipient. Paid fees tell the driver not to collect again.</p>
+	                                                <p class="mt-1 text-xs text-slate-500">Package-level fee for this recipient. Paid fees tell the rider not to collect again.</p>
 	                                            </div>
 	                                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
 	                                                <div>
@@ -3231,18 +3231,18 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 
                                 <section>
                                     <div class="mb-3 flex items-center justify-between">
-                                        <h4 class="text-xs font-black uppercase tracking-wide text-blue-700">Driver Photos</h4>
+                                        <h4 class="text-xs font-black uppercase tracking-wide text-blue-700">Rider Photos</h4>
                                         <span class="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700" x-text="receivingPhotoCount(receivingPhotosModal.pkg, 'driver_photos')"></span>
                                     </div>
                                     <template x-if="receivingPhotoCount(receivingPhotosModal.pkg, 'driver_photos') === 0">
-                                        <p class="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-xs text-slate-400">No driver photos uploaded.</p>
+                                        <p class="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-xs text-slate-400">No rider photos uploaded.</p>
                                     </template>
                                     <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
                                         <template x-for="photo in receivingPhotosModal.pkg.driver_photos" :key="`driver-${photo.id || photo.url}`">
                                             <button type="button" @@click="receivingLightbox = photo.url" class="overflow-hidden rounded-2xl border border-blue-100 bg-blue-50 text-left transition hover:border-blue-300">
                                                 <img :src="photo.url" class="aspect-square w-full object-cover">
                                                 <div class="px-3 py-2">
-                                                    <p class="truncate text-[10px] font-semibold text-blue-700">Driver photo</p>
+                                                    <p class="truncate text-[10px] font-semibold text-blue-700">Rider photo</p>
                                                 </div>
                                             </button>
                                         </template>
@@ -3408,10 +3408,10 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
             <form @@submit.prevent="assignDriver()">
                 <div class="max-h-[calc(100vh-240px)] space-y-5 overflow-y-auto px-6 py-6">
                     <div class="mb-4">
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Select Driver <span class="text-rose-500">*</span></label>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Select Rider <span class="text-rose-500">*</span></label>
                         <div class="relative">
                             <select x-model="assignmentForm.driver_id" class="w-full appearance-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100" required>
-                                <option value="">Choose a driver...</option>
+                                <option value="">Choose a rider...</option>
                                 <template x-for="driver in availableDrivers" :key="driver.id">
                                     <option :value="driver.id" x-text="driver.name + ' (' + driver.phone + ')'"></option>
                                 </template>
@@ -3421,10 +3421,10 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                             </div>
                         </div>
                         <template x-if="availableDrivers.length === 0 && !assignmentForm.loadingDrivers">
-                            <p class="mt-1.5 text-xs text-amber-600">No available drivers right now</p>
+                            <p class="mt-1.5 text-xs text-amber-600">No available riders right now</p>
                         </template>
                         <template x-if="assignmentForm.loadingDrivers">
-                            <p class="mt-1.5 text-xs text-slate-400">Loading drivers...</p>
+                            <p class="mt-1.5 text-xs text-slate-400">Loading riders...</p>
                         </template>
                     </div>
                     <div class="mb-4">
@@ -3511,10 +3511,10 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
             <form @@submit.prevent="updateAssignment()">
                 <div class="max-h-[calc(100vh-240px)] space-y-5 overflow-y-auto px-6 py-6">
                     <div class="mb-4">
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Driver</label>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Rider</label>
                         <div class="relative">
                             <select x-model="editAssignmentForm.driver_id" class="w-full appearance-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                <option value="">Choose a driver...</option>
+                                <option value="">Choose a rider...</option>
                                 <template x-for="driver in availableDriversForEdit" :key="driver.id">
                                     <option :value="driver.id" x-text="driver.name + ' (' + driver.phone + ')'"></option>
                                 </template>
@@ -3524,7 +3524,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                             </div>
                         </div>
                         <template x-if="editAssignmentForm.loadingDrivers">
-                            <p class="mt-1.5 text-xs text-slate-400">Loading drivers...</p>
+                            <p class="mt-1.5 text-xs text-slate-400">Loading riders...</p>
                         </template>
                     </div>
                     <div class="mb-6">

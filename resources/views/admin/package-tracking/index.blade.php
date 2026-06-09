@@ -20,7 +20,7 @@
         </div>
         <div class="bg-white/80 backdrop-blur-xl rounded-2xl border border-emerald-200/80 shadow-sm p-4">
             <p class="text-2xl font-bold text-emerald-700">{{ number_format($stats['claimed']) }}</p>
-            <p class="text-xs text-emerald-600 font-semibold mt-0.5">With Drivers</p>
+            <p class="text-xs text-emerald-600 font-semibold mt-0.5">With Riders</p>
         </div>
         <div class="bg-white/80 backdrop-blur-xl rounded-2xl border border-slate-200/80 shadow-sm p-4">
             <p class="text-2xl font-bold text-slate-400">{{ number_format($stats['unclaimed']) }}</p>
@@ -48,7 +48,7 @@
                     </div>
                     <div class="flex gap-1 bg-slate-100/80 p-1 rounded-xl">
                         <button @@click="statusFilter = ''; loadData()" :class="statusFilter === '' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all">All</button>
-                        <button @@click="statusFilter = 'claimed'; loadData()" :class="statusFilter === 'claimed' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all">With Drivers</button>
+                        <button @@click="statusFilter = 'claimed'; loadData()" :class="statusFilter === 'claimed' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all">With Riders</button>
                         <button @@click="statusFilter = 'unclaimed'; loadData()" :class="statusFilter === 'unclaimed' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all">At Warehouse</button>
                         <button @@click="statusFilter = 'delivered'; loadData()" :class="statusFilter === 'delivered' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all">Delivered</button>
                     </div>
@@ -104,7 +104,7 @@
                                     <td class="px-4 py-2.5 whitespace-nowrap">
                                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
                                               :class="row.status === 'claimed' ? 'bg-emerald-100 text-emerald-700' : row.status === 'delivered' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'"
-                                              x-text="row.status === 'claimed' ? 'With Driver' : row.status === 'delivered' ? 'Delivered' : 'At Warehouse'"></span>
+                                              x-text="row.status === 'claimed' ? 'With Rider' : row.status === 'delivered' ? 'Delivered' : 'At Warehouse'"></span>
                                     </td>
                                     <td class="px-4 py-2.5 whitespace-nowrap text-[10px] text-slate-400" x-text="row.last_event_at || row.created_at"></td>
                                 </tr>

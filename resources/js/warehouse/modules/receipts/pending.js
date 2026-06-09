@@ -28,8 +28,8 @@ function registerPendingReceiptsPage() {
         statuses: (config.statuses || []).filter((status) => status.value !== 'assigned'),
         columns: [
             { key: 'shipment_number', label: 'Order #', exportLabel: 'Order Number' },
-            { key: 'driver_name', label: 'Driver', exportLabel: 'Driver Name' },
-            { key: 'driver_phone', label: 'Driver Phone' },
+            { key: 'driver_name', label: 'Rider', exportLabel: 'Rider Name' },
+            { key: 'driver_phone', label: 'Rider Phone' },
             { key: 'status', label: 'Status' },
             { key: 'assigned_at', label: 'Assigned At' },
             { key: 'arrived_warehouse_at', label: 'Arrived Warehouse At' },

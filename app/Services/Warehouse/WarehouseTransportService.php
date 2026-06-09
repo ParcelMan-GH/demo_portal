@@ -40,7 +40,7 @@ class WarehouseTransportService
             ->withCount('items')
             ->with([
                 'destinationWarehouse:id,name,code',
-                'assignedDriver:id,name,phone,vehicle_type,vehicle_number',
+                'assignedRider:id,name,phone,vehicle_type,vehicle_number',
                 'sortBatch:id,batch_number,status',
                 'createdBy:id,name',
                 'items:id,transport_manifest_id,shipment_item_id,expected_quantity,loaded_quantity,received_quantity,line_status',
@@ -55,7 +55,7 @@ class WarehouseTransportService
             ->with([
                 'originWarehouse:id,name,code',
                 'destinationWarehouse:id,name,code',
-                'assignedDriver:id,name,phone,vehicle_type,vehicle_number',
+                'assignedRider:id,name,phone,vehicle_type,vehicle_number',
                 'warehouseReceipt:id,transport_manifest_id,status,started_at,finalized_at',
                 'items:id,transport_manifest_id,shipment_item_id,expected_quantity,loaded_quantity,received_quantity,line_status',
             ])
@@ -67,7 +67,7 @@ class WarehouseTransportService
         $manifest->loadMissing([
             'createdBy:id,name',
             'receivedBy:id,name',
-            'assignedDriver:id,name,phone',
+            'assignedRider:id,name,phone',
             'items:id,transport_manifest_id,shipment_item_id,expected_quantity,loaded_quantity,loaded_at,received_at,line_status',
             'assignments.driver:id,name,phone',
             'assignments.assignedBy:id,name',
@@ -112,7 +112,7 @@ class WarehouseTransportService
 
                 $addEvent(
                     'driver_assigned',
-                    'Driver Assigned',
+                    'Rider Assigned',
                     $assignment->assigned_at,
                     $assignment->assignedBy?->name,
                     $driver !== '' ? $driver : null,
@@ -121,7 +121,7 @@ class WarehouseTransportService
 
                 $addEvent(
                     'driver_unassigned',
-                    'Driver Unassigned',
+                    'Rider Unassigned',
                     $assignment->unassigned_at,
                     $assignment->unassignedBy?->name,
                     $assignment->unassign_reason,
@@ -343,7 +343,7 @@ class WarehouseTransportService
     public function assignDriver(TransportManifest $manifest, Driver $driver, Warehouse $warehouse, ?User $user = null): array
     {
         if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
-            return ['success' => false, 'message' => 'Cannot assign driver for another warehouse manifest.'];
+            return ['success' => false, 'message' => 'Cannot assign rider for another warehouse manifest.'];
         }
 
         if (in_array($manifest->status, [
@@ -356,11 +356,11 @@ class WarehouseTransportService
         }
 
         if (!$driver->is_active) {
-            return ['success' => false, 'message' => 'Driver is inactive.'];
+            return ['success' => false, 'message' => 'Rider is inactive.'];
         }
 
         if (!$driver->hasCapability(Driver::CAPABILITY_TRANSPORT)) {
-            return ['success' => false, 'message' => 'Driver is not configured for transport assignments.'];
+            return ['success' => false, 'message' => 'Rider is not configured for transport assignments.'];
         }
 
         return DB::transaction(function () use ($manifest, $driver, $user) {
@@ -377,7 +377,7 @@ class WarehouseTransportService
                     ->update([
                         'unassigned_at' => $now,
                         'unassigned_by_user_id' => $user?->id,
-                        'unassign_reason' => 'Reassigned to another driver',
+                        'unassign_reason' => 'Reassigned to another rider',
                     ]);
 
                 Driver::query()->whereKey($previousDriverId)->update(['status' => 'available']);
@@ -401,7 +401,7 @@ class WarehouseTransportService
 
             return [
                 'success' => true,
-                'message' => 'Transport driver assigned successfully.',
+                'message' => 'Transport rider assigned successfully.',
                 'data' => [
                     'manifest' => $lockedManifest->fresh([
                         'assignedDriver',
@@ -420,11 +420,11 @@ class WarehouseTransportService
         }
 
         if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_DRAFT], true)) {
-            return ['success' => false, 'message' => 'Driver can only be unassigned from draft or assigned manifests.'];
+            return ['success' => false, 'message' => 'Rider can only be unassigned from draft or assigned manifests.'];
         }
 
         if (!$manifest->assigned_driver_id) {
-            return ['success' => false, 'message' => 'No driver is currently assigned.'];
+            return ['success' => false, 'message' => 'No rider is currently assigned.'];
         }
 
         return DB::transaction(function () use ($manifest, $user, $reason) {
@@ -440,7 +440,7 @@ class WarehouseTransportService
                 ->update([
                     'unassigned_at' => $now,
                     'unassigned_by_user_id' => $user->id,
-                    'unassign_reason' => $reason ?: 'Driver unassigned',
+                        'unassign_reason' => $reason ?: 'Rider unassigned',
                 ]);
 
             $lockedManifest->update([
@@ -455,7 +455,7 @@ class WarehouseTransportService
 
             return [
                 'success' => true,
-                'message' => 'Driver unassigned successfully.',
+                'message' => 'Rider unassigned successfully.',
             ];
         });
     }
@@ -471,7 +471,7 @@ class WarehouseTransportService
         }
 
         if (!$manifest->assigned_driver_id) {
-            return ['success' => false, 'message' => 'Assign a driver before dispatching.'];
+            return ['success' => false, 'message' => 'Assign a rider before dispatching.'];
         }
 
         return DB::transaction(function () use ($manifest, $warehouse, $user) {
@@ -1835,7 +1835,7 @@ class WarehouseTransportService
         if ($manifest->assigned_driver_id || $manifest->assigned_at) {
             return [
                 'deletable' => false,
-                'reason' => 'Unassign the driver before deleting this manifest.',
+                'reason' => 'Unassign the rider before deleting this manifest.',
             ];
         }
 
@@ -1856,14 +1856,14 @@ class WarehouseTransportService
         if ($manifest->loadingExceptions()->exists()) {
             return [
                 'deletable' => false,
-                'reason' => 'This manifest has driver loading exceptions and cannot be deleted.',
+                'reason' => 'This manifest has rider loading exceptions and cannot be deleted.',
             ];
         }
 
         if ($manifest->labelScans()->exists()) {
             return [
                 'deletable' => false,
-                'reason' => 'This manifest has driver label scans and cannot be deleted.',
+                'reason' => 'This manifest has rider label scans and cannot be deleted.',
             ];
         }
 

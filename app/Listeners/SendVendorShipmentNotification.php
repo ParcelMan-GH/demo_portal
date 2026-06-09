@@ -40,15 +40,15 @@ class SendVendorShipmentNotification
     private function buildMessage(string $status, string $shipmentNumber): array
     {
         return match ($status) {
-            'pickup_assigned'   => ["Driver Assigned — {$shipmentNumber}", 'A driver has been assigned to pick up your shipment.'],
-            'picked_up'         => ["Shipment Picked Up — {$shipmentNumber}", 'Your shipment has been collected by the driver.'],
-            'at_warehouse'      => ["Shipment at Warehouse — {$shipmentNumber}", 'Your shipment has arrived at the warehouse.'],
-            'sorted'            => ["Shipment Sorted — {$shipmentNumber}", 'Your shipment has been sorted and is ready for dispatch.'],
-            'in_transit'        => ["In Transit — {$shipmentNumber}", 'Your shipment is in transit to the destination.'],
-            'out_for_delivery'  => ["Out for Delivery — {$shipmentNumber}", 'Your shipment is out for delivery.'],
-            'at_destination'    => ["Arrived at Destination — {$shipmentNumber}", 'Your shipment has arrived at the destination hub.'],
-            'delivered'         => ["Delivered — {$shipmentNumber}", 'Your shipment has been successfully delivered.'],
-            'cancelled'         => ["Shipment Cancelled — {$shipmentNumber}", 'Your shipment has been cancelled.'],
+            'pickup_assigned'   => ["Rider Assigned — {$shipmentNumber}", 'A rider has been assigned to pick up your parcel.'],
+            'picked_up'         => ["Parcel Picked Up — {$shipmentNumber}", 'Your parcel has been collected by the rider.'],
+            'at_warehouse'      => ["Parcel at Warehouse — {$shipmentNumber}", 'Your parcel has arrived at the warehouse.'],
+            'sorted'            => ["Parcel Sorted — {$shipmentNumber}", 'Your parcel has been sorted and is ready for dispatch.'],
+            'in_transit'        => ["Parcel in Transit — {$shipmentNumber}", 'Your parcel is in transit to the destination.'],
+            'out_for_delivery'  => ["Out for Delivery — {$shipmentNumber}", 'Your parcel is out for delivery.'],
+            'at_destination'    => ["Arrived at Destination — {$shipmentNumber}", 'Your parcel has arrived at the destination hub.'],
+            'delivered'         => ["Parcel Delivered — {$shipmentNumber}", 'Your parcel has been successfully delivered.'],
+            'cancelled'         => ["Parcel Cancelled — {$shipmentNumber}", 'Your parcel has been cancelled.'],
             default             => [null, null],
         };
     }

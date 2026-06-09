@@ -36,7 +36,7 @@
                 </div>
 
                 {{-- Welcome --}}
-                <h1 class="dash-hero-title">Welcome back, <span x-text="profile?.name || 'Driver'"></span></h1>
+                <h1 class="dash-hero-title">Welcome back, <span x-text="profile?.name || 'Rider'"></span></h1>
                 <p class="dash-hero-subtitle" x-show="profile?.vehicle_type || profile?.vehicle_number">
                     <span x-text="vehicleSubtitle"></span>
                 </p>

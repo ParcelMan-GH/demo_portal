@@ -13,11 +13,11 @@ class SendAdminPickupNotification
     {
         $assignment = $event->assignment;
         $shipmentNumber = $assignment->shipment?->shipment_number ?? 'Unknown';
-        $driverName = $assignment->driver?->name ?? 'Driver';
+        $driverName = $assignment->driver?->name ?? 'Rider';
 
         [$title, $body] = match ($event->newStatus) {
             'arrived' => [
-                'Driver Arrived at Pickup',
+                'Rider Arrived at Pickup',
                 "{$driverName} has arrived at the pickup location for shipment {$shipmentNumber}.",
             ],
             'completed' => [

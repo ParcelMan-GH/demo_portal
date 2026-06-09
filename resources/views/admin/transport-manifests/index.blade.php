@@ -667,7 +667,7 @@ document.addEventListener('alpine:init', () => {
         columns: [
             { key: 'manifest_number', label: 'Manifest #' },
             { key: 'route',           label: 'From → To' },
-            { key: 'driver',          label: 'Driver' },
+            { key: 'driver',          label: 'Rider' },
             { key: 'items',           label: 'Items' },
             { key: 'status',          label: 'Status' },
             { key: 'dispatched_at',   label: 'Dispatched' },

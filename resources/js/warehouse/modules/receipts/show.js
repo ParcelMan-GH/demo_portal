@@ -156,7 +156,7 @@ function registerWarehouseReceiptShowPage() {
         },
 
         assignmentDriverName() {
-            return this.assignment?.driver?.name || this.assignment?.driver_name || 'No driver assigned';
+            return this.assignment?.driver?.name || this.assignment?.driver_name || 'No rider assigned';
         },
 
         assignmentDriverPhone() {
@@ -360,7 +360,7 @@ function registerWarehouseReceiptShowPage() {
 
         itemPhotoList(item) {
             const vendorPhotos = (item?.vendor_photos || []).map((photo) => ({ url: this.vendorPhotoUrl(photo), label: 'Vendor' }));
-            const driverPhotos = (item?.driver_photos || []).map((photo) => ({ url: photo?.url, label: 'Driver' }));
+            const driverPhotos = (item?.driver_photos || []).map((photo) => ({ url: photo?.url, label: 'Rider' }));
             const receiptPhotos = (item?.photos || []).map((photo) => ({ url: photo?.url, label: 'Receipt' }));
 
             return [...vendorPhotos, ...driverPhotos, ...receiptPhotos].filter((photo) => photo.url);
@@ -691,7 +691,7 @@ function registerWarehouseReceiptShowPage() {
         openFinalizeModal() {
             if (this.isFinalized()) return;
             if (!this.canReceive) {
-                window.showToast?.('Cannot finalize — the driver has not picked up this shipment yet.', 'warning');
+                window.showToast?.('Cannot finalize — the rider has not picked up this shipment yet.', 'warning');
                 return;
             }
             this.showFinalizeModal = true;
@@ -802,7 +802,7 @@ function registerWarehouseReceiptShowPage() {
                 return;
             }
             if (!this.canReceive) {
-                window.showToast?.('Cannot receive items — the driver has not picked up this shipment yet.', 'warning');
+                window.showToast?.('Cannot receive items — the rider has not picked up this shipment yet.', 'warning');
                 return;
             }
 
@@ -1028,7 +1028,7 @@ function registerWarehouseReceiptShowPage() {
 
         openReceiveModal(itemId) {
             if (!this.canReceive) {
-                window.showToast?.('Cannot receive items — the driver has not picked up this shipment yet.', 'warning');
+                window.showToast?.('Cannot receive items — the rider has not picked up this shipment yet.', 'warning');
                 return;
             }
             const idx = this.items.findIndex((i) => Number(i.shipment_item_id) === Number(itemId));

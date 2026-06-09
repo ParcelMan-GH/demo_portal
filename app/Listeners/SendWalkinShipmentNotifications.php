@@ -38,8 +38,8 @@ class SendWalkinShipmentNotifications implements ShouldQueue
         if ($vendor?->fcm_token) {
             $this->pushService->sendToVendor(
                 vendor: $vendor,
-                title: 'Shipment Received',
-                body: "Your shipment {$shipmentNumber} has been received at {$warehouse->name}.",
+                title: 'Parcel Received',
+                body: "Your parcel {$shipmentNumber} has been received at {$warehouse->name}.",
                 data: [
                     'shipment_id'     => (string) $shipment->id,
                     'shipment_number' => $shipmentNumber,

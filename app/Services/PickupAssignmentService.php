@@ -41,14 +41,14 @@ class PickupAssignmentService
         if (!$driver->is_active) {
             return [
                 'success' => false,
-                'message' => 'Driver is inactive.',
+                'message' => 'Rider is inactive.',
             ];
         }
 
         if (!$driver->hasCapability(Driver::CAPABILITY_PICKUP)) {
             return [
                 'success' => false,
-                'message' => 'Driver is not configured for pickup assignments.',
+                'message' => 'Rider is not configured for pickup assignments.',
             ];
         }
 
@@ -69,7 +69,7 @@ class PickupAssignmentService
 
         return [
             'success' => true,
-            'message' => 'Driver assigned successfully.',
+            'message' => 'Rider assigned successfully.',
             'data' => ['assignment' => $assignment->load('driver', 'targetWarehouse')],
         ];
     }
@@ -113,13 +113,13 @@ class PickupAssignmentService
             $newDriver = Driver::find($newDriverId);
 
             if (!$newDriver) {
-                return ['success' => false, 'message' => 'Driver not found.'];
+                return ['success' => false, 'message' => 'Rider not found.'];
             }
             if (!$newDriver->is_active) {
-                return ['success' => false, 'message' => 'Selected driver is inactive.'];
+                return ['success' => false, 'message' => 'Selected rider is inactive.'];
             }
             if (!$newDriver->hasCapability(Driver::CAPABILITY_PICKUP)) {
-                return ['success' => false, 'message' => 'Selected driver is not configured for pickup assignments.'];
+                return ['success' => false, 'message' => 'Selected rider is not configured for pickup assignments.'];
             }
 
             if ($oldDriver) {
@@ -177,11 +177,11 @@ class PickupAssignmentService
             }
             // Notify warehouse managers: driver changed
             if ($currentWarehouse) {
-                $newDriverName = $currentDriver?->name ?? 'A driver';
+                $newDriverName = $currentDriver?->name ?? 'A rider';
                 $pushService->sendToWarehouseManagers(
                     warehouse: $currentWarehouse,
-                    title: 'Pickup Driver Changed',
-                    body: "Driver changed — {$newDriverName} will now handle pickup for shipment {$shipmentNumber}.",
+                    title: 'Pickup Rider Changed',
+                    body: "Rider changed — {$newDriverName} will now handle pickup for shipment {$shipmentNumber}.",
                     data: ['assignment_id' => (string) $assignment->id, 'shipment_number' => $shipmentNumber],
                     type: 'pickup_driver_changed'
                 );
@@ -211,7 +211,7 @@ class PickupAssignmentService
             }
             // Notify new warehouse managers: incoming
             if ($currentWarehouse) {
-                $driverName = $currentDriver?->name ?? 'A driver';
+                $driverName = $currentDriver?->name ?? 'A rider';
                 $pushService->sendToWarehouseManagers(
                     warehouse: $currentWarehouse,
                     title: 'Incoming Pickup',
@@ -259,7 +259,7 @@ class PickupAssignmentService
             }
             // Notify new warehouse managers: incoming with new driver
             if ($currentWarehouse) {
-                $newDriverName = $currentDriver?->name ?? 'A driver';
+                $newDriverName = $currentDriver?->name ?? 'A rider';
                 $pushService->sendToWarehouseManagers(
                     warehouse: $currentWarehouse,
                     title: 'Incoming Pickup',
@@ -318,7 +318,7 @@ class PickupAssignmentService
 
         return [
             'success' => true,
-            'message' => 'Driver is now en route.',
+            'message' => 'Rider is now en route.',
             'data' => ['assignment' => $assignment->fresh()],
         ];
     }
@@ -328,7 +328,7 @@ class PickupAssignmentService
         if ($assignment->status !== PickupAssignmentStatus::EN_ROUTE) {
             return [
                 'success' => false,
-                'message' => 'Driver must be en route to arrive.',
+                'message' => 'Rider must be en route to arrive.',
             ];
         }
 
@@ -341,7 +341,7 @@ class PickupAssignmentService
 
         return [
             'success' => true,
-            'message' => 'Driver has arrived.',
+            'message' => 'Rider has arrived.',
             'data' => ['assignment' => $assignment->fresh()],
         ];
     }
@@ -508,7 +508,7 @@ class PickupAssignmentService
         if (!in_array($assignment->status, [PickupAssignmentStatus::ARRIVED, PickupAssignmentStatus::PICKING_UP], true)) {
             return [
                 'success' => false,
-                'message' => 'Driver must have arrived to finalize pickup.',
+                'message' => 'Rider must have arrived to finalize pickup.',
             ];
         }
 
@@ -582,7 +582,7 @@ class PickupAssignmentService
                 }
                 $confirmed = (int) ($confirmation?->confirmed_quantity ?? 0);
                 $expected = (int) $item->quantity;
-                $baseNote = "Driver recorded shipment pickup total {$assignment->driver_picked_quantity}. Line reference {$confirmed}/{$expected}.";
+                $baseNote = "Rider recorded shipment pickup total {$assignment->driver_picked_quantity}. Line reference {$confirmed}/{$expected}.";
                 $extraNote = $confirmation?->notes;
 
                 ShipmentItemTracking::create([

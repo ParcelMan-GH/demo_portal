@@ -57,7 +57,7 @@ class WarehousePackageLedgerService
 
         if (Schema::hasTable('transport_manifests')) {
             $relations[] = 'sortBatchItems.sortBatch.transportManifest:id,sort_batch_id,manifest_number,status,assigned_driver_id,origin_warehouse_id,destination_warehouse_id,created_by_user_id,received_by_user_id,assigned_at,dispatched_at,arrived_at,received_at';
-            $relations[] = 'sortBatchItems.sortBatch.transportManifest.assignedDriver:id,name,phone';
+            $relations[] = 'sortBatchItems.sortBatch.transportManifest.assignedRider:id,name,phone';
             $relations[] = 'sortBatchItems.sortBatch.transportManifest.originWarehouse:id,name,code';
             $relations[] = 'sortBatchItems.sortBatch.transportManifest.destinationWarehouse:id,name,code';
             $relations[] = 'sortBatchItems.sortBatch.transportManifest.createdBy:id,name';
@@ -66,7 +66,7 @@ class WarehousePackageLedgerService
 
         if (Schema::hasTable('delivery_runs')) {
             $relations[] = 'sortBatchItems.sortBatch.deliveryRun:id,sort_batch_id,run_number,status,assigned_driver_id';
-            $relations[] = 'sortBatchItems.sortBatch.deliveryRun.assignedDriver:id,name,phone';
+            $relations[] = 'sortBatchItems.sortBatch.deliveryRun.assignedRider:id,name,phone';
         }
 
         if ($this->hasRecipientPaymentTables()) {
@@ -83,7 +83,7 @@ class WarehousePackageLedgerService
         }
 
         if ($this->hasTransportTables()) {
-            $relations[] = 'shipmentItem.transportManifestItems.manifest.assignedDriver:id,name,phone';
+            $relations[] = 'shipmentItem.transportManifestItems.manifest.assignedRider:id,name,phone';
             $relations[] = 'shipmentItem.transportManifestItems.manifest.originWarehouse:id,name,code';
             $relations[] = 'shipmentItem.transportManifestItems.manifest.destinationWarehouse:id,name,code';
             $relations[] = 'shipmentItem.transportManifestItems.manifest.createdBy:id,name';
@@ -91,21 +91,21 @@ class WarehousePackageLedgerService
         }
 
         if ($this->hasDeliveryTables()) {
-            $relations[] = 'shipmentItem.deliveryRunItems.run.assignedDriver:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.run.assignedRider:id,name,phone';
             $relations[] = 'shipmentItem.deliveryRunItems.run.createdBy:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.stop.region:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.stop.district:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.stop.confirmedBy:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.stop.verificationAttempts.driver:id,name,phone';
-            $relations[] = 'shipmentItem.deliveryRunItems.expectedDeliverySetByDriver:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.expectedDeliverySetByRider:id,name,phone';
             $relations[] = 'shipmentItem.deliveryRunItems.expectedDeliverySetByUser:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.delayEvents:id,delivery_run_item_id,delivery_delay_reason_id,reason_label,source,actor_driver_id,actor_user_id,old_expected_delivery_at,new_expected_delivery_at,recipient_sms_sent,vendor_notification_sent,vendor_sms_sent,created_at';
             $relations[] = 'shipmentItem.deliveryRunItems.delayEvents.reason:id,label';
-            $relations[] = 'shipmentItem.deliveryRunItems.delayEvents.actorDriver:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.delayEvents.actorRider:id,name,phone';
             $relations[] = 'shipmentItem.deliveryRunItems.delayEvents.actorUser:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.reason:id,label,type';
-            $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.handoffDriver:id,name,phone';
-            $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByDriver:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.handoffRider:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByRider:id,name,phone';
             $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByAdmin:id,name';
         }
 
@@ -726,7 +726,7 @@ class WarehousePackageLedgerService
         if ($deliveryRun?->assignedDriver && in_array($deliveryRunItem?->status, [DeliveryRunItem::STATUS_PENDING, DeliveryRunItem::STATUS_PARTIAL], true)) {
             return [
                 'type' => 'with_driver',
-                'label' => 'With delivery driver',
+                'label' => 'With delivery rider',
                 'holder' => $deliveryRun->assignedDriver->name,
                 'detail' => $deliveryRun->assignedDriver->phone,
                 'at' => $this->formatDateTime($deliveryRun->dispatched_at),
@@ -742,7 +742,7 @@ class WarehousePackageLedgerService
         if ($latest?->event_type === LabelCustodyEvent::TYPE_CLAIMED && $latest->driver) {
             return [
                 'type' => 'with_driver',
-                'label' => 'With driver',
+                'label' => 'With rider',
                 'holder' => $latest->driver->name,
                 'detail' => $latest->driver->phone,
                 'at' => $this->formatDateTime($latest->created_at),

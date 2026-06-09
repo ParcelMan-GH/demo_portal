@@ -123,9 +123,9 @@
                         </select>
                     </div>
                     <div>
-                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Driver</label>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Rider</label>
                         <select x-model="filters.driver_id" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                            <option value="">All drivers</option>
+                            <option value="">All riders</option>
                             <template x-for="driver in transportDrivers" :key="driver.id"><option :value="driver.id" x-text="driver.name"></option></template>
                         </select>
                     </div>
@@ -246,7 +246,7 @@
                         </div>
                         <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
                             <div><p class="font-black uppercase tracking-wide text-slate-400">Received</p><p class="font-bold text-slate-800" x-text="row.received_display || '0 / 0'"></p></div>
-                            <div><p class="font-black uppercase tracking-wide text-slate-400">Driver</p><p class="font-bold text-slate-800" x-text="row.driver_name || '-'"></p><p class="text-slate-500" x-text="row.driver_phone || ''"></p></div>
+                            <div><p class="font-black uppercase tracking-wide text-slate-400">Rider</p><p class="font-bold text-slate-800" x-text="row.driver_name || '-'"></p><p class="text-slate-500" x-text="row.driver_phone || ''"></p></div>
                             <div><p class="font-black uppercase tracking-wide text-slate-400">Arrived</p><p class="font-bold text-slate-800" x-text="formatDisplayDate(row.arrived_at)"></p></div>
                             <div><p class="font-black uppercase tracking-wide text-slate-400">Received At</p><p class="font-bold text-slate-800" x-text="formatDisplayDate(row.received_at)"></p></div>
                         </div>

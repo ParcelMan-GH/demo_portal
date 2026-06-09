@@ -38,7 +38,7 @@ window.adminGlobalSearch = (searchUrl) => ({
         packages: 'Packages',
         transactions: 'Transactions',
         vendors: 'Vendors',
-        drivers: 'Drivers',
+        drivers: 'Riders',
     },
     query: '',
     results: {},

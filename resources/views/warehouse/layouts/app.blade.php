@@ -242,8 +242,8 @@
                 @hasPermission('drivers.view')
                 <a href="{{ route('admin.drivers.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.drivers.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                     <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
-                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Riders & Drivers</span>
-                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Riders & Drivers</span></template>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Riders</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">Riders</span></template>
                 </a>
                 @endhasPermission
 

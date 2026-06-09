@@ -24,7 +24,7 @@
                 <div class="profile-avatar" x-text="profile ? (profile.name || 'D').charAt(0).toUpperCase() : 'D'"></div>
                 <div class="profile-hero-info">
                     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;">
-                        <div class="profile-hero-name" x-text="profile?.name || 'Driver'"></div>
+                        <div class="profile-hero-name" x-text="profile?.name || 'Rider'"></div>
                         <div class="profile-hero-status" :class="profile?.status === 'active' ? 'active' : 'inactive'" style="flex-shrink:0;margin-top:0.1rem;">
                             <span class="profile-hero-status-dot"></span>
                             <span x-text="profile?.status || 'Unknown'"></span>

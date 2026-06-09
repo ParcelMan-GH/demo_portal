@@ -363,7 +363,7 @@
                 <a href="#how">How it works</a>
                 <a href="#coverage">Coverage</a>
                 <a href="{{ route('web.vendor.login') }}">Vendor Portal</a>
-                <a href="{{ route('web.driver.login') }}">Driver Login</a>
+                <a href="{{ route('web.driver.login') }}">Rider Login</a>
                 <a href="#faq">FAQ</a>
                 <a href="#contact">Contact</a>
             </div>

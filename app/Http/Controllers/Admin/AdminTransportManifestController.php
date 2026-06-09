@@ -297,7 +297,7 @@ class AdminTransportManifestController extends Controller
             ->with([
                 'originWarehouse:id,name,code',
                 'destinationWarehouse:id,name,code',
-                'assignedDriver:id,name,phone',
+                'assignedRider:id,name,phone',
                 'items:id,transport_manifest_id',
             ]);
 
@@ -464,7 +464,7 @@ class AdminTransportManifestController extends Controller
     }
 
     /**
-     * Assign a driver to the transport manifest.
+     * Assign a rider to the transport manifest.
      */
     public function assignDriver(Request $request, TransportManifest $manifest): JsonResponse
     {
@@ -485,7 +485,7 @@ class AdminTransportManifestController extends Controller
     }
 
     /**
-     * Unassign the driver from the transport manifest.
+     * Unassign the rider from the transport manifest.
      */
     public function unassignDriver(Request $request, TransportManifest $manifest): JsonResponse
     {
@@ -1010,7 +1010,7 @@ class AdminTransportManifestController extends Controller
             'From'          => $m->originWarehouse?->name ?? '—',
             'To'            => $m->destinationWarehouse?->name ?? '—',
             'Driver'        => $m->assignedDriver?->name ?? '—',
-            'Driver Phone'  => $m->assignedDriver?->phone ?? '—',
+            'Rider Phone'  => $m->assignedDriver?->phone ?? '—',
             'Items'         => $m->items_count,
             'Status'        => $this->formatStatusLabel($m->status),
             'Dispatched At' => $m->dispatched_at?->format('Y-m-d H:i:s') ?? '—',

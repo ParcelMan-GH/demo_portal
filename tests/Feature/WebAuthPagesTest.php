@@ -37,12 +37,12 @@ beforeEach(function () {
     }
 });
 
-test('landing page contains vendor and driver login options', function () {
+test('landing page contains vendor and rider login options', function () {
     $response = $this->get('/');
 
     $response->assertOk();
     $response->assertSee('Vendor Portal');
-    $response->assertSee('Driver Login');
+    $response->assertSee('Rider Login');
 });
 
 test('web auth pages are accessible', function () {

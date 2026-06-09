@@ -35,7 +35,7 @@ $warehouseUsersTableConfig = [
 $receivedItemsFlat = $receivedItems->map(fn($c) => [
     'id'               => $c->id,
     '_primary'         => $c->shipmentItem?->description ?? 'Package',
-    '_secondary'       => ($c->shipmentItem?->shipment?->shipment_number ?? '-') . ' / ' . ($c->pickupAssignment?->driver?->name ?? 'No driver'),
+    '_secondary'       => ($c->shipmentItem?->shipment?->shipment_number ?? '-') . ' / ' . ($c->pickupAssignment?->driver?->name ?? 'No rider'),
     'confirmed_at'     => $c->confirmed_at?->format('d M Y, h:i A') ?? '-',
     'shipment_number'  => $c->shipmentItem?->shipment?->shipment_number ?? '-',
     'item_description' => $c->shipmentItem?->description ?? '-',
@@ -62,7 +62,7 @@ $statusLabel = fn($status) => is_object($status) && method_exists($status, 'labe
 $receivedPickupsFlat = $receivedPickups->map(fn($p) => [
     'id' => $p->id,
     '_primary' => $p->shipment?->shipment_number ?? 'Pickup',
-    '_secondary' => ($p->driver?->name ?? 'No driver') . ($p->driver?->phone ? ' / ' . $p->driver->phone : ''),
+    '_secondary' => ($p->driver?->name ?? 'No rider') . ($p->driver?->phone ? ' / ' . $p->driver->phone : ''),
     'shipment_number' => $p->shipment?->shipment_number ?? '-',
     'driver' => trim(($p->driver?->name ?? '-') . ($p->driver?->phone ? ' / ' . $p->driver->phone : '')),
     'status_label' => $statusLabel($p->status),
@@ -76,7 +76,7 @@ $receivedPickupsFlat = $receivedPickups->map(fn($p) => [
 $pendingReceiptsFlat = $pendingReceipts->map(fn($p) => [
     'id' => $p->id,
     '_primary' => $p->shipment?->shipment_number ?? 'Receipt',
-    '_secondary' => ($p->driver?->name ?? 'No driver') . ($p->driver?->phone ? ' / ' . $p->driver->phone : ''),
+    '_secondary' => ($p->driver?->name ?? 'No rider') . ($p->driver?->phone ? ' / ' . $p->driver->phone : ''),
     'shipment_number' => $p->shipment?->shipment_number ?? '-',
     'driver' => trim(($p->driver?->name ?? '-') . ($p->driver?->phone ? ' / ' . $p->driver->phone : '')),
     'status_label' => $statusLabel($p->status),
@@ -155,7 +155,7 @@ $manifestsFlat = $manifestsOutgoing->map(fn($m) => [
 $deliveryRunsFlat = $deliveryRuns->map(fn($r) => [
     'id' => $r->id,
     '_primary' => $r->run_number,
-    '_secondary' => $r->assignedDriver?->name ?? 'No driver assigned',
+    '_secondary' => $r->assignedDriver?->name ?? 'No rider assigned',
     'run_number' => $r->run_number,
     'driver' => $r->assignedDriver?->name ?? '-',
     'status' => ucwords(str_replace('_', ' ', (string) $r->status)),

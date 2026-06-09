@@ -1,7 +1,7 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Rider/Driver - ' . $driver->name)
-@section('breadcrumb-parent', 'Riders & Drivers')
+@section('title', 'Rider - ' . $driver->name)
+@section('breadcrumb-parent', 'Riders')
 @section('breadcrumb-current', $driver->name)
 
 @php
@@ -84,7 +84,7 @@ $driverConfig = [
                         </div>
 
                         <div class="min-w-0">
-                            <p class="text-xs font-black uppercase tracking-[0.16em] text-orange-200">Driver Workspace</p>
+                            <p class="text-xs font-black uppercase tracking-[0.16em] text-orange-200">Rider Workspace</p>
                             <h1 class="mt-1 max-w-4xl break-words text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl xl:text-2xl 2xl:text-3xl">{{ $driver->name }}</h1>
                             <div class="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-300">
                                 <span>{{ $driver->phone }}</span>
@@ -148,7 +148,7 @@ $driverConfig = [
 
     <!-- Tabs Section -->
     <section class="rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
-            <p class="sr-only">Rider/driver activity tabs</p>
+            <p class="sr-only">Rider activity tabs</p>
             <div class="flex flex-wrap items-center gap-2">
 
             <!-- Pickups -->
@@ -837,8 +837,8 @@ $driverConfig = [
                                 </svg>
                             </div>
                             <div>
-                                <h3 class="text-xl font-bold text-slate-900">Edit Rider/Driver</h3>
-                                <p class="text-sm text-slate-500 mt-1">Update rider/driver information and settings</p>
+                                <h3 class="text-xl font-bold text-slate-900">Edit Rider</h3>
+                                <p class="text-sm text-slate-500 mt-1">Update rider information and settings</p>
                             </div>
                         </div>
                         <button @@click="showEditModal = false" class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
@@ -854,7 +854,7 @@ $driverConfig = [
                     <div class="space-y-5 px-6 py-6 max-h-[calc(100vh-240px)] overflow-y-auto">
                         <!-- Photo -->
                         <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-2">Driver Photo</label>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Rider Photo</label>
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                                 <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-orange-50 text-xl font-black text-orange-700 ring-1 ring-orange-100">
                                     <template x-if="form.photo_preview_url">
@@ -949,7 +949,7 @@ $driverConfig = [
                                         type="email"
                                         x-model="form.email"
                                         class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all"
-                                        placeholder="driver@example.com"
+                                        placeholder="rider@example.com"
                                     >
                                 </div>
                                 <template x-if="errors.email">
@@ -1212,7 +1212,7 @@ $driverConfig = [
                         </svg>
                     </div>
 
-                    <h3 class="text-xl font-bold text-slate-900" x-text="driver.is_active ? 'Deactivate Rider/Driver?' : 'Activate Rider/Driver?'"></h3>
+                    <h3 class="text-xl font-bold text-slate-900" x-text="driver.is_active ? 'Deactivate Rider?' : 'Activate Rider?'"></h3>
                     <p class="mt-2 text-sm text-slate-600">
                         <span x-show="driver.is_active">
                             Are you sure you want to deactivate <strong x-text="driver.name"></strong>? They will no longer be able to accept assignments.

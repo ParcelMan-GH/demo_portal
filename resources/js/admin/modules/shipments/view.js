@@ -116,7 +116,7 @@ function shipmentShow() {
             loadingWarehouses: false
         },
 
-        // Available drivers
+        // Available riders
         availableDrivers: [],
         availableWarehouses: [],
 
@@ -468,7 +468,7 @@ function shipmentShow() {
                     if (!drivers[id]) {
                         drivers[id] = {
                             driver_id: id,
-                            name: l.current_driver.name || 'Unknown driver',
+                            name: l.current_driver.name || 'Unknown rider',
                             phone: l.current_driver.phone || '',
                             count: 0,
                         };
@@ -1308,14 +1308,14 @@ function shipmentShow() {
 
         receivingRestrictionMessage() {
             if (!this.assignment) {
-                return 'Assign a pickup driver and target warehouse before receiving packages.';
+                return 'Assign a pickup rider and target warehouse before receiving packages.';
             }
 
             if (!this.assignmentWarehouseName() || this.assignmentWarehouseName() === 'No target warehouse') {
                 return 'Set a target warehouse before receiving packages.';
             }
 
-            return 'The driver has not confirmed pickup yet. Saving receipt quantities will automatically mark pickup as completed first.';
+            return 'The rider has not confirmed pickup yet. Saving receipt quantities will automatically mark pickup as completed first.';
         },
 
         receivingDiscrepancyType(pkg) {
@@ -1646,7 +1646,7 @@ function shipmentShow() {
             if (total === 0) return 'No labels';
             if (delivered === total) return 'Delivered';
             if (claimed === 0 && warehouse > 0) return 'At Warehouse';
-            if (drivers.length === 1 && claimed === total) return drivers[0].name || 'Driver assigned';
+            if (drivers.length === 1 && claimed === total) return drivers[0].name || 'Rider assigned';
             if (drivers.length > 1) return 'Multiple Drivers';
             return 'Mixed Custody';
         },
@@ -3089,11 +3089,11 @@ function shipmentShow() {
 
         pickupAssignmentLockedLabel() {
             if (!this.assignment) {
-                return 'Assign a pickup driver before pickup starts.';
+                return 'Assign a pickup rider before pickup starts.';
             }
 
             if (this.assignment.picked_up_at || this.assignment.completed_at || ['picked_up', 'at_warehouse', 'sorted', 'in_transit', 'at_destination', 'out_for_delivery', 'delivered'].includes(this.shipment?.status)) {
-                return 'Pickup has already been confirmed, so the driver can no longer be changed here.';
+                return 'Pickup has already been confirmed, so the rider can no longer be changed here.';
             }
 
             if (this.assignment.cancelled_at || this.assignment.status === 'cancelled') {
@@ -3109,7 +3109,7 @@ function shipmentShow() {
         },
 
         assignmentDriverName() {
-            return this.assignment?.driver?.name || this.assignment?.driver_name || 'No driver assigned';
+            return this.assignment?.driver?.name || this.assignment?.driver_name || 'No rider assigned';
         },
 
         assignmentDriverPhone() {
@@ -3163,7 +3163,7 @@ function shipmentShow() {
                 const warehousesData = await warehousesRes.json();
 
                 if (!driversRes.ok) {
-                    throw new Error(driversData.message || 'Unable to load pickup drivers.');
+                    throw new Error(driversData.message || 'Unable to load pickup riders.');
                 }
 
                 if (!warehousesRes.ok) {
@@ -3233,7 +3233,7 @@ function shipmentShow() {
             this.editAssignmentForm.target_warehouse_id = this.assignment?.target_warehouse_id ?? '';
             this.editAssignmentOpen = true;
 
-            // Load available drivers for the edit form (all active, not busy — server filters)
+            // Load available riders for the edit form (all active, not busy — server filters)
             this.editAssignmentForm.loadingDrivers = true;
             this.editAssignmentForm.loadingWarehouses = true;
             try {
@@ -3361,7 +3361,7 @@ function shipmentShow() {
 
                 const data = await response.json();
                 if (!response.ok) {
-                    throw new Error(data.message || 'Failed to unassign driver');
+                    throw new Error(data.message || 'Failed to unassign rider');
                 }
 
                 this.showUnassignModal = false;
@@ -3372,7 +3372,7 @@ function shipmentShow() {
 
                 window.location.reload();
             } catch (error) {
-                this.assignmentUiError = error.message || 'Failed to unassign driver';
+                this.assignmentUiError = error.message || 'Failed to unassign rider';
                 if (window.showToast) {
                     window.showToast(this.assignmentUiError, 'error');
                 }
@@ -3460,20 +3460,20 @@ function shipmentShow() {
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.message || 'Failed to assign driver');
+                    throw new Error(data.message || 'Failed to assign rider');
                 }
 
                 if (window.showToast) {
-                    window.showToast('Driver assigned successfully', 'success');
+                    window.showToast('Rider assigned successfully', 'success');
                 }
 
                 this.applyAssignmentResponse(data);
                 this.resetAssignmentForm();
                 this.assignDriverModalOpen = false;
             } catch (error) {
-                console.error('Assign driver error:', error);
+                console.error('Assign rider error:', error);
                 if (window.showToast) {
-                    window.showToast(error.message || 'Failed to assign driver', 'error');
+                    window.showToast(error.message || 'Failed to assign rider', 'error');
                 }
             } finally {
                 this.assignmentForm.submitting = false;

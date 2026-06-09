@@ -1,6 +1,6 @@
 @extends('web.layouts.portal')
 
-@section('title', 'Driver Login')
+@section('title', 'Rider Login')
 
 @section('content')
 <main class="flex min-h-screen items-center justify-center px-4 py-12" x-data="driverAuthPage()" style="background:#f1f5f9;">
@@ -96,7 +96,7 @@
                     </div>
                     <div>
                         <h1 class="text-2xl font-bold" style="color:#0f172a;">Welcome back</h1>
-                        <p class="mt-0.5 text-sm" style="color:#64748b;">Sign in to your driver account</p>
+                        <p class="mt-0.5 text-sm" style="color:#64748b;">Sign in to your rider account</p>
                     </div>
                 </div>
 
@@ -119,7 +119,7 @@
                     {{-- Email --}}
                     <div>
                         <label class="mb-1.5 block text-sm font-medium" style="color:#374151;">Email Address</label>
-                        <input x-model="email" type="email" autocomplete="username" placeholder="driver@example.com"
+                        <input x-model="email" type="email" autocomplete="username" placeholder="rider@example.com"
                                style="width:100%;border-radius:12px;border:1px solid #e2e8f0;background:#f8fafc;padding:0.8125rem 1rem;font-size:0.875rem;color:#0f172a;outline:none;transition:border-color 0.15s,box-shadow 0.15s;box-sizing:border-box;"
                                onfocus="this.style.borderColor='rgba(249,115,22,0.6)';this.style.boxShadow='0 0 0 3px rgba(249,115,22,0.12)'"
                                onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
@@ -164,7 +164,7 @@
 
         {{-- Bottom copyright --}}
         <p class="mt-6 text-center text-xs" style="color:#94a3b8;">
-            &copy; {{ date('Y') }} ParcelMan Express &mdash; Secure Driver Portal
+            &copy; {{ date('Y') }} ParcelMan Express &mdash; Secure Rider Portal
         </p>
 
     </div>

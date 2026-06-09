@@ -96,7 +96,7 @@ $canPrintWaybill = $hasManifestItems;
                                 <svg class="h-4 w-4 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                 </svg>
-                                {{ $manifest->assigned_driver_id ? 'Reassign Driver' : 'Assign Driver' }}
+                                {{ $manifest->assigned_driver_id ? 'Reassign Rider' : 'Assign Rider' }}
                             </button>
                             @endif
 
@@ -105,7 +105,7 @@ $canPrintWaybill = $hasManifestItems;
                                 <svg class="h-4 w-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6m9-6-6 6 6 6"/>
                                 </svg>
-                                Unassign Driver
+                                Unassign Rider
                             </button>
                             @endif
                             @if($canDispatchManifest)
@@ -842,7 +842,7 @@ $canPrintWaybill = $hasManifestItems;
 
     @include('shared.transport-container-modals')
 
-    {{-- ── Assign Driver Modal ──────────────────────────────────────── --}}
+    {{-- ── Assign Rider Modal ──────────────────────────────────────── --}}
     <template x-teleport="body">
         <div
             x-show="assignDriverModalOpen"
@@ -861,8 +861,8 @@ $canPrintWaybill = $hasManifestItems;
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-lg font-extrabold text-slate-900">Assign Driver</h3>
-                            <p class="mt-1 text-sm text-slate-500">Select a transport driver for this transfer.</p>
+                            <h3 class="text-lg font-extrabold text-slate-900">Assign Rider</h3>
+                            <p class="mt-1 text-sm text-slate-500">Select a transport rider for this transfer.</p>
                         </div>
                     </div>
                     <button type="button" @@click="assignDriverModalOpen = false" class="shrink-0 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:text-slate-700">
@@ -873,7 +873,7 @@ $canPrintWaybill = $hasManifestItems;
                 </div>
                 <div class="min-h-0 flex-1 space-y-4 overflow-visible bg-slate-50/70 p-5">
                     <div>
-                        <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Driver <span class="text-rose-500">*</span></label>
+                        <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Rider <span class="text-rose-500">*</span></label>
                         <div class="relative" @@click.stop @@click.outside="driverDropdownOpen = false">
                             <div class="relative">
                                 <input
@@ -882,7 +882,7 @@ $canPrintWaybill = $hasManifestItems;
                                     x-model="driverSearch"
                                     @@focus="driverDropdownOpen = true"
                                     @@input="driverDropdownOpen = true; selectedDriverId = ''; selectedDriverLabel = ''"
-                                    placeholder="Search driver name, phone, vehicle..."
+                                    placeholder="Search rider name, phone, vehicle..."
                                     class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-3 pr-10 text-base font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm"
                                     :class="driverDropdownOpen ? 'rounded-b-none border-orange-400 ring-4 ring-orange-100' : ''"
                                 >
@@ -916,7 +916,7 @@ $canPrintWaybill = $hasManifestItems;
                                         </button>
                                     </template>
                                     <div x-show="filteredDrivers().length === 0" class="px-3 py-6 text-center text-sm text-slate-400">
-                                        No matching drivers.
+                                        No matching riders.
                                     </div>
                                 </div>
                             </div>
@@ -931,14 +931,14 @@ $canPrintWaybill = $hasManifestItems;
                         :disabled="!selectedDriverId || actionLoading"
                         class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-base font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:border-orange-300 disabled:bg-orange-300 disabled:shadow-none sm:text-sm"
                     >
-                        Assign Driver
+                        Assign Rider
                     </button>
                 </div>
             </div>
         </div>
     </template>
 
-    {{-- ── Unassign Driver Modal ─────────────────────────────────────── --}}
+    {{-- ── Unassign Rider Modal ─────────────────────────────────────── --}}
     <div
         x-show="unassignDriverModalOpen"
         x-transition.opacity.duration.200ms
@@ -956,8 +956,8 @@ $canPrintWaybill = $hasManifestItems;
                         </svg>
                     </div>
                     <div>
-                        <h3 class="text-lg font-extrabold text-slate-900">Unassign Driver</h3>
-                        <p class="mt-1 text-sm text-slate-500">Remove the assigned driver and return this transfer to Ready.</p>
+                        <h3 class="text-lg font-extrabold text-slate-900">Unassign Rider</h3>
+                        <p class="mt-1 text-sm text-slate-500">Remove the assigned rider and return this transfer to Ready.</p>
                     </div>
                 </div>
                 <button type="button" @@click="unassignDriverModalOpen = false" class="shrink-0 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:text-slate-700">
@@ -985,7 +985,7 @@ $canPrintWaybill = $hasManifestItems;
                     :disabled="actionLoading"
                     class="rounded-xl border-2 border-slate-900 bg-slate-900 px-5 py-3 text-base font-black text-white shadow-lg shadow-slate-900/15 transition hover:border-slate-800 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
                 >
-                    Unassign Driver
+                    Unassign Rider
                 </button>
             </div>
         </div>
@@ -1390,7 +1390,7 @@ document.addEventListener('alpine:init', () => {
 
             async submitAssignDriver() {
                 if (!this.selectedDriverId) {
-                    window.showToast?.('Please select a driver.', 'warning');
+                    window.showToast?.('Please select a rider.', 'warning');
                     return;
                 }
                 await this._postAction(config.assign_driver_endpoint, { driver_id: Number(this.selectedDriverId) }, () => {
@@ -1467,7 +1467,7 @@ document.addEventListener('alpine:init', () => {
             async undoDispatch() {
                 this.openConfirm({
                     title: 'Undo Dispatch',
-                    message: 'This brings the loaded transfer back to this warehouse so you can reassign the driver, unload it, or dispatch later. It is blocked once arrival or receiving starts.',
+                    message: 'This brings the loaded transfer back to this warehouse so you can reassign the rider, unload it, or dispatch later. It is blocked once arrival or receiving starts.',
                     confirmText: 'Undo Dispatch',
                     tone: 'amber',
                     onConfirm: () => this._postAction(config.undo_dispatch_endpoint, {}, null),

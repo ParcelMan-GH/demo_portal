@@ -69,7 +69,7 @@
         </div>
         <div>
             <p class="text-sm font-semibold text-amber-800">Awaiting Pickup</p>
-            <p class="text-xs text-amber-700 mt-0.5">The driver has not picked up this shipment yet. Receiving and finalization are disabled until pickup is confirmed.</p>
+            <p class="text-xs text-amber-700 mt-0.5">The rider has not picked up this shipment yet. Receiving and finalization are disabled until pickup is confirmed.</p>
         </div>
     </div>
 
@@ -125,7 +125,7 @@
                                     <span>{{ $shipment->vendor->business_name }}</span>
                                 @endif
                                 <span class="hidden h-1 w-1 rounded-full bg-slate-600 sm:inline-flex"></span>
-                                <span>Driver: {{ $assignment->driver?->name ?? '-' }}</span>
+                                <span>Rider: {{ $assignment->driver?->name ?? '-' }}</span>
                                 @if($assignment->driver?->phone)
                                     <span class="text-slate-600">/</span>
                                     <span>{{ $assignment->driver->phone }}</span>
@@ -434,7 +434,7 @@
                                     <p class="text-xl font-black text-slate-700 mt-1" x-text="items[receiveModal.itemIndex]?.vendor_quantity"></p>
                                 </div>
                                 <div class="text-center py-3 border-x border-slate-200/70">
-                                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Driver Qty</p>
+                                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Rider Qty</p>
                                     <p class="text-xl font-black mt-1"
                                        :class="items[receiveModal.itemIndex]?.driver_qty_matches_vendor === false ? 'text-amber-600' : 'text-slate-700'"
                                        x-text="items[receiveModal.itemIndex]?.driver_confirmed_quantity !== null ? items[receiveModal.itemIndex]?.driver_confirmed_quantity : '—'"></p>
@@ -566,7 +566,7 @@
                                                class="mt-0.5 h-5 w-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
                                         <div>
                                             <span class="text-xs font-bold text-orange-700 uppercase tracking-wider">Send via Bus Courier</span>
-                                            <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Tag this package for bus-courier handoff. A bus-handoff driver will pick it up; they choose the station in the field.</p>
+                                            <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Tag this package for bus-courier handoff. A bus-handoff rider will pick it up; they choose the station in the field.</p>
                                         </div>
                                     </label>
                                 </div>
@@ -639,11 +639,11 @@
 
                                         <template x-if="(items[receiveModal.itemIndex]?.driver_photos || []).length > 0">
                                             <div>
-                                                <p class="text-[11px] font-semibold text-slate-500 mb-2">Driver (<span x-text="(items[receiveModal.itemIndex]?.driver_photos || []).length"></span>)</p>
+                                                <p class="text-[11px] font-semibold text-slate-500 mb-2">Rider (<span x-text="(items[receiveModal.itemIndex]?.driver_photos || []).length"></span>)</p>
                                                 <div class="flex flex-wrap gap-2">
                                                     <template x-for="(photo, pi) in (items[receiveModal.itemIndex]?.driver_photos || [])" :key="'d-' + pi">
                                                         <a :href="photo.url" target="_blank" rel="noopener">
-                                                            <img :src="photo.url" alt="Driver photo" class="h-16 w-16 object-cover rounded-xl border border-slate-200 hover:opacity-80 transition">
+                                                            <img :src="photo.url" alt="Rider photo" class="h-16 w-16 object-cover rounded-xl border border-slate-200 hover:opacity-80 transition">
                                                         </a>
                                                     </template>
                                                 </div>

@@ -35,7 +35,7 @@ class PermissionSeeder extends Seeder
             ['module' => 'shipments', 'action' => 'create', 'name' => 'shipments.create', 'description' => 'Create orders', 'sort_order' => 41],
             ['module' => 'shipments', 'action' => 'edit', 'name' => 'shipments.edit', 'description' => 'Edit orders', 'sort_order' => 42],
             ['module' => 'shipments', 'action' => 'delete', 'name' => 'shipments.delete', 'description' => 'Delete orders', 'sort_order' => 43],
-            ['module' => 'shipments', 'action' => 'assign_driver', 'name' => 'shipments.assign_driver', 'description' => 'Assign drivers to orders', 'sort_order' => 44],
+            ['module' => 'shipments', 'action' => 'assign_driver', 'name' => 'shipments.assign_driver', 'description' => 'Assign riders to orders', 'sort_order' => 44],
             ['module' => 'shipments', 'action' => 'update_status', 'name' => 'shipments.update_status', 'description' => 'Update order status', 'sort_order' => 45],
 
             // Vendors (5)
@@ -47,11 +47,11 @@ class PermissionSeeder extends Seeder
             ['module' => 'vendors', 'action' => 'manage', 'name' => 'vendors.manage', 'description' => 'Manage vendor payouts and finance actions', 'sort_order' => 55],
 
             // Drivers (5)
-            ['module' => 'drivers', 'action' => 'view', 'name' => 'drivers.view', 'description' => 'View drivers list', 'sort_order' => 60],
-            ['module' => 'drivers', 'action' => 'create', 'name' => 'drivers.create', 'description' => 'Create new drivers', 'sort_order' => 61],
-            ['module' => 'drivers', 'action' => 'edit', 'name' => 'drivers.edit', 'description' => 'Edit existing drivers', 'sort_order' => 62],
-            ['module' => 'drivers', 'action' => 'delete', 'name' => 'drivers.delete', 'description' => 'Delete drivers', 'sort_order' => 63],
-            ['module' => 'drivers', 'action' => 'assign', 'name' => 'drivers.assign', 'description' => 'Assign drivers to tasks', 'sort_order' => 64],
+            ['module' => 'drivers', 'action' => 'view', 'name' => 'drivers.view', 'description' => 'View riders list', 'sort_order' => 60],
+            ['module' => 'drivers', 'action' => 'create', 'name' => 'drivers.create', 'description' => 'Create new riders', 'sort_order' => 61],
+            ['module' => 'drivers', 'action' => 'edit', 'name' => 'drivers.edit', 'description' => 'Edit existing riders', 'sort_order' => 62],
+            ['module' => 'drivers', 'action' => 'delete', 'name' => 'drivers.delete', 'description' => 'Delete riders', 'sort_order' => 63],
+            ['module' => 'drivers', 'action' => 'assign', 'name' => 'drivers.assign', 'description' => 'Assign riders to tasks', 'sort_order' => 64],
 
             // Charges ledger (admin-side: pickup/delivery/station/handling fees per shipment)
             ['module' => 'charges', 'action' => 'view', 'name' => 'charges.view', 'description' => 'View shipment charges ledger', 'sort_order' => 75],
@@ -76,8 +76,8 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouse', 'action' => 'sorting_manage', 'name' => 'warehouse.sorting.manage', 'description' => 'Manage warehouse sorting', 'sort_order' => 127],
             ['module' => 'warehouse', 'action' => 'sorting_reopen', 'name' => 'warehouse.sorting.reopen', 'description' => 'Reopen sealed sort batches', 'sort_order' => 1271],
             ['module' => 'warehouse', 'action' => 'manifest_manage', 'name' => 'warehouse.manifest.manage', 'description' => 'Manage transport manifests', 'sort_order' => 128],
-            ['module' => 'warehouse', 'action' => 'transport_assign', 'name' => 'warehouse.transport.assign', 'description' => 'Assign transport drivers', 'sort_order' => 129],
-            ['module' => 'warehouse', 'action' => 'delivery_assign', 'name' => 'warehouse.delivery.assign', 'description' => 'Assign delivery drivers', 'sort_order' => 130],
+            ['module' => 'warehouse', 'action' => 'transport_assign', 'name' => 'warehouse.transport.assign', 'description' => 'Assign transport riders', 'sort_order' => 129],
+            ['module' => 'warehouse', 'action' => 'delivery_assign', 'name' => 'warehouse.delivery.assign', 'description' => 'Assign delivery riders', 'sort_order' => 130],
             ['module' => 'warehouse', 'action' => 'delivery_code_reset', 'name' => 'warehouse.delivery.code.reset', 'description' => 'Regenerate delivery verification codes', 'sort_order' => 1301],
             ['module' => 'warehouse', 'action' => 'items_scan', 'name' => 'warehouse.items.scan', 'description' => 'Scan warehouse items in/out', 'sort_order' => 131],
             ['module' => 'warehouse', 'action' => 'contacts_manage', 'name' => 'warehouse.contacts.manage', 'description' => 'Manage package contact queue and log calls', 'sort_order' => 136],

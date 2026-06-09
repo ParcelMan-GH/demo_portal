@@ -1,8 +1,8 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Riders & Drivers')
+@section('title', 'Riders')
 @section('breadcrumb-parent', 'Management')
-@section('breadcrumb-current', 'Riders & Drivers')
+@section('breadcrumb-current', 'Riders')
 
 @section('content')
 
@@ -65,7 +65,7 @@
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h7.5m-7.5 0H3.375A1.125 1.125 0 0 1 2.25 17.625V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V14.25m-19.5 0V6.375c0-.621.504-1.125 1.125-1.125h11.25c.621 0 1.125.504 1.125 1.125v7.875m-12.375 0h18"/></svg>
                         </div>
                         <div class="min-w-0">
-                            <h2 class="text-lg font-extrabold text-slate-900">Riders & Drivers</h2>
+                            <h2 class="text-lg font-extrabold text-slate-900">Riders</h2>
                             <p class="truncate text-sm text-slate-500">Manage rider accounts, vehicle details, capabilities, and assignment access.</p>
                         </div>
                     </div>
@@ -74,7 +74,7 @@
                 <div class="flex lg:justify-end">
                     <button type="button" @@click="openAddModal()" class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        Add Rider/Driver
+                        Add Rider
                     </button>
                 </div>
                 @endif
@@ -250,7 +250,7 @@
                                     <div class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
                                         <svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h7.5"/></svg>
                                     </div>
-                                    <p class="text-sm font-medium text-slate-500">No riders or drivers match the current filters</p>
+                                    <p class="text-sm font-medium text-slate-500">No riders match the current filters</p>
                                     <button type="button" @@click="clearFilter('all')" class="text-xs font-semibold text-orange-600 hover:underline">Clear filters</button>
                                 </div>
                             </td>
@@ -378,7 +378,7 @@
 
             <div class="divide-y divide-slate-100 lg:hidden">
                 <template x-if="drivers.length === 0 && !loading">
-                    <div class="px-4 py-12 text-center text-sm text-slate-400">No riders or drivers match the current filters.</div>
+                    <div class="px-4 py-12 text-center text-sm text-slate-400">No riders match the current filters.</div>
                 </template>
                 <template x-for="driver in drivers" :key="driver.id">
                     <div class="p-4">
@@ -472,8 +472,8 @@
                             </div>
                             <!-- Title & Description -->
                             <div>
-                                <h3 class="text-xl font-bold text-slate-900" x-text="modalMode === 'add' ? 'Add Rider/Driver' : (modalMode === 'edit' ? 'Edit Rider/Driver' : 'View Rider/Driver')"></h3>
-                                <p class="text-sm text-slate-500 mt-1" x-text="modalMode === 'add' ? 'Create a rider or driver account with contact details' : (modalMode === 'edit' ? 'Update rider/driver information and settings' : 'View rider/driver account details')"></p>
+                                <h3 class="text-xl font-bold text-slate-900" x-text="modalMode === 'add' ? 'Add Rider' : (modalMode === 'edit' ? 'Edit Rider' : 'View Rider')"></h3>
+                                <p class="text-sm text-slate-500 mt-1" x-text="modalMode === 'add' ? 'Create a rider account with contact details' : (modalMode === 'edit' ? 'Update rider information and settings' : 'View rider account details')"></p>
                             </div>
                         </div>
                         <!-- Close Button -->
@@ -490,7 +490,7 @@
                     <div class="space-y-5 px-6 py-6 max-h-[calc(100vh-240px)] overflow-y-auto">
                             <!-- Photo -->
                             <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-2">Driver Photo</label>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Rider Photo</label>
                                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                                     <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-orange-50 text-xl font-black text-orange-700 ring-1 ring-orange-100">
                                         <template x-if="form.photo_preview_url">
@@ -604,7 +604,7 @@
                                             x-model="form.email"
                                             :disabled="modalMode === 'view'"
                                             class="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 text-sm text-slate-900 placeholder-slate-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
-                                            placeholder="driver@example.com"
+                                            placeholder="rider@example.com"
                                         >
                                     </div>
                                     <template x-if="errors.email">
@@ -887,7 +887,7 @@
                                     <svg x-show="!saving" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                     </svg>
-                                    <span x-text="saving ? 'Saving...' : (modalMode === 'add' ? 'Create Rider/Driver' : 'Save Changes')"></span>
+                                    <span x-text="saving ? 'Saving...' : (modalMode === 'add' ? 'Create Rider' : 'Save Changes')"></span>
                                 </button>
                             </div>
                         </div>
@@ -935,7 +935,7 @@
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-slate-900">Delete Rider/Driver</h3>
+                            <h3 class="text-lg font-semibold text-slate-900">Delete Rider</h3>
                             <p class="mt-1.5 text-sm text-slate-500 leading-relaxed">
                                 Are you sure you want to delete
                                 <span class="font-semibold text-slate-800" x-text="$store.driversDelete.driver?.name"></span>?

@@ -219,7 +219,7 @@ class DriverController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Rider/driver created successfully.',
+            'message' => 'Rider created successfully.',
             'driver' => $this->driverPayload($driver->fresh()),
         ]);
     }
@@ -278,7 +278,7 @@ class DriverController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Rider/driver updated successfully.',
+            'message' => 'Rider updated successfully.',
             'driver' => $this->driverPayload($driver->fresh()),
         ]);
     }
@@ -295,13 +295,13 @@ class DriverController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => $driver->is_active ? 'Rider/driver activated.' : 'Rider/driver deactivated.',
+            'message' => $driver->is_active ? 'Rider activated.' : 'Rider deactivated.',
             'is_active' => $driver->is_active,
         ]);
     }
 
     /**
-     * Delete a driver.
+     * Delete a rider.
      */
     public function destroy(Driver $driver)
     {
@@ -311,7 +311,7 @@ class DriverController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Rider/driver deleted successfully.',
+            'message' => 'Rider deleted successfully.',
         ]);
     }
 
@@ -750,7 +750,7 @@ class DriverController extends Controller
     private function exportPDF(array $rows)
     {
         $filename = 'drivers_' . date('Y-m-d_His') . '.pdf';
-        return GenericPdfExporter::download($rows, $filename, 'Riders & Drivers List');
+        return GenericPdfExporter::download($rows, $filename, 'Riders List');
     }
 
     /**

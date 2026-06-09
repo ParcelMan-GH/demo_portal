@@ -91,7 +91,7 @@ class EmailTemplateService
             'tracking_code' => 'TRK1SRFFMPF',
             'warehouse_name' => 'Accra Main Hub',
             'warehouse_address' => 'Accra Main Hub',
-            'driver_name' => 'John Driver',
+            'driver_name' => 'John Rider',
             'driver_phone' => '+233244111111',
             'run_number' => 'DR-2026-0007',
             'amount' => '25.00',

@@ -123,18 +123,18 @@
                         </select>
                     </div>
                     <div>
-                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Driver</label>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Rider</label>
                         <select x-model="filters.driver_id" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                            <option value="">All drivers</option>
+                            <option value="">All riders</option>
                             <template x-for="driver in transportDrivers" :key="driver.id"><option :value="driver.id" x-text="driver.name"></option></template>
                         </select>
                     </div>
                     <div>
-                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Driver Assignment</label>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Rider Assignment</label>
                         <select x-model="filters.assigned_state" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                             <option value="">Any assignment</option>
                             <option value="assigned">Assigned</option>
-                            <option value="unassigned">Needs driver</option>
+                            <option value="unassigned">Needs rider</option>
                         </select>
                     </div>
                     <div>
@@ -221,7 +221,7 @@
                                         </div>
                                     </template>
                                     <template x-if="!row.driver_name">
-                                        <span class="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 ring-1 ring-amber-200">Needs driver</span>
+                                        <span class="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 ring-1 ring-amber-200">Needs rider</span>
                                     </template>
                                 </td>
                                 <td x-show="visibleColumns.items_count" class="w-[7%] whitespace-nowrap px-3 py-3 text-center">
@@ -264,7 +264,7 @@
                         <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
                             <div><p class="font-black uppercase tracking-wide text-slate-400">Batch</p><p class="font-bold text-slate-800" x-text="row.batch_number || '-'"></p></div>
                             <div><p class="font-black uppercase tracking-wide text-slate-400">Loaded</p><p class="font-bold text-slate-800" x-text="row.loaded_display || '0 / 0'"></p></div>
-                            <div><p class="font-black uppercase tracking-wide text-slate-400">Driver</p><p class="font-bold text-slate-800" x-text="row.driver_name || 'Needs driver'"></p><p class="text-slate-500" x-text="row.driver_phone || ''"></p></div>
+                            <div><p class="font-black uppercase tracking-wide text-slate-400">Rider</p><p class="font-bold text-slate-800" x-text="row.driver_name || 'Needs rider'"></p><p class="text-slate-500" x-text="row.driver_phone || ''"></p></div>
                             <div><p class="font-black uppercase tracking-wide text-slate-400">Created</p><p class="font-bold text-slate-800" x-text="formatDisplayDate(row.created_at)"></p></div>
                             <div><p class="font-black uppercase tracking-wide text-slate-400">Dispatched</p><p class="font-bold text-slate-800" x-text="formatDisplayDate(row.dispatched_at)"></p></div>
                             <div><p class="font-black uppercase tracking-wide text-slate-400">Completed</p><p class="font-bold text-slate-800" x-text="formatDisplayDate(row.completed_at)"></p></div>

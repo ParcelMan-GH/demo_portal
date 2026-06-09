@@ -30,7 +30,7 @@ function buildPickupsTable(config) {
         columns: [
             { key: 'shipment', label: 'Shipment' },
             { key: 'vendor', label: 'Vendor' },
-            { key: 'driver', label: 'Driver' },
+            { key: 'driver', label: 'Rider' },
             { key: 'warehouse', label: 'Target Warehouse' },
             { key: 'status', label: 'Status' },
             { key: 'assigned_at', label: 'Assigned At' },
@@ -342,7 +342,7 @@ function buildPickupsTable(config) {
         // Export
         downloadCSV() {
             if (!this.assignments.length) return;
-            const headers = ['Shipment #', 'Vendor', 'Driver', 'Phone', 'Target Warehouse', 'Status', 'Assigned At', 'Completed At', 'Assigned By'];
+            const headers = ['Shipment #', 'Vendor', 'Rider', 'Phone', 'Target Warehouse', 'Status', 'Assigned At', 'Completed At', 'Assigned By'];
             const rows = this.assignments.map(a => [
                 a.shipment_number, a.vendor_name, a.driver_name, a.driver_phone,
                 a.target_warehouse, a.status_label, a.assigned_at || '', a.completed_at || '', a.assigned_by,
@@ -388,7 +388,7 @@ function buildPickupsTable(config) {
             title.textContent = 'Pickup Assignments';
             doc.body.appendChild(title);
 
-            const headers = ['Shipment #', 'Vendor', 'Driver', 'Target Warehouse', 'Status', 'Assigned At', 'Completed At'];
+            const headers = ['Shipment #', 'Vendor', 'Rider', 'Target Warehouse', 'Status', 'Assigned At', 'Completed At'];
             const table = doc.createElement('table');
             const thead = doc.createElement('thead');
             const headRow = doc.createElement('tr');

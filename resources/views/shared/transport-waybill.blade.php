@@ -70,9 +70,9 @@
                 <div class="sub">Manifest {{ $manifest->manifest_number }}</div>
             </div>
             <div>
-                <div class="label">Driver</div>
+                <div class="label">Rider</div>
                 <div class="value">{{ $manifest->assignedDriver?->name ?? 'Not assigned' }}</div>
-                <div class="sub">{{ collect([$manifest->assignedDriver?->phone, $manifest->assignedDriver?->vehicle_type, $manifest->assignedDriver?->vehicle_number])->filter()->implode(' / ') ?: 'No driver details' }}</div>
+                <div class="sub">{{ collect([$manifest->assignedDriver?->phone, $manifest->assignedDriver?->vehicle_type, $manifest->assignedDriver?->vehicle_number])->filter()->implode(' / ') ?: 'No rider details' }}</div>
             </div>
         </section>
 
@@ -169,7 +169,7 @@
                 <div class="sig-line">Date</div>
             </div>
             <div class="sig">
-                <div class="sig-title">Driver Received</div>
+                <div class="sig-title">Rider Received</div>
                 <div class="sig-line">Name</div>
                 <div class="sig-line">Signature</div>
                 <div class="sig-line">Date</div>

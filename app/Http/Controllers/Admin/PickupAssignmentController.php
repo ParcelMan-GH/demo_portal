@@ -114,7 +114,7 @@ class PickupAssignmentController extends Controller
     }
 
     /**
-     * Get available drivers, optionally filtered by vehicle type.
+     * Get available riders, optionally filtered by vehicle type.
      */
     public function availableDrivers(Request $request)
     {
@@ -153,7 +153,7 @@ class PickupAssignmentController extends Controller
     }
 
     /**
-     * Assign a driver to a shipment.
+     * Assign a rider to a shipment.
      */
     public function assign(Request $request, Shipment $shipment)
     {
@@ -212,7 +212,7 @@ class PickupAssignmentController extends Controller
     }
 
     /**
-     * Update the driver and/or target warehouse on an existing ASSIGNED pickup.
+     * Update the rider and/or target warehouse on an existing ASSIGNED pickup.
      */
     public function update(Request $request, PickupAssignment $pickupAssignment)
     {

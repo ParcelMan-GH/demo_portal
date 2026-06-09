@@ -7,10 +7,10 @@
     <meta name="theme-color" content="#1e293b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Parcelman Driver">
+    <meta name="apple-mobile-web-app-title" content="Parcelman Rider">
     <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
     <link rel="apple-touch-icon" href="{{ asset('favicon.jpg') }}">
-    <title>@yield('title', 'Driver Portal') - Parcelman</title>
+    <title>@yield('title', 'Rider Portal') - Parcelman</title>
     <link rel="icon" type="image/jpeg" href="{{ asset('favicon.jpg') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -90,7 +90,7 @@
                                 <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-600 to-emerald-800 text-white text-sm font-bold shadow-sm" x-text="driverInitial"></div>
                                 <div class="min-w-0 flex-1">
                                     <p class="driver-profile-dropdown-name" x-text="driverName"></p>
-                                    <p class="driver-profile-dropdown-role">Driver</p>
+                                    <p class="driver-profile-dropdown-role">Rider</p>
                                 </div>
                             </div>
                             {{-- Links --}}
@@ -407,7 +407,7 @@
                         });
                         const data = await response.json();
                         if (data?.success && data?.data?.user) {
-                            const name = data.data.user.name || 'Driver';
+                            const name = data.data.user.name || 'Rider';
                             this.driverName = name;
                             this.driverInitial = name.charAt(0).toUpperCase();
                             localStorage.setItem('parcelman_driver_name', name);

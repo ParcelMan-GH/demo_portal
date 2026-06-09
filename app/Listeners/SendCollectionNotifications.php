@@ -51,7 +51,7 @@ class SendCollectionNotifications implements ShouldQueue
             $this->pushService->sendToVendor(
                 vendor: $vendor,
                 title: 'Ready for Collection',
-                body: "Shipment {$shipmentNumber} is ready for collection at {$warehouse->name}.",
+                body: "Parcel {$shipmentNumber} is ready for collection at {$warehouse->name}.",
                 data: [
                     'shipment_id'     => (string) $shipment->id,
                     'shipment_number' => $shipmentNumber,
@@ -77,8 +77,8 @@ class SendCollectionNotifications implements ShouldQueue
         if ($vendor?->fcm_token) {
             $this->pushService->sendToVendor(
                 vendor: $vendor,
-                title: 'Shipment Collected',
-                body: "Shipment {$shipmentNumber} has been collected by {$collection->collected_by_name}.",
+                title: 'Parcel Collected',
+                body: "Parcel {$shipmentNumber} has been collected by {$collection->collected_by_name}.",
                 data: [
                     'shipment_id'     => (string) $shipment->id,
                     'shipment_number' => $shipmentNumber,

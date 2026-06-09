@@ -29,7 +29,7 @@ class DeliveryVerificationService
         ]);
 
         $message = sprintf(
-            'Parcelman delivery code for run %s: %s. Share this code with the driver to confirm delivery. Expires in 24 hours.',
+            'Parcelman delivery code for run %s: %s. Share this code with the rider to confirm delivery. Expires in 24 hours.',
             $runNumber,
             $plainCode
         );
@@ -148,4 +148,3 @@ class DeliveryVerificationService
         return str_repeat('*', strlen($code) - 2) . substr($code, -2);
     }
 }
-

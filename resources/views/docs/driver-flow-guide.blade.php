@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Parcelman — Driver & Warehouse Flow Guide</title>
+<title>Parcelman — Rider & Warehouse Flow Guide</title>
 <style>
   /* ── Reset & Base ─────────────────────────────── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -327,7 +327,7 @@
 
 <!-- ── COVER ───────────────────────────────────────────── -->
 <div class="cover">
-  <h1>Parcelman — Driver &amp; Warehouse Flow Guide</h1>
+  <h1>Parcelman — Rider &amp; Warehouse Flow Guide</h1>
   <div class="cover-subtitle">For Mobile Developers · v1 API</div>
   <div class="cover-meta">
     <div class="cover-meta-item">
@@ -352,7 +352,7 @@
   <tbody>
     <tr><td>Main Warehouse</td><td><code>main.warehouse@parcelman.test</code></td><td><code>password</code></td><td></td></tr>
     <tr><td>Kumasi Warehouse</td><td><code>main.warehouse@parcelman.test</code></td><td><code>password</code></td><td></td></tr>
-    <tr><td>Driver</td><td><code>driver@example.com</code></td><td><code>password</code></td><td>All 3 capabilities: Pickup, Transport, Delivery</td></tr>
+    <tr><td>Rider</td><td><code>rider@example.com</code></td><td><code>password</code></td><td>All 3 capabilities: Pickup, Transport, Delivery</td></tr>
   </tbody>
 </table>
 
@@ -361,7 +361,7 @@
   <div class="toc-title">Contents</div>
   <ul class="toc-list">
     <li><a href="#overview">Overview &amp; Item Lifecycle</a></li>
-    <li><a href="#phase1"><span class="toc-phase">Phase 1 — Driver Pickup</span></a></li>
+    <li><a href="#phase1"><span class="toc-phase">Phase 1 — Rider Pickup</span></a></li>
     <li><a href="#phase2"><span class="toc-phase">Phase 2 — Warehouse Receiving</span></a></li>
     <li><a href="#phase3"><span class="toc-phase">Phase 3 — Sorting</span></a></li>
     <li><a href="#phase4"><span class="toc-phase">Phase 4 — Transport Manifest</span></a></li>
@@ -374,14 +374,14 @@
 <!-- ── OVERVIEW ────────────────────────────────────────── -->
 <h2 id="overview">Overview &amp; Item Lifecycle</h2>
 
-<p>A shipment item follows this path from the moment a driver collects it from a vendor all the way to final delivery at the recipient's door. The flow branches at the warehouse — items can go to local delivery <strong>or</strong> be transported to another warehouse first.</p>
+<p>A shipment item follows this path from the moment a rider collects it from a vendor all the way to final delivery at the recipient's door. The flow branches at the warehouse — items can go to local delivery <strong>or</strong> be transported to another warehouse first.</p>
 
 <div class="flow-diagram">VENDOR submits shipment
        │
        ▼
 ┌──────────────────────────────────────────┐
-│  PHASE 1 · PICKUP                        │  ← Driver API
-│  Driver collects items from vendor       │
+│  PHASE 1 · PICKUP                        │  ← Rider API
+│  Rider collects items from vendor       │
 └──────────────────────────────────────────┘
        │
        ▼
@@ -399,15 +399,15 @@
        ├─── local_delivery ──────────────────────────────┐
        │                                                  ▼
        │                             ┌────────────────────────────────────┐
-       │                             │  PHASE 5 · DELIVERY RUN            │  ← Driver API
-       │                             │  Driver delivers to recipients     │
+       │                             │  PHASE 5 · DELIVERY RUN            │  ← Rider API
+       │                             │  Rider delivers to recipients     │
        │                             └────────────────────────────────────┘
        │
        └─── transfer ─────────────────────┐
                                           ▼
                    ┌──────────────────────────────────────────┐
-                   │  PHASE 4 · TRANSPORT MANIFEST            │  ← Driver API
-                   │  Driver moves items to another warehouse  │
+                   │  PHASE 4 · TRANSPORT MANIFEST            │  ← Rider API
+                   │  Rider moves items to another warehouse  │
                    └──────────────────────────────────────────┘
                                           │
                                           ▼
@@ -435,10 +435,10 @@
 <div class="phase phase-1" id="phase1">
   <div class="phase-header">
     <span class="phase-badge">Phase 1</span>
-    <span class="phase-title">Driver Pickup</span>
+    <span class="phase-title">Rider Pickup</span>
   </div>
-  <div class="phase-who"><strong>Who:</strong> Driver (mobile app) &nbsp;·&nbsp; <strong>What:</strong> Driver collects items from the vendor's location and brings them to the target warehouse.</div>
-  <p>Pickup assignments are created by the system and assigned to the driver. Each assignment includes the pickup address, vendor contact, items with expected quantities, and the target warehouse.</p>
+  <div class="phase-who"><strong>Who:</strong> Rider (mobile app) &nbsp;·&nbsp; <strong>What:</strong> Rider collects items from the vendor's location and brings them to the target warehouse.</div>
+  <p>Pickup assignments are created by the system and assigned to the rider. Each assignment includes the pickup address, vendor contact, items with expected quantities, and the target warehouse.</p>
 </div>
 
 <div class="endpoint">
@@ -475,7 +475,7 @@
     <span class="endpoint-url">/api/v1/driver/pickups/{assignment}/en-route</span>
   </div>
   <div class="endpoint-body">
-    <p class="endpoint-desc">Mark driver is heading to the vendor. No body required.</p>
+    <p class="endpoint-desc">Mark rider is heading to the vendor. No body required.</p>
     <div class="status-flow"><span class="status s-neutral">assigned</span><span class="sf-arrow">→</span><span class="status s-active">en_route</span></div>
   </div>
 </div>
@@ -505,7 +505,7 @@
     <table>
       <thead><tr><th>Field</th><th>Required</th><th>Description</th></tr></thead>
       <tbody>
-        <tr><td><code>confirmed_quantity</code></td><td><span class="td-required">Required</span></td><td>Units driver is physically taking</td></tr>
+        <tr><td><code>confirmed_quantity</code></td><td><span class="td-required">Required</span></td><td>Units rider is physically taking</td></tr>
         <tr><td><code>notes</code></td><td><span class="td-optional">Optional</span></td><td>Condition or discrepancy notes</td></tr>
         <tr><td><code>photos[]</code></td><td><span class="td-optional">Optional</span></td><td>Up to 10 photos, max 10 MB each</td></tr>
       </tbody>
@@ -529,9 +529,9 @@
     <ul>
       <li>All item statuses → <code>picked_up</code></li>
       <li>Each item gets a unique <code>tracking_code</code> generated (used for scanning in all later steps)</li>
-      <li>Assignment status → <code>completed</code>, driver status → <code>available</code></li>
+      <li>Assignment status → <code>completed</code>, rider status → <code>available</code></li>
     </ul>
-    <div class="callout callout-tip">The driver now physically takes the items to the target warehouse.</div>
+    <div class="callout callout-tip">The rider now physically takes the items to the target warehouse.</div>
   </div>
 </div>
 
@@ -544,7 +544,7 @@
     <span class="phase-title">Warehouse Receiving</span>
   </div>
   <div class="phase-who"><strong>Who:</strong> Warehouse staff (web portal) &nbsp;·&nbsp; <strong>What:</strong> Staff inspect items, record quantities and condition, print barcode labels, finalize receipt.</div>
-  <div class="callout callout-note">No driver API calls in this phase. The driver drops off the items and leaves.</div>
+  <div class="callout callout-note">No rider API calls in this phase. The rider drops off the items and leaves.</div>
 </div>
 
 <p><strong>Portal URL:</strong> <a href="https://parcelman.qixapps.com/warehouse/receipts/pending">https://parcelman.qixapps.com/warehouse/receipts/pending</a></p>
@@ -566,7 +566,7 @@
     <span class="phase-title">Sorting</span>
   </div>
   <div class="phase-who"><strong>Who:</strong> Warehouse staff (web portal) &nbsp;·&nbsp; <strong>What:</strong> Staff group items into batches and decide the next step.</div>
-  <div class="callout callout-note">No driver API calls in this phase.</div>
+  <div class="callout callout-note">No rider API calls in this phase.</div>
 </div>
 
 <p><strong>Portal URL:</strong> <a href="https://parcelman.qixapps.com/warehouse/sorting">https://parcelman.qixapps.com/warehouse/sorting</a></p>
@@ -592,7 +592,7 @@
     <span class="phase-badge">Phase 4</span>
     <span class="phase-title">Transport Manifest (Warehouse to Warehouse)</span>
   </div>
-  <div class="phase-who"><strong>Who:</strong> Warehouse staff (web portal) + Driver (mobile app) &nbsp;·&nbsp; <strong>What:</strong> Items are loaded onto a vehicle and transported to the destination warehouse.</div>
+  <div class="phase-who"><strong>Who:</strong> Warehouse staff (web portal) + Rider (mobile app) &nbsp;·&nbsp; <strong>What:</strong> Items are loaded onto a vehicle and transported to the destination warehouse.</div>
 </div>
 
 <h3>Warehouse Side — Origin</h3>
@@ -600,11 +600,11 @@
 
 <ol class="steps">
   <li><strong>Create Manifest</strong> from the sealed transfer batch. Manifest status → <code>draft</code></li>
-  <li><strong>Assign Driver</strong> (must have transport capability). Status → <code>assigned</code>, driver status → <code>busy</code></li>
+  <li><strong>Assign Rider</strong> (must have transport capability). Status → <code>assigned</code>, rider status → <code>busy</code></li>
   <li><strong>Dispatch</strong> when the vehicle is ready to leave. Status → <code>in_transit</code>, item statuses → <code>in_transit</code></li>
 </ol>
 
-<h3>Driver Side — Load &amp; Travel</h3>
+<h3>Rider Side — Load &amp; Travel</h3>
 
 <div class="callout callout-tip"><strong>Start Loading is optional.</strong> Scan Load works directly from <code>assigned</code> status and auto-advances the manifest to <code>loading</code> on the first scan.</div>
 
@@ -634,7 +634,7 @@
     <span class="endpoint-url">/api/v1/driver/transports/{manifest}/start-loading</span>
   </div>
   <div class="endpoint-body">
-    <p class="endpoint-desc">Optional. Mark driver has started loading. No body required.</p>
+    <p class="endpoint-desc">Optional. Mark rider has started loading. No body required.</p>
     <div class="status-flow"><span class="status s-active">assigned</span><span class="sf-arrow">→</span><span class="status s-active">loading</span></div>
   </div>
 </div>
@@ -659,7 +659,7 @@
     <span class="endpoint-url">/api/v1/driver/transports/{manifest}/depart</span>
   </div>
   <div class="endpoint-body">
-    <p class="endpoint-desc">All items loaded. Driver leaves the origin warehouse. No body required.</p>
+    <p class="endpoint-desc">All items loaded. Rider leaves the origin warehouse. No body required.</p>
     <div class="status-flow"><span class="status s-active">loading</span><span class="sf-arrow">→</span><span class="status s-active">in_transit</span></div>
   </div>
 </div>
@@ -670,7 +670,7 @@
     <span class="endpoint-url">/api/v1/driver/transports/{manifest}/arrive</span>
   </div>
   <div class="endpoint-body">
-    <p class="endpoint-desc">Driver arrives at the destination warehouse. No body required. The destination warehouse can now see this manifest in their Incoming tab.</p>
+    <p class="endpoint-desc">Rider arrives at the destination warehouse. No body required. The destination warehouse can now see this manifest in their Incoming tab.</p>
     <div class="status-flow"><span class="status s-active">in_transit</span><span class="sf-arrow">→</span><span class="status s-active">arrived</span></div>
   </div>
 </div>
@@ -681,7 +681,7 @@
 <ol class="steps">
   <li><strong>Find the arrived manifest</strong> and click View.</li>
   <li><strong>Scan each item in</strong> — enter received quantity per line. System flags discrepancies: <code>short</code>, <code>excess</code>, <code>damaged</code>.</li>
-  <li><strong>Finalize Receipt</strong> — manifest status → <code>received</code>, item statuses → <code>at_warehouse</code> (at the destination warehouse), driver status → <code>available</code>.</li>
+  <li><strong>Finalize Receipt</strong> — manifest status → <code>received</code>, item statuses → <code>at_warehouse</code> (at the destination warehouse), rider status → <code>available</code>.</li>
 </ol>
 
 <div class="callout callout-tip">Items are now back at <code>at_warehouse</code> at the destination warehouse and go through <strong>Sorting (Phase 3) again</strong> there.</div>
@@ -694,7 +694,7 @@
     <span class="phase-badge">Phase 5</span>
     <span class="phase-title">Delivery Run (Final Delivery to Recipient)</span>
   </div>
-  <div class="phase-who"><strong>Who:</strong> Warehouse staff (web portal) + Driver (mobile app) &nbsp;·&nbsp; <strong>What:</strong> Items are grouped into a delivery run and delivered to recipients.</div>
+  <div class="phase-who"><strong>Who:</strong> Warehouse staff (web portal) + Rider (mobile app) &nbsp;·&nbsp; <strong>What:</strong> Items are grouped into a delivery run and delivered to recipients.</div>
 </div>
 
 <h3>Warehouse Side — Create &amp; Dispatch</h3>
@@ -702,11 +702,11 @@
 
 <ol class="steps">
   <li><strong>Create Delivery Run</strong> from a sealed <code>local_delivery</code> batch. The system groups items by recipient/address into <strong>stops</strong> (one stop = one delivery address), generates a unique 6-digit verification code per stop, and sends it to the recipient by SMS. Run status → <code>draft</code></li>
-  <li><strong>Assign Driver</strong> (must have delivery capability). Run status → <code>assigned</code>, codes re-sent to recipients, driver status → <code>busy</code></li>
-  <li><strong>Dispatch</strong> when driver leaves with the items. Run status → <code>out_for_delivery</code></li>
+  <li><strong>Assign Rider</strong> (must have delivery capability). Run status → <code>assigned</code>, codes re-sent to recipients, rider status → <code>busy</code></li>
+  <li><strong>Dispatch</strong> when rider leaves with the items. Run status → <code>out_for_delivery</code></li>
 </ol>
 
-<h3>Driver Side — Make Deliveries</h3>
+<h3>Rider Side — Make Deliveries</h3>
 
 <div class="endpoint">
   <div class="endpoint-header">
@@ -785,7 +785,7 @@
     <span class="endpoint-url">/api/v1/driver/deliveries/{run}/stops/{stop}/arrive</span>
   </div>
   <div class="endpoint-body">
-    <p class="endpoint-desc">Mark arrival at the delivery address. No body required. <em>This step is optional</em> — if skipped, <code>arrived_at</code> is backfilled automatically when the driver confirms.</p>
+    <p class="endpoint-desc">Mark arrival at the delivery address. No body required. <em>This step is optional</em> — if skipped, <code>arrived_at</code> is backfilled automatically when the rider confirms.</p>
     <div class="status-flow"><span class="status s-pending">pending</span><span class="sf-arrow">→</span><span class="status s-active">arrived</span></div>
   </div>
 </div>
@@ -796,7 +796,7 @@
     <span class="endpoint-url">/api/v1/driver/deliveries/{run}/stops/{stop}/confirm</span>
   </div>
   <div class="endpoint-body">
-    <p class="endpoint-desc">Confirm delivery. The recipient gives the driver their 6-digit SMS code. Submit it with GPS, a proof photo, and delivered quantities for every item at the stop.</p>
+    <p class="endpoint-desc">Confirm delivery. The recipient gives the rider their 6-digit SMS code. Submit it with GPS, a proof photo, and delivered quantities for every item at the stop.</p>
     <p><strong>Content-Type:</strong> <code>multipart/form-data</code> (required for photo upload)</p>
     <table>
       <thead><tr><th>Field</th><th>Required</th><th>Description</th></tr></thead>
@@ -822,12 +822,12 @@
       </tbody>
     </table>
 
-    <div class="callout callout-tip">For sealed/bagged packages the driver cannot open, send <code>expected_quantity</code> as-is.</div>
+    <div class="callout callout-tip">For sealed/bagged packages the rider cannot open, send <code>expected_quantity</code> as-is.</div>
 
     <p><strong>After confirmation:</strong></p>
     <ul>
       <li>Stop status → <code>delivered</code></li>
-      <li>All stops done → Run → <code>completed</code>, driver freed</li>
+      <li>All stops done → Run → <code>completed</code>, rider freed</li>
       <li>Some stops remain → Run → <code>partially_delivered</code></li>
       <li>Partial/failed items return to the warehouse queue for re-delivery</li>
     </ul>
@@ -869,7 +869,7 @@
 </div>
 
 <div class="callout callout-note" style="margin-top:16px;">
-  <strong>Resend Verification Code</strong> — if a recipient didn't get their code, warehouse staff resend it from the portal: <em>Deliveries → Runs → [select run] → [select stop] → Resend Code</em>. No driver action needed — just retry Confirm Stop once the recipient has their new code.
+  <strong>Resend Verification Code</strong> — if a recipient didn't get their code, warehouse staff resend it from the portal: <em>Deliveries → Runs → [select run] → [select stop] → Resend Code</em>. No rider action needed — just retry Confirm Stop once the recipient has their new code.
 </div>
 
 <hr>
@@ -943,13 +943,13 @@
     <thead><tr><th>Status</th><th>Meaning</th><th>Set By</th></tr></thead>
     <tbody>
       <tr><td><span class="status s-neutral">pending</span></td><td>Item created, not yet collected</td><td>System</td></tr>
-      <tr><td><span class="status s-active">picked_up</span></td><td>Driver collected from vendor</td><td>Driver — Finalise Pickup</td></tr>
+      <tr><td><span class="status s-active">picked_up</span></td><td>Rider collected from vendor</td><td>Rider — Finalise Pickup</td></tr>
       <tr><td><span class="status s-active">at_warehouse</span></td><td>Received and logged at a warehouse</td><td>Warehouse — Finalise Receipt</td></tr>
       <tr><td><span class="status s-active">sorted</span></td><td>Grouped into a sort batch</td><td>Warehouse — Seal Batch</td></tr>
       <tr><td><span class="status s-active">in_transit</span></td><td>On a vehicle between warehouses</td><td>Warehouse — Dispatch Manifest</td></tr>
-      <tr><td><span class="status s-active">at_destination</span></td><td>Arrived at destination, pending receiving</td><td>Driver — Arrive at Destination</td></tr>
+      <tr><td><span class="status s-active">at_destination</span></td><td>Arrived at destination, pending receiving</td><td>Rider — Arrive at Destination</td></tr>
       <tr><td><span class="status s-active">out_for_delivery</span></td><td>On a delivery run heading to recipient</td><td>Warehouse — Dispatch Delivery Run</td></tr>
-      <tr><td><span class="status s-success">delivered</span></td><td>Handed to recipient</td><td>Driver — Confirm Stop</td></tr>
+      <tr><td><span class="status s-success">delivered</span></td><td>Handed to recipient</td><td>Rider — Confirm Stop</td></tr>
       <tr><td><span class="status s-failed">returned</span></td><td>Back in warehouse after failed delivery</td><td>System</td></tr>
     </tbody>
   </table>
@@ -961,13 +961,13 @@
 <h2 id="rules">Key Rules</h2>
 
 <ol>
-  <li><strong>Drivers have capabilities.</strong> A driver can have any combination of Pickup, Transport, and Delivery. Only show the relevant sections in the app.</li>
+  <li><strong>Riders have capabilities.</strong> A rider can have any combination of Pickup, Transport, and Delivery. Only show the relevant sections in the app.</li>
   <li><strong>Verification codes are per-stop, not per-run.</strong> Each stop has its own unique code sent to that recipient's phone number.</li>
   <li><strong>Verification codes expire after 24 hours.</strong> If expired, warehouse staff must resend via the portal.</li>
-  <li><strong>The <code>tracking_code</code> on Scan Load</strong> is the barcode printed and stuck on the item during warehouse receiving — not the shipment number. The driver reads it from the manifest item list in the API response.</li>
+  <li><strong>The <code>tracking_code</code> on Scan Load</strong> is the barcode printed and stuck on the item during warehouse receiving — not the shipment number. The rider reads it from the manifest item list in the API response.</li>
   <li><strong>Arrive at Stop is optional.</strong> Going straight to Confirm Stop is fine — <code>arrived_at</code> is backfilled automatically.</li>
   <li><strong>Failing a stop does not cancel the run.</strong> The run continues with remaining stops; failed items re-enter the delivery queue.</li>
-  <li><strong>Warehouse Dispatch ≠ Driver Depart.</strong> The warehouse Dispatch action and the driver's Depart call are independent — warehouse dispatches when the vehicle is ready; driver calls Depart after finishing loading.</li>
+  <li><strong>Warehouse Dispatch ≠ Rider Depart.</strong> The warehouse Dispatch action and the rider's Depart call are independent — warehouse dispatches when the vehicle is ready; rider calls Depart after finishing loading.</li>
 </ol>
 
 </body>

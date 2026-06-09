@@ -595,7 +595,7 @@ function buildDriversTable(config) {
                     if (response.status === 422) {
                         this.errors = result.errors || {};
                     } else {
-                        throw new Error(result.message || 'Failed to save rider/driver');
+                        throw new Error(result.message || 'Failed to save rider');
                     }
                     return;
                 }
@@ -603,7 +603,7 @@ function buildDriversTable(config) {
                 this.closeModal();
                 this.loadData();
             } catch (error) {
-                console.error('Error saving rider/driver:', error);
+                console.error('Error saving rider:', error);
             } finally {
                 this.saving = false;
             }
@@ -625,7 +625,7 @@ function buildDriversTable(config) {
                     this.loadData();
                 }
             } catch (err) {
-                console.error('Failed to update rider/driver status:', err);
+                console.error('Failed to update rider status:', err);
             }
         },
 
@@ -655,15 +655,15 @@ function buildDriversTable(config) {
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to delete rider/driver');
+                    throw new Error('Failed to delete rider');
                 }
 
                 store.show = false;
                 store.driver = null;
                 this.loadData();
             } catch (error) {
-                console.error('Error deleting rider/driver:', error);
-                alert('Failed to delete rider/driver. Please try again.');
+                console.error('Error deleting rider:', error);
+                alert('Failed to delete rider. Please try again.');
             } finally {
                 store.deleting = false;
             }
@@ -746,7 +746,7 @@ function buildDriversTable(config) {
             const doc = printWindow.document;
             const headers = Object.keys(data[0]);
 
-            doc.title = 'Riders & Drivers Export';
+            doc.title = 'Riders Export';
             doc.body.innerHTML = '';
 
             const style = doc.createElement('style');
@@ -761,7 +761,7 @@ function buildDriversTable(config) {
             doc.head.appendChild(style);
 
             const title = doc.createElement('h1');
-            title.textContent = 'Riders & Drivers List';
+            title.textContent = 'Riders List';
             doc.body.appendChild(title);
 
             const meta = doc.createElement('p');

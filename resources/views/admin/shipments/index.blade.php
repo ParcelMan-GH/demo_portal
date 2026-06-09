@@ -217,7 +217,7 @@
                         <span class="mb-1.5 block text-[11px] font-black uppercase tracking-wide text-slate-500">Assignment</span>
                         <select x-model="assignmentStateFilter" class="h-11 w-full rounded-xl border border-slate-200/70 bg-white/70 px-3 text-sm font-semibold text-slate-700 outline-none backdrop-blur-sm transition-colors focus:border-slate-300 focus:ring-2 focus:ring-slate-400/50">
                             <option value="">All orders</option>
-                            <option value="needs_assignment">Needs driver</option>
+                            <option value="needs_assignment">Needs rider</option>
                             <option value="assigned">Has pickup assignment</option>
                             <option value="active">Active pickup</option>
                             <option value="warehouse_received">Received at warehouse</option>
@@ -236,9 +236,9 @@
                     </label>
 
                     <label class="block">
-                        <span class="mb-1.5 block text-[11px] font-black uppercase tracking-wide text-slate-500">Pickup Driver</span>
+                        <span class="mb-1.5 block text-[11px] font-black uppercase tracking-wide text-slate-500">Pickup Rider</span>
                         <select x-model="driverFilter" class="h-11 w-full rounded-xl border border-slate-200/70 bg-white/70 px-3 text-sm font-semibold text-slate-700 outline-none backdrop-blur-sm transition-colors focus:border-slate-300 focus:ring-2 focus:ring-slate-400/50">
-                            <option value="">All drivers</option>
+                            <option value="">All riders</option>
                             <template x-for="driver in drivers" :key="driver.id">
                                 <option :value="driver.id" x-text="driver.name + (driver.phone ? ' / ' + driver.phone : '')"></option>
                             </template>
@@ -296,7 +296,7 @@
                     </label>
 
                     <label class="block">
-                        <span class="mb-1.5 block text-[11px] font-black uppercase tracking-wide text-slate-500">Driver Picked Qty</span>
+                        <span class="mb-1.5 block text-[11px] font-black uppercase tracking-wide text-slate-500">Rider Picked Qty</span>
                         <span class="grid grid-cols-2 overflow-hidden rounded-xl border-2 border-slate-200 bg-white transition focus-within:border-orange-400 focus-within:ring-4 focus-within:ring-orange-100">
                             <input type="number" min="0" x-model="driverQtyMin" placeholder="Min" class="min-w-0 border-0 bg-transparent px-3 py-3 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400">
                             <input type="number" min="0" x-model="driverQtyMax" placeholder="Max" class="min-w-0 border-0 border-l border-slate-200 bg-transparent px-3 py-3 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400">
@@ -389,7 +389,7 @@
                                 <p class="truncate font-mono text-xs font-bold text-slate-500" x-text="shipment.pickup_contact_phone || '-'"></p>
                             </div>
                             <div class="rounded-xl bg-slate-50 px-3 py-2">
-                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Driver</p>
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Rider</p>
                                 <p class="mt-1 truncate text-sm font-bold text-slate-800" x-text="shipment.pickup_driver_name || '-'"></p>
                                 <p x-show="shipment.pickup_driver_name" class="truncate font-mono text-xs font-bold text-slate-500" x-text="shipment.pickup_driver_phone || '-'"></p>
                             </div>
@@ -420,7 +420,7 @@
                             <th x-show="visibleColumns.pickup_contact" @@click="sort('pickup_contact_name')" class="cursor-pointer px-4 py-3">Pickup Contact</th>
                             <th x-show="visibleColumns.pickup_location" class="px-4 py-3">Pickup Location</th>
                             <th x-show="visibleColumns.target_warehouse" class="px-4 py-3">Drop-off Warehouse</th>
-                            <th x-show="visibleColumns.pickup_driver" class="px-4 py-3">Pickup Driver</th>
+                            <th x-show="visibleColumns.pickup_driver" class="px-4 py-3">Pickup Rider</th>
                             <th x-show="visibleColumns.items" @@click="sort('items_count')" class="cursor-pointer px-4 py-3 text-center">Packages</th>
                             <th x-show="visibleColumns.status" @@click="sort('status')" class="cursor-pointer px-4 py-3 text-center">Order Status</th>
                             <th x-show="visibleColumns.pickup_status" class="px-4 py-3 text-center">Pickup Status</th>

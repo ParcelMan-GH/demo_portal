@@ -209,7 +209,7 @@ class IncomingTransportManifestSeeder extends Seeder
         $manifest = $manifest->fresh();
         $manifest->update(['notes' => "Seeded {$tag}."]);
 
-        $this->ensureSuccess($transport->assignDriver($manifest->fresh(), $driver, $origin, $user), 'assign driver');
+        $this->ensureSuccess($transport->assignDriver($manifest->fresh(), $driver, $origin, $user), 'assign rider');
         $this->ensureSuccess($transport->adminMarkAllItemsLoaded($manifest->fresh(), $origin, $user), 'mark all loaded');
         $this->ensureSuccess($transport->dispatch($manifest->fresh(), $origin, $user), 'dispatch transfer');
 
@@ -364,8 +364,8 @@ SVG;
         return Driver::query()->updateOrCreate(
             ['phone' => '+233244222222'],
             [
-                'name' => 'Fixture Transport Driver',
-                'email' => 'fixture.transport.driver@parcelman.test',
+                'name' => 'Fixture Transport Rider',
+                'email' => 'fixture.transport.rider@parcelman.test',
                 'password' => Hash::make('password123'),
                 'vehicle_type' => 'truck',
                 'vehicle_number' => 'GT-4242-26',

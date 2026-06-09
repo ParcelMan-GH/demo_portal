@@ -31,7 +31,7 @@
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-slate-900">Transport Containers</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Drivers scan container codes during loading. Items stay visible for audit.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Riders scan container codes during loading. Items stay visible for audit.</p>
                 </div>
             </div>
 
@@ -182,7 +182,7 @@
                                                         @endforeach
                                                     </div>
                                                 @elseif($isLooseContainer && $labelCode)
-                                                    <p class="text-[10px] text-amber-600 mt-0.5">Printed labels not found. Reprint package labels before driver loading.</p>
+                                                    <p class="text-[10px] text-amber-600 mt-0.5">Printed labels not found. Reprint package labels before rider loading.</p>
                                                 @elseif(!$isLooseContainer && $labelCode)
                                                     <p class="text-[10px] text-slate-400 mt-0.5 font-mono">{{ $labelCode }}</p>
                                                 @endif

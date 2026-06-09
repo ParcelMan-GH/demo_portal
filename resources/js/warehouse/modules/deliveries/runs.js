@@ -56,7 +56,7 @@ function registerWarehouseDeliveryRunsPage() {
         columns: [
             { key: 'run_number', label: 'Run #', exportLabel: 'Run Number' },
             { key: 'status', label: 'Status' },
-            { key: 'driver_name', label: 'Driver', exportLabel: 'Driver Name' },
+            { key: 'driver_name', label: 'Rider', exportLabel: 'Rider Name' },
             { key: 'stops_count', label: 'Stops', sortable: false },
             { key: 'items_count', label: 'Items', sortable: false },
             { key: 'assigned_at', label: 'Assigned At' },
@@ -166,7 +166,7 @@ function registerWarehouseDeliveryRunsPage() {
                     dispatched_date_from: 'Dispatched date',
                     completed_date_from: 'Completed date',
                     status: 'Run status',
-                    driver_id: 'Driver',
+                    driver_id: 'Rider',
                     stop_status: 'Stop status',
                     verification: 'Verification',
                     stops_min: 'Min stops',
@@ -500,7 +500,7 @@ function registerWarehouseDeliveryRunsPage() {
             async assignDriver(runId) {
                 const driverId = this.selectedDriverByRun[runId];
                 if (!driverId) {
-                    window.showToast?.('Select a delivery driver first.', 'warning');
+                    window.showToast?.('Select a delivery rider first.', 'warning');
                     return;
                 }
 
@@ -519,15 +519,15 @@ function registerWarehouseDeliveryRunsPage() {
 
                     const result = await response.json();
                     if (!response.ok || !result.success) {
-                        throw new Error(result.message || 'Failed to assign driver.');
+                        throw new Error(result.message || 'Failed to assign rider.');
                     }
 
-                    window.showToast?.(result.message || 'Driver assigned successfully.', 'success');
+                    window.showToast?.(result.message || 'Rider assigned successfully.', 'success');
                     delete this.selectedDriverByRun[runId];
                     await this.loadData();
                 } catch (error) {
                     console.error(error);
-                    window.showToast?.(error.message || 'Unable to assign delivery driver.', 'error');
+                    window.showToast?.(error.message || 'Unable to assign delivery rider.', 'error');
                 } finally {
                     this.loading = false;
                 }

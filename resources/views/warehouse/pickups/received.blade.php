@@ -45,7 +45,7 @@
                         <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/>
                         </svg>
-                        <input type="text" x-model="search" @@input.debounce.500ms="meta.current_page = 1; loadData()" placeholder="Search order, driver, or phone..."
+                        <input type="text" x-model="search" @@input.debounce.500ms="meta.current_page = 1; loadData()" placeholder="Search order, rider, or phone..."
                                class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                     </div>
                 </div>
@@ -120,9 +120,9 @@
                         </select>
                     </div>
                     <div>
-                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Pickup Driver</label>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Pickup Rider</label>
                         <select x-model="filters.driver_id" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                            <option value="">All drivers</option>
+                            <option value="">All riders</option>
                             <template x-for="driver in drivers" :key="driver.id">
                                 <option :value="driver.id" x-text="driver.name + (driver.phone ? ' / ' + driver.phone : '')"></option>
                             </template>
@@ -148,7 +148,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Driver Picked Qty</label>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Rider Picked Qty</label>
                         <div class="flex overflow-hidden rounded-xl border-2 border-slate-200 bg-white transition focus-within:border-orange-400 focus-within:ring-4 focus-within:ring-orange-100">
                             <input type="number" min="0" x-model="filters.driver_qty_min" placeholder="Min" class="min-w-0 flex-1 border-0 bg-transparent px-3 py-3 text-sm font-semibold text-slate-900 outline-none">
                             <div class="w-px bg-slate-200"></div>

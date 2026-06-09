@@ -192,9 +192,9 @@
                         </select>
                     </div>
                     <div>
-                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Driver</label>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Rider</label>
                         <select x-model="filters.driver_id" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                            <option value="">All drivers</option>
+                            <option value="">All riders</option>
                             <template x-for="driver in deliveryDrivers" :key="driver.id"><option :value="driver.id" x-text="driver.name"></option></template>
                         </select>
                     </div>
@@ -378,7 +378,7 @@
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <a :href="row.view_url" class="truncate text-sm font-extrabold text-orange-700 hover:underline" x-text="row.run_number || '-'"></a>
-                                    <p class="mt-1 text-xs text-slate-500" x-text="row.driver_name ? row.driver_name + ' · ' + (row.driver_phone || '') : 'No driver assigned'"></p>
+                                    <p class="mt-1 text-xs text-slate-500" x-text="row.driver_name ? row.driver_name + ' · ' + (row.driver_phone || '') : 'No rider assigned'"></p>
                                 </div>
                                 <span class="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold" :class="statusBadgeClass(row.status)" x-text="statusLabel(row.status)"></span>
                             </div>

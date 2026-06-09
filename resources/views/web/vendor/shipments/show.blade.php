@@ -457,7 +457,7 @@
                                                 </div>
                                             </div>
 
-                                            {{-- Driver Pickup Photos --}}
+                                            {{-- Rider Pickup Photos --}}
                                             <div x-show="(item.pickup_confirmation?.photos || []).length > 0" x-cloak class="sh-item-photo-section driver">
                                                 <div class="sh-item-photo-label driver">
                                                     <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -804,7 +804,7 @@
                                     <span class="vendor-badge text-[10px]" :class="'vendor-badge-' + pickupAssignment?.status" x-text="statusLabel(pickupAssignment?.status)"></span>
                                 </div>
                                 <div class="sh-info-row">
-                                    <span class="sh-info-label">Driver</span>
+                                    <span class="sh-info-label">Rider</span>
                                     <span class="sh-info-value" x-text="pickupAssignment?.driver_name || pickupAssignment?.driver?.name || '-'"></span>
                                 </div>
                                 <div class="sh-info-row">
@@ -823,7 +823,7 @@
                                     <svg class="h-6 w-6 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0m-8 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
                                 </div>
                                 <p class="text-xs font-medium text-slate-500">No pickup assigned yet</p>
-                                <p class="mt-0.5 text-[11px] text-slate-400">Driver will be assigned after processing</p>
+                                <p class="mt-0.5 text-[11px] text-slate-400">Rider will be assigned after processing</p>
                             </div>
                         </template>
                     </div>

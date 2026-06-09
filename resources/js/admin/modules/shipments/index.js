@@ -77,7 +77,7 @@ function buildOrdersTable(config) {
             { key: 'pickup_contact', label: 'Pickup Contact' },
             { key: 'pickup_location', label: 'Pickup Location' },
             { key: 'target_warehouse', label: 'Drop-off Warehouse' },
-            { key: 'pickup_driver', label: 'Pickup Driver' },
+            { key: 'pickup_driver', label: 'Pickup Rider' },
             { key: 'items', label: 'Packages' },
             { key: 'status', label: 'Order Status' },
             { key: 'pickup_status', label: 'Pickup Status' },
@@ -99,7 +99,7 @@ function buildOrdersTable(config) {
         },
         statCards: [
             { key: 'total', label: 'Total Orders', icon: 'package', iconClass: 'bg-slate-50 text-slate-700 ring-slate-200' },
-            { key: 'needs_driver', label: 'Needs Driver', icon: 'user', iconClass: 'bg-amber-50 text-amber-700 ring-amber-100' },
+            { key: 'needs_driver', label: 'Needs Rider', icon: 'user', iconClass: 'bg-amber-50 text-amber-700 ring-amber-100' },
             { key: 'assigned_pickup', label: 'Assigned / Pickup', icon: 'truck', iconClass: 'bg-blue-50 text-blue-700 ring-blue-100' },
             { key: 'picked_up', label: 'Picked Up', icon: 'check', iconClass: 'bg-indigo-50 text-indigo-700 ring-indigo-100' },
             { key: 'received_warehouse', label: 'Received at Warehouse', icon: 'warehouse', iconClass: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },

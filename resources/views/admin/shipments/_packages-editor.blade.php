@@ -76,7 +76,7 @@
                                 <div class="w-7 h-7 rounded-full bg-violet-100 text-violet-700 text-[11px] font-black flex items-center justify-center flex-shrink-0">1</div>
                                 <div>
                                     <h2 class="text-sm font-bold text-slate-900 leading-tight">Pickup Details</h2>
-                                    <p class="text-[11px] text-slate-500 mt-0.5">Pickup location the driver will use to find the sender</p>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">Pickup location the rider will use to find the sender</p>
                                 </div>
                             </div>
                         </div>
@@ -647,7 +647,7 @@
                                       x-text="packages.length > 0 && packages.some(p => p.description) ? 'Done' : 'Pending'"></span>
                             </div>
                             <div class="h-px bg-slate-100 ml-9"></div>
-                            {{-- Step: Driver assigned --}}
+                            {{-- Step: Rider assigned --}}
                             <div class="flex items-center gap-3 py-2">
                                 <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all"
                                      :class="currentAssignment ? 'bg-emerald-500' : 'bg-slate-100 border-2 border-slate-200'">
@@ -655,8 +655,8 @@
                                     <span x-show="!currentAssignment" class="text-[10px] font-bold text-slate-400">6</span>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <p class="text-xs font-semibold text-slate-700">Assign Driver</p>
-                                    <p class="text-[11px] text-slate-400">Assign pickup driver & warehouse</p>
+                                    <p class="text-xs font-semibold text-slate-700">Assign Rider</p>
+                                    <p class="text-[11px] text-slate-400">Assign pickup rider & warehouse</p>
                                 </div>
                                 <span class="text-[10px] font-semibold"
                                       :class="currentAssignment ? 'text-emerald-600' : 'text-amber-500'"
@@ -701,7 +701,7 @@
                                 </div>
                                 <div>
                                     <h3 class="text-xs font-bold text-slate-800">Pickup Assignment</h3>
-                                    <p class="text-[11px] text-slate-400" x-text="currentAssignment ? 'Driver assigned' : 'No driver assigned yet'"></p>
+                                    <p class="text-[11px] text-slate-400" x-text="currentAssignment ? 'Rider assigned' : 'No rider assigned yet'"></p>
                                 </div>
                             </div>
                             {{-- Assign / change buttons --}}
@@ -710,14 +710,14 @@
                                     <button @@click="openAssignModal()"
                                             class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white text-[11px] font-bold rounded-xl shadow-md shadow-indigo-400/30 transition-all">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                        Assign Driver
+                                        Assign Rider
                                     </button>
                                 </template>
                                 <template x-if="currentAssignment && currentAssignment.status === 'assigned' && !currentAssignment.picked_up_at">
                                     <button @@click="openAssignModal(true)"
                                             class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-indigo-200 text-indigo-700 text-[11px] font-semibold rounded-xl hover:bg-indigo-50 transition-all">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                                        Change Driver
+                                        Change Rider
                                     </button>
                                 </template>
                             </div>
@@ -730,12 +730,12 @@
                             <div class="w-12 h-12 mx-auto mb-3 rounded-2xl bg-indigo-50 border-2 border-dashed border-indigo-200 flex items-center justify-center">
                                 <svg class="w-6 h-6 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                             </div>
-                            <p class="text-sm font-semibold text-slate-500">No driver assigned</p>
-                            <p class="text-xs text-slate-400 mt-1">Assign a driver to begin the pickup process</p>
+                            <p class="text-sm font-semibold text-slate-500">No rider assigned</p>
+                            <p class="text-xs text-slate-400 mt-1">Assign a rider to begin the pickup process</p>
                         </div>
                     </template>
 
-                    {{-- Assigned driver info --}}
+                    {{-- Assigned rider info --}}
                     <template x-if="currentAssignment">
                         <div class="px-5 py-4">
                             <div class="flex items-center gap-4">
@@ -765,7 +765,7 @@
     {{-- MODALS                                                     --}}
     {{-- ═══════════════════════════════════════════════════════════ --}}
 
-    {{-- Assign Driver Modal --}}
+    {{-- Assign Rider Modal --}}
     <div x-show="assignModal.open" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" style="display:none">
         <div @@click.stop class="bg-white rounded-3xl shadow-2xl border border-slate-200/80 w-full max-w-md overflow-hidden">
             <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-indigo-50/40">
@@ -774,8 +774,8 @@
                         <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                     </div>
                     <div>
-                        <h3 class="text-sm font-bold text-slate-900" x-text="assignModal.isEdit ? 'Change Driver' : 'Assign Driver'"></h3>
-                        <p class="text-xs text-slate-500" x-text="assignModal.isEdit ? 'Select a new driver or warehouse' : 'Select driver and target warehouse'"></p>
+                        <h3 class="text-sm font-bold text-slate-900" x-text="assignModal.isEdit ? 'Change Rider' : 'Assign Rider'"></h3>
+                        <p class="text-xs text-slate-500" x-text="assignModal.isEdit ? 'Select a new rider or warehouse' : 'Select rider and target warehouse'"></p>
                     </div>
                 </div>
                 <button @@click="assignModal.open = false" class="w-8 h-8 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
@@ -784,17 +784,17 @@
             </div>
             <div class="px-6 py-5 space-y-3">
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Driver <span class="text-rose-500">*</span></label>
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Rider <span class="text-rose-500">*</span></label>
                     <select x-model="assignModal.driver_id"
                             class="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all">
-                        <option value="">Choose a driver...</option>
+                        <option value="">Choose a rider...</option>
                         <template x-for="d in assignModal.drivers" :key="d.id">
                             <option :value="d.id" x-text="d.name + ' (' + d.phone + ')'"></option>
                         </template>
                     </select>
                     <p x-show="assignModal.drivers.length === 0 && !assignModal.loading" class="mt-1.5 text-xs text-amber-600 flex items-center gap-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        No available drivers
+                        No available riders
                     </p>
                 </div>
                 <div>
@@ -811,7 +811,7 @@
                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Notes <span class="text-slate-300 font-normal normal-case">(optional)</span></label>
                     <textarea x-model="assignModal.notes" rows="2"
                               class="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all resize-none"
-                              placeholder="Pickup notes for the driver..."></textarea>
+                              placeholder="Pickup notes for the rider..."></textarea>
                 </div>
                 <div class="flex justify-end gap-2 pt-1">
                     <button @@click="assignModal.open = false"
@@ -820,7 +820,7 @@
                             :disabled="assignModal.submitting || !assignModal.driver_id || !assignModal.warehouse_id"
                             class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-400/30 disabled:opacity-50 transition-all hover:opacity-90">
                         <svg x-show="assignModal.submitting" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span x-text="assignModal.submitting ? (assignModal.isEdit ? 'Updating...' : 'Assigning...') : (assignModal.isEdit ? 'Update Assignment' : 'Assign Driver')"></span>
+                        <span x-text="assignModal.submitting ? (assignModal.isEdit ? 'Updating...' : 'Assigning...') : (assignModal.isEdit ? 'Update Assignment' : 'Assign Rider')"></span>
                     </button>
                 </div>
             </div>
@@ -1357,7 +1357,7 @@ function shipmentEditor() {
         },
 
         async openAssignModal(isEdit = false) {
-            // Validate before opening (skip validation for edit/change driver)
+            // Validate before opening (skip validation for edit/change rider)
             if (!isEdit) {
                 const errors = this.validateBeforeAssign();
                 if (errors.length > 0) {
@@ -1378,7 +1378,7 @@ function shipmentEditor() {
                 ]);
                 this.assignModal.drivers = driversRes.data || driversRes || [];
                 this.assignModal.warehouses = warehousesRes.data || warehousesRes || [];
-            } catch (e) { this._toast('Failed to load drivers/warehouses.', 'error'); }
+            } catch (e) { this._toast('Failed to load riders/warehouses.', 'error'); }
             finally { this.assignModal.loading = false; }
         },
 
@@ -1405,7 +1405,7 @@ function shipmentEditor() {
                         id: this.currentAssignment?.id || res.data?.assignment?.id,
                         status: 'assigned',
                         driver_id: this.assignModal.driver_id,
-                        driver_name: driver?.name || 'Driver',
+                        driver_name: driver?.name || 'Rider',
                         driver_phone: driver?.phone || '',
                         target_warehouse_id: this.assignModal.warehouse_id,
                         warehouse_name: warehouse?.name || 'Warehouse',
@@ -1414,7 +1414,7 @@ function shipmentEditor() {
                     if (res.data?.assignment?.id && !this.config.updateAssignmentEndpointTemplate) {
                         this.config.updateAssignmentEndpointTemplate = this.config.assignDriverEndpoint.replace(/assign.*$/, 'assignments/' + res.data.assignment.id + '/update');
                     }
-                    this._toast(isEdit ? 'Driver changed successfully!' : 'Driver assigned successfully!', 'success');
+                    this._toast(isEdit ? 'Rider changed successfully!' : 'Rider assigned successfully!', 'success');
                 } else {
                     this._toast(res.message || 'Failed to assign.', 'error');
                 }

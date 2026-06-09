@@ -13,8 +13,8 @@ class DriversSeeder extends Seeder
         Driver::updateOrCreate(
             ['phone' => '+233244111111'],
             [
-                'name' => 'John Driver',
-                'email' => 'driver@example.com',
+                'name' => 'John Rider',
+                'email' => 'rider@example.com',
                 'password' => Hash::make('password123'),
                 'vehicle_type' => 'motorcycle',
                 'vehicle_number' => 'GR-1234-20',

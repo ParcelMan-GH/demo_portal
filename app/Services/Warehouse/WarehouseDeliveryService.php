@@ -48,7 +48,7 @@ class WarehouseDeliveryService
         return DeliveryRun::query()
             ->with([
                 'warehouse:id,name,code',
-                'assignedDriver:id,name,phone,vehicle_type,vehicle_number',
+                'assignedRider:id,name,phone,vehicle_type,vehicle_number',
                 'stops:id,delivery_run_id,status,total_packages,recipient_name,recipient_phone,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped',
                 'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status',
             ])
@@ -329,9 +329,9 @@ class WarehouseDeliveryService
             ->filter(fn ($label) => $label->receiptItem?->shipmentItem)
             ->groupBy(fn ($label) => (int) $label->receiptItem->shipment_item_id);
 
-        $pendingTransferCodes = \App\Models\RiderPackageTransfer::query()
+        $pendingTransferCodes = \App\Models\DriverPackageTransfer::query()
             ->whereIn('shipment_item_id', $labelsByItemId->keys())
-            ->where('status', \App\Models\RiderPackageTransfer::STATUS_PENDING)
+            ->where('status', \App\Models\DriverPackageTransfer::STATUS_PENDING)
             ->with('shipmentItem:id,tracking_code')
             ->get()
             ->map(fn ($transfer) => $transfer->shipmentItem?->tracking_code)
@@ -527,7 +527,7 @@ class WarehouseDeliveryService
                     ->update(['status' => RiderTeamHandoverItem::STATUS_IN_DELIVERY]);
 
                 $handoverIds->each(function ($handoverId) {
-                    $handover = \App\Models\RiderTeamHandover::find($handoverId);
+                    $handover = \App\Models\DriverTeamHandover::find($handoverId);
                     if ($handover) {
                         app(\App\Services\RiderTeamHandoverService::class)->refreshHandoverCounts($handover);
                     }
@@ -740,7 +740,7 @@ class WarehouseDeliveryService
     public function assignDriver(DeliveryRun $run, Driver $driver, Warehouse $warehouse): array
     {
         if ((int) $run->warehouse_id !== (int) $warehouse->id) {
-            return ['success' => false, 'message' => 'Cannot assign driver for another warehouse run.'];
+            return ['success' => false, 'message' => 'Cannot assign rider for another warehouse run.'];
         }
 
         if (!in_array($run->status, [DeliveryRun::STATUS_DRAFT, DeliveryRun::STATUS_ASSIGNED], true)) {
@@ -748,11 +748,11 @@ class WarehouseDeliveryService
         }
 
         if (!$driver->is_active) {
-            return ['success' => false, 'message' => 'Driver is inactive.'];
+            return ['success' => false, 'message' => 'Rider is inactive.'];
         }
 
         if (!$driver->hasCapability(Driver::CAPABILITY_DELIVERY)) {
-            return ['success' => false, 'message' => 'Driver is not configured for delivery assignments.'];
+            return ['success' => false, 'message' => 'Rider is not configured for delivery assignments.'];
         }
 
         return DB::transaction(function () use ($run, $driver) {
@@ -773,7 +773,7 @@ class WarehouseDeliveryService
 
             return [
                 'success' => true,
-                'message' => 'Delivery driver assigned successfully.',
+                'message' => 'Delivery rider assigned successfully.',
                 'data' => [
                     'run' => $run->fresh(['assignedDriver', 'stops', 'items']),
                 ],
@@ -792,7 +792,7 @@ class WarehouseDeliveryService
         }
 
         if (!$run->assigned_driver_id) {
-            return ['success' => false, 'message' => 'Assign a delivery driver before dispatch.'];
+            return ['success' => false, 'message' => 'Assign a delivery rider before dispatch.'];
         }
 
         return DB::transaction(function () use ($run, $warehouse, $user) {
@@ -1344,8 +1344,8 @@ class WarehouseDeliveryService
                     'delivery_run_stop_id'   => $charge->delivery_run_stop_id ?: $stop->id,
                     'recorded_by_driver_id'  => $driver->id,
                     'notes'                  => $chargeCount > 1
-                        ? "Driver collected delivery fee on arrival (split from GHS " . number_format($inFieldDeliveryFee, 2) . " across {$chargeCount} existing charge(s))"
-                        : 'Driver collected delivery fee on arrival',
+                        ? "Rider collected delivery fee on arrival (split from GHS " . number_format($inFieldDeliveryFee, 2) . " across {$chargeCount} existing charge(s))"
+                        : 'Rider collected delivery fee on arrival',
                 ]));
 
                 $this->chargesService->markPaid($charge, 'cash', null, $driver);
@@ -1380,7 +1380,7 @@ class WarehouseDeliveryService
                     'status'                => ShipmentCharge::STATUS_PAID,
                     'payment_method'        => 'cash',
                     'delivery_run_stop_id'  => $stop->id,
-                    'notes'                 => "Driver collected delivery fee on arrival{$noteSuffix}",
+                    'notes'                 => "Rider collected delivery fee on arrival{$noteSuffix}",
                 ], $driver);
             }
 
@@ -1402,7 +1402,7 @@ class WarehouseDeliveryService
                 'status'               => ShipmentCharge::STATUS_PAID,
                 'payment_method'       => 'cash',
                 'delivery_run_stop_id' => $stop->id,
-                'notes'                => "Driver collected delivery fee on arrival{$noteSuffix}",
+                'notes'                => "Rider collected delivery fee on arrival{$noteSuffix}",
             ], $driver);
         }
     }
@@ -1618,7 +1618,7 @@ class WarehouseDeliveryService
                         'status'                => ShipmentCharge::STATUS_PAID,
                         'payment_method'        => 'cash',
                         'delivery_run_stop_id'  => $stop->id,
-                        'notes'                 => "Driver paid bus courier at handoff{$noteSuffix}",
+                        'notes'                 => "Rider paid bus courier at handoff{$noteSuffix}",
                     ], $driver);
                 }
             }

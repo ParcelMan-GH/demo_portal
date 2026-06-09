@@ -29,7 +29,7 @@ function registerReceivedPickupsPage() {
         drivers: config.drivers || [],
         columns: [
             { key: 'shipment_number', label: 'Order #', exportLabel: 'Order Number' },
-            { key: 'driver_name', label: 'Driver', exportLabel: 'Driver Name' },
+            { key: 'driver_name', label: 'Rider', exportLabel: 'Rider Name' },
             { key: 'status', label: 'Status' },
             { key: 'assigned_at', label: 'Assigned At' },
             { key: 'arrived_warehouse_at', label: 'Arrived Warehouse At' },
@@ -292,7 +292,7 @@ function registerReceivedPickupsPage() {
 
                 if (this.filters.driver_id) {
                     const driver = this.drivers.find((item) => String(item.id) === String(this.filters.driver_id));
-                    chips.push({ key: 'driver_id', label: `Driver: ${driver?.name || this.filters.driver_id}` });
+                    chips.push({ key: 'driver_id', label: `Rider: ${driver?.name || this.filters.driver_id}` });
                 }
 
                 if (this.filters.receipt_result) {
@@ -305,7 +305,7 @@ function registerReceivedPickupsPage() {
                 }
 
                 if (this.filters.driver_qty_min || this.filters.driver_qty_max) {
-                    chips.push({ key: 'driver_qty_range', label: `Driver qty: ${this.filters.driver_qty_min || '0'} - ${this.filters.driver_qty_max || '...'}` });
+                    chips.push({ key: 'driver_qty_range', label: `Rider qty: ${this.filters.driver_qty_min || '0'} - ${this.filters.driver_qty_max || '...'}` });
                 }
 
                 return chips;

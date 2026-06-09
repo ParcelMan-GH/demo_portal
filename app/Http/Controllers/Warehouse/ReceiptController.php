@@ -276,7 +276,7 @@ class ReceiptController extends AdminShipmentController
         if (is_null($pickupAssignment->picked_up_at)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot receive items — the driver has not picked up this shipment yet.',
+                'message' => 'Cannot receive items — the rider has not picked up this shipment yet.',
             ], 422);
         }
 
@@ -645,7 +645,7 @@ class ReceiptController extends AdminShipmentController
         if (is_null($pickupAssignment->picked_up_at)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot finalize receipt — the driver has not picked up this shipment yet.',
+                'message' => 'Cannot finalize receipt — the rider has not picked up this shipment yet.',
             ], 422);
         }
 

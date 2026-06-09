@@ -45,7 +45,7 @@
     </ul>
     <h3>Information collected automatically</h3>
     <ul>
-        <li><strong>Location data</strong> — with your permission, GPS location from drivers' and vendors' devices to enable pickup, transport, and delivery (for example, navigating to a pickup or delivery point).</li>
+        <li><strong>Location data</strong> — with your permission, GPS location from riders' and vendors' devices to enable pickup, transport, and delivery (for example, navigating to a pickup or delivery point).</li>
         <li><strong>Device and usage data</strong> — device type, operating system, app version, and app activity used to operate and improve the Services.</li>
         <li><strong>Push notification tokens</strong> — identifiers used to send delivery and status notifications to your device.</li>
     </ul>
@@ -54,7 +54,7 @@
     <ul>
         <li>Create and manage your account and verify your identity by OTP.</li>
         <li>Accept, route, transport, and deliver parcels, and keep delivery records and history.</li>
-        <li>Coordinate pickups and deliveries between vendors, drivers, warehouse staff, and recipients.</li>
+        <li>Coordinate pickups and deliveries between vendors, riders, warehouse staff, and recipients.</li>
         <li>Process charges, record payments, and manage vendor payouts.</li>
         <li>Send transactional and delivery-status notifications.</li>
         <li>Provide customer support and respond to your requests.</li>
@@ -65,7 +65,7 @@
     <h2>4. How we share information</h2>
     <p>We do not sell your personal information. We share it only as needed to provide the Services:</p>
     <ul>
-        <li><strong>Operational parties</strong> — drivers, warehouse staff, and recipients receive the details necessary to complete a pickup or delivery (for example, a recipient's name, phone number, and address are shared with the assigned driver).</li>
+        <li><strong>Operational parties</strong> — riders, warehouse staff, and recipients receive the details necessary to complete a pickup or delivery (for example, a recipient's name, phone number, and address are shared with the assigned rider).</li>
         <li><strong>Service providers</strong> — trusted vendors that support the Services, such as SMS/OTP gateways, cloud hosting and file storage (including Amazon Web Services), push-notification infrastructure (such as Firebase), and payment or mobile-money providers. They may process information only on our instructions.</li>
         <li><strong>Legal and safety</strong> — authorities or third parties where required by law, to protect our rights, or to prevent harm or fraud.</li>
         <li><strong>Business transfers</strong> — in connection with a merger, acquisition, or sale of assets, subject to this Policy.</li>

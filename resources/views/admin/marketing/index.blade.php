@@ -52,7 +52,7 @@
                         Customer Messaging
                     </div>
                     <h1 class="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">Marketing Broadcasts</h1>
-                    <p class="mt-2 text-sm font-medium leading-6 text-slate-300">Send push notifications, SMS, and email campaigns to active vendors and drivers.</p>
+                    <p class="mt-2 text-sm font-medium leading-6 text-slate-300">Send push notifications, SMS, and email campaigns to active vendors and riders.</p>
                 </div>
                 <div class="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 xl:mt-11 xl:max-w-[680px]">
                     @foreach($channelStats as $stat)
@@ -130,7 +130,7 @@
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Audience</label>
                         <select x-model="form.audience" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                             <option value="all_vendors" x-text="`All Vendors (${audienceCount('vendors')} reachable)`"></option>
-                            <option value="all_drivers" x-text="`All Drivers (${audienceCount('drivers')} reachable)`"></option>
+                            <option value="all_drivers" x-text="`All Riders (${audienceCount('drivers')} reachable)`"></option>
                             <option value="all" x-text="`Everyone (${audienceCount('vendors') + audienceCount('drivers')} reachable)`"></option>
                         </select>
                     </div>
@@ -312,8 +312,8 @@
                         <select x-model="filters.audience" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                             <option value="">All audiences</option>
                             <option value="all_vendors">All Vendors</option>
-                            <option value="all_drivers">All Drivers</option>
-                            <option value="all">Vendors & Drivers</option>
+                            <option value="all_drivers">All Riders</option>
+                            <option value="all">Vendors & Riders</option>
                         </select>
                     </div>
                     <div>
@@ -562,7 +562,7 @@ function marketingPage() {
         },
 
         audienceLabel() {
-            const labels = { all_vendors: 'All Vendors', all_drivers: 'All Drivers', all: 'Vendors & Drivers' };
+            const labels = { all_vendors: 'All Vendors', all_drivers: 'All Riders', all: 'Vendors & Riders' };
             return labels[this.form.audience] || this.form.audience;
         },
 
@@ -813,8 +813,8 @@ function marketingPage() {
         audienceText(audience) {
             return {
                 all_vendors: 'All Vendors',
-                all_drivers: 'All Drivers',
-                all: 'Vendors & Drivers',
+                all_drivers: 'All Riders',
+                all: 'Vendors & Riders',
             }[audience] || '-';
         },
 

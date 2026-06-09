@@ -68,7 +68,7 @@
 
     $timeline = [
         ['label' => 'Created', 'value' => $manifest->created_at, 'dot' => 'bg-slate-500'],
-        ['label' => 'Driver Assigned', 'value' => $manifest->assigned_at, 'dot' => 'bg-orange-600'],
+        ['label' => 'Rider Assigned', 'value' => $manifest->assigned_at, 'dot' => 'bg-orange-600'],
         ['label' => 'Dispatched', 'value' => $manifest->dispatched_at, 'dot' => 'bg-violet-500'],
         ['label' => 'Arrived', 'value' => $manifest->arrived_at, 'dot' => 'bg-amber-500'],
         ['label' => 'Received', 'value' => $manifest->received_at, 'dot' => 'bg-emerald-500'],
@@ -174,7 +174,7 @@
                         <p class="text-xs font-black uppercase tracking-[0.22em] text-orange-200">From {{ $manifest->originWarehouse?->name ?? 'Origin Warehouse' }}</p>
                         <h1 class="mt-2 text-3xl font-black leading-tight text-white sm:text-4xl">{{ $manifest->manifest_number }}</h1>
                         <p class="mt-3 text-sm font-bold text-slate-300">
-                            {{ $manifest->assignedDriver?->name ?? 'No driver' }}
+                            {{ $manifest->assignedDriver?->name ?? 'No rider' }}
                             @if($manifest->assignedDriver?->phone)
                                 <span class="px-2 text-slate-500">/</span>{{ $manifest->assignedDriver->phone }}
                             @endif
@@ -827,11 +827,11 @@
                                         </svg>
                                     </div>
                                     <div>
-                                        <h3 class="text-sm font-bold text-white leading-none">Transport Driver</h3>
+                                        <h3 class="text-sm font-bold text-white leading-none">Transport Rider</h3>
                                         @if($manifest->assignedDriver)
                                             <p class="text-[11px] text-white/60 mt-0.5">{{ $manifest->assignedDriver->name }}</p>
                                         @else
-                                            <p class="text-[11px] text-white/50 mt-0.5">No driver assigned</p>
+                                            <p class="text-[11px] text-white/50 mt-0.5">No rider assigned</p>
                                         @endif
                                     </div>
                                 </div>
@@ -861,7 +861,7 @@
                                         <svg class="w-9 h-9 mx-auto mb-2 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                         </svg>
-                                        <p class="text-xs text-slate-400">No driver assigned</p>
+                                        <p class="text-xs text-slate-400">No rider assigned</p>
                                     </div>
                                 @endif
                             </div>
@@ -969,7 +969,7 @@
                     <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/>
                     </svg>
-                    <p class="text-xs font-semibold text-amber-700">Receiving is locked until the driver marks this manifest as arrived at the destination warehouse.</p>
+                    <p class="text-xs font-semibold text-amber-700">Receiving is locked until the rider marks this manifest as arrived at the destination warehouse.</p>
                 </div>
 
                 {{-- Items Grid --}}
@@ -1265,14 +1265,14 @@
                     $totalCount = count($timeline);
                     $timelineDescriptions = [
                         'Created'          => 'Transport manifest created from sealed batch',
-                        'Driver Assigned'  => 'Driver assigned for transport',
+                        'Rider Assigned'  => 'Rider assigned for transport',
                         'Dispatched'       => 'Manifest dispatched, items in transit',
-                        'Arrived'          => 'Driver arrived at destination warehouse',
+                        'Arrived'          => 'Rider arrived at destination warehouse',
                         'Received'         => 'Items received and verified at destination',
                     ];
                     $timelineIcons = [
                         'Created'          => 'M12 4v16m8-8H4',
-                        'Driver Assigned'  => 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+                        'Rider Assigned'  => 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
                         'Dispatched'       => 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4',
                         'Arrived'          => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
                         'Received'         => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',

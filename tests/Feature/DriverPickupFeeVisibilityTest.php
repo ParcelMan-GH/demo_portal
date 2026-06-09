@@ -241,8 +241,8 @@ function buildDriverPickupFeeVisibilitySchema(): void
 function createDriverForPickupFeeVisibilityTest(): Driver
 {
     return Driver::create([
-        'name' => 'Pickup Driver',
-        'email' => 'pickup-driver@example.test',
+        'name' => 'Pickup Rider',
+        'email' => 'pickup-rider@example.test',
         'phone' => '+233244000000',
         'password' => Hash::make('password123'),
         'status' => 'offline',

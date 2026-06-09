@@ -572,7 +572,7 @@ function buildDeliveryRunsTable(config) {
         columns: [
             { key: 'run_number',    label: 'Run #' },
             { key: 'warehouse',     label: 'Warehouse' },
-            { key: 'driver',        label: 'Driver' },
+            { key: 'driver',        label: 'Rider' },
             { key: 'stops_items',   label: 'Stops / Items' },
             { key: 'status',        label: 'Status' },
             { key: 'dispatched_at', label: 'Dispatched At' },

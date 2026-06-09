@@ -18,7 +18,7 @@ class VendorNotificationController extends Controller
         $vendor = $request->user();
 
         $validated = $request->validate([
-            'status'     => ['nullable', 'string', Rule::in(['sent', 'failed'])],
+            'status'     => ['nullable', 'string', Rule::in(['sent', 'failed', 'logged'])],
             'type'       => ['nullable', 'string', 'max:100'],
             'is_read'    => ['nullable', 'in:true,false,1,0'],
             'from_date'  => ['nullable', 'date'],
@@ -34,18 +34,12 @@ class VendorNotificationController extends Controller
 
         if (!empty($validated['status'])) {
             $query->where('status', $validated['status']);
+        } else {
+            $query->whereIn('status', ['sent', 'logged']);
         }
 
         if (!empty($validated['type'])) {
             $query->where('type', $validated['type']);
-        }
-
-        if (array_key_exists('is_read', $validated) && !is_null($validated['is_read'])) {
-            if (filter_var($validated['is_read'], FILTER_VALIDATE_BOOLEAN)) {
-                $query->whereNotNull('read_at');
-            } else {
-                $query->whereNull('read_at');
-            }
         }
 
         if (!empty($validated['from_date'])) {
@@ -56,16 +50,23 @@ class VendorNotificationController extends Controller
             $query->whereDate('created_at', '<=', $validated['to_date']);
         }
 
+        $unreadQuery = clone $query;
+
+        if (array_key_exists('is_read', $validated) && !is_null($validated['is_read'])) {
+            if (filter_var($validated['is_read'], FILTER_VALIDATE_BOOLEAN)) {
+                $query->whereNotNull('read_at');
+            } else {
+                $query->whereNull('read_at');
+            }
+        }
+
         $limit     = (int) ($validated['limit'] ?? 20);
         $offset    = (int) ($validated['offset'] ?? 0);
         $sortBy    = $validated['sort_by'] ?? 'created_at';
         $sortOrder = $validated['sort_order'] ?? 'desc';
 
         $total = (clone $query)->count();
-        $unreadCount = NotificationLog::where('notifiable_type', 'App\Models\Vendor')
-            ->where('notifiable_id', $vendor->id)
-            ->whereNull('read_at')
-            ->count();
+        $unreadCount = $unreadQuery->whereNull('read_at')->count();
 
         $notifications = $query
             ->orderBy($sortBy, $sortOrder)
@@ -155,6 +156,7 @@ class VendorNotificationController extends Controller
 
         $updated = NotificationLog::where('notifiable_type', 'App\Models\Vendor')
             ->where('notifiable_id', $vendor->id)
+            ->whereIn('status', ['sent', 'logged'])
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
 

@@ -13,12 +13,12 @@ class SendAdminTransportNotification
     {
         $manifest = $event->manifest;
         $manifestNumber = $manifest->manifest_number;
-        $driverName = $manifest->assignedDriver?->name ?? 'Driver';
+        $driverName = $manifest->assignedDriver?->name ?? 'Rider';
         $destination = $manifest->destinationWarehouse?->name ?? 'destination';
 
         [$title, $body] = match ($event->newStatus) {
             'loading' => [
-                'Driver Loading Transport',
+                'Rider Loading Transport',
                 "{$driverName} is loading manifest {$manifestNumber} for transport.",
             ],
             'in_transit' => [
