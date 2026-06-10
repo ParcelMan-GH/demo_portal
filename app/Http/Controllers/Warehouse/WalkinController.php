@@ -12,7 +12,9 @@ use App\Services\Warehouse\WarehousePortalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use Throwable;
 
 class WalkinController extends Controller
 {
@@ -80,6 +82,7 @@ class WalkinController extends Controller
             'delivery.town'                      => 'required_if:destination_mode,single|nullable|string|max:255',
             'delivery.landmark'                  => 'nullable|string|max:255',
             'delivery.instructions'              => 'nullable|string|max:1000',
+            'pickup_fee_amount'                  => 'nullable|numeric|min:0|max:9999999.99',
             'item_photos'                        => 'nullable|array',
             'item_photos.*'                      => 'nullable|array',
             'item_photos.*.*'                    => 'file|image|max:12288',
@@ -118,27 +121,51 @@ class WalkinController extends Controller
             unset($validated['delivery']);
         }
 
-        $result = $service->createWalkinShipment($validated);
-        $shipment = $result['shipment']->load(['items.warehouseReceiptItems.labels', 'items.warehouseReceiptItems.photos']);
+        try {
+            $result = $service->createWalkinShipment($validated);
+            $shipment = $result['shipment']->load(['items.warehouseReceiptItems.labels', 'items.warehouseReceiptItems.photos']);
 
-        return response()->json([
-            'success'  => true,
-            'message'  => 'Walk-in shipment created successfully.',
-            'shipment' => [
-                'id' => $shipment->id,
-                'shipment_number' => $shipment->shipment_number,
-            ],
-            'packages' => $shipment->items->map(fn (ShipmentItem $item) => [
-                'id' => $item->id,
-                'description' => $item->description,
-                'quantity' => $item->quantity,
-                'tracking_code' => $item->tracking_code,
-                'delivery_method' => $item->delivery_method,
-                'print_url' => route('warehouse.walkin.items.print-label', $item),
-                'photo_count' => (int) ($item->warehouseReceiptItems->first()?->photos?->count() ?? 0),
-                'barcode_print_count' => (int) ($item->warehouseReceiptItems->first()?->barcode_print_count ?? 0),
-            ]),
-        ]);
+            return response()->json([
+                'success'  => true,
+                'message'  => 'Walk-in shipment created successfully.',
+                'shipment' => [
+                    'id' => $shipment->id,
+                    'shipment_number' => $shipment->shipment_number,
+                ],
+                'charge' => $result['pickup_fee_charge'] ? [
+                    'id' => $result['pickup_fee_charge']->id,
+                    'amount' => $result['pickup_fee_charge']->amount,
+                    'currency' => $result['pickup_fee_charge']->currency,
+                    'status' => $result['pickup_fee_charge']->status,
+                ] : null,
+                'packages' => $shipment->items->map(fn (ShipmentItem $item) => [
+                    'id' => $item->id,
+                    'description' => $item->description,
+                    'quantity' => $item->quantity,
+                    'tracking_code' => $item->tracking_code,
+                    'delivery_method' => $item->delivery_method,
+                    'print_url' => route('warehouse.walkin.items.print-label', $item),
+                    'photo_count' => (int) ($item->warehouseReceiptItems->first()?->photos?->count() ?? 0),
+                    'barcode_print_count' => (int) ($item->warehouseReceiptItems->first()?->barcode_print_count ?? 0),
+                ]),
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Warehouse walk-in shipment creation failed.', [
+                'route' => $request->route()?->getName(),
+                'admin_id' => $user->id,
+                'warehouse_id' => $warehouse->id,
+                'vendor_id' => $validated['vendor_id'] ?? null,
+                'pickup_fee_amount' => $validated['pickup_fee_amount'] ?? null,
+                'item_count' => count($validated['items'] ?? []),
+                'exception_class' => $e::class,
+                'exception_message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Server error while creating shipment.',
+            ], 500);
+        }
     }
 
     public function printLabel(Request $request, ShipmentItem $shipmentItem, WalkinShipmentService $service): JsonResponse

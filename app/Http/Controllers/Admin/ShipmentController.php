@@ -37,8 +37,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Facades\Excel;
+use Throwable;
 
 class ShipmentController extends Controller
 {
@@ -928,12 +930,31 @@ class ShipmentController extends Controller
             'delivery.town' => 'nullable|string|max:255',
             'delivery.landmark' => 'nullable|string|max:255',
             'delivery.instructions' => 'nullable|string|max:1000',
+            'pickup_fee_amount' => 'nullable|numeric|min:0|max:9999999.99',
         ]);
 
         $validated['source'] = 'admin_walkin';
         $validated['created_by_user_id'] = Auth::guard('admin')->id();
 
-        $result = $service->createWalkinShipment($validated);
+        try {
+            $result = $service->createWalkinShipment($validated);
+        } catch (Throwable $e) {
+            Log::error('Admin walk-in shipment creation failed.', [
+                'route' => $request->route()?->getName(),
+                'admin_id' => Auth::guard('admin')->id(),
+                'warehouse_id' => $validated['warehouse_id'] ?? null,
+                'vendor_id' => $validated['vendor_id'] ?? null,
+                'pickup_fee_amount' => $validated['pickup_fee_amount'] ?? null,
+                'item_count' => count($validated['items'] ?? []),
+                'exception_class' => $e::class,
+                'exception_message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Server error while creating shipment.',
+            ], 500);
+        }
 
         return response()->json([
             'success' => true,

@@ -10,6 +10,7 @@ use App\Enums\ShipmentStatus;
 use App\Events\WalkinShipmentReceived;
 use App\Helpers\PhoneHelper;
 use App\Models\Shipment;
+use App\Models\ShipmentCharge;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemTracking;
 use App\Models\User;
@@ -25,8 +26,10 @@ use Illuminate\Support\Facades\View;
 
 class WalkinShipmentService
 {
-    public function __construct(private StorageService $storageService)
-    {
+    public function __construct(
+        private StorageService $storageService,
+        private ChargesService $chargesService,
+    ) {
     }
 
     public function lookupVendor(string $phone): ?Vendor
@@ -91,7 +94,23 @@ class WalkinShipmentService
                 $shipmentData['delivery_instructions']    = $delivery['instructions'] ?? null;
             }
 
+            $user = User::findOrFail($data['created_by_user_id']);
             $shipment = Shipment::create($shipmentData);
+            $pickupFeeCharge = null;
+            $pickupFeeAmount = filled($data['pickup_fee_amount'] ?? null)
+                ? round((float) $data['pickup_fee_amount'], 2)
+                : 0.0;
+
+            if ($pickupFeeAmount > 0) {
+                $pickupFeeCharge = $this->chargesService->addCharge($shipment, [
+                    'charge_type' => ShipmentCharge::TYPE_PICKUP_FEE,
+                    'payer_type' => ShipmentCharge::PAYER_VENDOR,
+                    'due_stage' => ShipmentCharge::STAGE_AT_PICKUP,
+                    'amount' => $pickupFeeAmount,
+                    'status' => ShipmentCharge::STATUS_PENDING,
+                    'notes' => 'Walk-in counter charge recorded at shipment creation.',
+                ], $user);
+            }
 
             // Create warehouse receipt (finalized immediately)
             $receipt = WarehouseReceipt::create([
@@ -196,7 +215,6 @@ class WalkinShipmentService
                 ]);
             }
 
-            $user = User::findOrFail($data['created_by_user_id']);
             $autoRouting = app(WarehouseSortingService::class)->autoRouteReceiptItemsToDestinationBatches(
                 $transferRoutes,
                 $warehouse,
@@ -216,6 +234,7 @@ class WalkinShipmentService
                 'shipment' => $shipment->fresh(['vendor', 'items']),
                 'receipt'  => $receipt,
                 'auto_routing' => $autoRouting,
+                'pickup_fee_charge' => $pickupFeeCharge,
             ];
         });
     }

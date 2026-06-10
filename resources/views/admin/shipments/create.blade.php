@@ -13,6 +13,7 @@ $walkinConfig = [
     'storeUrl' => route('admin.shipments.store'),
     'locationSearchUrl' => route('admin.locations.search'),
     'warehouses' => $warehouses,
+    'debug' => (bool) config('app.debug'),
 ];
 @endphp
 
@@ -378,6 +379,7 @@ $walkinConfig = [
                                                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
                                                     <span x-text="item.delivery.selectedLocation?.display"></span>
                                                 </p>
+                                                <p x-show="item.delivery.locationError" x-text="item.delivery.locationError" class="mt-1 text-[10px] font-semibold text-red-500"></p>
                                             </div>
                                             <div class="grid grid-cols-2 gap-3">
                                                 <div>
@@ -438,6 +440,7 @@ $walkinConfig = [
                             <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
                             <span x-text="delivery.selectedLocation?.display"></span>
                         </p>
+                        <p x-show="delivery.locationError" x-text="delivery.locationError" class="mt-1.5 text-xs font-semibold text-red-500"></p>
                     </div>
                     <div class="grid grid-cols-2 gap-3.5">
                         <div>
@@ -565,6 +568,8 @@ $walkinConfig = [
 
 @push('scripts')
 <script>
+@include('shared.walkin-response-helpers')
+
 function walkinShipment() {
     return {
         config: {},
@@ -592,6 +597,7 @@ function walkinShipment() {
             return {
                 recipient_name: '', recipient_phone: '',
                 locationQuery: '', locationResults: [], locationSearching: false,
+                locationError: '',
                 selectedLocation: null, _showDropdown: false,
                 region_id: '', district_id: '', town: '',
                 landmark: '', instructions: ''
@@ -606,6 +612,7 @@ function walkinShipment() {
                 delivery: this.makeDelivery ? this.makeDelivery() : {
                     recipient_name: '', recipient_phone: '',
                     locationQuery: '', locationResults: [], locationSearching: false,
+                    locationError: '',
                     selectedLocation: null, _showDropdown: false,
                     region_id: '', district_id: '', town: '',
                     landmark: '', instructions: ''
@@ -622,10 +629,28 @@ function walkinShipment() {
                 const res = await fetch(this.config.vendorLookupUrl + '?phone=' + encodeURIComponent(this.vendorPhone), {
                     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
                 });
-                const json = await res.json();
+                const response = await window.ParcelmanWalkinResponse.parse(res, {
+                    debug: this.config.debug,
+                    context: 'Unexpected admin vendor lookup response.',
+                    messages: {
+                        forbidden: 'You do not have permission to look up vendors.',
+                        server: 'Server error while looking up vendor. Please try again.',
+                        fallback: 'Vendor lookup failed. Please try again.',
+                    },
+                });
+                if (!res.ok || !response.json) {
+                    this.vendorError = response.message;
+                    return;
+                }
+                const json = response.json;
                 if (json.found) { this.vendorFound = true; this.vendorData = json.vendor; }
                 else { this.vendorFound = false; this.newVendor.phone = this.vendorPhone; }
-            } catch { this.vendorError = 'Failed to lookup vendor.'; }
+            } catch (error) {
+                if (this.config.debug) {
+                    console.error('Admin vendor lookup request failed before receiving a response.', error);
+                }
+                this.vendorError = 'Network error while looking up vendor. Please try again.';
+            }
             this.vendorLoading = false;
         },
 
@@ -641,31 +666,73 @@ function walkinShipment() {
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                     body: JSON.stringify(this.newVendor),
                 });
-                const json = await res.json();
+                const response = await window.ParcelmanWalkinResponse.parse(res, {
+                    debug: this.config.debug,
+                    context: 'Unexpected admin vendor create response.',
+                    messages: {
+                        forbidden: 'You do not have permission to create vendors.',
+                        validation: 'Please check the vendor details and try again.',
+                        server: 'Server error while creating vendor. Please try again.',
+                        fallback: 'Vendor creation failed. Please try again.',
+                    },
+                });
+                if (!res.ok || !response.json) {
+                    this.vendorError = response.message;
+                    return;
+                }
+                const json = response.json;
                 if (json.success) { this.selectVendor(json.vendor); this.vendorFound = true; this.vendorData = json.vendor; }
                 else if (json.errors) { this.vendorError = Object.values(json.errors).flat().join(', '); }
-                else { this.vendorError = json.message || 'Failed to create vendor.'; }
-            } catch { this.vendorError = 'Failed to create vendor.'; }
+                else { this.vendorError = json.message || 'Vendor was not created. Please check the form and try again.'; }
+            } catch (error) {
+                if (this.config.debug) {
+                    console.error('Admin vendor create request failed before receiving a response.', error);
+                }
+                this.vendorError = 'Network error while creating vendor. Please try again.';
+            }
             this.creatingVendor = false;
         },
 
         searchLocation(d) {
             const q = d.locationQuery;
-            if (q.length < 2) { d.locationResults = []; d._showDropdown = false; return; }
+            if (q.length < 2) { d.locationResults = []; d.locationError = ''; d._showDropdown = false; return; }
             d.selectedLocation = null; d.region_id = ''; d.district_id = ''; d.town = '';
+            d.locationError = '';
             clearTimeout(d._timeout);
             d._timeout = setTimeout(async () => {
                 try {
                     const res = await fetch(this.config.locationSearchUrl + '?q=' + encodeURIComponent(q), { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } });
-                    const json = await res.json();
+                    const response = await window.ParcelmanWalkinResponse.parse(res, {
+                        debug: this.config.debug,
+                        context: 'Unexpected admin location search response.',
+                        messages: {
+                            forbidden: 'You do not have permission to search locations.',
+                            server: 'Server error while searching locations. Please try again.',
+                            fallback: 'Location search failed. Please try again.',
+                        },
+                    });
+                    if (!res.ok || !response.json) {
+                        d.locationError = response.message;
+                        d.locationResults = [];
+                        d._showDropdown = false;
+                        return;
+                    }
+                    const json = response.json;
                     d.locationResults = json.locations || [];
                     d._showDropdown = d.locationResults.length > 0;
-                } catch { d.locationResults = []; }
+                } catch (error) {
+                    if (this.config.debug) {
+                        console.error('Admin location search request failed before receiving a response.', error);
+                    }
+                    d.locationError = 'Network error while searching locations. Please try again.';
+                    d.locationResults = [];
+                    d._showDropdown = false;
+                }
             }, 300);
         },
 
         selectLocation(d, loc) {
-            d.selectedLocation = loc; d.locationQuery = loc.display; d.locationResults = []; d._showDropdown = false;
+            d.selectedLocation = loc; d.locationQuery = loc.display; d.locationResults = []; d.locationError = ''; d._showDropdown = false;
             d.region_id = loc.region.id; d.district_id = loc.district.id; d.town = loc.name;
         },
 
@@ -732,13 +799,34 @@ function walkinShipment() {
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                     body: JSON.stringify(payload),
                 });
-                const json = await res.json();
+                const response = await window.ParcelmanWalkinResponse.parse(res, {
+                    debug: this.config.debug,
+                    context: 'Unexpected admin shipment response.',
+                    unreadableMessage: 'Server returned an unreadable response while creating shipment.',
+                    messages: {
+                        forbidden: 'You do not have permission to create shipments.',
+                        server: 'Server error while creating shipment. Please try again.',
+                        fallback: `Shipment request failed with status ${res.status}. Please try again.`,
+                    },
+                });
+                if (!res.ok || !response.json) {
+                    this.submitError = response.message;
+                    return;
+                }
+
+                const json = response.json;
                 if (json.success) { window.location.href = json.redirect; }
                 else if (json.errors) { this.submitError = Object.values(json.errors).flat().join(', '); }
-                else { this.submitError = json.message || 'Failed to create shipment.'; }
-            } catch { this.submitError = 'An unexpected error occurred.'; }
+                else { this.submitError = json.message || 'Shipment was not created. Please check the form and try again.'; }
+            } catch (error) {
+                if (this.config.debug) {
+                    console.error('Admin shipment submit failed before receiving a response.', error);
+                }
+                this.submitError = 'Network error while creating shipment. Please try again.';
+            }
             this.submitting = false;
         },
+
     };
 }
 </script>

@@ -11,6 +11,7 @@
         'printLabelsUrl' => route('warehouse.walkin.print-labels'),
         'locationSearchUrl' => route('warehouse.locations.search'),
         'transferWarehouses' => $transferWarehouses,
+        'debug' => (bool) config('app.debug'),
     ];
 @endphp
 
@@ -170,7 +171,7 @@
                 <h2 class="text-sm font-extrabold text-slate-950">Review</h2>
                 <p class="mt-1 text-xs text-slate-500">Confirm the package setup before creating labels.</p>
             </div>
-            <div class="grid gap-4 p-4 sm:grid-cols-3 sm:p-5">
+            <div class="grid gap-4 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-4">
                 <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
                     <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Vendor</p>
                     <p class="mt-2 text-sm font-extrabold text-slate-950" x-text="vendorData?.name"></p>
@@ -185,6 +186,15 @@
                     <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Packages</p>
                     <p class="mt-2 text-sm font-extrabold text-slate-950"><span x-text="items.length"></span> package(s)</p>
                     <p class="mt-1 text-xs text-slate-500"><span x-text="items.filter(i => i.delivery_method === 'bus_handoff').length"></span> bus-station handoff</p>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                    <label for="pickup_fee_amount" class="block text-[10px] font-black uppercase tracking-wider text-slate-400">Amount to Charge</label>
+                    <div class="mt-2 flex overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        <span class="flex items-center border-r border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-500">GHS</span>
+                        <input id="pickup_fee_amount" type="number" min="0" max="9999999.99" step="0.01" inputmode="decimal" x-model="pickupFeeAmount" placeholder="0.00"
+                               class="min-w-0 flex-1 border-0 bg-white px-3 py-2 text-sm font-extrabold text-slate-950 outline-none focus:ring-0">
+                    </div>
+                    <p class="mt-1 text-xs text-slate-500">Optional. Leave blank if no counter charge is needed.</p>
                 </div>
             </div>
             <div class="border-t border-slate-100">
@@ -359,6 +369,7 @@
                                         </button>
                                     </template>
                                 </div>
+                                <p x-show="packageForm.delivery.locationError" x-text="packageForm.delivery.locationError" class="mt-1 text-xs font-semibold text-rose-600"></p>
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Instructions</label>
@@ -421,6 +432,8 @@
 
 @push('scripts')
 <script>
+@include('shared.walkin-response-helpers')
+
 function walkinShipment() {
     return {
         config: {},
@@ -437,6 +450,7 @@ function walkinShipment() {
         newVendor: { name: '', business_name: '', phone: '', email: '' },
         creatingVendor: false,
         delivery: null,
+        pickupFeeAmount: '',
         items: [],
         itemSeed: 0,
         packageModalOpen: false,
@@ -466,6 +480,7 @@ function walkinShipment() {
                 phoneError: '',
                 locationQuery: '',
                 locationResults: [],
+                locationError: '',
                 selectedLocation: null,
                 _showDropdown: false,
                 region_id: '',
@@ -662,7 +677,20 @@ function walkinShipment() {
                 const res = await fetch(this.config.vendorLookupUrl + '?phone=' + encodeURIComponent(this.vendorPhone), {
                     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                 });
-                const json = await res.json();
+                const response = await window.ParcelmanWalkinResponse.parse(res, {
+                    debug: this.config.debug,
+                    context: 'Unexpected vendor lookup response.',
+                    messages: {
+                        forbidden: 'You do not have permission to look up vendors.',
+                        server: 'Server error while looking up vendor. Please try again.',
+                        fallback: 'Vendor lookup failed. Please try again.',
+                    },
+                });
+                if (!res.ok || !response.json) {
+                    this.vendorError = response.message;
+                    return;
+                }
+                const json = response.json;
                 if (json.found) {
                     this.vendorFound = true;
                     this.vendorData = json.vendor;
@@ -670,8 +698,11 @@ function walkinShipment() {
                     this.vendorFound = false;
                     this.newVendor.phone = this.vendorPhone;
                 }
-            } catch {
-                this.vendorError = 'Failed to lookup vendor.';
+            } catch (error) {
+                if (this.config.debug) {
+                    console.error('Vendor lookup request failed before receiving a response.', error);
+                }
+                this.vendorError = 'Network error while looking up vendor. Please try again.';
             } finally {
                 this.vendorLoading = false;
             }
@@ -707,16 +738,29 @@ function walkinShipment() {
                     },
                     body: JSON.stringify(this.newVendor),
                 });
-                const json = await res.json();
-                if (!res.ok) {
-                    this.vendorError = json.errors ? Object.values(json.errors).flat().join(', ') : (json.message || 'Failed to create vendor.');
+                const response = await window.ParcelmanWalkinResponse.parse(res, {
+                    debug: this.config.debug,
+                    context: 'Unexpected vendor create response.',
+                    messages: {
+                        forbidden: 'You do not have permission to create vendors.',
+                        validation: 'Please check the vendor details and try again.',
+                        server: 'Server error while creating vendor. Please try again.',
+                        fallback: 'Vendor creation failed. Please try again.',
+                    },
+                });
+                if (!res.ok || !response.json) {
+                    this.vendorError = response.message;
                     return;
                 }
+                const json = response.json;
                 this.vendorFound = true;
                 this.vendorData = json.vendor;
                 this.selectVendor(json.vendor);
-            } catch {
-                this.vendorError = 'Failed to create vendor.';
+            } catch (error) {
+                if (this.config.debug) {
+                    console.error('Vendor create request failed before receiving a response.', error);
+                }
+                this.vendorError = 'Network error while creating vendor. Please try again.';
             } finally {
                 this.creatingVendor = false;
             }
@@ -728,6 +772,7 @@ function walkinShipment() {
             target.region_id = '';
             target.district_id = '';
             target.town = query;
+            target.locationError = '';
             if (query.length < 2) {
                 target.locationResults = [];
                 target._showDropdown = false;
@@ -741,12 +786,32 @@ function walkinShipment() {
                     const res = await fetch(this.config.locationSearchUrl + '?q=' + encodeURIComponent(query), {
                         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                     });
-                    const json = await res.json();
+                    const response = await window.ParcelmanWalkinResponse.parse(res, {
+                        debug: this.config.debug,
+                        context: 'Unexpected location search response.',
+                        messages: {
+                            forbidden: 'You do not have permission to search locations.',
+                            server: 'Server error while searching locations. Please try again.',
+                            fallback: 'Location search failed. Please try again.',
+                        },
+                    });
                     if (searchSeq !== target._searchSeq) return;
+                    if (!res.ok || !response.json) {
+                        target.locationError = response.message;
+                        target.locationResults = [];
+                        target._showDropdown = false;
+                        return;
+                    }
+                    const json = response.json;
                     target.locationResults = json.locations || [];
                     target._showDropdown = target.locationResults.length > 0;
-                } catch {
+                } catch (error) {
+                    if (this.config.debug) {
+                        console.error('Location search request failed before receiving a response.', error);
+                    }
+                    target.locationError = 'Network error while searching locations. Please try again.';
                     target.locationResults = [];
+                    target._showDropdown = false;
                 }
             }, 250);
         },
@@ -757,6 +822,7 @@ function walkinShipment() {
             target.selectedLocation = location;
             target.locationQuery = location.display;
             target.locationResults = [];
+            target.locationError = '';
             target._showDropdown = false;
             target.region_id = location.region?.id || '';
             target.district_id = location.district?.id || '';
@@ -819,6 +885,9 @@ function walkinShipment() {
             formData.append('delivery_preference', 'deliver');
             formData.append('destination_mode', 'per_item');
             formData.append('items_json', JSON.stringify(items));
+            if (String(this.pickupFeeAmount ?? '').trim() !== '') {
+                formData.append('pickup_fee_amount', this.pickupFeeAmount);
+            }
             this.items.forEach((item, index) => {
                 (item.photos || []).forEach(file => formData.append(`item_photos[${index}][]`, file));
             });
@@ -833,15 +902,28 @@ function walkinShipment() {
                     },
                     body: formData,
                 });
-                const json = await res.json();
-                if (!res.ok) {
-                    this.submitError = json.errors ? Object.values(json.errors).flat().join(', ') : (json.message || 'Failed to create shipment.');
+                const response = await window.ParcelmanWalkinResponse.parse(res, {
+                    debug: this.config.debug,
+                    context: 'Unexpected walk-in shipment response.',
+                    unreadableMessage: 'Server returned an unreadable response while creating shipment.',
+                    messages: {
+                        forbidden: 'You do not have permission to create walk-in shipments.',
+                        server: 'Server error while creating shipment. Please try again.',
+                        fallback: `Shipment request failed with status ${res.status}. Please try again.`,
+                    },
+                });
+                if (!res.ok || !response.json) {
+                    this.submitError = response.message;
                     return;
                 }
+                const json = response.json;
                 this.createdPackages = (json.packages || []).map(pkg => this.prepareCreatedPackage(pkg));
                 this.step = 4;
-            } catch {
-                this.submitError = 'An unexpected error occurred.';
+            } catch (error) {
+                if (this.config.debug) {
+                    console.error('Walk-in shipment submit failed before receiving a response.', error);
+                }
+                this.submitError = 'Network error while creating shipment. Please try again.';
             } finally {
                 this.submitting = false;
             }
@@ -906,8 +988,19 @@ function walkinShipment() {
                             })),
                         }),
                 });
-                const json = await res.json();
-                if (!res.ok || !json.success) throw new Error(json.message || 'Failed to generate label.');
+                const response = await window.ParcelmanWalkinResponse.parse(res, {
+                    debug: this.config.debug,
+                    context: 'Unexpected walk-in label response.',
+                    messages: {
+                        forbidden: 'You do not have permission to print labels.',
+                        validation: 'Please check the label request and try again.',
+                        server: 'Server error while generating labels. Please try again.',
+                        fallback: 'Label generation failed. Please try again.',
+                    },
+                });
+                if (!res.ok || !response.json) throw new Error(response.message);
+                const json = response.json;
+                if (!json.success) throw new Error(json.message || 'Failed to generate label.');
                 const popup = window.open('', '_blank', 'width=900,height=650');
                 if (!popup) throw new Error('Pop-up blocked. Please allow pop-ups to print labels.');
                 popup.document.open();
