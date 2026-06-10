@@ -236,6 +236,15 @@
                         </a>
                     @endhasPermission
                 @endif
+
+                <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">Help</div>
+                <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
+
+                <a href="{{ route('admin.manual') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.manual') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg></div>
+                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">System Manual</span>
+                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">System Manual</span></template>
+                </a>
             </nav>
         </aside>
 

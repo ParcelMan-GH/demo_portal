@@ -40,7 +40,7 @@ class WarehouseTransportService
             ->withCount('items')
             ->with([
                 'destinationWarehouse:id,name,code',
-                'assignedRider:id,name,phone,vehicle_type,vehicle_number',
+                'assignedDriver:id,name,phone,vehicle_type,vehicle_number',
                 'sortBatch:id,batch_number,status',
                 'createdBy:id,name',
                 'items:id,transport_manifest_id,shipment_item_id,expected_quantity,loaded_quantity,received_quantity,line_status',
@@ -55,7 +55,7 @@ class WarehouseTransportService
             ->with([
                 'originWarehouse:id,name,code',
                 'destinationWarehouse:id,name,code',
-                'assignedRider:id,name,phone,vehicle_type,vehicle_number',
+                'assignedDriver:id,name,phone,vehicle_type,vehicle_number',
                 'warehouseReceipt:id,transport_manifest_id,status,started_at,finalized_at',
                 'items:id,transport_manifest_id,shipment_item_id,expected_quantity,loaded_quantity,received_quantity,line_status',
             ])
@@ -67,7 +67,7 @@ class WarehouseTransportService
         $manifest->loadMissing([
             'createdBy:id,name',
             'receivedBy:id,name',
-            'assignedRider:id,name,phone',
+            'assignedDriver:id,name,phone',
             'items:id,transport_manifest_id,shipment_item_id,expected_quantity,loaded_quantity,loaded_at,received_at,line_status',
             'assignments.driver:id,name,phone',
             'assignments.assignedBy:id,name',

@@ -297,7 +297,7 @@ class AdminTransportManifestController extends Controller
             ->with([
                 'originWarehouse:id,name,code',
                 'destinationWarehouse:id,name,code',
-                'assignedRider:id,name,phone',
+                'assignedDriver:id,name,phone',
                 'items:id,transport_manifest_id',
             ]);
 

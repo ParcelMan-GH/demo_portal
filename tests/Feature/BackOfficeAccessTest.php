@@ -22,6 +22,7 @@ beforeEach(function () {
     Schema::dropIfExists('roles');
     Schema::dropIfExists('users');
     Schema::dropIfExists('warehouses');
+    Schema::dropIfExists('platform_settings');
 
     Schema::create('warehouses', function (Blueprint $table) {
         $table->id();
@@ -115,6 +116,15 @@ beforeEach(function () {
         $table->unsignedInteger('duration_ms')->nullable();
         $table->json('metadata')->nullable();
         $table->timestamp('created_at')->useCurrent();
+    });
+
+    Schema::create('platform_settings', function (Blueprint $table) {
+        $table->id();
+        $table->string('key')->unique();
+        $table->text('value')->nullable();
+        $table->string('description')->nullable();
+        $table->boolean('is_encrypted')->default(false);
+        $table->timestamps();
     });
 });
 

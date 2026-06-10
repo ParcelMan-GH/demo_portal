@@ -282,7 +282,7 @@ class WarehouseDashboardService
         }
 
         if ($this->can($user, 'warehouse.manifest.manage') || $this->can($user, 'warehouse.transport.assign')) {
-            $activity = $activity->merge($this->outgoingManifests($warehouse)->with('assignedRider:id,name')->latest('updated_at')->limit(5)->get()->map(fn ($manifest) => [
+            $activity = $activity->merge($this->outgoingManifests($warehouse)->with('assignedDriver:id,name')->latest('updated_at')->limit(5)->get()->map(fn ($manifest) => [
                 'label' => 'Transport manifest',
                 'detail' => $manifest->manifest_number . ' / ' . $this->label($manifest->status),
                 'actor' => $manifest->assignedDriver?->name,
@@ -293,7 +293,7 @@ class WarehouseDashboardService
         }
 
         if ($this->can($user, 'warehouse.delivery.assign')) {
-            $activity = $activity->merge($this->deliveryRuns($warehouse)->with('assignedRider:id,name')->latest('updated_at')->limit(5)->get()->map(fn ($run) => [
+            $activity = $activity->merge($this->deliveryRuns($warehouse)->with('assignedDriver:id,name')->latest('updated_at')->limit(5)->get()->map(fn ($run) => [
                 'label' => 'Delivery run',
                 'detail' => $run->run_number . ' / ' . $this->label($run->status),
                 'actor' => $run->assignedDriver?->name,

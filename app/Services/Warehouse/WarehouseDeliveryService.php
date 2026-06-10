@@ -48,7 +48,7 @@ class WarehouseDeliveryService
         return DeliveryRun::query()
             ->with([
                 'warehouse:id,name,code',
-                'assignedRider:id,name,phone,vehicle_type,vehicle_number',
+                'assignedDriver:id,name,phone,vehicle_type,vehicle_number',
                 'stops:id,delivery_run_id,status,total_packages,recipient_name,recipient_phone,verification_code_sent_at,verification_code_expires_at,verification_attempts,max_attempts,verification_skipped',
                 'items:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,expected_quantity,delivered_quantity,status',
             ])

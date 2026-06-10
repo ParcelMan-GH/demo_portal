@@ -57,7 +57,7 @@ class WarehousePackageLedgerService
 
         if (Schema::hasTable('transport_manifests')) {
             $relations[] = 'sortBatchItems.sortBatch.transportManifest:id,sort_batch_id,manifest_number,status,assigned_driver_id,origin_warehouse_id,destination_warehouse_id,created_by_user_id,received_by_user_id,assigned_at,dispatched_at,arrived_at,received_at';
-            $relations[] = 'sortBatchItems.sortBatch.transportManifest.assignedRider:id,name,phone';
+            $relations[] = 'sortBatchItems.sortBatch.transportManifest.assignedDriver:id,name,phone';
             $relations[] = 'sortBatchItems.sortBatch.transportManifest.originWarehouse:id,name,code';
             $relations[] = 'sortBatchItems.sortBatch.transportManifest.destinationWarehouse:id,name,code';
             $relations[] = 'sortBatchItems.sortBatch.transportManifest.createdBy:id,name';
@@ -66,7 +66,7 @@ class WarehousePackageLedgerService
 
         if (Schema::hasTable('delivery_runs')) {
             $relations[] = 'sortBatchItems.sortBatch.deliveryRun:id,sort_batch_id,run_number,status,assigned_driver_id';
-            $relations[] = 'sortBatchItems.sortBatch.deliveryRun.assignedRider:id,name,phone';
+            $relations[] = 'sortBatchItems.sortBatch.deliveryRun.assignedDriver:id,name,phone';
         }
 
         if ($this->hasRecipientPaymentTables()) {
@@ -83,7 +83,7 @@ class WarehousePackageLedgerService
         }
 
         if ($this->hasTransportTables()) {
-            $relations[] = 'shipmentItem.transportManifestItems.manifest.assignedRider:id,name,phone';
+            $relations[] = 'shipmentItem.transportManifestItems.manifest.assignedDriver:id,name,phone';
             $relations[] = 'shipmentItem.transportManifestItems.manifest.originWarehouse:id,name,code';
             $relations[] = 'shipmentItem.transportManifestItems.manifest.destinationWarehouse:id,name,code';
             $relations[] = 'shipmentItem.transportManifestItems.manifest.createdBy:id,name';
@@ -91,7 +91,7 @@ class WarehousePackageLedgerService
         }
 
         if ($this->hasDeliveryTables()) {
-            $relations[] = 'shipmentItem.deliveryRunItems.run.assignedRider:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.run.assignedDriver:id,name,phone';
             $relations[] = 'shipmentItem.deliveryRunItems.run.createdBy:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.stop.region:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.stop.district:id,name';

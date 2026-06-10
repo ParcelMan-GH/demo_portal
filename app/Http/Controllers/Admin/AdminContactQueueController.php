@@ -301,7 +301,7 @@ class AdminContactQueueController extends Controller
             'shipmentItem:id,shipment_id,tracking_code,description,status',
             'shipmentItem.deliveryRunItems:id,delivery_run_id,delivery_run_stop_id,shipment_item_id,status,delivered_at',
             'shipmentItem.deliveryRunItems.run:id,run_number,assigned_driver_id',
-            'shipmentItem.deliveryRunItems.run.assignedRider:id,name,phone',
+            'shipmentItem.deliveryRunItems.run.assignedDriver:id,name,phone',
             'shipmentItem.deliveryRunItems.stop:id,delivery_run_id,status,delivery_method,delivered_at,confirmed_at,confirmed_by_admin_id,bus_station_name',
             'shipmentItem.deliveryRunItems.stop.confirmedBy:id,name',
             'shipmentItem.deliveryRunItems.busHandoffConfirmation:id,delivery_run_item_id,status,source,target_type,target_name,target_phone,confirmed_at,confirmed_by_driver_id,confirmed_by_admin_id,public_confirmed_at',

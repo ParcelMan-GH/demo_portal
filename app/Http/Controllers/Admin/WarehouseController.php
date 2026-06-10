@@ -260,14 +260,14 @@ class WarehouseController extends Controller
 
         // Transport Manifests (outgoing + incoming)
         $manifestsOutgoing = $warehouse->originTransportManifests()
-            ->with(['destinationWarehouse:id,name,code', 'assignedRider:id,name'])
+            ->with(['destinationWarehouse:id,name,code', 'assignedDriver:id,name'])
             ->withCount('items')
             ->latest()
             ->limit(200)
             ->get(['id', 'manifest_number', 'destination_warehouse_id', 'assigned_driver_id', 'status', 'dispatched_at', 'arrived_at', 'created_at']);
 
         $manifestsIncoming = $warehouse->destinationTransportManifests()
-            ->with(['originWarehouse:id,name,code', 'assignedRider:id,name'])
+            ->with(['originWarehouse:id,name,code', 'assignedDriver:id,name'])
             ->withCount('items')
             ->latest()
             ->limit(200)
@@ -275,7 +275,7 @@ class WarehouseController extends Controller
 
         // Delivery Runs
         $deliveryRuns = $warehouse->deliveryRuns()
-            ->with(['assignedRider:id,name'])
+            ->with(['assignedDriver:id,name'])
             ->withCount('stops')
             ->latest()
             ->limit(200)

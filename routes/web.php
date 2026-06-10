@@ -191,6 +191,9 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::post('impersonation/stop', [ImpersonationController::class, 'stop'])
             ->name('impersonation.stop');
 
+        // System Usage Manual
+        Route::get('manual', fn () => view('admin.manual.index'))->name('manual');
+
         // Admin Self-Profile
         Route::get('profile', [AdminProfileController::class, 'edit'])->name('profile.edit');
         Route::put('profile', [AdminProfileController::class, 'update'])->name('profile.update');

@@ -99,7 +99,7 @@ class DashboardController extends Controller
                                     ->get(['id', 'shipment_number', 'status', 'vendor_id', 'created_at']);
 
         $activeDeliveryRuns   = DeliveryRun::where('status', 'out_for_delivery')
-                                    ->with('assignedRider:id,name')
+                                    ->with('assignedDriver:id,name')
                                     ->latest()
                                     ->limit(5)
                                     ->get(['id', 'run_number', 'status', 'assigned_driver_id', 'dispatched_at']);
