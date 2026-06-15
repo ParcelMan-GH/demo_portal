@@ -13,15 +13,24 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Models\Warehouse;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 function createAdminUser(): User
 {
+    $warehouse = Warehouse::create([
+        'name' => 'Town Search HQ',
+        'code' => 'TS-HQ',
+        'address' => 'Accra',
+        'is_active' => true,
+        'is_hq' => true,
+        'can_administer_system' => true,
+    ]);
+
     $user = User::factory()->create([
         'is_active' => true,
-        'warehouse_id' => null,
+        'warehouse_id' => $warehouse->id,
     ]);
 
     $role = Role::create([
@@ -43,10 +52,10 @@ function createAdminUser(): User
 function createVendorRecord(): Vendor
 {
     $vendor = new Vendor([
-        'name' => 'Vendor ' . Str::upper(Str::random(4)),
+        'name' => 'Vendor '.Str::upper(Str::random(4)),
         'business_name' => 'Parcel Test Vendor',
-        'phone' => '23324' . random_int(1000000, 9999999),
-        'email' => Str::lower(Str::random(8)) . '@example.test',
+        'phone' => '23324'.random_int(1000000, 9999999),
+        'email' => Str::lower(Str::random(8)).'@example.test',
         'is_active' => true,
     ]);
 
@@ -87,7 +96,7 @@ function createShipmentRecord(Vendor $vendor, array $overrides = []): Shipment
 {
     return Shipment::create(array_merge([
         'vendor_id' => $vendor->id,
-        'shipment_number' => 'SHP-' . Str::upper(Str::random(10)),
+        'shipment_number' => 'SHP-'.Str::upper(Str::random(10)),
         'status' => 'draft',
         'source' => 'vendor_app',
         'destination_mode' => 'single',
@@ -100,7 +109,7 @@ function createShipmentItemRecord(Shipment $shipment, array $overrides = []): Sh
 {
     return ShipmentItem::create(array_merge([
         'shipment_id' => $shipment->id,
-        'description' => 'Parcel ' . Str::upper(Str::random(4)),
+        'description' => 'Parcel '.Str::upper(Str::random(4)),
         'quantity' => 1,
         'status' => 'pending',
     ], $overrides));
@@ -108,17 +117,18 @@ function createShipmentItemRecord(Shipment $shipment, array $overrides = []): Sh
 
 function buildTestSchema(): void
 {
-	    Schema::disableForeignKeyConstraints();
-	    foreach ([
-	        'warehouse_receipt_item_photos',
-	        'warehouse_receipt_items',
-	        'warehouse_receipts',
-	        'pickup_photos',
-	        'pickup_item_confirmations',
-	        'pickup_assignments',
-	        'shipment_item_images',
-	        'shipment_charges',
-	        'shipment_items',
+    Schema::disableForeignKeyConstraints();
+    foreach ([
+        'platform_settings',
+        'warehouse_receipt_item_photos',
+        'warehouse_receipt_items',
+        'warehouse_receipts',
+        'pickup_photos',
+        'pickup_item_confirmations',
+        'pickup_assignments',
+        'shipment_item_images',
+        'shipment_charges',
+        'shipment_items',
         'shipments',
         'locations',
         'districts',
@@ -146,6 +156,15 @@ function buildTestSchema(): void
         $table->unsignedBigInteger('created_by_user_id')->nullable();
         $table->unsignedBigInteger('warehouse_id')->nullable();
         $table->string('remember_token')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('platform_settings', function (Blueprint $table) {
+        $table->id();
+        $table->string('key')->unique();
+        $table->text('value')->nullable();
+        $table->string('description')->nullable();
+        $table->boolean('is_encrypted')->default(false);
         $table->timestamps();
     });
 
@@ -238,6 +257,8 @@ function buildTestSchema(): void
         $table->string('contact_email')->nullable();
         $table->integer('capacity')->nullable();
         $table->boolean('is_active')->default(true);
+        $table->boolean('is_hq')->default(false);
+        $table->boolean('can_administer_system')->default(false);
         $table->timestamps();
         $table->softDeletes();
     });
@@ -280,9 +301,9 @@ function buildTestSchema(): void
         $table->softDeletes();
     });
 
-	    Schema::create('shipment_items', function (Blueprint $table) {
-	        $table->id();
-	        $table->foreignId('shipment_id')->constrained('shipments')->cascadeOnDelete();
+    Schema::create('shipment_items', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('shipment_id')->constrained('shipments')->cascadeOnDelete();
         $table->string('description')->nullable();
         $table->unsignedInteger('quantity')->default(1);
         $table->string('delivery_recipient_name')->nullable();
@@ -300,47 +321,47 @@ function buildTestSchema(): void
         $table->string('delivery_preference', 20)->nullable();
         $table->string('status')->default('pending');
         $table->string('tracking_code')->nullable();
-	        $table->timestamps();
-	    });
+        $table->timestamps();
+    });
 
-	    Schema::create('shipment_item_images', function (Blueprint $table) {
-	        $table->id();
-	        $table->foreignId('shipment_item_id')->constrained('shipment_items')->cascadeOnDelete();
-	        $table->string('path');
-	        $table->string('original_name')->nullable();
-	        $table->unsignedBigInteger('size')->default(0);
-	        $table->unsignedInteger('sort_order')->default(0);
-	        $table->string('recipient_phone')->nullable();
-	        $table->timestamps();
-	    });
+    Schema::create('shipment_item_images', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('shipment_item_id')->constrained('shipment_items')->cascadeOnDelete();
+        $table->string('path');
+        $table->string('original_name')->nullable();
+        $table->unsignedBigInteger('size')->default(0);
+        $table->unsignedInteger('sort_order')->default(0);
+        $table->string('recipient_phone')->nullable();
+        $table->timestamps();
+    });
 
-	    Schema::create('shipment_charges', function (Blueprint $table) {
-	        $table->id();
-	        $table->foreignId('shipment_id')->constrained('shipments')->cascadeOnDelete();
-	        $table->foreignId('shipment_item_id')->nullable()->constrained('shipment_items')->nullOnDelete();
-	        $table->string('charge_type')->nullable();
-	        $table->string('payer_type')->nullable();
-	        $table->string('direction')->nullable();
-	        $table->string('due_stage')->nullable();
-	        $table->decimal('amount', 10, 2)->default(0);
-	        $table->string('currency')->default('GHS');
-	        $table->string('status')->default('pending');
-	        $table->timestamp('paid_at')->nullable();
-	        $table->string('payment_method')->nullable();
-	        $table->string('payment_reference')->nullable();
-	        $table->foreignId('recorded_by_admin_id')->nullable()->constrained('users')->nullOnDelete();
-	        $table->foreignId('recorded_by_driver_id')->nullable()->constrained('drivers')->nullOnDelete();
-	        $table->unsignedBigInteger('delivery_run_stop_id')->nullable();
-	        $table->foreignId('pickup_assignment_id')->nullable()->constrained('pickup_assignments')->nullOnDelete();
-	        $table->text('notes')->nullable();
-	        $table->text('waive_reason')->nullable();
-	        $table->timestamps();
-	        $table->softDeletes();
-	    });
+    Schema::create('shipment_charges', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('shipment_id')->constrained('shipments')->cascadeOnDelete();
+        $table->foreignId('shipment_item_id')->nullable()->constrained('shipment_items')->nullOnDelete();
+        $table->string('charge_type')->nullable();
+        $table->string('payer_type')->nullable();
+        $table->string('direction')->nullable();
+        $table->string('due_stage')->nullable();
+        $table->decimal('amount', 10, 2)->default(0);
+        $table->string('currency')->default('GHS');
+        $table->string('status')->default('pending');
+        $table->timestamp('paid_at')->nullable();
+        $table->string('payment_method')->nullable();
+        $table->string('payment_reference')->nullable();
+        $table->foreignId('recorded_by_admin_id')->nullable()->constrained('users')->nullOnDelete();
+        $table->foreignId('recorded_by_driver_id')->nullable()->constrained('drivers')->nullOnDelete();
+        $table->unsignedBigInteger('delivery_run_stop_id')->nullable();
+        $table->foreignId('pickup_assignment_id')->nullable()->constrained('pickup_assignments')->nullOnDelete();
+        $table->text('notes')->nullable();
+        $table->text('waive_reason')->nullable();
+        $table->timestamps();
+        $table->softDeletes();
+    });
 
-	    Schema::create('pickup_assignments', function (Blueprint $table) {
-	        $table->id();
-	        $table->foreignId('shipment_id')->constrained('shipments')->cascadeOnDelete();
+    Schema::create('pickup_assignments', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('shipment_id')->constrained('shipments')->cascadeOnDelete();
         $table->foreignId('driver_id')->constrained('drivers')->cascadeOnDelete();
         $table->foreignId('target_warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
         $table->string('status')->default('assigned');
@@ -359,72 +380,72 @@ function buildTestSchema(): void
         $table->text('cancellation_reason')->nullable();
         $table->decimal('pickup_latitude', 10, 8)->nullable();
         $table->decimal('pickup_longitude', 11, 8)->nullable();
-	        $table->text('notes')->nullable();
-	        $table->timestamps();
-	    });
+        $table->text('notes')->nullable();
+        $table->timestamps();
+    });
 
-	    Schema::create('pickup_item_confirmations', function (Blueprint $table) {
-	        $table->id();
-	        $table->foreignId('pickup_assignment_id')->constrained('pickup_assignments')->cascadeOnDelete();
-	        $table->foreignId('shipment_item_id')->constrained('shipment_items')->cascadeOnDelete();
-	        $table->unsignedInteger('expected_quantity')->default(1);
-	        $table->unsignedInteger('confirmed_quantity')->default(1);
-	        $table->text('notes')->nullable();
-	        $table->timestamp('confirmed_at')->nullable();
-	        $table->timestamps();
-	    });
+    Schema::create('pickup_item_confirmations', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('pickup_assignment_id')->constrained('pickup_assignments')->cascadeOnDelete();
+        $table->foreignId('shipment_item_id')->constrained('shipment_items')->cascadeOnDelete();
+        $table->unsignedInteger('expected_quantity')->default(1);
+        $table->unsignedInteger('confirmed_quantity')->default(1);
+        $table->text('notes')->nullable();
+        $table->timestamp('confirmed_at')->nullable();
+        $table->timestamps();
+    });
 
-	    Schema::create('pickup_photos', function (Blueprint $table) {
-	        $table->id();
-	        $table->foreignId('pickup_assignment_id')->constrained('pickup_assignments')->cascadeOnDelete();
-	        $table->foreignId('shipment_item_id')->constrained('shipment_items')->cascadeOnDelete();
-	        $table->string('path');
-	        $table->string('original_name')->nullable();
-	        $table->unsignedBigInteger('size')->default(0);
-	        $table->string('type')->nullable();
-	        $table->decimal('latitude', 10, 8)->nullable();
-	        $table->decimal('longitude', 11, 8)->nullable();
-	        $table->timestamps();
-	    });
+    Schema::create('pickup_photos', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('pickup_assignment_id')->constrained('pickup_assignments')->cascadeOnDelete();
+        $table->foreignId('shipment_item_id')->constrained('shipment_items')->cascadeOnDelete();
+        $table->string('path');
+        $table->string('original_name')->nullable();
+        $table->unsignedBigInteger('size')->default(0);
+        $table->string('type')->nullable();
+        $table->decimal('latitude', 10, 8)->nullable();
+        $table->decimal('longitude', 11, 8)->nullable();
+        $table->timestamps();
+    });
 
-	    Schema::create('warehouse_receipts', function (Blueprint $table) {
-	        $table->id();
-	        $table->foreignId('pickup_assignment_id')->constrained('pickup_assignments')->cascadeOnDelete();
-	        $table->foreignId('shipment_id')->constrained('shipments')->cascadeOnDelete();
-	        $table->foreignId('warehouse_id')->constrained('warehouses')->cascadeOnDelete();
-	        $table->string('status')->default('draft');
-	        $table->foreignId('received_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-	        $table->timestamp('received_at')->nullable();
-	        $table->timestamp('finalized_at')->nullable();
-	        $table->timestamps();
-	    });
+    Schema::create('warehouse_receipts', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('pickup_assignment_id')->constrained('pickup_assignments')->cascadeOnDelete();
+        $table->foreignId('shipment_id')->constrained('shipments')->cascadeOnDelete();
+        $table->foreignId('warehouse_id')->constrained('warehouses')->cascadeOnDelete();
+        $table->string('status')->default('draft');
+        $table->foreignId('received_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+        $table->timestamp('received_at')->nullable();
+        $table->timestamp('finalized_at')->nullable();
+        $table->timestamps();
+    });
 
-	    Schema::create('warehouse_receipt_items', function (Blueprint $table) {
-	        $table->id();
-	        $table->foreignId('warehouse_receipt_id')->constrained('warehouse_receipts')->cascadeOnDelete();
-	        $table->foreignId('shipment_item_id')->constrained('shipment_items')->cascadeOnDelete();
-	        $table->unsignedInteger('expected_quantity')->default(1);
-	        $table->unsignedInteger('received_quantity')->default(0);
-	        $table->unsignedInteger('damaged_quantity')->default(0);
-	        $table->string('condition_status')->default('ok');
-	        $table->string('discrepancy_type')->default('none');
-	        $table->text('notes')->nullable();
-	        $table->string('barcode_value')->nullable();
-	        $table->unsignedInteger('barcode_print_count')->default(0);
-	        $table->foreignId('received_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-	        $table->timestamp('received_at')->nullable();
-	        $table->timestamps();
-	    });
+    Schema::create('warehouse_receipt_items', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('warehouse_receipt_id')->constrained('warehouse_receipts')->cascadeOnDelete();
+        $table->foreignId('shipment_item_id')->constrained('shipment_items')->cascadeOnDelete();
+        $table->unsignedInteger('expected_quantity')->default(1);
+        $table->unsignedInteger('received_quantity')->default(0);
+        $table->unsignedInteger('damaged_quantity')->default(0);
+        $table->string('condition_status')->default('ok');
+        $table->string('discrepancy_type')->default('none');
+        $table->text('notes')->nullable();
+        $table->string('barcode_value')->nullable();
+        $table->unsignedInteger('barcode_print_count')->default(0);
+        $table->foreignId('received_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+        $table->timestamp('received_at')->nullable();
+        $table->timestamps();
+    });
 
-	    Schema::create('warehouse_receipt_item_photos', function (Blueprint $table) {
-	        $table->id();
-	        $table->foreignId('warehouse_receipt_item_id')->constrained('warehouse_receipt_items')->cascadeOnDelete();
-	        $table->string('path');
-	        $table->string('original_name')->nullable();
-	        $table->unsignedBigInteger('size')->default(0);
-	        $table->timestamps();
-	    });
-	}
+    Schema::create('warehouse_receipt_item_photos', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('warehouse_receipt_item_id')->constrained('warehouse_receipt_items')->cascadeOnDelete();
+        $table->string('path');
+        $table->string('original_name')->nullable();
+        $table->unsignedBigInteger('size')->default(0);
+        $table->timestamps();
+    });
+}
 
 beforeEach(function () {
     buildTestSchema();
@@ -552,8 +573,8 @@ test('receiving save keeps free-text towns unlinked and links selected towns for
 
     $driver = Driver::create([
         'name' => 'Driver One',
-        'email' => 'driver-' . Str::lower(Str::random(6)) . '@example.test',
-        'phone' => '23320' . random_int(1000000, 9999999),
+        'email' => 'driver-'.Str::lower(Str::random(6)).'@example.test',
+        'phone' => '23320'.random_int(1000000, 9999999),
         'password' => Hash::make('password'),
         'vehicle_type' => 'motorcycle',
         'status' => 'available',
@@ -563,7 +584,7 @@ test('receiving save keeps free-text towns unlinked and links selected towns for
 
     $warehouse = Warehouse::create([
         'name' => 'Main Warehouse',
-        'code' => 'WH-' . Str::upper(Str::random(5)),
+        'code' => 'WH-'.Str::upper(Str::random(5)),
         'is_active' => true,
     ]);
 

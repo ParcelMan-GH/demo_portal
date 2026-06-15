@@ -3,11 +3,16 @@
 namespace App\Listeners;
 
 use App\Events\ShipmentStatusChanged;
+use App\Models\AdminNotification;
+use App\Services\AdminInAppNotificationService;
 use App\Services\PushNotificationService;
 
-class SendAdminShipmentNotification 
+class SendAdminShipmentNotification
 {
-    public function __construct(private PushNotificationService $pushService) {}
+    public function __construct(
+        private PushNotificationService $pushService,
+        private AdminInAppNotificationService $inAppNotifications,
+    ) {}
 
     public function handle(ShipmentStatusChanged $event): void
     {
@@ -21,20 +26,32 @@ class SendAdminShipmentNotification
             default => [null, null],
         };
 
-        if (!$title) {
+        if (! $title) {
             return;
         }
 
-        $this->pushService->sendToAllAdmins(
-            title: $title,
-            body: $body,
-            data: [
-                'shipment_id'     => (string) $shipment->id,
-                'shipment_number' => $shipment->shipment_number,
-                'status'          => $event->newStatus,
-                'url'             => '/admin/shipments/' . $shipment->id,
-            ],
-            type: 'shipment_submitted'
-        );
+        $notifications = $this->inAppNotifications->notifyShipmentSubmitted($shipment, $title, $body);
+
+        $notifications->each(function (AdminNotification $notification) use ($shipment, $event): void {
+            $user = $notification->user;
+
+            if (! $user?->fcm_token) {
+                return;
+            }
+
+            $this->pushService->sendToAdmin(
+                user: $user,
+                title: $notification->title,
+                body: $notification->body,
+                data: [
+                    'notification_id' => (string) $notification->id,
+                    'shipment_id' => (string) $shipment->id,
+                    'shipment_number' => $shipment->shipment_number,
+                    'status' => $event->newStatus,
+                    'url' => $notification->url,
+                ],
+                type: 'shipment_submitted'
+            );
+        });
     }
 }

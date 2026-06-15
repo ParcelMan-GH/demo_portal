@@ -4,6 +4,7 @@ use App\Http\Middleware\LogAdminAuditActivity;
 use App\Models\District;
 use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
+use App\Models\Permission;
 use App\Models\PickupAssignment;
 use App\Models\Region;
 use App\Models\Role;
@@ -26,9 +27,18 @@ use Illuminate\Support\Str;
 
 function rwCreateAdminUser(): User
 {
+    $warehouse = Warehouse::create([
+        'name' => 'Receiving Workspace HQ',
+        'code' => 'RW-HQ',
+        'address' => 'Accra',
+        'is_active' => true,
+        'is_hq' => true,
+        'can_administer_system' => true,
+    ]);
+
     $user = User::factory()->create([
         'is_active' => true,
-        'warehouse_id' => null,
+        'warehouse_id' => $warehouse->id,
     ]);
 
     $role = Role::create([
@@ -39,18 +49,35 @@ function rwCreateAdminUser(): User
         'is_active' => true,
     ]);
 
+    foreach (['charges.manage', 'warehouse.receiving.manage', 'warehouse.receiving.approve_discrepancy'] as $permissionName) {
+        [$module, $action] = array_pad(explode('.', $permissionName, 2), 2, 'view');
+
+        $permission = Permission::create([
+            'module' => $module,
+            'action' => $action,
+            'name' => $permissionName,
+            'description' => $permissionName,
+        ]);
+
+        $role->permissions()->attach($permission->id);
+    }
+
     $user->roles()->attach($role->id, [
         'assigned_at' => now(),
         'assigned_by' => $user->id,
     ]);
+    $user->flushPermissionCache();
 
-    return $user;
+    return $user->fresh();
 }
 
 function rwBuildSchema(): void
 {
     Schema::disableForeignKeyConstraints();
     foreach ([
+        'email_templates',
+        'shipment_pickup_vehicle_requests',
+        'pickup_vehicle_types',
         'shipment_item_tracking',
         'shipment_charges',
         'warehouse_receipt_item_photos',
@@ -68,6 +95,8 @@ function rwBuildSchema(): void
         'drivers',
         'vendors',
         'platform_settings',
+        'role_permissions',
+        'permissions',
         'user_roles',
         'roles',
         'users',
@@ -101,6 +130,23 @@ function rwBuildSchema(): void
         $table->timestamps();
     });
 
+    Schema::create('permissions', function (Blueprint $table) {
+        $table->id();
+        $table->string('module');
+        $table->string('action');
+        $table->string('name')->unique();
+        $table->text('description')->nullable();
+        $table->integer('sort_order')->default(0);
+        $table->timestamps();
+    });
+
+    Schema::create('role_permissions', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('role_id')->constrained('roles')->cascadeOnDelete();
+        $table->foreignId('permission_id')->constrained('permissions')->cascadeOnDelete();
+        $table->timestamps();
+    });
+
     Schema::create('user_roles', function (Blueprint $table) {
         $table->id();
         $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
@@ -118,6 +164,21 @@ function rwBuildSchema(): void
         $table->timestamps();
     });
 
+    Schema::create('email_templates', function (Blueprint $table) {
+        $table->id();
+        $table->string('key')->unique();
+        $table->string('name');
+        $table->string('category')->index();
+        $table->string('recipient_type')->index();
+        $table->string('subject');
+        $table->longText('body_html')->nullable();
+        $table->longText('body_text')->nullable();
+        $table->json('variables')->nullable();
+        $table->boolean('is_enabled')->default(false)->index();
+        $table->boolean('is_system')->default(true)->index();
+        $table->timestamps();
+    });
+
     Schema::create('vendors', function (Blueprint $table) {
         $table->id();
         $table->string('name');
@@ -126,6 +187,18 @@ function rwBuildSchema(): void
         $table->string('email')->nullable();
         $table->string('pin_hash');
         $table->boolean('is_phone_verified')->default(false);
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+        $table->softDeletes();
+    });
+
+    Schema::create('pickup_vehicle_types', function (Blueprint $table) {
+        $table->id();
+        $table->string('name');
+        $table->string('slug')->unique();
+        $table->string('icon')->default('car');
+        $table->string('capacity_hint')->nullable();
+        $table->unsignedInteger('sort_order')->default(0);
         $table->boolean('is_active')->default(true);
         $table->timestamps();
         $table->softDeletes();
@@ -179,6 +252,8 @@ function rwBuildSchema(): void
         $table->string('contact_email')->nullable();
         $table->integer('capacity')->nullable();
         $table->boolean('is_active')->default(true);
+        $table->boolean('is_hq')->default(false);
+        $table->boolean('can_administer_system')->default(false);
         $table->timestamps();
         $table->softDeletes();
     });
@@ -219,6 +294,15 @@ function rwBuildSchema(): void
         $table->text('cancellation_reason')->nullable();
         $table->timestamps();
         $table->softDeletes();
+    });
+
+    Schema::create('shipment_pickup_vehicle_requests', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('shipment_id')->constrained('shipments')->cascadeOnDelete();
+        $table->foreignId('pickup_vehicle_type_id')->nullable()->constrained('pickup_vehicle_types')->nullOnDelete();
+        $table->string('vehicle_name_snapshot');
+        $table->unsignedInteger('quantity')->default(1);
+        $table->timestamps();
     });
 
     Schema::create('shipment_items', function (Blueprint $table) {
@@ -463,13 +547,21 @@ function rwCreateLocation(): array
 
 function rwCreateWarehouse(?Region $region = null, ?District $district = null): Warehouse
 {
-    return Warehouse::create([
+    $warehouse = Warehouse::create([
         'name' => 'Warehouse '.Str::upper(Str::random(4)),
         'code' => 'WH-'.Str::upper(Str::random(5)),
         'region_id' => $region?->id,
         'district_id' => $district?->id,
         'is_active' => true,
+        'is_hq' => true,
+        'can_administer_system' => true,
     ]);
+
+    if ($admin = auth('admin')->user()) {
+        $admin->forceFill(['warehouse_id' => $warehouse->id])->save();
+    }
+
+    return $warehouse;
 }
 
 function rwCreateShipment(Vendor $vendor, array $overrides = []): Shipment
@@ -1231,7 +1323,7 @@ test('post-pickup receiving remove is blocked once a printed label is in driver 
 
     $response->assertStatus(422)
         ->assertJsonPath('success', false)
-        ->assertJsonPath('message', 'This package has labels already claimed by a driver or delivered.');
+        ->assertJsonPath('message', 'This package has labels already claimed by a rider or delivered.');
 
     $this->assertDatabaseHas('shipment_items', ['id' => $item->id]);
     $this->assertDatabaseHas('warehouse_receipt_item_labels', ['id' => $label->id]);

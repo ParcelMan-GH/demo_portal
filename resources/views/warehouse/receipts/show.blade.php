@@ -48,6 +48,9 @@
         'discrepancy_open' => 'bg-amber-500/20 text-amber-300',
         default => 'bg-slate-500/20 text-slate-300',
     };
+    $capturedPickupLatitude = $assignment->pickup_latitude;
+    $capturedPickupLongitude = $assignment->pickup_longitude;
+    $hasCapturedPickupCoordinates = ! is_null($capturedPickupLatitude) && ! is_null($capturedPickupLongitude);
     $heroStatusClasses = match ($statusValue) {
         'assigned' => 'border-orange-300/20 bg-orange-500/15 text-orange-100',
         'en_route' => 'border-indigo-300/20 bg-indigo-500/15 text-indigo-100',
@@ -140,6 +143,17 @@
                                 <span class="inline-flex items-center rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-bold text-slate-200">
                                     Assigned {{ optional($assignment->assigned_at)?->format('d M Y, h:i A') ?? '-' }}
                                 </span>
+                                @if($hasCapturedPickupCoordinates)
+                                    <a
+                                        href="https://www.google.com/maps?q={{ $capturedPickupLatitude }},{{ $capturedPickupLongitude }}"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/30 bg-emerald-400/15 px-3 py-1.5 text-xs font-bold text-emerald-100 transition hover:bg-emerald-400/25"
+                                    >
+                                        <span>Pickup GPS captured</span>
+                                        <span class="text-emerald-200/80">View on map</span>
+                                    </a>
+                                @endif
                             </div>
                         </div>
                     </div>

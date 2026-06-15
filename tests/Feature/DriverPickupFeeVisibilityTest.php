@@ -3,11 +3,9 @@
 use App\Models\Driver;
 use App\Models\PickupAssignment;
 use App\Models\Region;
-use App\Models\Role;
 use App\Models\Shipment;
 use App\Models\ShipmentCharge;
 use App\Models\ShipmentItem;
-use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Hash;
@@ -19,6 +17,7 @@ function buildDriverPickupFeeVisibilitySchema(): void
     Schema::disableForeignKeyConstraints();
     foreach ([
         'shipment_charges',
+        'shipment_item_tracking',
         'shipment_item_images',
         'pickup_photos',
         'pickup_item_confirmations',
@@ -188,7 +187,19 @@ function buildDriverPickupFeeVisibilitySchema(): void
         $table->text('cancellation_reason')->nullable();
         $table->decimal('pickup_latitude', 10, 8)->nullable();
         $table->decimal('pickup_longitude', 11, 8)->nullable();
+        $table->unsignedInteger('driver_picked_quantity')->nullable();
         $table->text('notes')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('shipment_item_tracking', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('shipment_item_id')->constrained('shipment_items')->cascadeOnDelete();
+        $table->string('status');
+        $table->string('location')->nullable();
+        $table->text('notes')->nullable();
+        $table->json('meta')->nullable();
+        $table->string('created_by')->nullable();
         $table->timestamps();
     });
 
@@ -375,4 +386,87 @@ test('driver pickup details include pending pickup fees from the shipment charge
         ->assertJsonPath('data.pickup.shipment.pickup_fee.currency', 'GHS')
         ->assertJsonPath('data.pickup.shipment.pickup_fee.status', ShipmentCharge::STATUS_PENDING)
         ->assertJsonPath('data.pickup.shipment.pickup_fee.is_paid', false);
+});
+
+test('driver pickup arrival requires coordinates', function () {
+    $driver = createDriverForPickupFeeVisibilityTest();
+    $vendor = createVendorForPickupFeeVisibilityTest();
+
+    $shipment = Shipment::create([
+        'vendor_id' => $vendor->id,
+        'shipment_number' => 'PCM-2026-00022',
+        'status' => 'submitted',
+        'source' => 'vendor_app',
+        'destination_mode' => 'single',
+        'pickup_contact_name' => 'Ama Vendor',
+        'pickup_contact_phone' => '0241112222',
+        'pickup_town' => 'Madina',
+    ]);
+
+    $assignment = PickupAssignment::create([
+        'shipment_id' => $shipment->id,
+        'driver_id' => $driver->id,
+        'status' => 'en_route',
+        'assigned_at' => now()->subMinutes(5),
+        'en_route_at' => now()->subMinute(),
+    ]);
+
+    Sanctum::actingAs($driver);
+
+    $this->postJson("/api/v1/driver/pickups/{$assignment->id}/arrive")
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['latitude', 'longitude']);
+});
+
+test('driver pickup completion stores optional pickup coordinates and returns them in the timeline', function () {
+    $driver = createDriverForPickupFeeVisibilityTest();
+    $vendor = createVendorForPickupFeeVisibilityTest();
+
+    $shipment = Shipment::create([
+        'vendor_id' => $vendor->id,
+        'shipment_number' => 'PCM-2026-00023',
+        'status' => 'submitted',
+        'source' => 'vendor_app',
+        'destination_mode' => 'single',
+        'pickup_contact_name' => 'Ama Vendor',
+        'pickup_contact_phone' => '0241112222',
+        'pickup_town' => 'Madina',
+    ]);
+
+    ShipmentItem::create([
+        'shipment_id' => $shipment->id,
+        'description' => 'Phone case',
+        'quantity' => 2,
+        'status' => 'pending',
+        'tracking_code' => 'TRK-TEST-00023',
+    ]);
+
+    $assignment = PickupAssignment::create([
+        'shipment_id' => $shipment->id,
+        'driver_id' => $driver->id,
+        'status' => 'arrived',
+        'assigned_at' => now()->subMinutes(10),
+        'en_route_at' => now()->subMinutes(6),
+        'arrived_at' => now()->subMinute(),
+    ]);
+
+    Sanctum::actingAs($driver);
+
+    $response = $this->postJson("/api/v1/driver/pickups/{$assignment->id}/confirm-pickup", [
+        'driver_picked_quantity' => 2,
+        'latitude' => 5.603717,
+        'longitude' => -0.186964,
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.assignment.pickup_latitude', '5.60371700')
+        ->assertJsonPath('data.assignment.pickup_longitude', '-0.18696400')
+        ->assertJsonPath('data.assignment.timeline.arrived_pickup.latitude', '5.60371700')
+        ->assertJsonPath('data.assignment.timeline.arrived_pickup.longitude', '-0.18696400');
+
+    $assignment->refresh();
+
+    expect((string) $assignment->pickup_latitude)->toBe('5.60371700')
+        ->and((string) $assignment->pickup_longitude)->toBe('-0.18696400');
 });

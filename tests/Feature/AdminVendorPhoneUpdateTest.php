@@ -1,9 +1,11 @@
 <?php
 
 use App\Http\Middleware\LogAdminAuditActivity;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Models\Warehouse;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
@@ -12,9 +14,11 @@ function buildVendorPhoneUpdateTestSchema(): void
     Schema::disableForeignKeyConstraints();
     foreach ([
         'vendors',
+        'role_permissions',
         'permissions',
         'user_roles',
         'roles',
+        'warehouses',
         'users',
     ] as $table) {
         Schema::dropIfExists($table);
@@ -34,6 +38,18 @@ function buildVendorPhoneUpdateTestSchema(): void
         $table->unsignedBigInteger('warehouse_id')->nullable();
         $table->string('remember_token')->nullable();
         $table->timestamps();
+    });
+
+    Schema::create('warehouses', function (Blueprint $table) {
+        $table->id();
+        $table->string('name');
+        $table->string('code')->unique();
+        $table->text('address')->nullable();
+        $table->boolean('is_active')->default(true);
+        $table->boolean('is_hq')->default(false);
+        $table->boolean('can_administer_system')->default(false);
+        $table->timestamps();
+        $table->softDeletes();
     });
 
     Schema::create('roles', function (Blueprint $table) {
@@ -64,6 +80,13 @@ function buildVendorPhoneUpdateTestSchema(): void
         $table->timestamps();
     });
 
+    Schema::create('role_permissions', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('role_id')->constrained('roles')->cascadeOnDelete();
+        $table->foreignId('permission_id')->constrained('permissions')->cascadeOnDelete();
+        $table->timestamps();
+    });
+
     Schema::create('vendors', function (Blueprint $table) {
         $table->id();
         $table->string('name');
@@ -73,6 +96,10 @@ function buildVendorPhoneUpdateTestSchema(): void
         $table->boolean('is_active')->default(true);
         $table->string('fcm_token')->nullable();
         $table->decimal('commission_rate_override', 10, 2)->nullable();
+        $table->string('payout_momo_network', 40)->nullable();
+        $table->string('payout_account_name')->nullable();
+        $table->string('payout_account_number', 20)->nullable();
+        $table->timestamp('payout_account_updated_at')->nullable();
         $table->timestamps();
         $table->softDeletes();
     });
@@ -80,9 +107,18 @@ function buildVendorPhoneUpdateTestSchema(): void
 
 function createVendorAdminUserForPhoneUpdateTest(): User
 {
+    $warehouse = Warehouse::create([
+        'name' => 'Vendor Phone HQ',
+        'code' => 'VP-HQ',
+        'address' => 'Accra',
+        'is_active' => true,
+        'is_hq' => true,
+        'can_administer_system' => true,
+    ]);
+
     $user = User::factory()->create([
         'is_active' => true,
-        'warehouse_id' => null,
+        'warehouse_id' => $warehouse->id,
     ]);
 
     $role = Role::create([
@@ -93,12 +129,22 @@ function createVendorAdminUserForPhoneUpdateTest(): User
         'is_active' => true,
     ]);
 
+    $permission = Permission::create([
+        'module' => 'vendors',
+        'action' => 'edit',
+        'name' => 'vendors.edit',
+        'description' => 'Edit vendors',
+    ]);
+
+    $role->permissions()->attach($permission->id);
+
     $user->roles()->attach($role->id, [
         'assigned_at' => now(),
         'assigned_by' => $user->id,
     ]);
+    $user->flushPermissionCache();
 
-    return $user;
+    return $user->fresh();
 }
 
 function createVendorPhoneUpdateRecord(array $overrides = []): Vendor
@@ -162,4 +208,3 @@ test('vendor phone update rejects numbers already stored in equivalent local or 
 
     expect($vendor->fresh()->phone)->toBe('+233244111111');
 });
-

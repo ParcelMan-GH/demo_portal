@@ -288,7 +288,7 @@
                 </div>
 
                 <div class="flex flex-1 justify-end md:justify-center px-2 md:px-8"
-                     x-data="adminGlobalSearch(@js(route('admin.search')))"
+                     x-data="adminGlobalSearch(@js(route('admin.search')), @js(route('admin.search.results')))"
                      x-init="init()"
                      @keydown.escape.window="close()">
                     <div class="hidden md:block relative w-full max-w-md" @click.away="open = false">
@@ -316,10 +316,16 @@
                             <span class="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded-md border border-slate-200/60 font-medium tracking-wide">⌘K</span>
                         </div>
                         <div x-show="open" x-cloak x-transition id="admin-global-search-results" role="listbox" class="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-xl rounded-xl shadow-xl shadow-slate-200/60 border border-slate-100/80 z-50 max-h-[420px] overflow-y-auto">
+                            <div class="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b border-slate-100/80 bg-slate-50/60">
+                                <button type="button" @click="setType(null)" :class="!activeType ? 'bg-orange-600 text-white' : 'bg-white text-slate-500 hover:text-orange-700 border border-slate-200/70'" class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide transition">All</button>
+                                <template x-for="group in groups" :key="'chip-' + group">
+                                    <button type="button" @click="setType(group)" :class="activeType === group ? 'bg-orange-600 text-white' : 'bg-white text-slate-500 hover:text-orange-700 border border-slate-200/70'" class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide transition" x-text="groupLabels[group]"></button>
+                                </template>
+                            </div>
                             <template x-if="error">
                                 <div class="px-4 py-3 text-[12px] text-red-600 bg-red-50 border-b border-red-100" x-text="error"></div>
                             </template>
-                            <template x-for="group in groups" :key="group">
+                            <template x-for="group in orderedGroups()" :key="group">
                                 <template x-if="results[group] && results[group].length">
                                     <div>
                                         <div class="px-3 pt-2 pb-1"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider" x-text="groupLabels[group]"></span></div>
@@ -342,6 +348,12 @@
                             </template>
                             <template x-if="open && !searching && !error && !hasResults()">
                                 <div class="px-4 py-6 text-center"><p class="text-[12px] text-slate-400">No results for "<span x-text="query"></span>"</p></div>
+                            </template>
+                            <template x-if="query.trim().length >= 2">
+                                <a :href="resultsPageHref()" @click="close()" class="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-slate-100/80 bg-slate-50/60 text-[11px] font-black text-orange-700 hover:bg-orange-50 transition-colors">
+                                    <span>View all results &amp; filters</span>
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </a>
                             </template>
                         </div>
                     </div>
@@ -374,10 +386,16 @@
                             </button>
                         </div>
                         <div id="admin-global-search-mobile-results" role="listbox" class="max-h-[70vh] overflow-y-auto">
+                            <div class="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
+                                <button type="button" @click="setType(null)" :class="!activeType ? 'bg-orange-600 text-white' : 'bg-white text-slate-500 border border-slate-200/70'" class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide transition">All</button>
+                                <template x-for="group in groups" :key="'mobile-chip-' + group">
+                                    <button type="button" @click="setType(group)" :class="activeType === group ? 'bg-orange-600 text-white' : 'bg-white text-slate-500 border border-slate-200/70'" class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide transition" x-text="groupLabels[group]"></button>
+                                </template>
+                            </div>
                             <template x-if="error">
                                 <div class="px-4 py-3 text-[12px] text-red-600 bg-red-50 border-b border-red-100" x-text="error"></div>
                             </template>
-                            <template x-for="group in groups" :key="group">
+                            <template x-for="group in orderedGroups()" :key="group">
                                 <template x-if="results[group] && results[group].length">
                                     <div>
                                         <div class="px-4 pt-3 pb-1"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider" x-text="groupLabels[group]"></span></div>
@@ -398,6 +416,12 @@
                             <template x-if="mobileOpen && !searching && !error && query.length >= 2 && !hasResults()">
                                 <div class="px-4 py-8 text-center"><p class="text-[12px] text-slate-400">No results for "<span x-text="query"></span>"</p></div>
                             </template>
+                            <template x-if="query.trim().length >= 2">
+                                <a :href="resultsPageHref()" @click="close()" class="flex items-center justify-between gap-2 px-4 py-3 border-t border-slate-100 bg-slate-50/60 text-[12px] font-black text-orange-700 transition-colors">
+                                    <span>View all results &amp; filters</span>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </a>
+                            </template>
                         </div>
                     </div>
                 </div>
@@ -410,6 +434,74 @@
                         <span x-data x-init="setInterval(() => $el.textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), 1000)"></span>
                     </div>
                     @include('admin.shared.warehouse-context-selector')
+                    <div
+                        class="relative"
+                        x-data="adminNotifications({
+                            indexUrl: @js(route('admin.in-app-notifications.index')),
+                            readAllUrl: @js(route('admin.in-app-notifications.read-all')),
+                            markReadUrlTemplate: @js(route('admin.in-app-notifications.mark-read', ['notification' => '__ID__'])),
+                            csrfToken: @js(csrf_token()),
+                        })"
+                        x-init="init()"
+                    >
+                        <button
+                            type="button"
+                            @click="toggle()"
+                            class="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/70 bg-slate-50/80 text-slate-500 transition-colors hover:bg-white hover:text-orange-600"
+                            aria-label="Open notifications"
+                            :aria-expanded="open ? 'true' : 'false'"
+                        >
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
+                            </svg>
+                            <span x-show="unreadCount > 0" x-cloak class="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-orange-600 px-1.5 py-0.5 text-center text-[9px] font-black leading-none text-white ring-2 ring-white" x-text="badgeText()"></span>
+                        </button>
+                        <div x-show="open" x-cloak x-transition @click.away="open = false" class="absolute right-0 mt-2 w-[340px] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl shadow-slate-900/10 z-50">
+                            <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                                <div>
+                                    <p class="text-[13px] font-black text-slate-900">Notifications</p>
+                                    <p class="text-[11px] font-semibold text-slate-400"><span x-text="unreadCount"></span> unread</p>
+                                </div>
+                                <button type="button" @click="markAllRead()" x-show="unreadCount > 0" x-cloak class="rounded-lg bg-orange-50 px-2.5 py-1.5 text-[11px] font-bold text-orange-700 transition-colors hover:bg-orange-100">Mark all read</button>
+                            </div>
+
+                            <template x-if="error">
+                                <div class="border-b border-red-100 bg-red-50 px-4 py-3 text-[12px] font-semibold text-red-600" x-text="error"></div>
+                            </template>
+
+                            <div class="max-h-[380px] overflow-y-auto">
+                                <template x-if="loading && notifications.length === 0">
+                                    <div class="px-4 py-8 text-center text-[12px] font-semibold text-slate-400">Loading notifications...</div>
+                                </template>
+
+                                <template x-if="!loading && notifications.length === 0">
+                                    <div class="px-4 py-8 text-center">
+                                        <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-400">
+                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h16" /></svg>
+                                        </div>
+                                        <p class="text-[13px] font-bold text-slate-700">No notifications</p>
+                                        <p class="mt-1 text-[11px] font-medium text-slate-400">New vendor orders will appear here.</p>
+                                    </div>
+                                </template>
+
+                                <template x-for="notification in notifications" :key="notification.id">
+                                    <button type="button" @click="openNotification(notification)" class="flex w-full gap-3 border-b border-slate-100 px-4 py-3 text-left transition-colors hover:bg-slate-50" :class="notification.read_at ? 'bg-white' : 'bg-orange-50/40'">
+                                        <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-700">
+                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" /></svg>
+                                        </span>
+                                        <span class="min-w-0 flex-1">
+                                            <span class="flex items-center gap-2">
+                                                <span class="truncate text-[12px] font-black text-slate-900" x-text="notification.title"></span>
+                                                <span x-show="!notification.read_at" x-cloak class="h-2 w-2 shrink-0 rounded-full bg-orange-600"></span>
+                                            </span>
+                                            <span class="mt-1 line-clamp-2 block text-[11px] font-medium leading-5 text-slate-500" x-text="notification.body"></span>
+                                            <span class="mt-1 block text-[10px] font-bold text-slate-400" x-text="notification.created_at_label || ''"></span>
+                                        </span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
                     <div class="relative">
                         <button @click="userMenuOpen = !userMenuOpen" class="flex items-center gap-2 py-1 px-1.5 rounded-xl hover:bg-slate-50/80 transition-all">
                             <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[12px] font-bold shadow-sm ring-1 ring-slate-200/50 bg-gradient-to-br from-slate-700 to-slate-900">{{ substr($authUser?->name ?? 'U', 0, 1) }}</div>

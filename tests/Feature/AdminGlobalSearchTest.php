@@ -45,7 +45,7 @@ function agsAdminWithPermissions(array $permissionNames): User
 
     $role = Role::create([
         'name' => 'Search Role',
-        'slug' => 'search-role-' . $admin->id,
+        'slug' => 'search-role-'.$admin->id,
         'description' => 'Search test role',
         'is_system_role' => false,
         'is_warehouse_role' => false,
@@ -311,4 +311,115 @@ it('does not expose result groups when the admin lacks their permissions', funct
         ->getJson(route('admin.search', ['q' => 'PKG-ABC-001']))
         ->assertOk()
         ->assertJsonPath('data.packages.0.label', 'PKG-ABC-001');
+});
+
+it('scopes results with a typed category prefix', function (): void {
+    $admin = agsAdminWithPermissions(['shipments.view', 'vendors.view', 'drivers.view']);
+
+    $vendor = agsCreateVendor(['name' => 'Prefix Vendor', 'business_name' => 'Prefix Trading']);
+    agsCreateShipment($vendor, [
+        'shipment_number' => 'PCM-PREFIX-001',
+        'recipient_name' => 'Prefix Recipient',
+        'delivery_recipient_name' => 'Prefix Recipient',
+    ]);
+
+    $this->actingAs($admin, 'admin')
+        ->getJson(route('admin.search', ['q' => 'vendor: Prefix']))
+        ->assertOk()
+        ->assertJsonPath('meta.type', 'vendors')
+        ->assertJsonPath('data.vendors.0.label', 'Prefix Trading')
+        ->assertJsonMissingPath('data.shipments');
+});
+
+it('scopes results with the type query parameter', function (): void {
+    $admin = agsAdminWithPermissions(['shipments.view', 'vendors.view']);
+
+    $vendor = agsCreateVendor(['name' => 'Scoped Vendor', 'business_name' => 'Scoped Trading']);
+    agsCreateShipment($vendor, [
+        'shipment_number' => 'PCM-SCOPED-001',
+        'recipient_name' => 'Scoped Recipient',
+        'delivery_recipient_name' => 'Scoped Recipient',
+    ]);
+
+    $this->actingAs($admin, 'admin')
+        ->getJson(route('admin.search', ['q' => 'Scoped', 'type' => 'shipments']))
+        ->assertOk()
+        ->assertJsonPath('meta.type', 'shipments')
+        ->assertJsonPath('data.shipments.0.label', 'PCM-SCOPED-001')
+        ->assertJsonMissingPath('data.vendors');
+});
+
+it('normalizes ghana phone formats when searching', function (): void {
+    $admin = agsAdminWithPermissions(['vendors.view']);
+
+    agsCreateVendor([
+        'business_name' => 'Phone Format Vendor',
+        'phone' => '+233241234567',
+        'email' => 'phone-format@example.test',
+    ]);
+
+    // Local format with leading zero finds the +233-stored number.
+    $this->actingAs($admin, 'admin')
+        ->getJson(route('admin.search', ['q' => '0241234567']))
+        ->assertOk()
+        ->assertJsonPath('data.vendors.0.label', 'Phone Format Vendor');
+
+    // Spaced local format works too.
+    $this->actingAs($admin, 'admin')
+        ->getJson(route('admin.search', ['q' => '024 123 4567']))
+        ->assertOk()
+        ->assertJsonPath('data.vendors.0.label', 'Phone Format Vendor');
+});
+
+it('orders people first for phone queries via meta order', function (): void {
+    $admin = agsAdminWithPermissions(['vendors.view']);
+
+    $this->actingAs($admin, 'admin')
+        ->getJson(route('admin.search', ['q' => '0241234567']))
+        ->assertOk()
+        ->assertJsonPath('meta.order.0', 'vendors');
+});
+
+it('renders the advanced search results page with tabs and rows', function (): void {
+    $admin = agsAdminWithPermissions(['shipments.view', 'vendors.view', 'drivers.view']);
+
+    $vendor = agsCreateVendor(['business_name' => 'Results Page Vendor']);
+    agsCreateShipment($vendor, [
+        'shipment_number' => 'PCM-RESULTS-001',
+        'recipient_name' => 'Results Recipient',
+        'delivery_recipient_name' => 'Results Recipient',
+    ]);
+
+    $this->actingAs($admin, 'admin')
+        ->get(route('admin.search.results', ['q' => 'Results', 'type' => 'vendors']))
+        ->assertOk()
+        ->assertSeeText('Advanced Search')
+        ->assertSeeText('Results Page Vendor')
+        ->assertSeeText('Shipments')
+        ->assertSeeText('Vendors');
+});
+
+it('paginates the results page beyond fifteen matches', function (): void {
+    $admin = agsAdminWithPermissions(['vendors.view']);
+
+    foreach (range(1, 18) as $i) {
+        agsCreateVendor([
+            'name' => "Paged Vendor {$i}",
+            'business_name' => "Paged Trading {$i}",
+            'phone' => '+2332499900'.str_pad((string) $i, 2, '0', STR_PAD_LEFT),
+            'email' => "paged-{$i}@example.test",
+        ]);
+    }
+
+    $response = $this->actingAs($admin, 'admin')
+        ->get(route('admin.search.results', ['q' => 'Paged', 'type' => 'vendors']))
+        ->assertOk()
+        ->assertSeeText('18');
+
+    $response->assertSee('page=2', false);
+});
+
+it('redirects guests away from the results page', function (): void {
+    $this->get(route('admin.search.results', ['q' => 'anything']))
+        ->assertRedirect(route('admin.login'));
 });

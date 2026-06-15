@@ -8,6 +8,7 @@ import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/browser';
 import { DecodeHintType } from '@zxing/library';
 import { initAdminUtils } from './core/admin-utils.js';
 import { initAdminLayout } from './modules/layout/index.js';
+import { registerAdminNotifications } from './modules/layout/notifications.js';
 
 // Page-level modules
 import './modules/users/index.js';
@@ -26,12 +27,13 @@ import '../warehouse/modules/manifests/incoming.js';
 import '../warehouse/modules/manifests/incoming-show.js';
 
 window.Alpine = Alpine;
+registerAdminNotifications(Alpine);
 window.ZXingBrowser = {
     BrowserMultiFormatReader,
     BarcodeFormat,
     DecodeHintType,
 };
-window.adminGlobalSearch = (searchUrl) => ({
+window.adminGlobalSearch = (searchUrl, resultsPageUrl = null) => ({
     groups: ['shipments', 'packages', 'transactions', 'vendors', 'drivers'],
     groupLabels: {
         shipments: 'Shipments',
@@ -42,6 +44,8 @@ window.adminGlobalSearch = (searchUrl) => ({
     },
     query: '',
     results: {},
+    meta: {},
+    activeType: null,
     searching: false,
     open: false,
     mobileOpen: false,
@@ -91,7 +95,13 @@ window.adminGlobalSearch = (searchUrl) => ({
         this.searching = true;
 
         try {
-            const response = await fetch(`${searchUrl}?q=${encodeURIComponent(this.query.trim())}`, {
+            const params = new URLSearchParams({ q: this.query.trim() });
+
+            if (this.activeType) {
+                params.set('type', this.activeType);
+            }
+
+            const response = await fetch(`${searchUrl}?${params.toString()}`, {
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     Accept: 'application/json',
@@ -104,6 +114,14 @@ window.adminGlobalSearch = (searchUrl) => ({
 
             const payload = await response.json();
             this.results = payload.data || {};
+            this.meta = payload.meta || {};
+
+            // A typed prefix like "vendor:" scopes the search server-side;
+            // reflect it in the chips so the UI matches what was searched.
+            if (this.meta.type) {
+                this.activeType = this.meta.type;
+            }
+
             this.open = true;
             this.activeIndex = this.hasResults() ? 0 : -1;
         } catch (error) {
@@ -113,6 +131,42 @@ window.adminGlobalSearch = (searchUrl) => ({
             this.error = 'Search is unavailable. Please try again.';
         } finally {
             this.searching = false;
+        }
+    },
+
+    setType(type) {
+        this.activeType = this.activeType === type ? null : type;
+        this.activeIndex = 0;
+
+        if (this.query.trim().length >= 2) {
+            this.fetchResults();
+        }
+    },
+
+    orderedGroups() {
+        const order = Array.isArray(this.meta.order) ? this.meta.order : [];
+        const known = order.filter((group) => this.groups.includes(group));
+
+        return known.length ? known : this.groups;
+    },
+
+    resultsPageHref() {
+        if (!resultsPageUrl) {
+            return '#';
+        }
+
+        const params = new URLSearchParams({ q: this.query.trim() });
+
+        if (this.activeType) {
+            params.set('type', this.activeType);
+        }
+
+        return `${resultsPageUrl}?${params.toString()}`;
+    },
+
+    goToResults() {
+        if (resultsPageUrl && this.query.trim().length >= 2) {
+            window.location.href = this.resultsPageHref();
         }
     },
 
@@ -127,7 +181,7 @@ window.adminGlobalSearch = (searchUrl) => ({
     },
 
     flatResults() {
-        return this.groups.flatMap((group) => (this.results[group] || []).map((item, index) => ({
+        return this.orderedGroups().flatMap((group) => (this.results[group] || []).map((item, index) => ({
             group,
             index,
             item,
@@ -141,7 +195,7 @@ window.adminGlobalSearch = (searchUrl) => ({
     groupOffset(group) {
         let offset = 0;
 
-        for (const current of this.groups) {
+        for (const current of this.orderedGroups()) {
             if (current === group) {
                 return offset;
             }
@@ -183,7 +237,11 @@ window.adminGlobalSearch = (searchUrl) => ({
 
         if (active?.item?.url) {
             window.location.href = active.item.url;
+            return;
         }
+
+        // No selectable result — fall through to the full results page.
+        this.goToResults();
     },
 });
 initAdminUtils();

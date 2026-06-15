@@ -108,6 +108,11 @@ class User extends Authenticatable
         return $this->hasMany(AdminAuditLog::class);
     }
 
+    public function adminNotifications(): HasMany
+    {
+        return $this->hasMany(AdminNotification::class);
+    }
+
     public function paymentWallets(): BelongsToMany
     {
         return $this->belongsToMany(PaymentWallet::class, 'payment_wallet_user')->withTimestamps();
@@ -125,7 +130,7 @@ class User extends Authenticatable
         $permissionNames = Cache::remember(
             "user.{$this->id}.permission_names",
             now()->addHours(24),
-            fn() => $this->getAllPermissions()
+            fn () => $this->getAllPermissions()
                 ->pluck('name')
                 ->filter()
                 ->unique()
@@ -146,6 +151,7 @@ class User extends Authenticatable
                 return true;
             }
         }
+
         return false;
     }
 
@@ -155,10 +161,11 @@ class User extends Authenticatable
     public function hasAllPermissions(array $permissions): bool
     {
         foreach ($permissions as $permission) {
-            if (!$this->hasPermission($permission)) {
+            if (! $this->hasPermission($permission)) {
                 return false;
             }
         }
+
         return true;
     }
 
@@ -215,8 +222,8 @@ class User extends Authenticatable
         $this->roles()->sync([
             $role->id => [
                 'assigned_at' => now(),
-                'assigned_by' => auth('admin')->id()
-            ]
+                'assigned_by' => auth('admin')->id(),
+            ],
         ]);
 
         $this->flushPermissionCache();
@@ -241,21 +248,22 @@ class User extends Authenticatable
     public function syncRoles(array $roleIds): void
     {
         $firstRoleId = collect($roleIds)
-            ->filter(fn($id) => !is_null($id) && $id !== '')
-            ->map(fn($id) => (int) $id)
+            ->filter(fn ($id) => ! is_null($id) && $id !== '')
+            ->map(fn ($id) => (int) $id)
             ->first();
 
-        if (!$firstRoleId) {
+        if (! $firstRoleId) {
             $this->roles()->sync([]);
             $this->flushPermissionCache();
+
             return;
         }
 
         $this->roles()->sync([
             $firstRoleId => [
                 'assigned_at' => now(),
-                'assigned_by' => auth('admin')->id()
-            ]
+                'assigned_by' => auth('admin')->id(),
+            ],
         ]);
         $this->flushPermissionCache();
     }

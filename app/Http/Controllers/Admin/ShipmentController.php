@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\ItemStatus;
 use App\Enums\FulfillmentType;
+use App\Enums\ItemStatus;
 use App\Enums\PickupAssignmentStatus;
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentSource;
@@ -11,13 +11,13 @@ use App\Enums\ShipmentStatus;
 use App\Exports\ShipmentsExport;
 use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
-use App\Models\Location;
+use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
+use App\Models\Location;
 use App\Models\NotificationLog;
 use App\Models\PickupItemConfirmation;
 use App\Models\PickupPhoto;
 use App\Models\Region;
-use App\Models\Driver;
 use App\Models\Shipment;
 use App\Models\ShipmentCharge;
 use App\Models\ShipmentItem;
@@ -27,11 +27,11 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
-use App\Services\StorageService;
+use App\Services\BackOfficeAccess;
 use App\Services\PushNotificationService;
+use App\Services\StorageService;
 use App\Services\WalkinShipmentService;
 use App\Services\Warehouse\WarehouseReceivingService;
-use App\Services\BackOfficeAccess;
 use App\Support\GenericPdfExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -237,6 +237,8 @@ class ShipmentController extends Controller
                     'arrived_at' => $assignment->arrived_at,
                     'picked_up_at' => $assignment->picked_up_at,
                     'completed_at' => $assignment->completed_at,
+                    'pickup_latitude' => $assignment->pickup_latitude,
+                    'pickup_longitude' => $assignment->pickup_longitude,
                     'arrived_warehouse_at' => $assignment->arrived_warehouse_at,
                     'received_warehouse_id' => $assignment->received_warehouse_id,
                     'received_warehouse_name' => $assignment->receivedWarehouse?->name,
@@ -781,11 +783,11 @@ class ShipmentController extends Controller
         }
 
         if ($quantityState = $request->get('quantity_state')) {
-            $receivedQtySql = "(select coalesce(sum(wri.received_quantity), 0)
+            $receivedQtySql = '(select coalesce(sum(wri.received_quantity), 0)
                 from pickup_assignments pa
                 left join warehouse_receipts wr on wr.pickup_assignment_id = pa.id
                 left join warehouse_receipt_items wri on wri.warehouse_receipt_id = wr.id
-                where pa.shipment_id = shipments.id)";
+                where pa.shipment_id = shipments.id)';
 
             match ($quantityState) {
                 'missing_vendor_total' => $query->whereNull('vendor_declared_quantity'),
@@ -822,7 +824,7 @@ class ShipmentController extends Controller
 
     private function applyShipmentSummaryStateFilter($query, ?string $state): void
     {
-        if (!$state || $state === 'total') {
+        if (! $state || $state === 'total') {
             return;
         }
 
@@ -833,11 +835,11 @@ class ShipmentController extends Controller
             PickupAssignmentStatus::PICKING_UP->value,
         ];
 
-        $receivedQtySql = "(select coalesce(sum(wri.received_quantity), 0)
+        $receivedQtySql = '(select coalesce(sum(wri.received_quantity), 0)
             from pickup_assignments pa
             left join warehouse_receipts wr on wr.pickup_assignment_id = pa.id
             left join warehouse_receipt_items wri on wri.warehouse_receipt_id = wr.id
-            where pa.shipment_id = shipments.id)";
+            where pa.shipment_id = shipments.id)';
 
         match ($state) {
             'needs_driver' => $query
@@ -2873,7 +2875,7 @@ class ShipmentController extends Controller
             $shipment->vendor_declared_quantity
             ?? ($shipment->relationLoaded('items') ? $shipment->items->sum('quantity') : $shipment->items()->sum('quantity'))
         );
-        $driverPickedQuantity = $assignment && !is_null($assignment->driver_picked_quantity)
+        $driverPickedQuantity = $assignment && ! is_null($assignment->driver_picked_quantity)
             ? (int) $assignment->driver_picked_quantity
             : null;
         $warehouseReceivedQuantity = $assignment?->warehouseReceipt?->items
@@ -2980,7 +2982,7 @@ class ShipmentController extends Controller
                     $shipment->vendor_declared_quantity
                     ?? ($shipment->relationLoaded('items') ? $shipment->items->sum('quantity') : $shipment->items()->sum('quantity'))
                 ),
-                'driver_picked' => $assignment && !is_null($assignment->driver_picked_quantity)
+                'driver_picked' => $assignment && ! is_null($assignment->driver_picked_quantity)
                     ? (int) $assignment->driver_picked_quantity
                     : null,
                 'warehouse_received' => $assignment?->warehouseReceipt?->items
@@ -3643,6 +3645,7 @@ class ShipmentController extends Controller
                 $payload['paid_at'] = now();
             }
             $charge->update($payload);
+
             return;
         }
 
@@ -3974,6 +3977,7 @@ class ShipmentController extends Controller
             if (! $targetConfirmation) {
                 $confirmation->update(['shipment_item_id' => $targetItemId]);
                 $targetConfirmation = $confirmation->fresh();
+
                 continue;
             }
 

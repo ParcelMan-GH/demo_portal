@@ -1,35 +1,37 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminContactQueueController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminDeliveryRunController;
-use App\Http\Controllers\Admin\CollectionCenterController;
+use App\Http\Controllers\Admin\AdminInAppNotificationController;
 use App\Http\Controllers\Admin\AdminLocationController;
+use App\Http\Controllers\Admin\AdminMarketingController;
+use App\Http\Controllers\Admin\AdminNotificationController;
 use App\Http\Controllers\Admin\AdminProfileController;
 use App\Http\Controllers\Admin\AdminSearchController;
+use App\Http\Controllers\Admin\AdminShipmentChargesController;
 use App\Http\Controllers\Admin\AdminSortBatchController;
-use App\Http\Controllers\Admin\AdminNotificationController;
 use App\Http\Controllers\Admin\AdminTransportManifestController;
 use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\BackOfficeContextController;
+use App\Http\Controllers\Admin\CollectionCenterController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DriverController;
 use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Admin\PickupAssignmentController;
+use App\Http\Controllers\Admin\RecipientPaymentController;
 use App\Http\Controllers\Admin\RiderTeamController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\ShipmentController;
 use App\Http\Controllers\Admin\ShipmentPaymentController;
-use App\Http\Controllers\Admin\AdminMarketingController;
 use App\Http\Controllers\Admin\VendorController;
-use App\Http\Controllers\Admin\AdminContactQueueController;
-use App\Http\Controllers\Admin\AdminShipmentChargesController;
-use App\Http\Controllers\Admin\BackOfficeContextController;
-use App\Http\Controllers\Admin\RecipientPaymentController;
-use App\Http\Controllers\BusHandoffPublicController;
-use App\Http\Controllers\Warehouse\WarehouseShipmentChargesController;
 use App\Http\Controllers\Admin\VendorPayoutController;
-use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\Admin\WarehouseCapabilityController;
+use App\Http\Controllers\Admin\WarehouseController;
+use App\Http\Controllers\BusHandoffPublicController;
+use App\Http\Controllers\Warehouse\CollectionController as WarehouseCollectionController;
+use App\Http\Controllers\Warehouse\ContactQueueController as WarehouseContactQueueController;
 use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
 use App\Http\Controllers\Warehouse\DeliveryRunController as WarehouseDeliveryRunController;
 use App\Http\Controllers\Warehouse\PackageController as WarehousePackageController;
@@ -39,9 +41,8 @@ use App\Http\Controllers\Warehouse\ShipmentPaymentController as WarehouseShipmen
 use App\Http\Controllers\Warehouse\SortingController as WarehouseSortingController;
 use App\Http\Controllers\Warehouse\TransportManifestController as WarehouseTransportManifestController;
 use App\Http\Controllers\Warehouse\UserController as WarehouseUserController;
-use App\Http\Controllers\Warehouse\CollectionController as WarehouseCollectionController;
-use App\Http\Controllers\Warehouse\ContactQueueController as WarehouseContactQueueController;
 use App\Http\Controllers\Warehouse\WalkinController as WarehouseWalkinController;
+use App\Http\Controllers\Warehouse\WarehouseShipmentChargesController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -201,6 +202,12 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
 
         // Global Search
         Route::get('search', [AdminSearchController::class, 'search'])->name('search');
+        Route::get('search/results', [AdminSearchController::class, 'results'])->name('search.results');
+
+        // Admin in-app notifications
+        Route::get('in-app-notifications', [AdminInAppNotificationController::class, 'index'])->name('in-app-notifications.index');
+        Route::post('in-app-notifications/read-all', [AdminInAppNotificationController::class, 'markAllRead'])->name('in-app-notifications.read-all');
+        Route::post('in-app-notifications/{notification}/read', [AdminInAppNotificationController::class, 'markRead'])->name('in-app-notifications.mark-read');
 
         // Role Management
         Route::get('roles/warehouse', [RoleController::class, 'warehouseIndex'])->name('roles.warehouse.index');
@@ -612,6 +619,7 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::post('fcm-token', function (\Illuminate\Http\Request $request) {
             $request->validate(['fcm_token' => 'required|string|max:512']);
             \Illuminate\Support\Facades\Auth::guard('admin')->user()->update(['fcm_token' => $request->fcm_token]);
+
             return response()->json(['success' => true]);
         })->name('fcm-token');
     });
@@ -622,7 +630,7 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
 | Warehouse Web Portal Routes
 |--------------------------------------------------------------------------
 */
-Route::prefix(config('backoffice.prefix', 'admin') . '/operations')
+Route::prefix(config('backoffice.prefix', 'admin').'/operations')
     ->name('warehouse.')
     ->middleware(['auth:admin', 'admin.audit', 'backoffice.user'])
     ->group(function () {
@@ -834,10 +842,10 @@ Route::prefix(config('backoffice.prefix', 'admin') . '/operations')
     });
 
 Route::any('warehouse/{path?}', function (?string $path = null) {
-    $target = trim(config('backoffice.prefix', 'admin') . '/operations/' . ltrim((string) $path, '/'), '/');
+    $target = trim(config('backoffice.prefix', 'admin').'/operations/'.ltrim((string) $path, '/'), '/');
     $query = request()->getQueryString();
 
-    return redirect('/' . $target . ($query ? '?' . $query : ''), 308);
+    return redirect('/'.$target.($query ? '?'.$query : ''), 308);
 })->where('path', '.*')->name('warehouse.compat.redirect');
 
 /*

@@ -632,6 +632,23 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                                 <span class="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md flex-shrink-0" x-text="assignment.target_warehouse.code"></span>
                                             </template>
                                         </div>
+                                        <template x-if="assignment.pickup_latitude !== null && assignment.pickup_latitude !== undefined && assignment.pickup_latitude !== '' && assignment.pickup_longitude !== null && assignment.pickup_longitude !== undefined && assignment.pickup_longitude !== ''">
+                                            <a
+                                                class="mb-4 flex items-center gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-700 transition hover:border-emerald-200 hover:bg-emerald-100"
+                                                :href="`https://www.google.com/maps?q=${assignment.pickup_latitude},${assignment.pickup_longitude}`"
+                                                target="_blank"
+                                                rel="noopener"
+                                            >
+                                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                                                </svg>
+                                                <span class="min-w-0 flex-1">
+                                                    Pickup GPS captured
+                                                    <span class="block truncate text-[10px] font-semibold text-emerald-600" x-text="`${assignment.pickup_latitude}, ${assignment.pickup_longitude}`"></span>
+                                                </span>
+                                                <span class="shrink-0 text-[10px] uppercase tracking-wide">View map</span>
+                                            </a>
+                                        </template>
                                         <!-- Progress: 2-row pill bars -->
                                         <div class="mb-4">
                                             <div class="grid grid-cols-4 gap-1 mb-2">
@@ -2245,6 +2262,16 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
 	                                            <td class="px-4 py-4">
 	                                                <p class="text-[11px] font-semibold text-slate-800" x-text="history.target_warehouse_name || '-'"></p>
 	                                                <p x-show="history.target_warehouse_code" class="mt-0.5 text-[10px] text-slate-500" x-text="history.target_warehouse_code"></p>
+                                                    <template x-if="history.pickup_latitude !== null && history.pickup_latitude !== undefined && history.pickup_latitude !== '' && history.pickup_longitude !== null && history.pickup_longitude !== undefined && history.pickup_longitude !== ''">
+                                                        <a
+                                                            class="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100"
+                                                            :href="`https://www.google.com/maps?q=${history.pickup_latitude},${history.pickup_longitude}`"
+                                                            target="_blank"
+                                                            rel="noopener"
+                                                        >
+                                                            GPS map
+                                                        </a>
+                                                    </template>
 	                                            </td>
 	                                            <td class="px-4 py-4 text-[11px] font-semibold text-slate-700" x-text="history.assigned_at ? formatDateTime(history.assigned_at) : '-'"></td>
 	                                            <td class="px-4 py-4 text-[11px] font-semibold text-emerald-700" x-text="history.received_at ? formatDateTime(history.received_at) : '-'"></td>

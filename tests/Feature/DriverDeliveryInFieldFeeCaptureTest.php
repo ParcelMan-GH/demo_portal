@@ -11,6 +11,7 @@ use App\Models\Driver;
 use App\Models\Shipment;
 use App\Models\ShipmentCharge;
 use App\Models\ShipmentItem;
+use App\Services\BusHandoffConfirmationService;
 use App\Services\ChargesService;
 use App\Services\SmsService;
 use App\Services\StorageService;
@@ -31,6 +32,7 @@ function buildDriverDeliveryInFieldFeeCaptureSchema(): void
         'delivery_run_stops',
         'delivery_runs',
         'shipment_items',
+        'pickup_assignments',
         'shipments',
         'drivers',
     ] as $table) {
@@ -71,6 +73,15 @@ function buildDriverDeliveryInFieldFeeCaptureSchema(): void
         $table->string('delivery_town')->nullable();
         $table->timestamps();
         $table->softDeletes();
+    });
+
+    Schema::create('pickup_assignments', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('shipment_id');
+        $table->unsignedBigInteger('driver_id')->nullable();
+        $table->unsignedBigInteger('target_warehouse_id')->nullable();
+        $table->string('status')->nullable();
+        $table->timestamps();
     });
 
     Schema::create('shipment_items', function (Blueprint $table) {
@@ -255,7 +266,8 @@ test('driver direct delivery settles existing pending delivery fee instead of cr
         $storageService,
         $smsService,
         $commissionService,
-        new ChargesService(),
+        new ChargesService,
+        Mockery::mock(BusHandoffConfirmationService::class),
     );
 
     $result = $service->driverConfirmStopByPackage(
