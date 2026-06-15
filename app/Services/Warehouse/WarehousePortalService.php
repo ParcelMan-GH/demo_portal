@@ -15,9 +15,7 @@ use Illuminate\Support\Collection;
 
 class WarehousePortalService
 {
-    public function __construct(private readonly BackOfficeAccess $access)
-    {
-    }
+    public function __construct(private readonly BackOfficeAccess $access) {}
 
     public function resolveWarehouse(User $user): Warehouse
     {
@@ -31,6 +29,16 @@ class WarehousePortalService
             ->whereKey($user->warehouse_id)
             ->where('is_active', true)
             ->firstOrFail();
+    }
+
+    public function resolveAccessibleWarehouse(User $user, int $warehouseId, string $module = 'warehouse'): Warehouse
+    {
+        $warehouse = $this->access->warehousesFor($user, $module)
+            ->firstWhere('id', $warehouseId);
+
+        abort_unless($warehouse, 404);
+
+        return $warehouse;
     }
 
     public function getDashboardStats(Warehouse $warehouse): array
@@ -49,7 +57,7 @@ class WarehousePortalService
             ->active()
             ->warehouseRoles();
 
-        if (!$actor?->isHqUser()) {
+        if (! $actor?->isHqUser()) {
             $query->where('is_assignable_by_warehouse_manager', true);
         }
 
