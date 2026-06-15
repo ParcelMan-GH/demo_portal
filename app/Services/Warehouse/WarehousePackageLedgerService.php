@@ -97,15 +97,15 @@ class WarehousePackageLedgerService
             $relations[] = 'shipmentItem.deliveryRunItems.stop.district:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.stop.confirmedBy:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.stop.verificationAttempts.driver:id,name,phone';
-            $relations[] = 'shipmentItem.deliveryRunItems.expectedDeliverySetByRider:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.expectedDeliverySetByDriver:id,name,phone';
             $relations[] = 'shipmentItem.deliveryRunItems.expectedDeliverySetByUser:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.delayEvents:id,delivery_run_item_id,delivery_delay_reason_id,reason_label,source,actor_driver_id,actor_user_id,old_expected_delivery_at,new_expected_delivery_at,recipient_sms_sent,vendor_notification_sent,vendor_sms_sent,created_at';
             $relations[] = 'shipmentItem.deliveryRunItems.delayEvents.reason:id,label';
-            $relations[] = 'shipmentItem.deliveryRunItems.delayEvents.actorRider:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.delayEvents.actorDriver:id,name,phone';
             $relations[] = 'shipmentItem.deliveryRunItems.delayEvents.actorUser:id,name';
             $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.reason:id,label,type';
-            $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.handoffRider:id,name,phone';
-            $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByRider:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.handoffDriver:id,name,phone';
+            $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByDriver:id,name,phone';
             $relations[] = 'shipmentItem.deliveryRunItems.busHandoffConfirmation.confirmedByAdmin:id,name';
         }
 

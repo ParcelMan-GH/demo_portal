@@ -21,9 +21,14 @@ use Laravel\Sanctum\Sanctum;
 function driverPackageRouteIntentBuildSchema(): void
 {
     foreach ([
+        'bus_handoff_confirmations',
+        'delivery_delay_events',
         'delivery_run_items',
         'delivery_run_stops',
         'delivery_runs',
+        'delivery_failure_reasons',
+        'delivery_delay_reasons',
+        'shipment_charges',
         'rider_package_transfers',
         'rider_team_handover_items',
         'label_custody_events',
@@ -34,6 +39,7 @@ function driverPackageRouteIntentBuildSchema(): void
         'shipments',
         'vendors',
         'warehouses',
+        'platform_settings',
         'drivers',
     ] as $table) {
         Schema::dropIfExists($table);
@@ -62,9 +68,21 @@ function driverPackageRouteIntentBuildSchema(): void
         $table->string('name');
         $table->string('code')->nullable();
         $table->string('address')->nullable();
+        $table->decimal('latitude', 10, 8)->nullable();
+        $table->decimal('longitude', 11, 8)->nullable();
+        $table->string('contact_phone')->nullable();
         $table->boolean('is_active')->default(true);
         $table->timestamps();
         $table->softDeletes();
+    });
+
+    Schema::create('platform_settings', function (Blueprint $table) {
+        $table->id();
+        $table->string('key')->unique();
+        $table->text('value')->nullable();
+        $table->text('description')->nullable();
+        $table->boolean('is_encrypted')->default(false);
+        $table->timestamps();
     });
 
     Schema::create('vendors', function (Blueprint $table) {
@@ -187,6 +205,26 @@ function driverPackageRouteIntentBuildSchema(): void
         $table->unsignedInteger('total_packages')->default(0);
         $table->string('status')->default('pending');
         $table->string('delivery_method')->default('direct');
+        $table->timestamp('verification_code_sent_at')->nullable();
+        $table->timestamp('verification_code_expires_at')->nullable();
+        $table->unsignedInteger('verification_attempts')->default(0);
+        $table->unsignedInteger('max_attempts')->default(3);
+        $table->boolean('verification_skipped')->default(false);
+        $table->string('verification_skip_reason')->nullable();
+        $table->timestamp('verification_skipped_at')->nullable();
+        $table->timestamp('arrived_at')->nullable();
+        $table->timestamp('delivered_at')->nullable();
+        $table->decimal('delivery_latitude', 10, 8)->nullable();
+        $table->decimal('delivery_longitude', 11, 8)->nullable();
+        $table->string('proof_photo_path')->nullable();
+        $table->string('failure_reason')->nullable();
+        $table->text('failure_notes')->nullable();
+        $table->text('delivery_notes')->nullable();
+        $table->string('handoff_courier_name')->nullable();
+        $table->string('handoff_courier_phone')->nullable();
+        $table->string('handoff_vehicle_number')->nullable();
+        $table->string('bus_station_name')->nullable();
+        $table->timestamp('handoff_at')->nullable();
         $table->timestamps();
     });
 
@@ -200,7 +238,77 @@ function driverPackageRouteIntentBuildSchema(): void
         $table->string('status')->default('pending');
         $table->text('notes')->nullable();
         $table->timestamp('delivered_at')->nullable();
+        $table->timestamp('expected_delivery_at')->nullable();
+        $table->timestamp('expected_delivery_set_at')->nullable();
+        $table->unsignedBigInteger('expected_delivery_set_by_driver_id')->nullable();
+        $table->unsignedBigInteger('expected_delivery_set_by_user_id')->nullable();
         $table->timestamps();
+    });
+
+    Schema::create('delivery_failure_reasons', function (Blueprint $table) {
+        $table->id();
+        $table->string('label');
+        $table->string('slug')->nullable();
+        $table->string('type')->default('other');
+        $table->unsignedInteger('sort_order')->default(0);
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+        $table->softDeletes();
+    });
+
+    Schema::create('delivery_delay_reasons', function (Blueprint $table) {
+        $table->id();
+        $table->string('label');
+        $table->string('slug')->nullable();
+        $table->unsignedInteger('sort_order')->default(0);
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+        $table->softDeletes();
+    });
+
+    Schema::create('delivery_delay_events', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('delivery_run_item_id');
+        $table->unsignedBigInteger('delivery_delay_reason_id')->nullable();
+        $table->string('reason_label')->nullable();
+        $table->string('source')->nullable();
+        $table->unsignedBigInteger('actor_driver_id')->nullable();
+        $table->unsignedBigInteger('actor_user_id')->nullable();
+        $table->timestamp('old_expected_delivery_at')->nullable();
+        $table->timestamp('new_expected_delivery_at')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('bus_handoff_confirmations', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('delivery_run_item_id')->unique();
+        $table->string('status')->default('pending');
+        $table->string('source')->nullable();
+        $table->string('target_type')->nullable();
+        $table->string('target_phone')->nullable();
+        $table->timestamp('confirmation_code_sent_at')->nullable();
+        $table->timestamp('confirmed_at')->nullable();
+        $table->unsignedBigInteger('reason_id')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('shipment_charges', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('shipment_id')->nullable();
+        $table->unsignedBigInteger('shipment_item_id')->nullable();
+        $table->string('charge_type');
+        $table->string('payer_type');
+        $table->string('direction');
+        $table->string('due_stage');
+        $table->decimal('amount', 12, 2)->default(0);
+        $table->string('currency')->default('GHS');
+        $table->string('status')->default('draft');
+        $table->timestamp('paid_at')->nullable();
+        $table->string('payment_method')->nullable();
+        $table->text('notes')->nullable();
+        $table->unsignedBigInteger('delivery_run_stop_id')->nullable();
+        $table->timestamps();
+        $table->softDeletes();
     });
 
     Schema::create('rider_package_transfers', function (Blueprint $table) {
@@ -460,6 +568,99 @@ test('starting deliveries uses claimed label count instead of full package quant
     expect($runItems)->toHaveCount(2)
         ->and((int) $runItems[0]->expected_quantity)->toBe(1)
         ->and((int) $runItems[1]->expected_quantity)->toBe(1);
+});
+
+test('starting deliveries can immediately load the delivery detail response', function () {
+    $warehouse = Warehouse::create([
+        'name' => 'Accra Main Office',
+        'code' => 'AMO',
+        'is_active' => true,
+    ]);
+    $vendor = driverPackageRouteIntentCreateVendor();
+
+    $shipment = Shipment::create([
+        'vendor_id' => $vendor->id,
+        'shipment_number' => 'PCM-2026-00995',
+        'status' => 'at_warehouse',
+        'source' => 'vendor_app',
+        'destination_mode' => 'per_item',
+    ]);
+
+    $item = ShipmentItem::create([
+        'shipment_id' => $shipment->id,
+        'description' => 'Immediate detail package',
+        'quantity' => 1,
+        'delivery_recipient_name' => 'Esi Boateng',
+        'delivery_recipient_phone' => '+233541112225',
+        'delivery_town' => 'Tema',
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_DIRECT,
+        'status' => 'at_warehouse',
+        'tracking_code' => 'TRKDETAIL123',
+    ]);
+
+    $receipt = WarehouseReceipt::create();
+    $receiptItem = WarehouseReceiptItem::create([
+        'warehouse_receipt_id' => $receipt->id,
+        'shipment_item_id' => $item->id,
+        'expected_quantity' => 1,
+        'received_quantity' => 1,
+    ]);
+
+    $label = WarehouseReceiptItemLabel::create([
+        'warehouse_receipt_item_id' => $receiptItem->id,
+        'barcode_value' => 'TRKDETAIL123-001',
+        'label_index' => 1,
+        'labels_total' => 1,
+        'label_type' => 'unit',
+    ]);
+
+    LabelCustodyEvent::create([
+        'warehouse_receipt_item_label_id' => $label->id,
+        'event_type' => LabelCustodyEvent::TYPE_CLAIMED,
+        'driver_id' => $this->driver->id,
+    ]);
+
+    $startResponse = $this->postJson('/api/v1/driver/start-deliveries', [
+        'warehouse_id' => $warehouse->id,
+        'barcodes' => ['TRKDETAIL123-001'],
+    ]);
+
+    $startResponse->assertOk()
+        ->assertJsonPath('success', true);
+
+    $runId = $startResponse->json('data.delivery_run_id');
+    $runItem = DeliveryRunItem::query()
+        ->where('delivery_run_id', $runId)
+        ->firstOrFail();
+
+    $expectedDeliveryAt = now()->addHours(2)->seconds(0);
+    $runItem->forceFill([
+        'expected_delivery_at' => $expectedDeliveryAt,
+        'expected_delivery_set_at' => now()->seconds(0),
+        'expected_delivery_set_by_driver_id' => $this->driver->id,
+    ])->save();
+
+    \App\Models\DeliveryDelayEvent::create([
+        'delivery_run_item_id' => $runItem->id,
+        'reason_label' => 'Traffic delay',
+        'source' => \App\Models\DeliveryDelayEvent::SOURCE_RIDER_ETA,
+        'actor_driver_id' => $this->driver->id,
+        'old_expected_delivery_at' => now()->addHour(),
+        'new_expected_delivery_at' => now()->addHours(2),
+    ]);
+
+    $this->getJson('/api/v1/driver/deliveries')
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.deliveries.0.id', $runId);
+
+    $this->getJson("/api/v1/driver/deliveries/{$runId}")
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.delivery.id', $runId)
+        ->assertJsonPath('data.delivery.stops.0.items.0.tracking_code', 'TRKDETAIL123')
+        ->assertJsonPath('data.delivery.stops.0.items.0.eta.set_by', $this->driver->name)
+        ->assertJsonPath('data.delivery.stops.0.items.0.eta.expected_delivery_at_iso', $expectedDeliveryAt->toIso8601String());
 });
 
 test('starting deliveries blocks packages with pending rider transfers', function () {
