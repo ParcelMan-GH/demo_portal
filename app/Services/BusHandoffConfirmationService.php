@@ -744,8 +744,8 @@ class BusHandoffConfirmationService
             'shipmentItem.shipment:id,shipment_number,vendor_id,delivery_recipient_name,delivery_recipient_phone,delivery_town',
             'shipmentItem.shipment.vendor:id,name,business_name,phone',
             'reason:id,label,type',
-            'handoffRider:id,name,phone',
-            'confirmedByRider:id,name,phone',
+            'handoffDriver:id,name,phone',
+            'confirmedByDriver:id,name,phone',
             'confirmedByAdmin:id,name',
         ];
     }
