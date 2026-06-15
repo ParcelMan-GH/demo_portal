@@ -4,6 +4,8 @@ use App\Models\Driver;
 use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
 use App\Models\LabelCustodyEvent;
+use App\Models\RiderPackageTransfer;
+use App\Models\RiderTeamHandoverItem;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\Vendor;
@@ -22,6 +24,8 @@ function driverPackageRouteIntentBuildSchema(): void
         'delivery_run_items',
         'delivery_run_stops',
         'delivery_runs',
+        'rider_package_transfers',
+        'rider_team_handover_items',
         'label_custody_events',
         'warehouse_receipt_item_labels',
         'warehouse_receipt_items',
@@ -196,6 +200,33 @@ function driverPackageRouteIntentBuildSchema(): void
         $table->string('status')->default('pending');
         $table->text('notes')->nullable();
         $table->timestamp('delivered_at')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('rider_package_transfers', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('shipment_item_id');
+        $table->unsignedBigInteger('from_driver_id')->nullable();
+        $table->unsignedBigInteger('to_driver_id')->nullable();
+        $table->string('status')->default(RiderPackageTransfer::STATUS_PENDING);
+        $table->timestamp('requested_at')->nullable();
+        $table->timestamp('responded_at')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('rider_team_handover_items', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('rider_team_handover_id')->nullable();
+        $table->unsignedBigInteger('warehouse_receipt_item_label_id');
+        $table->unsignedBigInteger('allocated_to_driver_id')->nullable();
+        $table->string('status')->default(RiderTeamHandoverItem::STATUS_ASSIGNED_TO_LEADER);
+        $table->timestamp('assigned_at')->nullable();
+        $table->timestamp('leader_received_at')->nullable();
+        $table->timestamp('allocated_at')->nullable();
+        $table->timestamp('member_claimed_at')->nullable();
+        $table->timestamp('delivered_at')->nullable();
+        $table->timestamp('returned_at')->nullable();
+        $table->text('notes')->nullable();
         $table->timestamps();
     });
 }
@@ -429,6 +460,71 @@ test('starting deliveries uses claimed label count instead of full package quant
     expect($runItems)->toHaveCount(2)
         ->and((int) $runItems[0]->expected_quantity)->toBe(1)
         ->and((int) $runItems[1]->expected_quantity)->toBe(1);
+});
+
+test('starting deliveries blocks packages with pending rider transfers', function () {
+    $warehouse = Warehouse::create([
+        'name' => 'Accra Main Office',
+        'code' => 'AMO',
+        'is_active' => true,
+    ]);
+    $vendor = driverPackageRouteIntentCreateVendor();
+
+    $shipment = Shipment::create([
+        'vendor_id' => $vendor->id,
+        'shipment_number' => 'PCM-2026-00994',
+        'status' => 'at_warehouse',
+        'source' => 'vendor_app',
+        'destination_mode' => 'per_item',
+    ]);
+
+    $item = ShipmentItem::create([
+        'shipment_id' => $shipment->id,
+        'description' => 'Ready package',
+        'quantity' => 1,
+        'delivery_recipient_name' => 'Yaw',
+        'delivery_recipient_phone' => '+233205531645',
+        'delivery_town' => 'Kasoa',
+        'delivery_method' => ShipmentItem::DELIVERY_METHOD_DIRECT,
+        'status' => 'at_warehouse',
+        'tracking_code' => 'TRKPENDING123',
+    ]);
+
+    $receipt = WarehouseReceipt::create();
+    $receiptItem = WarehouseReceiptItem::create([
+        'warehouse_receipt_id' => $receipt->id,
+        'shipment_item_id' => $item->id,
+        'expected_quantity' => 1,
+        'received_quantity' => 1,
+    ]);
+
+    $label = WarehouseReceiptItemLabel::create([
+        'warehouse_receipt_item_id' => $receiptItem->id,
+        'barcode_value' => 'TRKPENDING123-001',
+        'label_index' => 1,
+        'labels_total' => 1,
+        'label_type' => 'unit',
+    ]);
+
+    LabelCustodyEvent::create([
+        'warehouse_receipt_item_label_id' => $label->id,
+        'event_type' => LabelCustodyEvent::TYPE_CLAIMED,
+        'driver_id' => $this->driver->id,
+    ]);
+
+    RiderPackageTransfer::create([
+        'shipment_item_id' => $item->id,
+        'from_driver_id' => $this->driver->id,
+        'status' => RiderPackageTransfer::STATUS_PENDING,
+        'requested_at' => now(),
+    ]);
+
+    $this->postJson('/api/v1/driver/start-deliveries', [
+        'warehouse_id' => $warehouse->id,
+    ])->assertUnprocessable()
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('message', 'Some packages have pending rider transfer requests and cannot be started for delivery.')
+        ->assertJsonPath('pending_transfer_packages.0', 'TRKPENDING123');
 });
 
 test('starting deliveries does not reuse delivered packages still held in custody', function () {

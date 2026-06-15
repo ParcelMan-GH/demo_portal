@@ -11,6 +11,7 @@ use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
 use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
+use App\Models\RiderPackageTransfer;
 use App\Models\RiderTeamHandoverItem;
 use App\Models\WarehouseReceiptItemLabel;
 use App\Models\Shipment;
@@ -329,9 +330,9 @@ class WarehouseDeliveryService
             ->filter(fn ($label) => $label->receiptItem?->shipmentItem)
             ->groupBy(fn ($label) => (int) $label->receiptItem->shipment_item_id);
 
-        $pendingTransferCodes = \App\Models\DriverPackageTransfer::query()
+        $pendingTransferCodes = RiderPackageTransfer::query()
             ->whereIn('shipment_item_id', $labelsByItemId->keys())
-            ->where('status', \App\Models\DriverPackageTransfer::STATUS_PENDING)
+            ->where('status', RiderPackageTransfer::STATUS_PENDING)
             ->with('shipmentItem:id,tracking_code')
             ->get()
             ->map(fn ($transfer) => $transfer->shipmentItem?->tracking_code)
