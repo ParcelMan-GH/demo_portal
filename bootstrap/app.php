@@ -16,6 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Configure redirect for admin guard
         $middleware->redirectGuestsTo(function (Request $request) {
+            if ($request->is('api/*')) {
+                return null;
+            }
+
             $backOfficePrefix = trim((string) config('backoffice.prefix', 'admin'), '/');
 
             if ($request->is($backOfficePrefix . '/*')
