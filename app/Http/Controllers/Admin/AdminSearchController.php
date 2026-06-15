@@ -17,6 +17,7 @@ use App\Services\BackOfficeAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class AdminSearchController extends Controller
 {
@@ -237,22 +238,52 @@ class AdminSearchController extends Controller
     private function shipmentsQuery(string $q, array $phones = [], string $status = '')
     {
         $like = $this->like($q);
+        $hasLegacyRecipientName = Schema::hasColumn('shipments', 'recipient_name');
+        $hasLegacyRecipientPhone = Schema::hasColumn('shipments', 'recipient_phone');
+        $hasDeliveryRecipientName = Schema::hasColumn('shipments', 'delivery_recipient_name');
+        $hasDeliveryRecipientPhone = Schema::hasColumn('shipments', 'delivery_recipient_phone');
 
         return Shipment::query()
-            ->where(function ($query) use ($like, $phones) {
-                $query->where('shipment_number', 'like', $like)
-                    ->orWhere('recipient_name', 'like', $like)
-                    ->orWhere('recipient_phone', 'like', $like)
-                    ->orWhere('delivery_recipient_name', 'like', $like)
-                    ->orWhere('delivery_recipient_phone', 'like', $like)
-                    ->orWhereHas('vendor', fn ($vendor) => $vendor
-                        ->where('name', 'like', $like)
-                        ->orWhere('business_name', 'like', $like));
+            ->where(function ($query) use (
+                $like,
+                $phones,
+                $hasLegacyRecipientName,
+                $hasLegacyRecipientPhone,
+                $hasDeliveryRecipientName,
+                $hasDeliveryRecipientPhone
+            ) {
+                $query->where('shipment_number', 'like', $like);
+
+                if ($hasLegacyRecipientName) {
+                    $query->orWhere('recipient_name', 'like', $like);
+                }
+
+                if ($hasLegacyRecipientPhone) {
+                    $query->orWhere('recipient_phone', 'like', $like);
+                }
+
+                if ($hasDeliveryRecipientName) {
+                    $query->orWhere('delivery_recipient_name', 'like', $like);
+                }
+
+                if ($hasDeliveryRecipientPhone) {
+                    $query->orWhere('delivery_recipient_phone', 'like', $like);
+                }
+
+                $query->orWhereHas('vendor', fn ($vendor) => $vendor
+                    ->where('name', 'like', $like)
+                    ->orWhere('business_name', 'like', $like));
 
                 foreach ($phones as $phone) {
-                    $query->orWhere('recipient_phone', 'like', $phone.'%')
-                        ->orWhere('delivery_recipient_phone', 'like', $phone.'%')
-                        ->orWhereHas('vendor', fn ($vendor) => $vendor->where('phone', 'like', $phone.'%'));
+                    if ($hasLegacyRecipientPhone) {
+                        $query->orWhere('recipient_phone', 'like', $phone.'%');
+                    }
+
+                    if ($hasDeliveryRecipientPhone) {
+                        $query->orWhere('delivery_recipient_phone', 'like', $phone.'%');
+                    }
+
+                    $query->orWhereHas('vendor', fn ($vendor) => $vendor->where('phone', 'like', $phone.'%'));
                 }
             })
             ->when($status !== '', fn ($query) => $query->where('status', $status));

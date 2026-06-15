@@ -17,7 +17,9 @@ use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceiptItemLabel;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
@@ -369,6 +371,28 @@ it('normalizes ghana phone formats when searching', function (): void {
         ->getJson(route('admin.search', ['q' => '024 123 4567']))
         ->assertOk()
         ->assertJsonPath('data.vendors.0.label', 'Phone Format Vendor');
+});
+
+it('searches shipments when legacy recipient columns are absent', function (): void {
+    if (Schema::hasColumn('shipments', 'recipient_name') && Schema::hasColumn('shipments', 'recipient_phone')) {
+        Schema::table('shipments', function (Blueprint $table): void {
+            $table->dropColumn(['recipient_name', 'recipient_phone']);
+        });
+    }
+
+    $admin = agsAdminWithPermissions(['shipments.view']);
+    $vendor = agsCreateVendor(['business_name' => 'Current Schema Vendor']);
+
+    agsCreateShipment($vendor, [
+        'shipment_number' => 'PCM-CURRENT-SCHEMA',
+        'delivery_recipient_name' => 'Current Recipient',
+        'delivery_recipient_phone' => '+233240000088',
+    ]);
+
+    $this->actingAs($admin, 'admin')
+        ->getJson(route('admin.search', ['q' => 'Current Recipient']))
+        ->assertOk()
+        ->assertJsonPath('data.shipments.0.label', 'PCM-CURRENT-SCHEMA');
 });
 
 it('orders people first for phone queries via meta order', function (): void {

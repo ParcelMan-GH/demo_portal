@@ -10,33 +10,39 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('shipments', function (Blueprint $table) {
-            $table->index('recipient_phone', 'shipments_recipient_phone_idx');
-            $table->index('delivery_recipient_phone', 'shipments_delivery_recipient_phone_idx');
-        });
-
-        Schema::table('shipment_items', function (Blueprint $table) {
-            $table->index('delivery_recipient_phone', 'si_delivery_recipient_phone_idx');
-        });
-
-        Schema::table('recipient_payment_tasks', function (Blueprint $table) {
-            $table->index('recipient_phone', 'rpt_recipient_phone_idx');
-        });
+        $this->addIndexIfColumnExists('shipments', 'recipient_phone', 'shipments_recipient_phone_idx');
+        $this->addIndexIfColumnExists('shipments', 'delivery_recipient_phone', 'shipments_delivery_recipient_phone_idx');
+        $this->addIndexIfColumnExists('shipment_items', 'delivery_recipient_phone', 'si_delivery_recipient_phone_idx');
+        $this->addIndexIfColumnExists('recipient_payment_tasks', 'recipient_phone', 'rpt_recipient_phone_idx');
     }
 
     public function down(): void
     {
-        Schema::table('recipient_payment_tasks', function (Blueprint $table) {
-            $table->dropIndex('rpt_recipient_phone_idx');
-        });
+        $this->dropIndexIfColumnExists('recipient_payment_tasks', 'recipient_phone', 'rpt_recipient_phone_idx');
+        $this->dropIndexIfColumnExists('shipment_items', 'delivery_recipient_phone', 'si_delivery_recipient_phone_idx');
+        $this->dropIndexIfColumnExists('shipments', 'delivery_recipient_phone', 'shipments_delivery_recipient_phone_idx');
+        $this->dropIndexIfColumnExists('shipments', 'recipient_phone', 'shipments_recipient_phone_idx');
+    }
 
-        Schema::table('shipment_items', function (Blueprint $table) {
-            $table->dropIndex('si_delivery_recipient_phone_idx');
-        });
+    private function addIndexIfColumnExists(string $tableName, string $column, string $indexName): void
+    {
+        if (! Schema::hasColumn($tableName, $column)) {
+            return;
+        }
 
-        Schema::table('shipments', function (Blueprint $table) {
-            $table->dropIndex('shipments_delivery_recipient_phone_idx');
-            $table->dropIndex('shipments_recipient_phone_idx');
+        Schema::table($tableName, function (Blueprint $table) use ($column, $indexName) {
+            $table->index($column, $indexName);
+        });
+    }
+
+    private function dropIndexIfColumnExists(string $tableName, string $column, string $indexName): void
+    {
+        if (! Schema::hasColumn($tableName, $column)) {
+            return;
+        }
+
+        Schema::table($tableName, function (Blueprint $table) use ($indexName) {
+            $table->dropIndex($indexName);
         });
     }
 };
