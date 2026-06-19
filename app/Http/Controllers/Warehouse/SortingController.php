@@ -487,11 +487,18 @@ class SortingController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
-    public function destroy(SortBatch $sortBatch): JsonResponse
+    public function destroy(string $sortBatch): JsonResponse
     {
         $this->authorizePermission('warehouse.sorting.manage');
 
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
+
+        $sortBatch = SortBatch::query()->find((int) $sortBatch);
+
+        if (!$sortBatch) {
+            return response()->json($this->missingSortBatchPayload(), 404);
+        }
+
         $this->ensureWarehouseBatch($sortBatch, $warehouse);
 
         $result = $this->sortingService->deleteBatch(
@@ -501,6 +508,15 @@ class SortingController extends Controller
         );
 
         return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    private function missingSortBatchPayload(): array
+    {
+        return [
+            'success' => false,
+            'code' => 'sort_batch_not_found',
+            'message' => 'This sort batch was already deleted or is no longer available. The list has been refreshed.',
+        ];
     }
 
     public function createTransportManifest(SortBatch $sortBatch): JsonResponse

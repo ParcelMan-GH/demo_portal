@@ -653,7 +653,7 @@
                         class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50">
                     Cancel
                 </button>
-                <button type="button" @@click="deleteBatch()" :disabled="deleteBatchLoading"
+                <button type="button" @@click="deleteBatch()" :disabled="deleteBatchLoading || !deleteBatchTarget"
                         class="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50">
                     <svg x-show="deleteBatchLoading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" style="display:none">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
@@ -752,13 +752,17 @@ document.addEventListener('alpine:init', () => {
             if (this.dispatchModeFilter)  params.set('dispatch_mode', this.dispatchModeFilter);
             if (this.warehouseFilter)     params.set('origin_warehouse_id', this.warehouseFilter);
 
-            fetch(`${this.config.dataUrl}?${params.toString()}`, {
+            return fetch(`${this.config.dataUrl}?${params.toString()}`, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
             })
                 .then(r => r.json())
                 .then(json => {
                     this.batches = json.data;
                     this.meta    = json.meta;
+                })
+                .catch(error => {
+                    console.error('Load sort batches failed:', error);
+                    window.showToast?.('Unable to refresh sort batches.', 'error');
                 })
                 .finally(() => { this.loading = false; });
         },
@@ -832,11 +836,25 @@ document.addEventListener('alpine:init', () => {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
                     },
                 });
-                const result = await response.json();
+                let result = {};
+                try {
+                    result = await response.json();
+                } catch (parseError) {
+                    result = {};
+                }
 
                 if (response.ok && result.success) {
                     this.closeDeleteBatchModal();
                     this.loadData(this.meta.current_page || 1);
+                    return;
+                }
+
+                if (result.code === 'sort_batch_not_found') {
+                    const message = result.message || 'This sort batch was already deleted or is no longer available. The list has been refreshed.';
+                    this.deleteBatchError = message;
+                    this.deleteBatchTarget = null;
+                    this.loadData(this.meta.current_page || 1);
+                    window.showToast?.(message, 'warning');
                     return;
                 }
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\LogAdminAuditActivity;
 use App\Models\User;
 use App\Services\AdminAuditLogService;
 use Illuminate\Database\Schema\Blueprint;
@@ -64,6 +65,10 @@ test('admin login route remains accessible', function () {
     $this->get('/admin/login')->assertOk();
 });
 
+test('admin portal session lifetime defaults to one hour', function () {
+    expect(config('session.lifetime'))->toBe(60);
+});
+
 test('staff can log in with phone number and password', function () {
     $this->mock(AdminAuditLogService::class, function ($mock) {
         $mock->shouldReceive('logAuthEvent')->zeroOrMoreTimes();
@@ -81,4 +86,42 @@ test('staff can log in with phone number and password', function () {
     ])->assertRedirect(route('warehouse.dashboard'));
 
     $this->assertAuthenticatedAs($user, 'admin');
+});
+
+test('staff can log in with remember me selected', function () {
+    $this->mock(AdminAuditLogService::class, function ($mock) {
+        $mock->shouldReceive('logAuthEvent')->zeroOrMoreTimes();
+    });
+
+    $user = User::factory()->create([
+        'email' => 'remember-admin@example.test',
+        'phone' => '+233241234568',
+        'password' => Hash::make('secret-password'),
+        'is_active' => true,
+    ]);
+
+    $this->post('/admin/login', [
+        'email' => 'remember-admin@example.test',
+        'password' => 'secret-password',
+        'remember' => '1',
+    ])->assertRedirect(route('warehouse.dashboard'));
+
+    $this->assertAuthenticatedAs($user, 'admin');
+});
+
+test('admin logout clears the admin guard session', function () {
+    $this->withoutMiddleware(LogAdminAuditActivity::class);
+
+    $user = User::factory()->create([
+        'email' => 'logout-admin@example.test',
+        'phone' => '+233241234569',
+        'password' => Hash::make('secret-password'),
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user, 'admin')
+        ->post('/admin/logout')
+        ->assertRedirect(route('admin.login'));
+
+    $this->assertGuest('admin');
 });

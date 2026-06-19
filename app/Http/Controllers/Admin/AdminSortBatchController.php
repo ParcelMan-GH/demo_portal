@@ -462,8 +462,14 @@ class AdminSortBatchController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
-    public function destroy(SortBatch $batch): JsonResponse
+    public function destroy(string $batch): JsonResponse
     {
+        $batch = SortBatch::query()->find((int) $batch);
+
+        if (!$batch) {
+            return response()->json($this->missingSortBatchPayload(), 404);
+        }
+
         $warehouse = Warehouse::findOrFail((int) $batch->origin_warehouse_id);
         $user      = Auth::guard('admin')->user();
 
@@ -474,6 +480,15 @@ class AdminSortBatchController extends Controller
         );
 
         return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    private function missingSortBatchPayload(): array
+    {
+        return [
+            'success' => false,
+            'code' => 'sort_batch_not_found',
+            'message' => 'This sort batch was already deleted or is no longer available. The list has been refreshed.',
+        ];
     }
 
     public function createDeliveryRun(SortBatch $batch): JsonResponse
