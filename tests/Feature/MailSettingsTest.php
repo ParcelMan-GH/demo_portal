@@ -264,6 +264,7 @@ test('runtime mail config supports local smtp without auth or auto tls', functio
         'mail.mailers.smtp.port' => 587,
         'mail.mailers.smtp.username' => 'support@example.test',
         'mail.mailers.smtp.password' => 'secret-password',
+        'mail.mailers.smtp.encryption' => 'tls',
         'mail.mailers.smtp.auto_tls' => true,
     ]);
     seedMailSettings([

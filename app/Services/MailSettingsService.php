@@ -17,7 +17,7 @@ class MailSettingsService
         $port = (int) ($this->setting('mail_port', Config::get('mail.mailers.smtp.port', 587)) ?: 587);
         $username = $this->setting('mail_username', Config::get('mail.mailers.smtp.username'), allowBlank: true);
         $password = $this->setting('mail_password', Config::get('mail.mailers.smtp.password'), allowBlank: true);
-        $encryption = $this->setting('mail_encryption', Config::get('mail.mailers.smtp.encryption'));
+        $encryption = $this->setting('mail_encryption', Config::get('mail.mailers.smtp.encryption'), allowBlank: true);
         $scheme = $this->smtpScheme($encryption);
         $fromAddress = $this->setting('mail_from_address', Config::get('mail.from.address'));
         $fromName = $this->setting('mail_from_name', Config::get('mail.from.name'));
