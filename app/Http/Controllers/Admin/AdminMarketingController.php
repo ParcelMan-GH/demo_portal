@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\NotificationLog;
 use App\Models\Vendor;
+use App\Services\MailSettingsService;
 use App\Services\PushNotificationService;
 use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
@@ -282,6 +283,8 @@ class AdminMarketingController extends Controller
         $template = $data['email_template'] ?? 'custom';
 
         try {
+            app(MailSettingsService::class)->apply();
+
             $toEmail = $recipient->email;
             $toName  = $recipient->name ?? $recipient->business_name ?? '';
 

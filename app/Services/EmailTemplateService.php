@@ -34,6 +34,8 @@ class EmailTemplateService
         $notifiable = $options['notifiable'] ?? $recipient;
 
         try {
+            app(MailSettingsService::class)->apply();
+
             Mail::html($html, function ($message) use ($email, $recipient, $subject) {
                 $message->to($email, $recipient->name ?? null)->subject($subject);
             });

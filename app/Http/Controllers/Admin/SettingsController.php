@@ -14,6 +14,7 @@ use App\Models\PlatformSetting;
 use App\Models\SmsLog;
 use App\Services\BackOfficeAccess;
 use App\Services\EmailTemplateService;
+use App\Services\MailSettingsService;
 use App\Services\SmsService;
 use App\Services\StorageService;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +26,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Throwable;
 
 class SettingsController extends Controller
 {
@@ -494,6 +496,10 @@ class SettingsController extends Controller
         $tab = $request->input('tab');
         $settings = $request->input('settings', []);
 
+        if ($tab === 'mail') {
+            $this->validateMailSettings($request);
+        }
+
         foreach ($settings as $key => $data) {
             // Extract the actual value - settings come in as objects with 'value' property
             $value = is_array($data) && array_key_exists('value', $data) ? $data['value'] : $data;
@@ -516,6 +522,22 @@ class SettingsController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Settings saved successfully.',
+        ]);
+    }
+
+    private function validateMailSettings(Request $request): void
+    {
+        $request->validate([
+            'settings.mail_mailer.value' => ['nullable', 'string', Rule::in(['smtp', 'mailgun'])],
+            'settings.mail_host.value' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z0-9.-]+$/'],
+            'settings.mail_port.value' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'settings.mail_username.value' => ['nullable', 'string', 'max:255'],
+            'settings.mail_password.value' => ['nullable', 'string', 'max:2048'],
+            'settings.mail_encryption.value' => ['nullable', 'string', Rule::in(['tls', 'ssl', ''])],
+            'settings.mail_from_address.value' => ['nullable', 'email', 'max:255'],
+            'settings.mail_from_name.value' => ['nullable', 'string', 'max:255'],
+        ], [
+            'settings.mail_host.value.regex' => 'Enter a valid SMTP host name without a protocol or spaces.',
         ]);
     }
 
@@ -1453,6 +1475,8 @@ class SettingsController extends Controller
         ]);
 
         try {
+            app(MailSettingsService::class)->apply();
+
             \Illuminate\Support\Facades\Mail::raw('This is a test email from Parcelman Express.', function ($message) use ($request) {
                 $message->to($request->email)
                     ->subject('Test Email - Parcelman Express');
@@ -1462,10 +1486,10 @@ class SettingsController extends Controller
                 'success' => true,
                 'message' => 'Test email sent successfully.',
             ]);
-        } catch (\Exception $e) {
+        } catch (Throwable) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to send test email: '.$e->getMessage(),
+                'message' => MailSettingsService::TEST_FAILURE_MESSAGE,
             ], 500);
         }
     }
