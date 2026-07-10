@@ -8,9 +8,14 @@ class OtpService
 {
     protected SmsService $smsService;
 
-    public function __construct(SmsService $smsService)
-    {
+    protected AppReviewAccessService $appReviewAccessService;
+
+    public function __construct(
+        SmsService $smsService,
+        AppReviewAccessService $appReviewAccessService
+    ) {
         $this->smsService = $smsService;
+        $this->appReviewAccessService = $appReviewAccessService;
     }
 
     /**
@@ -25,8 +30,12 @@ class OtpService
             ->whereNull('verified_at')
             ->delete();
 
-        // Generate 6-digit OTP
-        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $reviewCode = $this->appReviewAccessService->fixedOtpFor($phone, $purpose);
+
+        // Review access still uses a normal expiring OTP record. Only the
+        // configured review phone skips the external SMS provider.
+        $code = $reviewCode
+            ?? str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         // Store OTP with 5-minute expiry
         $otp = OtpCode::create([
@@ -38,10 +47,13 @@ class OtpService
         ]);
 
         // Send SMS
-        $message = "Your Parcelman code is {$code}";
-        $sent = $this->smsService->send($phone, $message);
+        $sent = $reviewCode !== null;
+        if (! $sent) {
+            $message = "Your Parcelman code is {$code}";
+            $sent = $this->smsService->send($phone, $message);
+        }
 
-        if (!$sent) {
+        if (! $sent) {
             $otp->delete();
 
             return null;
@@ -62,7 +74,7 @@ class OtpService
             ->whereNull('verified_at')
             ->first();
 
-        if (!$otp) {
+        if (! $otp) {
             return false;
         }
 
@@ -100,7 +112,7 @@ class OtpService
             ->latest('created_at')
             ->first();
 
-        if (!$otp) {
+        if (! $otp) {
             return 0;
         }
 
