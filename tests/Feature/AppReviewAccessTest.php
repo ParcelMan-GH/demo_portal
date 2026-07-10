@@ -12,9 +12,9 @@ beforeEach(function () {
     config([
         'app_review.enabled' => true,
         'app_review.vendor_phone' => '0200000001',
-        'app_review.vendor_otp' => '246810',
+        'app_review.vendor_otp' => '654321',
         'app_review.rider_phone' => '0200000002',
-        'app_review.rider_password' => 'Review@ParcelMan2026!',
+        'app_review.rider_password' => 'TestOnlyReviewPassword!',
     ]);
 });
 
@@ -37,21 +37,21 @@ test('configured review vendor receives a normal expiring fixed otp without usin
     $sendResponse
         ->assertOk()
         ->assertJsonPath('success', true)
-        ->assertJsonMissing(['otp' => '246810'])
-        ->assertJsonMissing(['code' => '246810']);
+        ->assertJsonMissing(['otp' => '654321'])
+        ->assertJsonMissing(['code' => '654321']);
 
     $otp = OtpCode::query()
         ->where('phone', '+233200000001')
         ->where('purpose', 'login')
         ->firstOrFail();
 
-    expect($otp->code)->toBe('246810')
+    expect($otp->code)->toBe('654321')
         ->and($otp->expires_at->isFuture())->toBeTrue()
         ->and($otp->verified_at)->toBeNull();
 
     $this->postJson('/api/v1/auth/vendor/verify-phone', [
         'phone' => '+233200000001',
-        'otp' => '246810',
+        'otp' => '654321',
     ])->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.user_exists', true)
@@ -86,7 +86,7 @@ test('fixed review otp cannot authenticate any other phone', function () {
 
     $this->postJson('/api/v1/auth/vendor/verify-phone', [
         'phone' => '+233200000003',
-        'otp' => '246810',
+        'otp' => '654321',
     ])->assertStatus(422)
         ->assertJsonPath('success', false)
         ->assertJsonPath('message', 'Invalid or expired OTP.');
