@@ -55,11 +55,12 @@ class DriverProfileController extends Controller
     public function changePassword(ChangePasswordRequest $request): JsonResponse
     {
         $driver = $request->user();
+        $data = $request->validated();
 
         $result = $this->profileService->changePassword(
             $driver,
-            $request->current_password,
-            $request->new_password,
+            $data['current_password'],
+            $data['new_password'],
             $request
         );
 
@@ -77,6 +78,7 @@ class DriverProfileController extends Controller
         $request->validate(['fcm_token' => ['required', 'string', 'max:512']]);
         $driver = $request->user();
         $driver->update(['fcm_token' => $request->fcm_token]);
+
         return response()->json(['success' => true, 'message' => 'FCM token updated.']);
     }
 }

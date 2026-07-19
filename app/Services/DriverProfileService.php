@@ -4,11 +4,13 @@ namespace App\Services;
 
 use App\Models\Driver;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class DriverProfileService
 {
     protected DriverActivityLogService $activityLogService;
+
     protected DriverAuthService $driverAuthService;
 
     public function __construct(DriverActivityLogService $activityLogService, DriverAuthService $driverAuthService)
@@ -69,38 +71,38 @@ class DriverProfileService
      */
     public function changePassword(Driver $driver, string $currentPassword, string $newPassword, Request $request): array
     {
-        // Verify current password
-        if (!Hash::check($currentPassword, $driver->password)) {
+        if (! Hash::check($currentPassword, $driver->password)) {
             return [
                 'success' => false,
                 'message' => 'Current password is incorrect.',
             ];
         }
 
-        // Update password
-        $driver->password = Hash::make($newPassword);
-        $driver->save();
+        $currentTokenId = $driver->currentAccessToken()?->getKey();
 
-        // Revoke all existing tokens
-        $driver->tokens()->delete();
+        DB::transaction(function () use ($driver, $newPassword, $request, $currentTokenId): void {
+            $driver->password = Hash::make($newPassword);
+            $driver->save();
 
-        // Create new token
-        $token = $driver->createToken('driver-app')->plainTextToken;
+            $otherTokens = $driver->tokens();
+            if ($currentTokenId !== null) {
+                $otherTokens->whereKeyNot($currentTokenId);
+            }
+            $otherTokens->delete();
 
-        // Log activity
-        $this->activityLogService->log(
-            $driver->id,
-            'driver_password_changed',
-            'Password changed successfully',
-            $request
-        );
+            $this->activityLogService->log(
+                $driver->id,
+                'driver_password_changed',
+                'Password changed successfully',
+                $request
+            );
+        });
 
         return [
             'success' => true,
             'message' => 'Password changed successfully.',
             'data' => [
-                'user' => $this->driverAuthService->formatDriver($driver),
-                'token' => $token,
+                'user' => $this->driverAuthService->formatDriver($driver->fresh()),
             ],
         ];
     }

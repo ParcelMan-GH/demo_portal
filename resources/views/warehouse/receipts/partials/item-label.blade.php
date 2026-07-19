@@ -14,7 +14,7 @@
 
     {{-- From / To --}}
     <div class="addresses">
-        <div class="address-block">
+        <div class="address-block address-block-from">
             <div class="address-label">FROM</div>
             <div class="address-name">{{ $shipment?->vendor?->name ?? '-' }}</div>
             <div class="address-detail">
@@ -27,7 +27,7 @@
             @endif
         </div>
         <div class="address-divider"></div>
-        <div class="address-block">
+        <div class="address-block address-block-to">
             <div class="address-label">TO</div>
             @if($shipment?->isPerItemDestination())
                 <div class="address-name">{{ $shipmentItem->delivery_recipient_name ?: '-' }}</div>

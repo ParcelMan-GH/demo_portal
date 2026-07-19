@@ -2,7 +2,6 @@
 
 namespace App\Services\Warehouse;
 
-use App\Enums\ItemStatus;
 use App\Models\PickupAssignment;
 use App\Models\PickupItemConfirmation;
 use App\Models\ShipmentItem;
@@ -12,7 +11,6 @@ use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceiptItemPhoto;
 use App\Services\PickupAssignmentService;
-use App\Services\Warehouse\PackageContactService;
 use App\Services\StorageService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -25,9 +23,9 @@ class WarehouseReceivingService
     public function __construct(
         private StorageService $storageService,
         private BarcodeService $barcodeService,
-        private PickupAssignmentService $pickupAssignmentService
-    ) {
-    }
+        private PickupAssignmentService $pickupAssignmentService,
+        private PackageLabelHtmlRenderer $labelHtmlRenderer
+    ) {}
 
     public function getOrCreateReceipt(PickupAssignment $assignment, Warehouse $warehouse, User $user): WarehouseReceipt
     {
@@ -61,8 +59,8 @@ class WarehouseReceivingService
     }
 
     /**
-     * @param array<int, UploadedFile> $photos
-     * @param array<int, int|string> $removePhotoIds
+     * @param  array<int, UploadedFile>  $photos
+     * @param  array<int, int|string>  $removePhotoIds
      * @return array{success:bool,message:string,data?:array<string,mixed>}
      */
     public function upsertReceiptItem(
@@ -93,7 +91,7 @@ class WarehouseReceivingService
         }
 
         $allowedConditions = ['ok', 'damaged', 'partial'];
-        if ($conditionStatus && !in_array($conditionStatus, $allowedConditions, true)) {
+        if ($conditionStatus && ! in_array($conditionStatus, $allowedConditions, true)) {
             return [
                 'success' => false,
                 'message' => 'Invalid condition status.',
@@ -196,7 +194,7 @@ class WarehouseReceivingService
             }
 
             foreach ($photos as $photo) {
-                if (!$photo instanceof UploadedFile) {
+                if (! $photo instanceof UploadedFile) {
                     continue;
                 }
 
@@ -252,7 +250,7 @@ class WarehouseReceivingService
                 ->where('warehouse_id', $warehouse->id)
                 ->first();
 
-            if (!$receipt) {
+            if (! $receipt) {
                 // Only validate preconditions when creating a new receipt (first-time label)
                 if ($error = $this->validateReceivingPreconditions($lockedAssignment, $warehouse)) {
                     return $error;
@@ -266,7 +264,7 @@ class WarehouseReceivingService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$receiptItem) {
+            if (! $receiptItem) {
                 return [
                     'success' => false,
                     'message' => 'Save this item first before printing barcode label.',
@@ -304,7 +302,7 @@ class WarehouseReceivingService
                 'labelBarcode' => $barcodeValue,
             ])->render();
 
-            $labelHtml = $this->buildLabelPageHtml($labelCard, $barcodeValue);
+            $labelHtml = $this->labelHtmlRenderer->renderPage($labelCard, $barcodeValue);
 
             return [
                 'success' => true,
@@ -343,7 +341,7 @@ class WarehouseReceivingService
                 ->where('warehouse_id', $warehouse->id)
                 ->first();
 
-            if (!$receipt) {
+            if (! $receipt) {
                 if ($error = $this->validateReceivingPreconditions($lockedAssignment, $warehouse)) {
                     return $error;
                 }
@@ -356,7 +354,7 @@ class WarehouseReceivingService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$receiptItem) {
+            if (! $receiptItem) {
                 return ['success' => false, 'message' => 'Save this package first before printing labels.'];
             }
 
@@ -377,7 +375,7 @@ class WarehouseReceivingService
 
             $labels = [];
             for ($i = 1; $i <= $labelCount; $i++) {
-                $barcodeValue = $parentBarcode . '-' . str_pad($i, 3, '0', STR_PAD_LEFT);
+                $barcodeValue = $parentBarcode.'-'.str_pad($i, 3, '0', STR_PAD_LEFT);
 
                 $label = $receiptItem->labels()->create([
                     'barcode_value' => $barcodeValue,
@@ -416,11 +414,11 @@ class WarehouseReceivingService
                 ])->render();
             }
 
-            $labelsHtml = $this->buildLabelPageHtml($labelCards, $parentBarcode);
+            $labelsHtml = $this->labelHtmlRenderer->renderPage($labelCards, $parentBarcode);
 
             return [
                 'success' => true,
-                'message' => $labelCount . ' label(s) generated.',
+                'message' => $labelCount.' label(s) generated.',
                 'data' => [
                     'barcode_value' => $parentBarcode,
                     'label_count' => $labelCount,
@@ -486,7 +484,7 @@ class WarehouseReceivingService
             );
 
             if ($hasDiscrepancies) {
-                if (!$user->hasPermission('warehouse.receiving.approve_discrepancy')) {
+                if (! $user->hasPermission('warehouse.receiving.approve_discrepancy')) {
                     return [
                         'success' => false,
                         'message' => 'Only a warehouse manager or HQ administrator can finalize discrepancy receipts.',
@@ -542,7 +540,7 @@ class WarehouseReceivingService
                     trackingMetaByItem: $trackingMetaByItem
                 );
 
-                if (!$receiveResult['success']) {
+                if (! $receiveResult['success']) {
                     return $receiveResult;
                 }
             }
@@ -659,19 +657,19 @@ class WarehouseReceivingService
         $hasExcess = $totalObserved > $expected;
         $hasDamaged = $damaged > 0;
 
-        if (!$hasMissing && !$hasExcess && !$hasDamaged) {
+        if (! $hasMissing && ! $hasExcess && ! $hasDamaged) {
             return 'none';
         }
 
-        if ($hasMissing && !$hasDamaged && !$hasExcess) {
+        if ($hasMissing && ! $hasDamaged && ! $hasExcess) {
             return 'missing';
         }
 
-        if ($hasExcess && !$hasDamaged && !$hasMissing) {
+        if ($hasExcess && ! $hasDamaged && ! $hasMissing) {
             return 'excess';
         }
 
-        if ($hasDamaged && !$hasMissing && !$hasExcess) {
+        if ($hasDamaged && ! $hasMissing && ! $hasExcess) {
             return 'damaged';
         }
 
@@ -732,14 +730,14 @@ class WarehouseReceivingService
             ];
         }
 
-        if (! $allowAlreadyReceived && !is_null($assignment->received_at)) {
+        if (! $allowAlreadyReceived && ! is_null($assignment->received_at)) {
             return [
                 'success' => false,
                 'message' => 'This pickup has already been received at warehouse.',
             ];
         }
 
-        if (!is_null($assignment->target_warehouse_id) && (int) $assignment->target_warehouse_id !== (int) $warehouse->id) {
+        if (! is_null($assignment->target_warehouse_id) && (int) $assignment->target_warehouse_id !== (int) $warehouse->id) {
             return [
                 'success' => false,
                 'message' => 'This pickup is assigned to a different warehouse.',
@@ -747,55 +745,5 @@ class WarehouseReceivingService
         }
 
         return null;
-    }
-
-    private function buildLabelPageHtml(string $labelCards, string $title): string
-    {
-        $css = <<<'CSS'
-@page { size: 4in 6in; margin: 0; }
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', Arial, sans-serif; padding: 10px; background: #fff; }
-.label {
-    width: 4in; margin: 0 auto 10px; border: 1.5px solid #333; border-radius: 4px;
-    background: #fff; padding: 0; overflow: hidden;
-}
-.label-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 14px; border-bottom: 1.5px solid #333;
-}
-.brand-name { font-size: 15px; font-weight: 900; letter-spacing: 2px; color: #000; }
-.brand-sub { font-size: 8px; font-weight: 700; letter-spacing: 3px; color: #666; margin-top: 1px; }
-.qr-container { padding: 0; }
-.qr-code { width: 64px; height: 64px; }
-.qr-code img { width: 64px !important; height: 64px !important; }
-.qr-code canvas { width: 64px !important; height: 64px !important; }
-.divider { height: 1px; background: #ccc; }
-.addresses { padding: 8px 14px; }
-.address-block { margin: 4px 0; }
-.address-label { font-size: 8px; font-weight: 800; color: #666; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 1px; }
-.address-name { font-size: 14px; font-weight: 800; color: #000; }
-.address-detail { font-size: 10px; color: #333; margin-top: 1px; }
-.address-phone { font-size: 10px; color: #555; margin-top: 1px; }
-.address-divider { height: 1px; background: #ddd; margin: 6px 0; }
-.pkg-info { padding: 6px 14px; border-top: 1px solid #ccc; }
-.pkg-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 10px; }
-.pkg-label { color: #888; font-weight: 700; text-transform: uppercase; font-size: 8px; letter-spacing: 0.5px; }
-.pkg-value { color: #000; font-weight: 700; }
-.pkg-bold { font-size: 12px; font-weight: 900; color: #000; }
-.barcode-section { padding: 10px 14px 12px; text-align: center; border-top: 1.5px solid #333; }
-.barcode-svg { margin: 0 auto; }
-.barcode-svg svg { max-width: 100%; height: 50px; }
-.barcode-text { font-size: 12px; font-weight: 800; font-family: 'Courier New', monospace; color: #000; margin-top: 3px; letter-spacing: 2px; }
-@media print {
-    body { padding: 0; }
-    .label { border: 1.5px solid #000; margin: 0; page-break-after: always; }
-}
-CSS;
-
-        return '<!doctype html><html><head><meta charset="utf-8">'
-            . '<title>Labels - ' . e($title) . '</title>'
-            . '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>'
-            . '<style>' . $css . '</style>'
-            . '</head><body>' . $labelCards . '</body></html>';
     }
 }

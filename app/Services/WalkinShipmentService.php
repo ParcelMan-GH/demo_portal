@@ -20,6 +20,7 @@ use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceiptItemPhoto;
 use App\Services\Warehouse\BarcodeService;
+use App\Services\Warehouse\PackageLabelHtmlRenderer;
 use App\Services\Warehouse\WarehouseSortingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\View;
@@ -29,14 +30,14 @@ class WalkinShipmentService
     public function __construct(
         private StorageService $storageService,
         private ChargesService $chargesService,
-    ) {
-    }
+        private PackageLabelHtmlRenderer $labelHtmlRenderer,
+    ) {}
 
     public function lookupVendor(string $phone): ?Vendor
     {
         $formatted = PhoneHelper::format($phone);
 
-        if (!$formatted) {
+        if (! $formatted) {
             return null;
         }
 
@@ -46,11 +47,11 @@ class WalkinShipmentService
     public function createVendorInline(array $data): Vendor
     {
         return Vendor::create([
-            'name'          => $data['name'],
+            'name' => $data['name'],
             'business_name' => $data['business_name'] ?? null,
-            'phone'         => PhoneHelper::format($data['phone']),
-            'email'         => $data['email'] ?? null,
-            'is_active'     => true,
+            'phone' => PhoneHelper::format($data['phone']),
+            'email' => $data['email'] ?? null,
+            'is_active' => true,
         ]);
     }
 
@@ -58,9 +59,9 @@ class WalkinShipmentService
     {
         return DB::transaction(function () use ($data) {
             $warehouse = Warehouse::findOrFail($data['warehouse_id']);
-            $vendor    = Vendor::findOrFail($data['vendor_id']);
-            $source    = ShipmentSource::from($data['source']);
-            $destMode  = $data['destination_mode'] === 'per_item'
+            $vendor = Vendor::findOrFail($data['vendor_id']);
+            $source = ShipmentSource::from($data['source']);
+            $destMode = $data['destination_mode'] === 'per_item'
                 ? ShipmentDestinationMode::PER_ITEM
                 : ShipmentDestinationMode::SINGLE;
 
@@ -69,29 +70,29 @@ class WalkinShipmentService
 
             // Build shipment attributes
             $shipmentData = [
-                'vendor_id'           => $vendor->id,
-                'status'              => ShipmentStatus::AT_WAREHOUSE,
-                'source'              => $source,
-                'fulfillment_type'    => $fulfillmentType,
+                'vendor_id' => $vendor->id,
+                'status' => ShipmentStatus::AT_WAREHOUSE,
+                'source' => $source,
+                'fulfillment_type' => $fulfillmentType,
                 'delivery_preference' => $deliveryPreference,
-                'created_by_user_id'  => $data['created_by_user_id'],
-                'destination_mode'    => $destMode,
-                'submitted_at'        => now(),
+                'created_by_user_id' => $data['created_by_user_id'],
+                'destination_mode' => $destMode,
+                'submitted_at' => now(),
                 // Pickup location = warehouse address
-                'pickup_contact_name'  => $vendor->name,
+                'pickup_contact_name' => $vendor->name,
                 'pickup_contact_phone' => $vendor->phone,
             ];
 
             // For single destination mode, set shipment-level delivery fields
-            if ($destMode === ShipmentDestinationMode::SINGLE && !empty($data['delivery'])) {
+            if ($destMode === ShipmentDestinationMode::SINGLE && ! empty($data['delivery'])) {
                 $delivery = $data['delivery'];
-                $shipmentData['delivery_recipient_name']  = $delivery['recipient_name'] ?? null;
+                $shipmentData['delivery_recipient_name'] = $delivery['recipient_name'] ?? null;
                 $shipmentData['delivery_recipient_phone'] = $delivery['recipient_phone'] ?? null;
-                $shipmentData['delivery_region_id']       = $delivery['region_id'] ?? null;
-                $shipmentData['delivery_district_id']     = $delivery['district_id'] ?? null;
-                $shipmentData['delivery_town']            = $delivery['town'] ?? null;
-                $shipmentData['delivery_landmark']        = $delivery['landmark'] ?? null;
-                $shipmentData['delivery_instructions']    = $delivery['instructions'] ?? null;
+                $shipmentData['delivery_region_id'] = $delivery['region_id'] ?? null;
+                $shipmentData['delivery_district_id'] = $delivery['district_id'] ?? null;
+                $shipmentData['delivery_town'] = $delivery['town'] ?? null;
+                $shipmentData['delivery_landmark'] = $delivery['landmark'] ?? null;
+                $shipmentData['delivery_instructions'] = $delivery['instructions'] ?? null;
             }
 
             $user = User::findOrFail($data['created_by_user_id']);
@@ -114,14 +115,14 @@ class WalkinShipmentService
 
             // Create warehouse receipt (finalized immediately)
             $receipt = WarehouseReceipt::create([
-                'shipment_id'         => $shipment->id,
-                'warehouse_id'        => $warehouse->id,
-                'status'              => WarehouseReceipt::STATUS_FINALIZED,
-                'started_by_user_id'  => $data['created_by_user_id'],
-                'finalized_by_user_id'=> $data['created_by_user_id'],
-                'notes'               => 'Walk-in vendor delivery — received directly at warehouse.',
-                'started_at'          => now(),
-                'finalized_at'        => now(),
+                'shipment_id' => $shipment->id,
+                'warehouse_id' => $warehouse->id,
+                'status' => WarehouseReceipt::STATUS_FINALIZED,
+                'started_by_user_id' => $data['created_by_user_id'],
+                'finalized_by_user_id' => $data['created_by_user_id'],
+                'notes' => 'Walk-in vendor delivery — received directly at warehouse.',
+                'started_at' => now(),
+                'finalized_at' => now(),
             ]);
 
             $transferRoutes = collect();
@@ -130,38 +131,38 @@ class WalkinShipmentService
             foreach ($data['items'] as $itemIndex => $itemData) {
                 $trackingCode = ShipmentItem::generateTrackingCode();
                 $deliveryMethod = $itemData['delivery_method'] ?? ShipmentItem::DELIVERY_METHOD_DIRECT;
-                if (!in_array($deliveryMethod, ShipmentItem::DELIVERY_METHODS, true)) {
+                if (! in_array($deliveryMethod, ShipmentItem::DELIVERY_METHODS, true)) {
                     $deliveryMethod = ShipmentItem::DELIVERY_METHOD_DIRECT;
                 }
 
                 $itemAttrs = [
-                    'shipment_id'          => $shipment->id,
-                    'description'          => $itemData['description'],
-                    'quantity'             => $itemData['quantity'],
-                    'fulfillment_type'     => $fulfillmentType,
-                    'delivery_preference'  => $itemData['delivery_preference'] ?? $deliveryPreference,
-                    'delivery_method'      => $deliveryMethod,
-                    'status'               => ItemStatus::AT_WAREHOUSE,
-                    'tracking_code'        => $trackingCode,
+                    'shipment_id' => $shipment->id,
+                    'description' => $itemData['description'],
+                    'quantity' => $itemData['quantity'],
+                    'fulfillment_type' => $fulfillmentType,
+                    'delivery_preference' => $itemData['delivery_preference'] ?? $deliveryPreference,
+                    'delivery_method' => $deliveryMethod,
+                    'status' => ItemStatus::AT_WAREHOUSE,
+                    'tracking_code' => $trackingCode,
                 ];
 
                 // Keep item-level delivery details populated so warehouse screens, sorting,
                 // and delivery runs can work from the package record directly.
                 $del = null;
-                if ($destMode === ShipmentDestinationMode::PER_ITEM && !empty($itemData['delivery'])) {
+                if ($destMode === ShipmentDestinationMode::PER_ITEM && ! empty($itemData['delivery'])) {
                     $del = $itemData['delivery'];
-                } elseif ($destMode === ShipmentDestinationMode::SINGLE && !empty($data['delivery'])) {
+                } elseif ($destMode === ShipmentDestinationMode::SINGLE && ! empty($data['delivery'])) {
                     $del = $data['delivery'];
                 }
 
                 if ($del) {
-                    $itemAttrs['delivery_recipient_name']  = $del['recipient_name'] ?? null;
+                    $itemAttrs['delivery_recipient_name'] = $del['recipient_name'] ?? null;
                     $itemAttrs['delivery_recipient_phone'] = $del['recipient_phone'] ?? null;
-                    $itemAttrs['delivery_region_id']       = $del['region_id'] ?? null;
-                    $itemAttrs['delivery_district_id']     = $del['district_id'] ?? null;
-                    $itemAttrs['delivery_town']            = $del['town'] ?? null;
-                    $itemAttrs['delivery_landmark']        = $del['landmark'] ?? null;
-                    $itemAttrs['delivery_instructions']    = $del['instructions'] ?? null;
+                    $itemAttrs['delivery_region_id'] = $del['region_id'] ?? null;
+                    $itemAttrs['delivery_district_id'] = $del['district_id'] ?? null;
+                    $itemAttrs['delivery_town'] = $del['town'] ?? null;
+                    $itemAttrs['delivery_landmark'] = $del['landmark'] ?? null;
+                    $itemAttrs['delivery_instructions'] = $del['instructions'] ?? null;
                 }
 
                 $shipmentItem = ShipmentItem::create($itemAttrs);
@@ -169,19 +170,19 @@ class WalkinShipmentService
                 // Warehouse receipt item
                 $receiptItem = WarehouseReceiptItem::create([
                     'warehouse_receipt_id' => $receipt->id,
-                    'shipment_item_id'     => $shipmentItem->id,
-                    'expected_quantity'     => $shipmentItem->quantity,
-                    'received_quantity'     => $shipmentItem->quantity,
-                    'damaged_quantity'      => 0,
-                    'discrepancy_type'      => 'none',
-                    'condition_status'      => 'ok',
-                    'barcode_value'         => $trackingCode,
-                    'barcode_format'        => 'code128',
-                    'received_by_user_id'   => $data['created_by_user_id'],
-                    'received_at'           => now(),
+                    'shipment_item_id' => $shipmentItem->id,
+                    'expected_quantity' => $shipmentItem->quantity,
+                    'received_quantity' => $shipmentItem->quantity,
+                    'damaged_quantity' => 0,
+                    'discrepancy_type' => 'none',
+                    'condition_status' => 'ok',
+                    'barcode_value' => $trackingCode,
+                    'barcode_format' => 'code128',
+                    'received_by_user_id' => $data['created_by_user_id'],
+                    'received_at' => now(),
                 ]);
 
-                if (!empty($itemData['forward_to_warehouse_id']) && (int) $itemData['forward_to_warehouse_id'] !== (int) $warehouse->id) {
+                if (! empty($itemData['forward_to_warehouse_id']) && (int) $itemData['forward_to_warehouse_id'] !== (int) $warehouse->id) {
                     $transferRoutes->push([
                         'warehouse_receipt_item_id' => $receiptItem->id,
                         'destination_warehouse_id' => (int) $itemData['forward_to_warehouse_id'],
@@ -189,11 +190,11 @@ class WalkinShipmentService
                 }
 
                 foreach (($data['item_photos'][$itemIndex] ?? []) as $photo) {
-                    if (!$photo) {
+                    if (! $photo) {
                         continue;
                     }
 
-                    $storedPhoto = $this->storageService->upload($photo, 'warehouse-receipts/' . $receipt->id);
+                    $storedPhoto = $this->storageService->upload($photo, 'warehouse-receipts/'.$receipt->id);
                     WarehouseReceiptItemPhoto::create([
                         'warehouse_receipt_item_id' => $receiptItem->id,
                         'path' => $storedPhoto['path'],
@@ -207,11 +208,11 @@ class WalkinShipmentService
                 // Tracking entry
                 ShipmentItemTracking::create([
                     'shipment_item_id' => $shipmentItem->id,
-                    'status'           => 'at_warehouse',
-                    'location'         => $warehouse->name,
-                    'notes'            => 'Walk-in: received directly at ' . $warehouse->name,
-                    'created_by'       => $data['created_by_user_id'],
-                    'created_at'       => now(),
+                    'status' => 'at_warehouse',
+                    'location' => $warehouse->name,
+                    'notes' => 'Walk-in: received directly at '.$warehouse->name,
+                    'created_by' => $data['created_by_user_id'],
+                    'created_at' => now(),
                 ]);
             }
 
@@ -229,10 +230,9 @@ class WalkinShipmentService
                 app(ShipmentCollectionService::class)->markReadyForCollection($shipment, $warehouse);
             }
 
-
             return [
                 'shipment' => $shipment->fresh(['vendor', 'items']),
-                'receipt'  => $receipt,
+                'receipt' => $receipt,
                 'auto_routing' => $autoRouting,
                 'pickup_fee_charge' => $pickupFeeCharge,
             ];
@@ -248,7 +248,7 @@ class WalkinShipmentService
             ],
         ], $warehouse, $user);
 
-        if (($result['success'] ?? false) && !empty($result['data']['packages'][0])) {
+        if (($result['success'] ?? false) && ! empty($result['data']['packages'][0])) {
             $package = $result['data']['packages'][0];
             $result['data']['barcode_value'] = $package['barcode_value'];
             $result['data']['barcode_format'] = 'code128';
@@ -300,7 +300,7 @@ class WalkinShipmentService
             foreach ($requests as $request) {
                 $receiptItem = $receiptItems->get($request['shipment_item_id']);
 
-                if (!$receiptItem) {
+                if (! $receiptItem) {
                     return [
                         'success' => false,
                         'message' => 'Save each walk-in package before printing labels.',
@@ -330,7 +330,7 @@ class WalkinShipmentService
                 $labels = [];
                 for ($i = 1; $i <= $labelCount; $i++) {
                     $labels[] = $lockedReceiptItem->labels()->create([
-                        'barcode_value' => $parentBarcode . '-' . str_pad((string) $i, 3, '0', STR_PAD_LEFT),
+                        'barcode_value' => $parentBarcode.'-'.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
                         'label_index' => $i,
                         'labels_total' => $labelCount,
                         'label_type' => $labelType,
@@ -381,49 +381,14 @@ class WalkinShipmentService
             return [
                 'success' => true,
                 'message' => $requests->count() === 1
-                    ? $totalLabels . ' label(s) generated.'
-                    : $totalLabels . ' label(s) generated for ' . $requests->count() . ' package(s).',
+                    ? $totalLabels.' label(s) generated.'
+                    : $totalLabels.' label(s) generated for '.$requests->count().' package(s).',
                 'data' => [
                     'label_count' => $totalLabels,
                     'packages' => $printedPackages,
-                    'label_html' => $this->buildLabelPageHtml($labelCards, 'Walk-in Labels'),
+                    'label_html' => $this->labelHtmlRenderer->renderPage($labelCards, 'Walk-in Labels'),
                 ],
             ];
         });
-    }
-
-    private function buildLabelPageHtml(string $labelCards, string $title): string
-    {
-        $css = <<<'CSS'
-@page { size: 4in 6in; margin: 0; }
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', Arial, sans-serif; padding: 10px; background: #fff; }
-.label { width: 4in; margin: 0 auto 10px; border: 1.5px solid #333; border-radius: 4px; background: #fff; padding: 0; overflow: hidden; }
-.label-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1.5px solid #333; }
-.brand-name { font-size: 15px; font-weight: 900; letter-spacing: 2px; color: #000; }
-.brand-sub { font-size: 8px; font-weight: 700; letter-spacing: 3px; color: #666; margin-top: 1px; }
-.qr-code, .qr-code img, .qr-code canvas { width: 64px !important; height: 64px !important; }
-.divider { height: 1px; background: #ccc; }
-.addresses { padding: 8px 14px; }
-.address-block { margin: 4px 0; }
-.address-label { font-size: 8px; font-weight: 800; color: #666; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 1px; }
-.address-name { font-size: 14px; font-weight: 800; color: #000; }
-.address-detail, .address-phone { font-size: 10px; color: #333; margin-top: 1px; }
-.address-divider { height: 1px; background: #ddd; margin: 6px 0; }
-.pkg-info { padding: 6px 14px; border-top: 1px solid #ccc; }
-.pkg-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 10px; }
-.pkg-label { color: #888; font-weight: 700; text-transform: uppercase; font-size: 8px; letter-spacing: 0.5px; }
-.pkg-value { color: #000; font-weight: 700; }
-.barcode-section { padding: 10px 14px 12px; text-align: center; border-top: 1.5px solid #333; }
-.barcode-svg svg { max-width: 100%; height: 50px; }
-.barcode-text { font-size: 12px; font-weight: 800; font-family: 'Courier New', monospace; color: #000; margin-top: 3px; letter-spacing: 2px; }
-@media print { body { padding: 0; } .label { border: 1.5px solid #000; margin: 0; page-break-after: always; } }
-CSS;
-
-        return '<!doctype html><html><head><meta charset="utf-8">'
-            . '<title>Labels - ' . e($title) . '</title>'
-            . '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>'
-            . '<style>' . $css . '</style>'
-            . '</head><body>' . $labelCards . '</body></html>';
     }
 }
