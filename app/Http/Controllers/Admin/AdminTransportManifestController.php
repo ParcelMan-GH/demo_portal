@@ -911,7 +911,7 @@ class AdminTransportManifestController extends Controller
 
         $manifest->loadMissing(['originWarehouse', 'destinationWarehouse']);
         $container->loadMissing('items');
-        $barcodeSvg = $this->barcodeService->renderCode128Svg($container->container_code, 70, 2, 10, true);
+        $barcodeSvg = $this->barcodeService->renderCode128Svg($container->container_code, 210, 2, 10, false);
         $labelHtml = view('shared.transport-container-label', [
             'manifest' => $manifest,
             'container' => $container,
