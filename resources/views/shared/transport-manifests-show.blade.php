@@ -861,7 +861,7 @@ $canPrintWaybill = $hasManifestItems;
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-lg font-extrabold text-slate-900">Assign Rider</h3>
+                            <h3 class="text-lg font-extrabold text-slate-900">{{ $manifest->assigned_driver_id ? 'Reassign Rider' : 'Assign Rider' }}</h3>
                             <p class="mt-1 text-sm text-slate-500">Select a transport rider for this transfer.</p>
                         </div>
                     </div>
@@ -881,7 +881,16 @@ $canPrintWaybill = $hasManifestItems;
                                     type="search"
                                     x-model="driverSearch"
                                     @@focus="driverDropdownOpen = true"
-                                    @@input="driverDropdownOpen = true; selectedDriverId = ''; selectedDriverLabel = ''"
+                                    @@input="driverDropdownOpen = true; driverActiveIndex = -1; selectedDriverId = ''; selectedDriverLabel = ''"
+                                    @@keydown.arrow-down.prevent="moveDriverFocus(1)"
+                                    @@keydown.arrow-up.prevent="moveDriverFocus(-1)"
+                                    @@keydown.enter.prevent="selectActiveDriver()"
+                                    @@keydown.escape.stop.prevent="driverDropdownOpen = false; driverActiveIndex = -1"
+                                    role="combobox"
+                                    aria-autocomplete="list"
+                                    aria-controls="transport-rider-listbox"
+                                    :aria-expanded="driverDropdownOpen"
+                                    :aria-activedescendant="driverActiveIndex >= 0 ? `transport-rider-option-${filteredDrivers()[driverActiveIndex]?.id}` : null"
                                     placeholder="Search rider name, phone, vehicle..."
                                     class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-3 pr-10 text-base font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm"
                                     :class="driverDropdownOpen ? 'rounded-b-none border-orange-400 ring-4 ring-orange-100' : ''"
@@ -898,18 +907,28 @@ $canPrintWaybill = $hasManifestItems;
                                 class="absolute left-0 right-0 z-40 -mt-0.5 overflow-hidden rounded-b-xl border-2 border-t-0 border-orange-400 bg-white shadow-xl shadow-orange-900/10"
                                 style="display: none;"
                             >
-                                <div class="max-h-72 overflow-y-auto border-t border-orange-100">
-                                    <template x-for="driver in filteredDrivers()" :key="driver.id">
+                                <div id="transport-rider-listbox" role="listbox" aria-label="Transport riders" class="max-h-72 overflow-y-auto border-t border-orange-100">
+                                    <template x-for="(driver, index) in filteredDrivers()" :key="driver.id">
                                         <button
-                                            type="button"
-                                            @@click="selectDriver(driver)"
-                                            class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-3 text-left last:border-b-0 hover:bg-orange-50"
-                                            :class="Number(selectedDriverId) === Number(driver.id) ? 'bg-orange-50' : ''"
-                                        >
-                                            <div class="min-w-0">
-                                                <p class="truncate text-sm font-black text-slate-900" x-text="driver.name"></p>
-                                                <p class="mt-0.5 truncate text-xs font-semibold text-slate-500" x-text="driver.meta"></p>
+                                        type="button"
+                                        :id="`transport-rider-option-${driver.id}`"
+                                        @@click="selectDriver(driver)"
+                                        @@mouseenter="driverActiveIndex = index"
+                                        role="option"
+                                        :aria-selected="Number(selectedDriverId) === Number(driver.id)"
+                                        class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-3 text-left last:border-b-0 hover:bg-orange-50"
+                                        :class="Number(currentDriverId) === Number(driver.id) ? 'bg-orange-50 ring-1 ring-inset ring-orange-200' : ((Number(selectedDriverId) === Number(driver.id) || driverActiveIndex === index) ? 'bg-orange-50' : '')"
+                                    >
+                                        <div class="min-w-0">
+                                            <p class="truncate text-sm font-black text-slate-900" x-text="driver.name"></p>
+                                            <p class="mt-0.5 truncate text-xs font-semibold text-slate-500" x-text="driver.meta"></p>
+                                            <div class="mt-1 flex flex-wrap gap-1.5">
+                                                <span x-show="Number(currentDriverId) === Number(driver.id)" class="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-black text-orange-700">Assigned here</span>
+                                                <span x-show="driver.is_busy && Number(currentDriverId) !== Number(driver.id)" class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700" x-text="`Busy · ${driver.active_work_count} active ${Number(driver.active_work_count) === 1 ? 'job' : 'jobs'}`"></span>
+                                                <span x-show="!driver.is_busy" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">Available</span>
                                             </div>
+                                            <p x-show="driver.is_busy && Number(currentDriverId) !== Number(driver.id)" class="mt-1 text-[10px] font-semibold text-amber-700" x-text="`${driver.active_work?.pickups || 0} pickups · ${driver.active_work?.transports || 0} transports · ${driver.active_work?.deliveries || 0} deliveries`"></p>
+                                        </div>
                                             <svg x-show="Number(selectedDriverId) === Number(driver.id)" class="h-4 w-4 shrink-0 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                             </svg>
@@ -922,6 +941,10 @@ $canPrintWaybill = $hasManifestItems;
                             </div>
                         </div>
                     </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Reassignment reason <span class="font-semibold normal-case text-slate-400">(optional)</span></label>
+                        <textarea x-model="reassignmentReason" maxlength="500" rows="2" placeholder="Add context for the old and new rider..." class="w-full resize-none rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100"></textarea>
+                    </div>
                 </div>
                 <div class="shrink-0 flex justify-end gap-3 rounded-b-3xl border-t border-slate-100 bg-slate-50 p-4">
                     <button type="button" @@click="assignDriverModalOpen = false" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-base font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:text-sm">Cancel</button>
@@ -931,7 +954,7 @@ $canPrintWaybill = $hasManifestItems;
                         :disabled="!selectedDriverId || actionLoading"
                         class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-base font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:border-orange-300 disabled:bg-orange-300 disabled:shadow-none sm:text-sm"
                     >
-                        Assign Rider
+                        {{ $manifest->assigned_driver_id ? 'Reassign Rider' : 'Assign Rider' }}
                     </button>
                 </div>
             </div>
@@ -1101,13 +1124,17 @@ $canPrintWaybill = $hasManifestItems;
 
 @push('scripts')
 @php
-    $transportDriverOptions = $transportDrivers->map(fn ($driver) => [
-        'id' => $driver->id,
-        'name' => $driver->name,
-        'phone' => $driver->phone,
-        'vehicle_type' => $driver->vehicle_type,
-        'vehicle_number' => $driver->vehicle_number,
-        'meta' => collect([$driver->phone, $driver->vehicle_type, $driver->vehicle_number])->filter()->join(' · '),
+    $transportDriverOptions = collect($transportDrivers)->map(fn ($driver) => [
+        'id' => data_get($driver, 'id'),
+        'name' => data_get($driver, 'name'),
+        'phone' => data_get($driver, 'phone'),
+        'vehicle_type' => data_get($driver, 'vehicle_type'),
+        'vehicle_number' => data_get($driver, 'vehicle_number'),
+        'status' => data_get($driver, 'status'),
+        'is_busy' => (bool) data_get($driver, 'is_busy', false),
+        'active_work_count' => (int) data_get($driver, 'active_work_count', 0),
+        'active_work' => data_get($driver, 'active_work', ['pickups' => 0, 'transports' => 0, 'deliveries' => 0]),
+        'meta' => collect([data_get($driver, 'phone'), data_get($driver, 'vehicle_type'), data_get($driver, 'vehicle_number')])->filter()->join(' · '),
     ])->values();
     $sortBatchOptions = collect($availableSortBatches ?? [])->values();
     $containerMoveTargets = $manifest->containers->sortBy('sequence_number')->map(function ($container) {
@@ -1156,8 +1183,11 @@ document.addEventListener('alpine:init', () => {
             // Form values
             selectedDriverId: '',
             selectedDriverLabel: '',
+            currentDriverId: Number(el?.dataset.manifestDriver || 0),
             driverSearch: '',
             driverDropdownOpen: false,
+            driverActiveIndex: -1,
+            reassignmentReason: '',
             drivers: @json($transportDriverOptions),
             sortBatches: @json($sortBatchOptions),
             containerMoveTargets: @json($containerMoveTargets),
@@ -1237,10 +1267,12 @@ document.addEventListener('alpine:init', () => {
             },
 
             openAssignDriverModal() {
-                this.selectedDriverId = '';
-                this.selectedDriverLabel = '';
-                this.driverSearch = '';
+                const current = this.drivers.find((driver) => Number(driver.id) === Number(this.currentDriverId));
+                this.selectedDriverId = current?.id || '';
+                this.selectedDriverLabel = current?.name || '';
+                this.driverSearch = current ? (current.meta ? `${current.name} / ${current.meta}` : current.name) : '';
                 this.driverDropdownOpen = false;
+                this.reassignmentReason = '';
                 this.assignDriverModalOpen = true;
             },
 
@@ -1318,6 +1350,21 @@ document.addEventListener('alpine:init', () => {
                 this.selectedDriverLabel = driver.name;
                 this.driverSearch = driver.meta ? `${driver.name} / ${driver.meta}` : driver.name;
                 this.driverDropdownOpen = false;
+                this.driverActiveIndex = -1;
+            },
+
+            moveDriverFocus(direction) {
+                const drivers = this.filteredDrivers();
+                if (!drivers.length) return;
+                this.driverDropdownOpen = true;
+                this.driverActiveIndex = this.driverActiveIndex < 0
+                    ? (direction > 0 ? 0 : drivers.length - 1)
+                    : (this.driverActiveIndex + direction + drivers.length) % drivers.length;
+            },
+
+            selectActiveDriver() {
+                const driver = this.filteredDrivers()[this.driverActiveIndex];
+                if (driver) this.selectDriver(driver);
             },
 
             selectSortBatch(batch) {
@@ -1393,7 +1440,10 @@ document.addEventListener('alpine:init', () => {
                     window.showToast?.('Please select a rider.', 'warning');
                     return;
                 }
-                await this._postAction(config.assign_driver_endpoint, { driver_id: Number(this.selectedDriverId) }, () => {
+                await this._postAction(config.assign_driver_endpoint, {
+                    driver_id: Number(this.selectedDriverId),
+                    reassignment_reason: this.reassignmentReason.trim() || null,
+                }, () => {
                     this.assignDriverModalOpen = false;
                 });
             },
@@ -1752,6 +1802,14 @@ document.addEventListener('alpine:init', () => {
                         body: JSON.stringify(body),
                     });
                     const result = await response.json();
+                    if (response.status === 409 && result.code === 'rider_busy' && !body.confirm_busy_assignment) {
+                        const counts = result.data?.active_work || {};
+                        const detail = `${counts.pickups || 0} pickup, ${counts.transports || 0} transport, ${counts.deliveries || 0} delivery`;
+                        if (window.confirm(`${result.message}\n\nCurrent workload: ${detail}.\n\nAssign this rider anyway?`)) {
+                            this.actionLoading = false;
+                            return this._postAction(endpoint, { ...body, confirm_busy_assignment: true }, onSuccess);
+                        }
+                    }
                     if (!response.ok || !result.success) {
                         throw new Error(result.message || 'Action failed.');
                     }

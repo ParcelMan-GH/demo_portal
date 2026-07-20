@@ -5,22 +5,23 @@ namespace App\Services\Warehouse;
 use App\Enums\ItemStatus;
 use App\Enums\ShipmentStatus;
 use App\Models\Driver;
+use App\Models\PlatformSetting;
 use App\Models\Shipment;
-use App\Models\ShipmentItem;
 use App\Models\ShipmentItemTracking;
 use App\Models\SortBatch;
-use App\Models\TransportManifest;
-use App\Models\TransportManifestAssignment;
 use App\Models\TransportContainer;
 use App\Models\TransportContainerItem;
 use App\Models\TransportLoadingException;
+use App\Models\TransportManifest;
+use App\Models\TransportManifestAssignment;
 use App\Models\TransportManifestItem;
 use App\Models\TransportManifestLabelScan;
-use App\Models\PlatformSetting;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItemLabel;
+use App\Services\DriverWorkloadService;
+use App\Services\RiderAssignmentAuditService;
 use App\Services\StorageService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
@@ -31,7 +32,9 @@ class WarehouseTransportService
 {
     public function __construct(
         private RecipientPaymentService $recipientPaymentService,
-        private StorageService $storageService
+        private StorageService $storageService,
+        private DriverWorkloadService $workloads,
+        private RiderAssignmentAuditService $assignmentAudit,
     ) {}
 
     public function outboundQuery(Warehouse $warehouse): Builder
@@ -78,7 +81,7 @@ class WarehouseTransportService
 
         $events = collect();
         $addEvent = function (string $type, string $label, mixed $at, ?string $actor = null, ?string $detail = null, string $tone = 'slate') use (&$events): void {
-            if (!$at) {
+            if (! $at) {
                 return;
             }
 
@@ -175,14 +178,14 @@ class WarehouseTransportService
 
         $trackingEvents
             ->filter(fn (ShipmentItemTracking $tracking) => data_get($tracking->meta, 'event') === 'dispatch_reversed')
-            ->groupBy(fn (ShipmentItemTracking $tracking) => $tracking->created_at?->timestamp . '|' . ($tracking->created_by ?? ''))
+            ->groupBy(fn (ShipmentItemTracking $tracking) => $tracking->created_at?->timestamp.'|'.($tracking->created_by ?? ''))
             ->each(function (Collection $group) use ($addEvent, $eventActors) {
                 $tracking = $group->first();
                 $addEvent(
                     'dispatch_reversed',
                     'Dispatch Reversed',
                     $tracking->created_at,
-                    $eventActors['dispatch_reversed:' . $tracking->created_at?->timestamp] ?? $eventActors['dispatch_reversed'] ?? null,
+                    $eventActors['dispatch_reversed:'.$tracking->created_at?->timestamp] ?? $eventActors['dispatch_reversed'] ?? null,
                     'Transfer returned to origin workflow.',
                     'amber'
                 );
@@ -199,14 +202,14 @@ class WarehouseTransportService
 
         $trackingEvents
             ->filter(fn (ShipmentItemTracking $tracking) => data_get($tracking->meta, 'event') === 'arrival_reversed')
-            ->groupBy(fn (ShipmentItemTracking $tracking) => $tracking->created_at?->timestamp . '|' . ($tracking->created_by ?? ''))
+            ->groupBy(fn (ShipmentItemTracking $tracking) => $tracking->created_at?->timestamp.'|'.($tracking->created_by ?? ''))
             ->each(function (Collection $group) use ($addEvent, $eventActors) {
                 $tracking = $group->first();
                 $addEvent(
                     'arrival_reversed',
                     'Arrival Reversed',
                     $tracking->created_at,
-                    $eventActors['arrival_reversed:' . $tracking->created_at?->timestamp] ?? $eventActors['arrival_reversed'] ?? null,
+                    $eventActors['arrival_reversed:'.$tracking->created_at?->timestamp] ?? $eventActors['arrival_reversed'] ?? null,
                     'Transfer moved back to in transit.',
                     'cyan'
                 );
@@ -259,7 +262,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Batch must be sealed before creating manifest.'];
         }
 
-        if (!$batch->destination_warehouse_id) {
+        if (! $batch->destination_warehouse_id) {
             return ['success' => false, 'message' => 'Destination warehouse is required for transfer manifest.'];
         }
 
@@ -340,8 +343,14 @@ class WarehouseTransportService
         });
     }
 
-    public function assignDriver(TransportManifest $manifest, Driver $driver, Warehouse $warehouse, ?User $user = null): array
-    {
+    public function assignDriver(
+        TransportManifest $manifest,
+        Driver $driver,
+        Warehouse $warehouse,
+        ?User $user = null,
+        bool $confirmBusyAssignment = false,
+        ?string $reassignmentReason = null,
+    ): array {
         if ((int) $manifest->origin_warehouse_id !== (int) $warehouse->id) {
             return ['success' => false, 'message' => 'Cannot assign rider for another warehouse manifest.'];
         }
@@ -355,18 +364,55 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Manifest can no longer be assigned.'];
         }
 
-        if (!$driver->is_active) {
+        if (! $driver->is_active) {
             return ['success' => false, 'message' => 'Rider is inactive.'];
         }
 
-        if (!$driver->hasCapability(Driver::CAPABILITY_TRANSPORT)) {
+        if (! $driver->hasCapability(Driver::CAPABILITY_TRANSPORT)) {
             return ['success' => false, 'message' => 'Rider is not configured for transport assignments.'];
         }
 
-        return DB::transaction(function () use ($manifest, $driver, $user) {
+        return DB::transaction(function () use ($manifest, $driver, $user, $confirmBusyAssignment, $reassignmentReason) {
             $lockedManifest = TransportManifest::query()->lockForUpdate()->findOrFail($manifest->id);
             $previousDriverId = $lockedManifest->assigned_driver_id;
+            $lockedDrivers = Driver::query()
+                ->whereIn('id', collect([$previousDriverId, $driver->id])->filter()->unique())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            $lockedDriver = $lockedDrivers->get((int) $driver->id);
             $now = now();
+
+            if (in_array($lockedManifest->status, [TransportManifest::STATUS_IN_TRANSIT, TransportManifest::STATUS_ARRIVED, TransportManifest::STATUS_RECEIVED, TransportManifest::STATUS_CANCELLED], true)) {
+                return ['success' => false, 'message' => 'Manifest can no longer be assigned.'];
+            }
+
+            if (! $lockedDriver) {
+                return ['success' => false, 'message' => 'Rider not found.'];
+            }
+
+            if (! $lockedDriver->is_active) {
+                return ['success' => false, 'message' => 'Rider is inactive.'];
+            }
+
+            if (! $lockedDriver->hasCapability(Driver::CAPABILITY_TRANSPORT)) {
+                return ['success' => false, 'message' => 'Rider is not configured for transport assignments.'];
+            }
+
+            if ($previousDriverId && (int) $previousDriverId === (int) $lockedDriver->id) {
+                return [
+                    'success' => true,
+                    'message' => 'This rider is already assigned.',
+                    'data' => ['manifest' => $lockedManifest->fresh(['assignedDriver', 'originWarehouse', 'destinationWarehouse'])],
+                ];
+            }
+
+            if ($busy = $this->workloads->busyConflict($lockedDriver, $confirmBusyAssignment)) {
+                return $busy;
+            }
+
+            $previousDriver = $previousDriverId ? $lockedDrivers->get((int) $previousDriverId) : null;
 
             // Close previous assignment log if driver is changing
             if ($previousDriverId && (int) $previousDriverId !== (int) $driver->id) {
@@ -377,14 +423,12 @@ class WarehouseTransportService
                     ->update([
                         'unassigned_at' => $now,
                         'unassigned_by_user_id' => $user?->id,
-                        'unassign_reason' => 'Reassigned to another rider',
+                        'unassign_reason' => $reassignmentReason ?: 'Reassigned to another rider',
                     ]);
-
-                Driver::query()->whereKey($previousDriverId)->update(['status' => 'available']);
             }
 
             $lockedManifest->update([
-                'assigned_driver_id' => $driver->id,
+                'assigned_driver_id' => $lockedDriver->id,
                 'assigned_at' => $now,
                 'status' => TransportManifest::STATUS_ASSIGNED,
             ]);
@@ -392,12 +436,19 @@ class WarehouseTransportService
             // Create assignment log entry
             TransportManifestAssignment::query()->create([
                 'transport_manifest_id' => $lockedManifest->id,
-                'driver_id' => $driver->id,
+                'driver_id' => $lockedDriver->id,
                 'assigned_by_user_id' => $user?->id,
                 'assigned_at' => $now,
             ]);
 
-            $driver->update(['status' => 'busy']);
+            $eventType = $previousDriverId ? 'reassigned' : 'assigned';
+            $this->assignmentAudit->record('transport', $lockedManifest->id, $eventType, $previousDriverId, $lockedDriver->id, $user, $reassignmentReason);
+
+            if ($previousDriver) {
+                event(new \App\Events\DriverUnassignedFromTransport($lockedManifest, $previousDriver, $reassignmentReason));
+            }
+            event(new \App\Events\DriverAssignedToTransport($lockedManifest, $lockedDriver, $reassignmentReason));
+            $this->workloads->syncMany([$previousDriverId, $lockedDriver->id]);
 
             return [
                 'success' => true,
@@ -419,16 +470,25 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Cannot modify another warehouse manifest.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_DRAFT], true)) {
+        if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_DRAFT], true)) {
             return ['success' => false, 'message' => 'Rider can only be unassigned from draft or assigned manifests.'];
         }
 
-        if (!$manifest->assigned_driver_id) {
+        if (! $manifest->assigned_driver_id) {
             return ['success' => false, 'message' => 'No rider is currently assigned.'];
         }
 
         return DB::transaction(function () use ($manifest, $user, $reason) {
             $lockedManifest = TransportManifest::query()->lockForUpdate()->findOrFail($manifest->id);
+
+            if (! in_array($lockedManifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_DRAFT], true)) {
+                return ['success' => false, 'message' => 'Rider can only be unassigned from draft or assigned manifests.'];
+            }
+
+            if (! $lockedManifest->assigned_driver_id) {
+                return ['success' => false, 'message' => 'No rider is currently assigned.'];
+            }
+
             $previousDriverId = $lockedManifest->assigned_driver_id;
             $now = now();
 
@@ -440,7 +500,7 @@ class WarehouseTransportService
                 ->update([
                     'unassigned_at' => $now,
                     'unassigned_by_user_id' => $user->id,
-                        'unassign_reason' => $reason ?: 'Rider unassigned',
+                    'unassign_reason' => $reason ?: 'Rider unassigned',
                 ]);
 
             $lockedManifest->update([
@@ -450,7 +510,12 @@ class WarehouseTransportService
             ]);
 
             if ($previousDriverId) {
-                Driver::query()->whereKey($previousDriverId)->update(['status' => 'available']);
+                $previousDriver = Driver::query()->find($previousDriverId);
+                $this->assignmentAudit->record('transport', $lockedManifest->id, 'unassigned', $previousDriverId, null, $user, $reason);
+                if ($previousDriver) {
+                    event(new \App\Events\DriverUnassignedFromTransport($lockedManifest, $previousDriver, $reason));
+                }
+                $this->workloads->syncStatus($previousDriverId);
             }
 
             return [
@@ -466,11 +531,11 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Cannot dispatch another warehouse manifest.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+        if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
             return ['success' => false, 'message' => 'Only assigned or loaded manifests can be dispatched.'];
         }
 
-        if (!$manifest->assigned_driver_id) {
+        if (! $manifest->assigned_driver_id) {
             return ['success' => false, 'message' => 'Assign a rider before dispatching.'];
         }
 
@@ -504,7 +569,7 @@ class WarehouseTransportService
 
             foreach ($lockedManifest->items as $line) {
                 $item = $line->shipmentItem;
-                if (!$item) {
+                if (! $item) {
                     continue;
                 }
 
@@ -514,7 +579,7 @@ class WarehouseTransportService
                     'shipment_item_id' => $item->id,
                     'status' => ItemStatus::IN_TRANSIT->value,
                     'location' => $warehouse->name,
-                    'notes' => 'Item dispatched for transport manifest ' . $lockedManifest->manifest_number . '.',
+                    'notes' => 'Item dispatched for transport manifest '.$lockedManifest->manifest_number.'.',
                     'meta' => [
                         'transport_manifest_id' => $lockedManifest->id,
                         'transport_manifest_number' => $lockedManifest->manifest_number,
@@ -547,7 +612,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Cannot undo dispatch for another warehouse manifest.'];
         }
 
-        if ($manifest->status !== TransportManifest::STATUS_IN_TRANSIT || !$manifest->dispatched_at) {
+        if ($manifest->status !== TransportManifest::STATUS_IN_TRANSIT || ! $manifest->dispatched_at) {
             return ['success' => false, 'message' => 'Only dispatched transfers can be reverted.'];
         }
 
@@ -561,7 +626,7 @@ class WarehouseTransportService
                 ->lockForUpdate()
                 ->findOrFail($manifest->id);
 
-            if ($lockedManifest->status !== TransportManifest::STATUS_IN_TRANSIT || !$lockedManifest->dispatched_at) {
+            if ($lockedManifest->status !== TransportManifest::STATUS_IN_TRANSIT || ! $lockedManifest->dispatched_at) {
                 return ['success' => false, 'message' => 'Only dispatched transfers can be reverted.'];
             }
 
@@ -581,11 +646,11 @@ class WarehouseTransportService
 
             /** @var Collection<int, Shipment> $shipments */
             $shipments = collect();
-            $noteReason = filled($reason) ? ' Reason: ' . trim((string) $reason) : '';
+            $noteReason = filled($reason) ? ' Reason: '.trim((string) $reason) : '';
 
             foreach ($lockedManifest->items as $line) {
                 $item = $line->shipmentItem;
-                if (!$item) {
+                if (! $item) {
                     continue;
                 }
 
@@ -597,7 +662,7 @@ class WarehouseTransportService
                     'shipment_item_id' => $item->id,
                     'status' => ItemStatus::AT_WAREHOUSE->value,
                     'location' => $warehouse->name,
-                    'notes' => 'Dispatch reversed for transport manifest ' . $lockedManifest->manifest_number . '.' . $noteReason,
+                    'notes' => 'Dispatch reversed for transport manifest '.$lockedManifest->manifest_number.'.'.$noteReason,
                     'meta' => [
                         'transport_manifest_id' => $lockedManifest->id,
                         'transport_manifest_number' => $lockedManifest->manifest_number,
@@ -630,7 +695,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Cannot undo arrival for another warehouse manifest.'];
         }
 
-        if ($manifest->status !== TransportManifest::STATUS_ARRIVED || !$manifest->arrived_at) {
+        if ($manifest->status !== TransportManifest::STATUS_ARRIVED || ! $manifest->arrived_at) {
             return ['success' => false, 'message' => 'Only arrived transfers can be reverted.'];
         }
 
@@ -644,7 +709,7 @@ class WarehouseTransportService
                 ->lockForUpdate()
                 ->findOrFail($manifest->id);
 
-            if ($lockedManifest->status !== TransportManifest::STATUS_ARRIVED || !$lockedManifest->arrived_at) {
+            if ($lockedManifest->status !== TransportManifest::STATUS_ARRIVED || ! $lockedManifest->arrived_at) {
                 return ['success' => false, 'message' => 'Only arrived transfers can be reverted.'];
             }
 
@@ -653,7 +718,7 @@ class WarehouseTransportService
             }
 
             $now = now();
-            $noteReason = filled($reason) ? ' Reason: ' . trim((string) $reason) : '';
+            $noteReason = filled($reason) ? ' Reason: '.trim((string) $reason) : '';
 
             $lockedManifest->update([
                 'status' => TransportManifest::STATUS_IN_TRANSIT,
@@ -662,7 +727,7 @@ class WarehouseTransportService
 
             foreach ($lockedManifest->items as $line) {
                 $item = $line->shipmentItem;
-                if (!$item) {
+                if (! $item) {
                     continue;
                 }
 
@@ -670,7 +735,7 @@ class WarehouseTransportService
                     'shipment_item_id' => $item->id,
                     'status' => ItemStatus::IN_TRANSIT->value,
                     'location' => $lockedManifest->originWarehouse?->name ?? $warehouse->name,
-                    'notes' => 'Arrival reversed for transport manifest ' . $lockedManifest->manifest_number . '.' . $noteReason,
+                    'notes' => 'Arrival reversed for transport manifest '.$lockedManifest->manifest_number.'.'.$noteReason,
                     'meta' => [
                         'transport_manifest_id' => $lockedManifest->id,
                         'transport_manifest_number' => $lockedManifest->manifest_number,
@@ -695,7 +760,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Manifest not found.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+        if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
             return ['success' => false, 'message' => 'Manifest is not ready for loading.'];
         }
 
@@ -717,7 +782,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Manifest not found.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+        if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
             return ['success' => false, 'message' => 'Manifest is not in loading state.'];
         }
 
@@ -765,7 +830,7 @@ class WarehouseTransportService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$label) {
+            if (! $label) {
                 if ($baseCodeLine) {
                     return [
                         'success' => false,
@@ -777,7 +842,7 @@ class WarehouseTransportService
             }
 
             $shipmentItemId = $label->receiptItem?->shipment_item_id;
-            if (!$shipmentItemId) {
+            if (! $shipmentItemId) {
                 return ['success' => false, 'message' => 'Label is not linked to a package item.'];
             }
 
@@ -787,7 +852,7 @@ class WarehouseTransportService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$line) {
+            if (! $line) {
                 return ['success' => false, 'message' => 'Label code not found in this manifest.'];
             }
 
@@ -796,10 +861,10 @@ class WarehouseTransportService
                 ->with('container.items.manifestItem')
                 ->first();
 
-            if ($containerItem?->container && !$this->isLooseTransportContainer($containerItem->container)) {
+            if ($containerItem?->container && ! $this->isLooseTransportContainer($containerItem->container)) {
                 return [
                     'success' => false,
-                    'message' => 'This package is packed in ' . $containerItem->container->container_code . '. Scan the load group label instead.',
+                    'message' => 'This package is packed in '.$containerItem->container->container_code.'. Scan the load group label instead.',
                 ];
             }
 
@@ -808,7 +873,7 @@ class WarehouseTransportService
                 ->where('warehouse_receipt_item_label_id', $label->id)
                 ->first();
 
-            if (!$existingScan) {
+            if (! $existingScan) {
                 TransportManifestLabelScan::query()->create([
                     'transport_manifest_id' => $manifest->id,
                     'transport_manifest_item_id' => $line->id,
@@ -875,7 +940,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Manifest not found.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+        if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
             return ['success' => false, 'message' => 'Manifest is not in loading state.'];
         }
 
@@ -900,7 +965,7 @@ class WarehouseTransportService
                     ->whereKey((int) $data['container_id'])
                     ->first();
 
-                if (!$container) {
+                if (! $container) {
                     return ['success' => false, 'message' => 'Load group not found on this manifest.'];
                 }
 
@@ -915,7 +980,7 @@ class WarehouseTransportService
                     ->whereKey((int) $data['manifest_item_id'])
                     ->first();
 
-                if (!$line) {
+                if (! $line) {
                     return ['success' => false, 'message' => 'Manifest item not found on this transport.'];
                 }
 
@@ -924,16 +989,16 @@ class WarehouseTransportService
                     ->filter()
                     ->first();
 
-                if ($packedContainer && !$this->isLooseTransportContainer($packedContainer)) {
+                if ($packedContainer && ! $this->isLooseTransportContainer($packedContainer)) {
                     return [
                         'success' => false,
-                        'message' => 'This package is packed in ' . $packedContainer->container_code . '. Report the scan issue on the load group instead.',
+                        'message' => 'This package is packed in '.$packedContainer->container_code.'. Report the scan issue on the load group instead.',
                     ];
                 }
             }
 
             $autoAccept = (bool) PlatformSetting::getValue('transport.scan_issue_auto_accept', false);
-            $storedPhoto = $this->storageService->upload($proofPhoto, 'transport-loading-exceptions/' . $lockedManifest->id);
+            $storedPhoto = $this->storageService->upload($proofPhoto, 'transport-loading-exceptions/'.$lockedManifest->id);
             $path = $storedPhoto['path'];
             $now = now();
 
@@ -1035,7 +1100,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Item not found on this manifest.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+        if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
             return ['success' => false, 'message' => 'Manifest is not in loading state.'];
         }
 
@@ -1065,7 +1130,7 @@ class WarehouseTransportService
                 'line_status' => TransportManifestItem::LINE_LOADED,
                 'notes' => trim(implode("\n", array_filter([
                     $lockedLine->notes,
-                    'Marked loaded by admin ' . $user->name . '.',
+                    'Marked loaded by admin '.$user->name.'.',
                 ]))),
             ]);
 
@@ -1088,7 +1153,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Item not found on this manifest.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+        if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
             return ['success' => false, 'message' => 'Items can only be marked not loaded before departure.'];
         }
 
@@ -1119,7 +1184,7 @@ class WarehouseTransportService
                 'line_status' => TransportManifestItem::LINE_PENDING,
                 'notes' => trim(implode("\n", array_filter([
                     $lockedLine->notes,
-                    'Marked not loaded by admin ' . $user->name . '.',
+                    'Marked not loaded by admin '.$user->name.'.',
                 ]))),
             ]);
 
@@ -1138,7 +1203,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Cannot load another warehouse manifest.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+        if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
             return ['success' => false, 'message' => 'Manifest is not in loading state.'];
         }
 
@@ -1165,7 +1230,7 @@ class WarehouseTransportService
                     'line_status' => TransportManifestItem::LINE_LOADED,
                     'notes' => trim(implode("\n", array_filter([
                         $line->notes,
-                        'Marked loaded by admin ' . $user->name . '.',
+                        'Marked loaded by admin '.$user->name.'.',
                     ]))),
                 ]);
                 $this->syncLineContainerLoadState($line);
@@ -1188,7 +1253,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Cannot modify another warehouse manifest.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+        if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
             return ['success' => false, 'message' => 'Items can only be marked not loaded before departure.'];
         }
 
@@ -1207,7 +1272,7 @@ class WarehouseTransportService
                 if (
                     (int) $line->loaded_quantity === 0
                     && (int) $line->scan_out_count === 0
-                    && !$line->loaded_at
+                    && ! $line->loaded_at
                     && $line->line_status === TransportManifestItem::LINE_PENDING
                 ) {
                     continue;
@@ -1224,7 +1289,7 @@ class WarehouseTransportService
                     'line_status' => TransportManifestItem::LINE_PENDING,
                     'notes' => trim(implode("\n", array_filter([
                         $line->notes,
-                        'Marked not loaded by admin ' . $user->name . '.',
+                        'Marked not loaded by admin '.$user->name.'.',
                     ]))),
                 ]);
 
@@ -1262,11 +1327,11 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Cannot update another warehouse manifest.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_LOADING, TransportManifest::STATUS_IN_TRANSIT], true)) {
+        if (! in_array($manifest->status, [TransportManifest::STATUS_LOADING, TransportManifest::STATUS_IN_TRANSIT], true)) {
             return ['success' => false, 'message' => 'Only loaded or in-transit manifests can be marked arrived.'];
         }
 
-        if (!$manifest->dispatched_at) {
+        if (! $manifest->dispatched_at) {
             return ['success' => false, 'message' => 'Dispatch the transfer before marking it arrived.'];
         }
 
@@ -1297,7 +1362,7 @@ class WarehouseTransportService
 
             foreach ($lockedManifest->items as $line) {
                 $item = $line->shipmentItem;
-                if (!$item) {
+                if (! $item) {
                     continue;
                 }
 
@@ -1307,7 +1372,7 @@ class WarehouseTransportService
                     'shipment_item_id' => $item->id,
                     'status' => ItemStatus::IN_TRANSIT->value,
                     'location' => $lockedManifest->destinationWarehouse?->name ?? $warehouse->name,
-                    'notes' => 'Transport manifest ' . $lockedManifest->manifest_number . ' marked arrived by admin ' . $user->name . '.',
+                    'notes' => 'Transport manifest '.$lockedManifest->manifest_number.' marked arrived by admin '.$user->name.'.',
                     'meta' => [
                         'transport_manifest_id' => $lockedManifest->id,
                         'transport_manifest_number' => $lockedManifest->manifest_number,
@@ -1332,7 +1397,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Cannot modify another warehouse manifest.'];
         }
 
-        if (!in_array($manifest->status, [
+        if (! in_array($manifest->status, [
             TransportManifest::STATUS_DRAFT,
             TransportManifest::STATUS_ASSIGNED,
             TransportManifest::STATUS_LOADING,
@@ -1342,42 +1407,42 @@ class WarehouseTransportService
 
         try {
             return DB::transaction(function () use ($manifest, $warehouse, $user, $containerType, $notes, $sortBatch) {
-            $lockedManifest = TransportManifest::query()
-                ->with('containers')
-                ->lockForUpdate()
-                ->findOrFail($manifest->id);
+                $lockedManifest = TransportManifest::query()
+                    ->with('containers')
+                    ->lockForUpdate()
+                    ->findOrFail($manifest->id);
 
-            $nextSequence = ((int) $lockedManifest->containers->max('sequence_number')) + 1;
+                $nextSequence = ((int) $lockedManifest->containers->max('sequence_number')) + 1;
 
-            $container = TransportContainer::query()->create([
-                'transport_manifest_id' => $lockedManifest->id,
-                'container_code' => $this->generateContainerCode($lockedManifest, $nextSequence),
-                'container_type' => $containerType ?: 'box',
-                'sequence_number' => $nextSequence,
-                'status' => TransportContainer::STATUS_OPEN,
-                'expected_package_count' => 0,
-                'sealed_by_user_id' => $user->id,
-                'notes' => $notes,
-            ]);
+                $container = TransportContainer::query()->create([
+                    'transport_manifest_id' => $lockedManifest->id,
+                    'container_code' => $this->generateContainerCode($lockedManifest, $nextSequence),
+                    'container_type' => $containerType ?: 'box',
+                    'sequence_number' => $nextSequence,
+                    'status' => TransportContainer::STATUS_OPEN,
+                    'expected_package_count' => 0,
+                    'sealed_by_user_id' => $user->id,
+                    'notes' => $notes,
+                ]);
 
-            if ($sortBatch) {
-                $attachResult = $this->attachSortBatchToContainer($lockedManifest, $container, $sortBatch, $warehouse, $user);
-                if (!$attachResult['success']) {
-                    throw new \RuntimeException($attachResult['message'] ?? 'Unable to attach sort batch.');
+                if ($sortBatch) {
+                    $attachResult = $this->attachSortBatchToContainer($lockedManifest, $container, $sortBatch, $warehouse, $user);
+                    if (! $attachResult['success']) {
+                        throw new \RuntimeException($attachResult['message'] ?? 'Unable to attach sort batch.');
+                    }
+
+                    return [
+                        'success' => true,
+                        'message' => 'Container created and sort batch loaded.',
+                        'data' => ['container' => $container->fresh('items.manifestItem.shipmentItem')],
+                    ];
                 }
 
                 return [
                     'success' => true,
-                    'message' => 'Container created and sort batch loaded.',
-                    'data' => ['container' => $container->fresh('items.manifestItem.shipmentItem')],
+                    'message' => 'Transport container created.',
+                    'data' => ['container' => $container],
                 ];
-            }
-
-            return [
-                'success' => true,
-                'message' => 'Transport container created.',
-                'data' => ['container' => $container],
-            ];
             });
         } catch (\RuntimeException $exception) {
             return ['success' => false, 'message' => $exception->getMessage()];
@@ -1399,7 +1464,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Container not found on this outgoing transfer.'];
         }
 
-        if (!in_array($manifest->status, [
+        if (! in_array($manifest->status, [
             TransportManifest::STATUS_DRAFT,
             TransportManifest::STATUS_ASSIGNED,
             TransportManifest::STATUS_LOADING,
@@ -1428,7 +1493,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Container not found on this outgoing transfer.'];
         }
 
-        if (!in_array($manifest->status, [
+        if (! in_array($manifest->status, [
             TransportManifest::STATUS_DRAFT,
             TransportManifest::STATUS_ASSIGNED,
             TransportManifest::STATUS_LOADING,
@@ -1466,7 +1531,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Sort batch must be sealed before it can be loaded.'];
         }
 
-        if (!$sortBatch->destination_warehouse_id) {
+        if (! $sortBatch->destination_warehouse_id) {
             return ['success' => false, 'message' => 'Sort batch needs a destination warehouse.'];
         }
 
@@ -1579,7 +1644,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Container or item does not belong to this manifest.'];
         }
 
-        if (!in_array($manifest->status, [
+        if (! in_array($manifest->status, [
             TransportManifest::STATUS_DRAFT,
             TransportManifest::STATUS_ASSIGNED,
             TransportManifest::STATUS_LOADING,
@@ -1651,7 +1716,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Container not found on this manifest.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+        if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
             return ['success' => false, 'message' => 'Manifest is not in loading state.'];
         }
 
@@ -1673,7 +1738,7 @@ class WarehouseTransportService
             $now = now();
             foreach ($lockedContainer->items as $containerItem) {
                 $line = $containerItem->manifestItem;
-                if (!$line) {
+                if (! $line) {
                     continue;
                 }
 
@@ -1684,7 +1749,7 @@ class WarehouseTransportService
                     'line_status' => TransportManifestItem::LINE_LOADED,
                     'notes' => trim(implode("\n", array_filter([
                         $line->notes,
-                        'Container ' . $lockedContainer->container_code . ' marked loaded by admin ' . $user->name . '.',
+                        'Container '.$lockedContainer->container_code.' marked loaded by admin '.$user->name.'.',
                     ]))),
                 ]);
 
@@ -1713,7 +1778,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Load group not found on this manifest.'];
         }
 
-        if (!in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+        if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
             return ['success' => false, 'message' => 'Load groups can only be marked not loaded before departure.'];
         }
 
@@ -1728,7 +1793,7 @@ class WarehouseTransportService
 
             foreach ($lockedContainer->items as $containerItem) {
                 $line = $containerItem->manifestItem;
-                if (!$line) {
+                if (! $line) {
                     continue;
                 }
 
@@ -1739,7 +1804,7 @@ class WarehouseTransportService
 
             foreach ($lockedContainer->items as $containerItem) {
                 $line = $containerItem->manifestItem;
-                if (!$line) {
+                if (! $line) {
                     continue;
                 }
 
@@ -1754,7 +1819,7 @@ class WarehouseTransportService
                     'line_status' => TransportManifestItem::LINE_PENDING,
                     'notes' => trim(implode("\n", array_filter([
                         $line->notes,
-                        'Load group ' . $lockedContainer->container_code . ' marked not loaded by admin ' . $user->name . '.',
+                        'Load group '.$lockedContainer->container_code.' marked not loaded by admin '.$user->name.'.',
                     ]))),
                 ]);
 
@@ -1784,7 +1849,7 @@ class WarehouseTransportService
             return ['success' => false, 'message' => 'Container not found on this manifest.'];
         }
 
-        if (!in_array($manifest->status, [
+        if (! in_array($manifest->status, [
             TransportManifest::STATUS_DRAFT,
             TransportManifest::STATUS_ASSIGNED,
             TransportManifest::STATUS_LOADING,
@@ -1933,7 +1998,7 @@ class WarehouseTransportService
         }
 
         $deleteState = $this->deleteState($manifest);
-        if (!$deleteState['deletable']) {
+        if (! $deleteState['deletable']) {
             return [
                 'success' => false,
                 'message' => $deleteState['reason'] ?? 'This manifest cannot be deleted.',
@@ -1946,7 +2011,7 @@ class WarehouseTransportService
                 ->findOrFail($manifest->id);
 
             $deleteState = $this->deleteState($lockedManifest);
-            if (!$deleteState['deletable']) {
+            if (! $deleteState['deletable']) {
                 return [
                     'success' => false,
                     'message' => $deleteState['reason'] ?? 'This manifest cannot be deleted.',
@@ -1958,7 +2023,7 @@ class WarehouseTransportService
 
             foreach ($items as $item) {
                 $shipmentItem = $item->shipmentItem;
-                if (!$shipmentItem) {
+                if (! $shipmentItem) {
                     continue;
                 }
 
@@ -1966,7 +2031,7 @@ class WarehouseTransportService
                     'shipment_item_id' => $shipmentItem->id,
                     'status' => $shipmentItem->status?->value ?? $shipmentItem->getRawOriginal('status'),
                     'location' => $warehouse->name,
-                    'notes' => 'Transport manifest ' . $manifestNumber . ' was deleted before loading.',
+                    'notes' => 'Transport manifest '.$manifestNumber.' was deleted before loading.',
                     'meta' => [
                         'transport_manifest_id' => $lockedManifest->id,
                         'transport_manifest_number' => $manifestNumber,
@@ -2094,7 +2159,7 @@ class WarehouseTransportService
         $now = now();
         foreach ($container->items as $containerItem) {
             $line = $containerItem->manifestItem;
-            if (!$line) {
+            if (! $line) {
                 continue;
             }
 
@@ -2127,7 +2192,7 @@ class WarehouseTransportService
 
         foreach ($container->items as $containerItem) {
             $line = $containerItem->manifestItem;
-            if (!$line) {
+            if (! $line) {
                 continue;
             }
 
@@ -2138,7 +2203,7 @@ class WarehouseTransportService
                 'line_status' => TransportManifestItem::LINE_LOADED,
                 'notes' => trim(implode("\n", array_filter([
                     $line->notes,
-                    'Loaded from scan issue #' . $exception->id . '.',
+                    'Loaded from scan issue #'.$exception->id.'.',
                 ]))),
             ]);
 
@@ -2161,7 +2226,7 @@ class WarehouseTransportService
             'line_status' => TransportManifestItem::LINE_LOADED,
             'notes' => trim(implode("\n", array_filter([
                 $line->notes,
-                'Loaded from scan issue #' . $exception->id . '.',
+                'Loaded from scan issue #'.$exception->id.'.',
             ]))),
         ]);
 
@@ -2186,7 +2251,7 @@ class WarehouseTransportService
             ->with('container.items.manifestItem')
             ->first();
 
-        if (!$containerItem?->container) {
+        if (! $containerItem?->container) {
             return;
         }
 
@@ -2215,7 +2280,7 @@ class WarehouseTransportService
             ->with('container')
             ->first();
 
-        if (!$containerItem?->container) {
+        if (! $containerItem?->container) {
             return;
         }
 
@@ -2235,7 +2300,7 @@ class WarehouseTransportService
 
     private function generateContainerCode(TransportManifest $manifest, int $sequence): string
     {
-        return preg_replace('/[^A-Z0-9-]/', '', strtoupper($manifest->manifest_number)) . '-C' . str_pad((string) $sequence, 2, '0', STR_PAD_LEFT);
+        return preg_replace('/[^A-Z0-9-]/', '', strtoupper($manifest->manifest_number)).'-C'.str_pad((string) $sequence, 2, '0', STR_PAD_LEFT);
     }
 
     private function generateManifestNumber(Warehouse $origin, ?Warehouse $destination): string
@@ -2246,7 +2311,7 @@ class WarehouseTransportService
         $prefix = "TM-{$year}-{$originCode}-{$destinationCode}-";
 
         $last = TransportManifest::query()
-            ->where('manifest_number', 'like', $prefix . '%')
+            ->where('manifest_number', 'like', $prefix.'%')
             ->latest('id')
             ->first();
 
@@ -2256,12 +2321,12 @@ class WarehouseTransportService
             $next = ((int) end($parts)) + 1;
         }
 
-        return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 
     private function syncShipmentInTransitStatus(Shipment $shipment): void
     {
-        $allTransitOrBeyond = !$shipment->items()
+        $allTransitOrBeyond = ! $shipment->items()
             ->whereNotIn('status', [
                 ItemStatus::IN_TRANSIT->value,
                 ItemStatus::AT_DESTINATION->value,
@@ -2289,7 +2354,7 @@ class WarehouseTransportService
             ])
             ->exists();
 
-        if (!$hasTransitOrBeyond && $shipment->status === ShipmentStatus::IN_TRANSIT) {
+        if (! $hasTransitOrBeyond && $shipment->status === ShipmentStatus::IN_TRANSIT) {
             $shipment->update(['status' => ShipmentStatus::AT_WAREHOUSE]);
         }
     }
@@ -2300,7 +2365,7 @@ class WarehouseTransportService
             ? $manifest->warehouseReceipt
             : $manifest->warehouseReceipt()->first();
 
-        if (!$receipt) {
+        if (! $receipt) {
             return false;
         }
 
@@ -2364,18 +2429,18 @@ class WarehouseTransportService
 
         foreach ($trackingEvents as $tracking) {
             $event = data_get($tracking->meta, 'event');
-            if (!$event) {
+            if (! $event) {
                 continue;
             }
 
             $userId = $this->userIdFromCreatedBy($tracking->created_by);
             $actor = $userId ? $users->get($userId) : null;
-            if (!$actor) {
+            if (! $actor) {
                 continue;
             }
 
             $actors[$event] ??= $actor;
-            $actors[$event . ':' . $tracking->created_at?->timestamp] ??= $actor;
+            $actors[$event.':'.$tracking->created_at?->timestamp] ??= $actor;
         }
 
         return $actors;
@@ -2383,7 +2448,7 @@ class WarehouseTransportService
 
     private function userIdFromCreatedBy(?string $createdBy): ?int
     {
-        if (!$createdBy || !str_starts_with($createdBy, 'user:')) {
+        if (! $createdBy || ! str_starts_with($createdBy, 'user:')) {
             return null;
         }
 

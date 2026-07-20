@@ -18,7 +18,7 @@ class DriverNotificationController extends Controller
         $driver = $request->user();
 
         $validated = $request->validate([
-            'status'     => ['nullable', 'string', Rule::in(['sent', 'failed'])],
+            'status'     => ['nullable', 'string', Rule::in(['sent', 'failed', 'logged'])],
             'type'       => ['nullable', 'string', 'max:100'],
             'is_read'    => ['nullable', 'in:true,false,1,0'],
             'from_date'  => ['nullable', 'date'],

@@ -20,7 +20,9 @@ use Illuminate\Support\Facades\DB;
 class PickupAssignmentService
 {
     public function __construct(
-        private StorageService $storageService
+        private StorageService $storageService,
+        private DriverWorkloadService $workloads,
+        private RiderAssignmentAuditService $assignmentAudit,
     ) {}
 
     public function assign(
@@ -28,278 +30,186 @@ class PickupAssignmentService
         Driver $driver,
         ?User $admin = null,
         ?string $notes = null,
-        ?int $targetWarehouseId = null
-    ): array
-    {
-        if (!$shipment->canBeAssigned()) {
+        ?int $targetWarehouseId = null,
+        bool $confirmBusyAssignment = false,
+    ): array {
+        if (! $shipment->canBeAssigned()) {
             return [
                 'success' => false,
                 'message' => 'Shipment cannot be assigned in its current status.',
             ];
         }
 
-        if (!$driver->is_active) {
+        if (! $driver->is_active) {
             return [
                 'success' => false,
                 'message' => 'Rider is inactive.',
             ];
         }
 
-        if (!$driver->hasCapability(Driver::CAPABILITY_PICKUP)) {
+        if (! $driver->hasCapability(Driver::CAPABILITY_PICKUP)) {
             return [
                 'success' => false,
                 'message' => 'Rider is not configured for pickup assignments.',
             ];
         }
 
-        $assignment = PickupAssignment::create([
-            'shipment_id' => $shipment->id,
-            'driver_id' => $driver->id,
-            'target_warehouse_id' => $targetWarehouseId,
-            'status' => PickupAssignmentStatus::ASSIGNED,
-            'assigned_by' => $admin?->id,
-            'assigned_at' => now(),
-            'notes' => $notes,
-        ]);
+        return DB::transaction(function () use ($shipment, $driver, $admin, $notes, $targetWarehouseId, $confirmBusyAssignment) {
+            $lockedShipment = Shipment::query()->lockForUpdate()->findOrFail($shipment->id);
+            $lockedDriver = Driver::query()->lockForUpdate()->findOrFail($driver->id);
 
-        $shipment->update(['status' => ShipmentStatus::PICKUP_ASSIGNED]);
-        $driver->update(['status' => 'busy']);
+            if (! $lockedShipment->canBeAssigned() || $lockedShipment->pickupAssignment()->exists()) {
+                return ['success' => false, 'message' => 'Shipment cannot be assigned in its current status.'];
+            }
 
-        event(new \App\Events\DriverAssignedToPickup($assignment, $driver));
+            if (! $lockedDriver->is_active) {
+                return ['success' => false, 'message' => 'Rider is inactive.'];
+            }
 
-        return [
-            'success' => true,
-            'message' => 'Rider assigned successfully.',
-            'data' => ['assignment' => $assignment->load('driver', 'targetWarehouse')],
-        ];
+            if (! $lockedDriver->hasCapability(Driver::CAPABILITY_PICKUP)) {
+                return ['success' => false, 'message' => 'Rider is not configured for pickup assignments.'];
+            }
+
+            $busy = $this->busyConflict($lockedDriver, $confirmBusyAssignment);
+            if ($busy) {
+                return $busy;
+            }
+
+            $assignment = PickupAssignment::query()->create([
+                'shipment_id' => $lockedShipment->id,
+                'driver_id' => $lockedDriver->id,
+                'target_warehouse_id' => $targetWarehouseId,
+                'status' => PickupAssignmentStatus::ASSIGNED,
+                'assigned_by' => $admin?->id,
+                'assigned_at' => now(),
+                'notes' => $notes,
+            ]);
+
+            $lockedShipment->update(['status' => ShipmentStatus::PICKUP_ASSIGNED]);
+            $this->assignmentAudit->record('pickup', $assignment->id, 'assigned', null, $lockedDriver->id, $admin);
+            $this->workloads->syncStatus($lockedDriver);
+
+            event(new \App\Events\DriverAssignedToPickup($assignment, $lockedDriver));
+
+            return [
+                'success' => true,
+                'message' => 'Rider assigned successfully.',
+                'data' => ['assignment' => $assignment->load('driver', 'targetWarehouse')],
+            ];
+        });
     }
 
     public function updateAssignment(
         PickupAssignment $assignment,
         ?int $newDriverId,
         ?int $newWarehouseId,
-        PushNotificationService $pushService
-    ): array
-    {
-        if (
-            $assignment->picked_up_at
-            || $assignment->completed_at
-            || in_array($assignment->status, [PickupAssignmentStatus::COMPLETED, PickupAssignmentStatus::CANCELLED], true)
-        ) {
-            return [
-                'success' => false,
-                'message' => 'Assignment can only be edited before pickup is confirmed.',
-            ];
-        }
-
-        $driverChanged    = $newDriverId !== null && (int) $newDriverId !== (int) $assignment->driver_id;
-        $warehouseChanged = $newWarehouseId !== (int) $assignment->target_warehouse_id;
-
-        if (!$driverChanged && !$warehouseChanged) {
-            return [
-                'success' => true,
-                'message' => 'No changes were made.',
-                'data'    => ['assignment' => $assignment->load(['driver', 'targetWarehouse', 'shipment'])],
-            ];
-        }
-
-        // Capture old values before any mutation
-        $assignment->loadMissing(['driver', 'targetWarehouse', 'shipment']);
-        $oldDriver    = $assignment->driver;
-        $oldWarehouse = $assignment->targetWarehouse;
-
-        // --- Apply driver change ---
-        if ($driverChanged) {
-            $newDriver = Driver::find($newDriverId);
-
-            if (!$newDriver) {
-                return ['success' => false, 'message' => 'Rider not found.'];
-            }
-            if (!$newDriver->is_active) {
-                return ['success' => false, 'message' => 'Selected rider is inactive.'];
-            }
-            if (!$newDriver->hasCapability(Driver::CAPABILITY_PICKUP)) {
-                return ['success' => false, 'message' => 'Selected rider is not configured for pickup assignments.'];
+        PushNotificationService $pushService,
+        ?User $actor = null,
+        bool $confirmBusyAssignment = false,
+        ?string $reassignmentReason = null,
+    ): array {
+        return DB::transaction(function () use ($assignment, $newDriverId, $newWarehouseId, $pushService, $actor, $confirmBusyAssignment, $reassignmentReason) {
+            $assignment = PickupAssignment::query()->lockForUpdate()->findOrFail($assignment->id);
+            if ($assignment->picked_up_at || $assignment->completed_at
+                || in_array($assignment->status, [PickupAssignmentStatus::COMPLETED, PickupAssignmentStatus::CANCELLED], true)) {
+                return ['success' => false, 'message' => 'Assignment can only be edited before pickup is confirmed.'];
             }
 
-            if ($oldDriver) {
-                $oldDriver->update(['status' => 'available']);
+            $driverChanged = $newDriverId !== null && (int) $newDriverId !== (int) $assignment->driver_id;
+            $warehouseChanged = $newWarehouseId !== null
+                && (int) $newWarehouseId !== (int) $assignment->target_warehouse_id;
+            if (! $driverChanged && ! $warehouseChanged) {
+                return ['success' => true, 'message' => 'No changes were made.', 'data' => ['assignment' => $assignment->load(['driver', 'targetWarehouse', 'shipment'])]];
             }
-            $newDriver->update(['status' => 'busy']);
-            $assignment->driver_id = $newDriver->id;
-        }
 
-        // --- Apply warehouse change ---
-        $newWarehouse = null;
-        if ($warehouseChanged) {
-            if ($newWarehouseId) {
-                $newWarehouse = Warehouse::find($newWarehouseId);
-                if (!$newWarehouse) {
+            $assignment->loadMissing(['targetWarehouse', 'shipment']);
+            $oldDriver = $assignment->driver;
+            $oldWarehouse = $assignment->targetWarehouse;
+            $newDriver = $oldDriver;
+
+            if ($driverChanged) {
+                $lockedDrivers = Driver::query()
+                    ->whereIn('id', collect([$assignment->driver_id, $newDriverId])->filter()->unique())
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+                $oldDriver = $lockedDrivers->get((int) $assignment->driver_id) ?? $oldDriver;
+                $newDriver = $lockedDrivers->get((int) $newDriverId);
+                if (! $newDriver) {
+                    return ['success' => false, 'message' => 'Rider not found.'];
+                }
+                if (! $newDriver->is_active) {
+                    return ['success' => false, 'message' => 'Selected rider is inactive.'];
+                }
+                if (! $newDriver->hasCapability(Driver::CAPABILITY_PICKUP)) {
+                    return ['success' => false, 'message' => 'Selected rider is not configured for pickup assignments.'];
+                }
+                if ($busy = $this->busyConflict($newDriver, $confirmBusyAssignment)) {
+                    return $busy;
+                }
+                $assignment->driver_id = $newDriver->id;
+            }
+
+            if ($warehouseChanged) {
+                if ($newWarehouseId && ! Warehouse::query()->whereKey($newWarehouseId)->exists()) {
                     return ['success' => false, 'message' => 'Warehouse not found.'];
                 }
+                $assignment->target_warehouse_id = $newWarehouseId ?: null;
             }
-            $assignment->target_warehouse_id = $newWarehouseId ?: null;
-        }
 
-        $assignment->save();
-        $assignment->load(['driver', 'targetWarehouse', 'shipment']);
+            $assignment->save();
+            $assignment->load(['driver', 'targetWarehouse', 'shipment']);
 
-        $shipmentNumber  = $assignment->shipment?->shipment_number ?? 'N/A';
-        $currentDriver   = $assignment->driver;
-        $currentWarehouse = $assignment->targetWarehouse;
+            if ($driverChanged) {
+                $this->assignmentAudit->record('pickup', $assignment->id, 'reassigned', $oldDriver?->id, $newDriver?->id, $actor, $reassignmentReason);
+                if ($oldDriver) {
+                    event(new \App\Events\DriverUnassignedFromPickup($assignment, $oldDriver, $reassignmentReason));
+                }
+                if ($newDriver) {
+                    event(new \App\Events\DriverAssignedToPickup($assignment, $newDriver, $reassignmentReason, false));
+                }
+                $this->workloads->syncMany([$oldDriver?->id, $newDriver?->id]);
+            }
 
-        // --- Send smart notifications ---
+            if ($warehouseChanged) {
+                $assignmentId = $assignment->id;
+                $shipmentNumber = $assignment->shipment?->shipment_number ?? 'N/A';
+                $currentDriver = $assignment->driver;
+                $currentWarehouse = $assignment->targetWarehouse;
+                DB::afterCommit(function () use ($pushService, $assignmentId, $shipmentNumber, $currentDriver, $currentWarehouse, $oldWarehouse, $driverChanged) {
+                    $data = ['pickup_id' => (string) $assignmentId, 'assignment_id' => (string) $assignmentId, 'shipment_number' => $shipmentNumber];
+                    if ($currentDriver && ! $driverChanged) {
+                        $name = $currentWarehouse?->name ?? 'a new warehouse';
+                        $pushService->sendToDriver($currentDriver, 'Drop-off Destination Changed', "Your drop-off destination for parcel {$shipmentNumber} has been changed to {$name}.", $data, 'pickup_warehouse_changed');
+                    }
+                    if ($oldWarehouse && $oldWarehouse->id !== $currentWarehouse?->id) {
+                        $pushService->sendToWarehouseManagers($oldWarehouse, 'Pickup Redirected', "Pickup for parcel {$shipmentNumber} has been redirected to ".($currentWarehouse?->name ?? 'another warehouse').'.', $data, 'pickup_redirected');
+                    }
+                    if ($currentWarehouse && ! $driverChanged) {
+                        $driverName = $currentDriver?->name ?? 'A rider';
+                        $pushService->sendToWarehouseManagers($currentWarehouse, 'Incoming Pickup', "{$driverName} will bring parcel {$shipmentNumber} to your warehouse.", $data, 'pickup_incoming');
+                    }
+                });
+            }
 
-        if ($driverChanged && !$warehouseChanged) {
-            // Notify old driver: unassigned
-            if ($oldDriver) {
-                $pushService->sendToDriver(
-                    driver: $oldDriver,
-                    title: 'Pickup Assignment Removed',
-                    body: "You have been unassigned from pickup for shipment {$shipmentNumber}.",
-                    data: ['assignment_id' => (string) $assignment->id, 'shipment_number' => $shipmentNumber],
-                    type: 'driver_unassigned'
-                );
-            }
-            // Notify new driver: assigned
-            if ($currentDriver) {
-                $warehouseName = $currentWarehouse?->name;
-                $body = $warehouseName
-                    ? "Pick up shipment {$shipmentNumber} and deliver to {$warehouseName}."
-                    : "You have been assigned to pick up shipment {$shipmentNumber}.";
-                $pushService->sendToDriver(
-                    driver: $currentDriver,
-                    title: 'New Pickup Assignment',
-                    body: $body,
-                    data: ['assignment_id' => (string) $assignment->id, 'shipment_number' => $shipmentNumber],
-                    type: 'driver_assigned'
-                );
-            }
-            // Notify warehouse managers: driver changed
-            if ($currentWarehouse) {
-                $newDriverName = $currentDriver?->name ?? 'A rider';
-                $pushService->sendToWarehouseManagers(
-                    warehouse: $currentWarehouse,
-                    title: 'Pickup Rider Changed',
-                    body: "Rider changed — {$newDriverName} will now handle pickup for shipment {$shipmentNumber}.",
-                    data: ['assignment_id' => (string) $assignment->id, 'shipment_number' => $shipmentNumber],
-                    type: 'pickup_driver_changed'
-                );
-            }
-        } elseif ($warehouseChanged && !$driverChanged) {
-            // Notify driver: destination changed
-            if ($currentDriver) {
-                $newWarehouseName = $currentWarehouse?->name ?? 'a new warehouse';
-                $pushService->sendToDriver(
-                    driver: $currentDriver,
-                    title: 'Drop-off Destination Changed',
-                    body: "Your drop-off destination for shipment {$shipmentNumber} has been changed to {$newWarehouseName}.",
-                    data: ['assignment_id' => (string) $assignment->id, 'shipment_number' => $shipmentNumber],
-                    type: 'pickup_warehouse_changed'
-                );
-            }
-            // Notify old warehouse managers: redirected
-            if ($oldWarehouse && $oldWarehouse->id !== $assignment->target_warehouse_id) {
-                $newWarehouseName = $currentWarehouse?->name ?? 'another warehouse';
-                $pushService->sendToWarehouseManagers(
-                    warehouse: $oldWarehouse,
-                    title: 'Pickup Redirected',
-                    body: "Pickup for shipment {$shipmentNumber} has been redirected to {$newWarehouseName}.",
-                    data: ['assignment_id' => (string) $assignment->id, 'shipment_number' => $shipmentNumber],
-                    type: 'pickup_redirected'
-                );
-            }
-            // Notify new warehouse managers: incoming
-            if ($currentWarehouse) {
-                $driverName = $currentDriver?->name ?? 'A rider';
-                $pushService->sendToWarehouseManagers(
-                    warehouse: $currentWarehouse,
-                    title: 'Incoming Pickup',
-                    body: "Incoming pickup: {$driverName} will bring shipment {$shipmentNumber} to your warehouse.",
-                    data: ['assignment_id' => (string) $assignment->id, 'shipment_number' => $shipmentNumber],
-                    type: 'pickup_incoming'
-                );
-            }
-        } else {
-            // Both changed
-            // Notify old driver: unassigned
-            if ($oldDriver) {
-                $pushService->sendToDriver(
-                    driver: $oldDriver,
-                    title: 'Pickup Assignment Removed',
-                    body: "You have been unassigned from pickup for shipment {$shipmentNumber}.",
-                    data: ['assignment_id' => (string) $assignment->id, 'shipment_number' => $shipmentNumber],
-                    type: 'driver_unassigned'
-                );
-            }
-            // Notify new driver: assigned to new warehouse
-            if ($currentDriver) {
-                $newWarehouseName = $currentWarehouse?->name;
-                $body = $newWarehouseName
-                    ? "Pick up shipment {$shipmentNumber} and deliver to {$newWarehouseName}."
-                    : "You have been assigned to pick up shipment {$shipmentNumber}.";
-                $pushService->sendToDriver(
-                    driver: $currentDriver,
-                    title: 'New Pickup Assignment',
-                    body: $body,
-                    data: ['assignment_id' => (string) $assignment->id, 'shipment_number' => $shipmentNumber],
-                    type: 'driver_assigned'
-                );
-            }
-            // Notify old warehouse managers: redirected
-            if ($oldWarehouse && $oldWarehouse->id !== $assignment->target_warehouse_id) {
-                $newWarehouseName = $currentWarehouse?->name ?? 'another warehouse';
-                $pushService->sendToWarehouseManagers(
-                    warehouse: $oldWarehouse,
-                    title: 'Pickup Redirected',
-                    body: "Pickup for shipment {$shipmentNumber} has been redirected to {$newWarehouseName}.",
-                    data: ['assignment_id' => (string) $assignment->id, 'shipment_number' => $shipmentNumber],
-                    type: 'pickup_redirected'
-                );
-            }
-            // Notify new warehouse managers: incoming with new driver
-            if ($currentWarehouse) {
-                $newDriverName = $currentDriver?->name ?? 'A rider';
-                $pushService->sendToWarehouseManagers(
-                    warehouse: $currentWarehouse,
-                    title: 'Incoming Pickup',
-                    body: "Incoming pickup: {$newDriverName} will bring shipment {$shipmentNumber} to your warehouse.",
-                    data: ['assignment_id' => (string) $assignment->id, 'shipment_number' => $shipmentNumber],
-                    type: 'pickup_incoming'
-                );
-            }
-        }
-
-        return [
-            'success' => true,
-            'message' => 'Assignment updated successfully.',
-            'data'    => ['assignment' => $assignment],
-        ];
+            return ['success' => true, 'message' => 'Assignment updated successfully.', 'data' => ['assignment' => $assignment]];
+        });
     }
 
     public function getAvailableDrivers(?string $vehicleType = null, ?string $assignmentType = null): array
     {
         $assignmentType = is_string($assignmentType) ? strtolower(trim($assignmentType)) : null;
-        if (!in_array($assignmentType, Driver::CAPABILITIES, true)) {
+        if (! in_array($assignmentType, Driver::CAPABILITIES, true)) {
             $assignmentType = Driver::CAPABILITY_PICKUP;
         }
 
-        $query = Driver::where('is_active', true)
-            ->where(function ($q) use ($assignmentType) {
-                // Backward compatibility: null capabilities are treated as pickup-capable.
-                if ($assignmentType === Driver::CAPABILITY_PICKUP) {
-                    $q->whereNull('task_capabilities')
-                        ->orWhereJsonContains('task_capabilities', $assignmentType);
-                } else {
-                    $q->whereJsonContains('task_capabilities', $assignmentType);
-                }
-            });
+        return $this->workloads->assignmentOptions($assignmentType, $vehicleType)->all();
+    }
 
-        if ($vehicleType) {
-            $query->where('vehicle_type', $vehicleType);
-        }
-
-        return $query->orderBy('name')->get()->toArray();
+    private function busyConflict(Driver $driver, bool $confirmed): ?array
+    {
+        return $this->workloads->busyConflict($driver, $confirmed);
     }
 
     public function startEnRoute(PickupAssignment $assignment): array
@@ -353,8 +263,7 @@ class PickupAssignmentService
         array $photos = [],
         ?string $notes = null,
         array $removePhotoIds = []
-    ): array
-    {
+    ): array {
         // Auto-advance through skipped statuses so driver can confirm directly
         $now = now();
         if ($assignment->status === PickupAssignmentStatus::ASSIGNED) {
@@ -397,7 +306,7 @@ class PickupAssignmentService
         }
 
         foreach ($photos as $photo) {
-            if (!($photo instanceof UploadedFile)) {
+            if (! ($photo instanceof UploadedFile)) {
                 return [
                     'success' => false,
                     'message' => 'Invalid item photo upload.',
@@ -417,8 +326,8 @@ class PickupAssignmentService
                 ->count();
 
             $normalizedRemoveIds = collect($removePhotoIds)
-                ->map(fn($value) => (int) $value)
-                ->filter(fn($value) => $value > 0)
+                ->map(fn ($value) => (int) $value)
+                ->filter(fn ($value) => $value > 0)
                 ->unique()
                 ->values()
                 ->all();
@@ -457,7 +366,7 @@ class PickupAssignmentService
                 'confirmed_at' => $confirmedAt,
             ]);
 
-            if (!empty($removablePhotoIds)) {
+            if (! empty($removablePhotoIds)) {
                 PickupPhoto::query()
                     ->where('pickup_assignment_id', $assignment->id)
                     ->where('shipment_item_id', $item->id)
@@ -468,7 +377,7 @@ class PickupAssignmentService
             }
 
             foreach ($photos as $photo) {
-                if (!$photo instanceof UploadedFile) {
+                if (! $photo instanceof UploadedFile) {
                     continue;
                 }
 
@@ -503,9 +412,8 @@ class PickupAssignmentService
         ?float $lat = null,
         ?float $lng = null,
         ?string $notes = null
-    ): array
-    {
-        if (!in_array($assignment->status, [PickupAssignmentStatus::ARRIVED, PickupAssignmentStatus::PICKING_UP], true)) {
+    ): array {
+        if (! in_array($assignment->status, [PickupAssignmentStatus::ARRIVED, PickupAssignmentStatus::PICKING_UP], true)) {
             return [
                 'success' => false,
                 'message' => 'Rider must have arrived to finalize pickup.',
@@ -532,7 +440,7 @@ class PickupAssignmentService
             ->get()
             ->keyBy('shipment_item_id');
 
-        return DB::transaction(function () use ($assignment, $shipmentItems, $confirmations, $driverPickedQuantity, $lat, $lng, $notes) {
+        return DB::transaction(function () use ($assignment, $confirmations, $driverPickedQuantity, $lat, $lng, $notes) {
             $pickedUpAt = now();
 
             $payload = [
@@ -542,13 +450,13 @@ class PickupAssignmentService
                 'completed_at' => $pickedUpAt,
             ];
 
-            if (!is_null($notes)) {
+            if (! is_null($notes)) {
                 $payload['notes'] = $notes;
             }
-            if (!is_null($lat)) {
+            if (! is_null($lat)) {
                 $payload['pickup_latitude'] = $lat;
             }
-            if (!is_null($lng)) {
+            if (! is_null($lng)) {
                 $payload['pickup_longitude'] = $lng;
             }
 
@@ -556,7 +464,7 @@ class PickupAssignmentService
 
             $pickupLocation = $assignment->shipment->pickup_town
                 ?: $assignment->shipment->pickup_gh_post_address
-                ?: (!is_null($assignment->pickup_latitude) && !is_null($assignment->pickup_longitude)
+                ?: (! is_null($assignment->pickup_latitude) && ! is_null($assignment->pickup_longitude)
                     ? "{$assignment->pickup_latitude}, {$assignment->pickup_longitude}"
                     : null);
 
@@ -569,7 +477,7 @@ class PickupAssignmentService
                 $item->update(['status' => ItemStatus::PICKED_UP]);
 
                 $confirmation = $confirmations->get($item->id);
-                if (!$confirmation) {
+                if (! $confirmation) {
                     $confirmation = PickupItemConfirmation::query()->create([
                         'pickup_assignment_id' => $assignment->id,
                         'shipment_item_id' => $item->id,
@@ -589,13 +497,14 @@ class PickupAssignmentService
                     'shipment_item_id' => $item->id,
                     'status' => ItemStatus::PICKED_UP->value,
                     'location' => $pickupLocation,
-                    'notes' => trim($baseNote . ' ' . ($extraNote ?? '')),
+                    'notes' => trim($baseNote.' '.($extraNote ?? '')),
                     'created_by' => "driver:{$assignment->driver_id}",
                     'created_at' => $pickedUpAt,
                 ]);
             });
 
             $assignment->shipment->update(['status' => ShipmentStatus::PICKED_UP]);
+            $this->workloads->syncStatus($assignment->driver_id);
 
             return [
                 'success' => true,
@@ -611,8 +520,7 @@ class PickupAssignmentService
         ?int $receivedWarehouseId = null,
         ?string $receiveNotes = null,
         array $trackingMetaByItem = []
-    ): array
-    {
+    ): array {
         if (in_array($assignment->status, [PickupAssignmentStatus::CANCELLED], true)) {
             return [
                 'success' => false,
@@ -627,7 +535,7 @@ class PickupAssignmentService
             ];
         }
 
-        if (!is_null($assignment->received_at)) {
+        if (! is_null($assignment->received_at)) {
             return [
                 'success' => false,
                 'message' => 'This pickup has already been received at warehouse.',
@@ -648,14 +556,14 @@ class PickupAssignmentService
                 ->lockForUpdate()
                 ->find($assignment->id);
 
-            if (!$lockedAssignment) {
+            if (! $lockedAssignment) {
                 return [
                     'success' => false,
                     'message' => 'Pickup assignment not found.',
                 ];
             }
 
-            if (!is_null($lockedAssignment->received_at)) {
+            if (! is_null($lockedAssignment->received_at)) {
                 return [
                     'success' => false,
                     'message' => 'This pickup has already been received at warehouse.',
@@ -692,7 +600,7 @@ class PickupAssignmentService
             });
 
             if ($lockedAssignment->driver) {
-                $lockedAssignment->driver->update(['status' => 'available']);
+                $this->workloads->syncStatus($lockedAssignment->driver);
             }
 
             return [
@@ -709,7 +617,7 @@ class PickupAssignmentService
         });
     }
 
-    public function cancel(PickupAssignment $assignment, ?string $reason = null): array
+    public function cancel(PickupAssignment $assignment, ?string $reason = null, ?User $actor = null): array
     {
         if (blank($reason)) {
             return [
@@ -718,7 +626,7 @@ class PickupAssignmentService
             ];
         }
 
-        if (!is_null($assignment->picked_up_at) || !is_null($assignment->completed_at)) {
+        if (! is_null($assignment->picked_up_at) || ! is_null($assignment->completed_at)) {
             return [
                 'success' => false,
                 'message' => 'You cannot unassign after items have been picked up.',
@@ -732,26 +640,28 @@ class PickupAssignmentService
             ];
         }
 
-        $driver = $assignment->driver;
+        return DB::transaction(function () use ($assignment, $reason, $actor) {
+            $assignment = PickupAssignment::query()->lockForUpdate()->findOrFail($assignment->id);
+            if ($assignment->picked_up_at || $assignment->completed_at
+                || in_array($assignment->status, [PickupAssignmentStatus::COMPLETED, PickupAssignmentStatus::CANCELLED], true)) {
+                return ['success' => false, 'message' => 'This assignment can no longer be cancelled.'];
+            }
 
-        $assignment->update([
-            'status' => PickupAssignmentStatus::CANCELLED,
-            'cancelled_at' => now(),
-            'cancellation_reason' => $reason,
-        ]);
+            $driver = $assignment->driver;
+            $assignment->update([
+                'status' => PickupAssignmentStatus::CANCELLED,
+                'cancelled_at' => now(),
+                'cancellation_reason' => $reason,
+            ]);
+            $assignment->shipment->update(['status' => ShipmentStatus::SUBMITTED]);
+            $this->assignmentAudit->record('pickup', $assignment->id, 'unassigned', $driver?->id, null, $actor, $reason);
 
-        $shipment = $assignment->shipment;
-        $shipment->update(['status' => ShipmentStatus::SUBMITTED]);
-        $assignment->driver->update(['status' => 'available']);
+            if ($driver) {
+                event(new \App\Events\DriverUnassignedFromPickup($assignment, $driver, $reason));
+                $this->workloads->syncStatus($driver);
+            }
 
-        // Fire unassignment event so driver receives a push notification
-        if ($driver) {
-            event(new \App\Events\DriverUnassignedFromPickup($assignment, $driver));
-        }
-
-        return [
-            'success' => true,
-            'message' => 'Assignment cancelled.',
-        ];
+            return ['success' => true, 'message' => 'Assignment cancelled.'];
+        });
     }
 }

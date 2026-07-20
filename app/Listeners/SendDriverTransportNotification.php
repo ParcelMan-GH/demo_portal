@@ -21,6 +21,7 @@ class SendDriverTransportNotification
             title: 'New Transport Assignment',
             body: "You have been assigned to transport manifest {$manifestNumber} to {$destination}.",
             data: [
+                'transport_id'    => (string) $manifest->id,
                 'manifest_id'     => (string) $manifest->id,
                 'manifest_number' => $manifestNumber,
             ],

@@ -14,6 +14,7 @@ use App\Models\TransportManifestReceiptLabelScan;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceiptItemLabel;
 use App\Services\Warehouse\BarcodeService;
+use App\Services\DriverWorkloadService;
 use App\Services\Warehouse\WarehousePortalService;
 use App\Services\Warehouse\WarehouseTransportReceivingService;
 use App\Services\Warehouse\WarehouseTransportService;
@@ -105,11 +106,10 @@ class TransportManifestController extends Controller
             'warehouseReceipt.finalizedBy',
         ]);
 
-        $transportDrivers = Driver::query()
-            ->where('is_active', true)
-            ->whereJsonContains('task_capabilities', Driver::CAPABILITY_TRANSPORT)
-            ->orderBy('name')
-            ->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']);
+        $transportDrivers = app(DriverWorkloadService::class)->assignmentOptions(
+            Driver::CAPABILITY_TRANSPORT,
+            includeDriverIds: [$manifest->assigned_driver_id],
+        );
 
         $availableSortBatches = SortBatch::query()
             ->with([
@@ -351,12 +351,21 @@ class TransportManifestController extends Controller
 
         $validated = $request->validate([
             'driver_id' => ['required', 'integer', 'exists:drivers,id'],
+            'confirm_busy_assignment' => ['sometimes', 'boolean'],
+            'reassignment_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         $driver = Driver::query()->findOrFail((int) $validated['driver_id']);
-        $result = $this->transportService->assignDriver($manifest, $driver, $warehouse, Auth::guard('admin')->user());
+        $result = $this->transportService->assignDriver(
+            $manifest,
+            $driver,
+            $warehouse,
+            Auth::guard('admin')->user(),
+            (bool) ($validated['confirm_busy_assignment'] ?? false),
+            $validated['reassignment_reason'] ?? null,
+        );
 
-        return response()->json($result, $result['success'] ? 200 : 422);
+        return response()->json($result, ($result['success'] ?? false) ? 200 : (($result['code'] ?? null) === 'rider_busy' ? 409 : 422));
     }
 
     public function unassignDriver(Request $request, TransportManifest $manifest): JsonResponse

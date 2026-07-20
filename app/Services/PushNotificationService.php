@@ -32,6 +32,7 @@ class PushNotificationService
     public function sendToDriver(Driver $driver, string $title, string $body, array $data = [], string $type = 'general'): bool
     {
         if (!$driver->fcm_token) {
+            $this->log('App\\Models\\Driver', $driver->id, $type, $title, $body, $data, 'logged');
             return false;
         }
         return $this->send($driver->fcm_token, $title, $body, $data, 'App\Models\Driver', $driver->id, $type);
@@ -199,6 +200,22 @@ class PushNotificationService
             );
 
             if (!$success) {
+                $errorStatus = (string) ($response->json('error.status') ?? '');
+                $errorMessage = (string) ($response->json('error.message') ?? '');
+                $fcmErrorCodes = collect($response->json('error.details', []))
+                    ->pluck('errorCode')
+                    ->filter()
+                    ->map(fn ($code) => strtoupper((string) $code));
+                if ($notifiableType === 'App\\Models\\Driver'
+                    && ($errorStatus === 'NOT_FOUND'
+                        || $fcmErrorCodes->contains('UNREGISTERED')
+                        || str_contains(strtoupper($errorMessage), 'UNREGISTERED'))) {
+                    Driver::query()
+                        ->whereKey($notifiableId)
+                        ->where('fcm_token', $token)
+                        ->update(['fcm_token' => null]);
+                }
+
                 Log::warning('PushNotificationService: FCM v1 send failed.', [
                     'status'   => $response->status(),
                     'response' => $response->body(),

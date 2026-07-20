@@ -2,10 +2,10 @@
 
 namespace App\Services\Warehouse;
 
-use App\Helpers\PhoneHelper;
 use App\Enums\ItemStatus;
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentStatus;
+use App\Helpers\PhoneHelper;
 use App\Models\DeliveryRun;
 use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
@@ -13,16 +13,18 @@ use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
 use App\Models\RiderPackageTransfer;
 use App\Models\RiderTeamHandoverItem;
-use App\Models\WarehouseReceiptItemLabel;
 use App\Models\Shipment;
+use App\Models\ShipmentCharge;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemTracking;
 use App\Models\SortBatch;
 use App\Models\User;
 use App\Models\Warehouse;
-use App\Models\ShipmentCharge;
-use App\Services\ChargesService;
+use App\Models\WarehouseReceiptItemLabel;
 use App\Services\BusHandoffConfirmationService;
+use App\Services\ChargesService;
+use App\Services\DriverWorkloadService;
+use App\Services\RiderAssignmentAuditService;
 use App\Services\SmsService;
 use App\Services\StorageService;
 use Illuminate\Database\Eloquent\Builder;
@@ -41,8 +43,9 @@ class WarehouseDeliveryService
         private ChargesService $chargesService,
         private BusHandoffConfirmationService $busHandoffConfirmationService,
         private ?RecipientPaymentService $recipientPaymentService = null,
-    ) {
-    }
+        private ?DriverWorkloadService $workloads = null,
+        private ?RiderAssignmentAuditService $assignmentAudit = null,
+    ) {}
 
     public function runsQuery(Warehouse $warehouse): Builder
     {
@@ -77,7 +80,7 @@ class WarehouseDeliveryService
     /**
      * Add loose warehouse packages to a draft run while keeping the sorting pipeline intact.
      *
-     * @param array<int, int|string> $warehouseReceiptItemIds
+     * @param  array<int, int|string>  $warehouseReceiptItemIds
      */
     public function addItemsToDraftRun(
         DeliveryRun $run,
@@ -110,16 +113,16 @@ class WarehouseDeliveryService
                 return ['success' => false, 'message' => 'This run is already linked to a sealed batch. Create a new draft run to add loose packages.'];
             }
 
-            if (!$batch) {
+            if (! $batch) {
                 $batchResult = $sortingService->createBatch(
                     originWarehouse: $warehouse,
                     destinationWarehouse: null,
                     user: $user,
                     dispatchMode: SortBatch::DISPATCH_LOCAL_DELIVERY,
-                    notes: 'Draft package group for delivery run ' . $run->run_number . '.',
+                    notes: 'Draft package group for delivery run '.$run->run_number.'.',
                 );
 
-                if (!$batchResult['success']) {
+                if (! $batchResult['success']) {
                     return $batchResult;
                 }
 
@@ -134,7 +137,7 @@ class WarehouseDeliveryService
                 warehouseReceiptItemIds: $warehouseReceiptItemIds,
             );
 
-            if (!$addResult['success']) {
+            if (! $addResult['success']) {
                 return $addResult;
             }
 
@@ -208,7 +211,7 @@ class WarehouseDeliveryService
      * Create a delivery run directly from eligible receipt items.
      * Auto-creates a sealed local-delivery sort batch behind the scenes.
      *
-     * @param array<int, int|string> $warehouseReceiptItemIds
+     * @param  array<int, int|string>  $warehouseReceiptItemIds
      */
     public function createRunFromItems(
         Warehouse $warehouse,
@@ -229,7 +232,7 @@ class WarehouseDeliveryService
                 notes: 'Auto-created for direct delivery run.',
             );
 
-            if (!$batchResult['success']) {
+            if (! $batchResult['success']) {
                 return $batchResult;
             }
 
@@ -242,7 +245,7 @@ class WarehouseDeliveryService
                 warehouseReceiptItemIds: $warehouseReceiptItemIds,
             );
 
-            if (!$addResult['success']) {
+            if (! $addResult['success']) {
                 return $addResult;
             }
 
@@ -252,7 +255,7 @@ class WarehouseDeliveryService
                 user: $user,
             );
 
-            if (!$sealResult['success']) {
+            if (! $sealResult['success']) {
                 return $sealResult;
             }
 
@@ -417,12 +420,15 @@ class WarehouseDeliveryService
         }
 
         return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems, $claimedLabelIds, $allocatedQuantitiesByItemId) {
+            $driver = Driver::query()->lockForUpdate()->findOrFail($driver->id);
+            $assignedAt = now();
             $run = DeliveryRun::query()->create([
                 'run_number' => $this->generateRunNumber($warehouse),
                 'warehouse_id' => $warehouse->id,
                 'assigned_driver_id' => $driver->id,
                 'status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY,
-                'dispatched_at' => now(),
+                'assigned_at' => $assignedAt,
+                'dispatched_at' => $assignedAt,
                 'created_by_user_id' => $admin?->id,
             ]);
 
@@ -471,7 +477,8 @@ class WarehouseDeliveryService
                 $destination = $this->resolveDeliveryDestination($item);
                 $phone = preg_replace('/\D/', '', (string) ($destination['recipient_phone'] ?? ''));
                 $town = mb_strtolower(trim((string) ($destination['town'] ?? '')));
-                return $phone . '|' . $town;
+
+                return $phone.'|'.$town;
             })->values();
 
             foreach ($sortedDirect as $shipmentItem) {
@@ -535,9 +542,13 @@ class WarehouseDeliveryService
                 });
             }
 
+            $this->assignmentAudit()->record('delivery', $run->id, 'assigned', null, $driver->id, $admin);
+            event(new \App\Events\DriverAssignedToDelivery($run, $driver));
+            $this->workloads()->syncStatus($driver);
+
             return [
                 'success' => true,
-                'message' => 'Delivery run created with ' . $stopsCount . ' stop(s).',
+                'message' => 'Delivery run created with '.$stopsCount.' stop(s).',
                 'data' => [
                     'delivery_run_id' => $run->id,
                     'run_number' => $run->run_number,
@@ -594,7 +605,7 @@ class WarehouseDeliveryService
             $grouped = [];
             foreach ($activeItems as $batchItem) {
                 $shipmentItem = $batchItem->shipmentItem;
-                if (!$shipmentItem || !$shipmentItem->shipment) {
+                if (! $shipmentItem || ! $shipmentItem->shipment) {
                     continue;
                 }
 
@@ -611,7 +622,7 @@ class WarehouseDeliveryService
                     mb_strtolower((string) ($destination['landmark'] ?? '')),
                 ]);
 
-                if (!isset($grouped[$key])) {
+                if (! isset($grouped[$key])) {
                     $grouped[$key] = [
                         'destination' => $destination,
                         'items' => [],
@@ -679,7 +690,7 @@ class WarehouseDeliveryService
 
         foreach ($activeItems as $batchItem) {
             $shipmentItem = $batchItem->shipmentItem;
-            if (!$shipmentItem || !$shipmentItem->shipment) {
+            if (! $shipmentItem || ! $shipmentItem->shipment) {
                 continue;
             }
 
@@ -738,39 +749,86 @@ class WarehouseDeliveryService
         }
     }
 
-    public function assignDriver(DeliveryRun $run, Driver $driver, Warehouse $warehouse): array
-    {
+    public function assignDriver(
+        DeliveryRun $run,
+        Driver $driver,
+        Warehouse $warehouse,
+        ?User $actor = null,
+        bool $confirmBusyAssignment = false,
+        ?string $reassignmentReason = null,
+    ): array {
         if ((int) $run->warehouse_id !== (int) $warehouse->id) {
             return ['success' => false, 'message' => 'Cannot assign rider for another warehouse run.'];
         }
 
-        if (!in_array($run->status, [DeliveryRun::STATUS_DRAFT, DeliveryRun::STATUS_ASSIGNED], true)) {
+        if (! in_array($run->status, [DeliveryRun::STATUS_DRAFT, DeliveryRun::STATUS_ASSIGNED], true)) {
             return ['success' => false, 'message' => 'Delivery run cannot be reassigned in its current state.'];
         }
 
-        if (!$driver->is_active) {
+        if (! $driver->is_active) {
             return ['success' => false, 'message' => 'Rider is inactive.'];
         }
 
-        if (!$driver->hasCapability(Driver::CAPABILITY_DELIVERY)) {
+        if (! $driver->hasCapability(Driver::CAPABILITY_DELIVERY)) {
             return ['success' => false, 'message' => 'Rider is not configured for delivery assignments.'];
         }
 
-        return DB::transaction(function () use ($run, $driver) {
+        return DB::transaction(function () use ($run, $driver, $actor, $confirmBusyAssignment, $reassignmentReason) {
             $run = DeliveryRun::query()->lockForUpdate()->findOrFail($run->id);
             $previousDriverId = $run->assigned_driver_id;
+            $lockedDrivers = Driver::query()
+                ->whereIn('id', collect([$previousDriverId, $driver->id])->filter()->unique())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            $lockedDriver = $lockedDrivers->get((int) $driver->id);
+
+            if (! in_array($run->status, [DeliveryRun::STATUS_DRAFT, DeliveryRun::STATUS_ASSIGNED], true)) {
+                return ['success' => false, 'message' => 'Delivery run cannot be reassigned in its current state.'];
+            }
+
+            if (! $lockedDriver) {
+                return ['success' => false, 'message' => 'Rider not found.'];
+            }
+
+            if (! $lockedDriver->is_active) {
+                return ['success' => false, 'message' => 'Rider is inactive.'];
+            }
+
+            if (! $lockedDriver->hasCapability(Driver::CAPABILITY_DELIVERY)) {
+                return ['success' => false, 'message' => 'Rider is not configured for delivery assignments.'];
+            }
+
+            if ($previousDriverId && (int) $previousDriverId === (int) $lockedDriver->id) {
+                return [
+                    'success' => true,
+                    'message' => 'This rider is already assigned.',
+                    'data' => ['run' => $run->fresh(['assignedDriver', 'stops', 'items'])],
+                ];
+            }
+
+            if ($busy = $this->workloads()->busyConflict($lockedDriver, $confirmBusyAssignment)) {
+                return $busy;
+            }
+
+            $previousDriver = $previousDriverId ? $lockedDrivers->get((int) $previousDriverId) : null;
 
             $run->update([
-                'assigned_driver_id' => $driver->id,
+                'assigned_driver_id' => $lockedDriver->id,
                 'assigned_at' => now(),
                 'status' => DeliveryRun::STATUS_ASSIGNED,
             ]);
 
-            if ($previousDriverId && (int) $previousDriverId !== (int) $driver->id) {
-                Driver::query()->whereKey($previousDriverId)->update(['status' => 'available']);
-            }
+            $eventType = $previousDriverId ? 'reassigned' : 'assigned';
+            $this->assignmentAudit()->record('delivery', $run->id, $eventType, $previousDriverId, $lockedDriver->id, $actor, $reassignmentReason);
 
-            $driver->update(['status' => 'busy']);
+            if ($previousDriver) {
+                event(new \App\Events\DriverUnassignedFromDelivery($run, $previousDriver, $reassignmentReason));
+            }
+            event(new \App\Events\DriverAssignedToDelivery($run, $lockedDriver, $reassignmentReason));
+
+            $this->workloads()->syncMany([$previousDriverId, $lockedDriver->id]);
 
             return [
                 'success' => true,
@@ -792,7 +850,7 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Only assigned runs can be dispatched.'];
         }
 
-        if (!$run->assigned_driver_id) {
+        if (! $run->assigned_driver_id) {
             return ['success' => false, 'message' => 'Assign a delivery rider before dispatch.'];
         }
 
@@ -824,7 +882,7 @@ class WarehouseDeliveryService
 
             foreach ($run->items as $runItem) {
                 $item = $runItem->shipmentItem;
-                if (!$item) {
+                if (! $item) {
                     continue;
                 }
 
@@ -834,7 +892,7 @@ class WarehouseDeliveryService
                     'shipment_item_id' => $item->id,
                     'status' => ItemStatus::OUT_FOR_DELIVERY->value,
                     'location' => $warehouse->name,
-                    'notes' => 'Item dispatched for delivery run ' . $run->run_number . '.',
+                    'notes' => 'Item dispatched for delivery run '.$run->run_number.'.',
                     'meta' => [
                         'delivery_run_id' => $run->id,
                         'delivery_run_number' => $run->run_number,
@@ -881,7 +939,7 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Stop not found for this warehouse run.'];
         }
 
-        if (!in_array($run->status, [DeliveryRun::STATUS_ASSIGNED, DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED], true)) {
+        if (! in_array($run->status, [DeliveryRun::STATUS_ASSIGNED, DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED], true)) {
             return ['success' => false, 'message' => 'Cannot resend code in the current run status.'];
         }
 
@@ -899,7 +957,7 @@ class WarehouseDeliveryService
             $run->update(['status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY]);
         }
 
-        if (!in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED], true)) {
+        if (! in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED], true)) {
             return ['success' => false, 'message' => 'Delivery run is not active.'];
         }
 
@@ -928,7 +986,7 @@ class WarehouseDeliveryService
     }
 
     /**
-     * @param array<int, array<string, mixed>> $linePayloads
+     * @param  array<int, array<string, mixed>>  $linePayloads
      */
     public function driverConfirmStop(
         DeliveryRun $run,
@@ -948,7 +1006,7 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Delivery stop not found.'];
         }
 
-        if (!in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED], true)) {
+        if (! in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED], true)) {
             return ['success' => false, 'message' => 'Delivery run is not active.'];
         }
 
@@ -969,7 +1027,7 @@ class WarehouseDeliveryService
                 driver: $driver,
                 ipAddress: $ipAddress
             );
-            if (!$verifyResult['success']) {
+            if (! $verifyResult['success']) {
                 return $verifyResult;
             }
         }
@@ -1052,7 +1110,7 @@ class WarehouseDeliveryService
                             : ItemStatus::AT_DESTINATION->value,
                         'location' => $stop->town ?: $stop->gh_post_address ?: $stop->landmark,
                         'notes' => $lineStatus === DeliveryRunItem::STATUS_DELIVERED
-                            ? 'Delivery confirmed with verification code for run ' . $run->run_number . '.'
+                            ? 'Delivery confirmed with verification code for run '.$run->run_number.'.'
                             : 'Delivery partially/unsuccessfully confirmed; item returned to destination warehouse queue.',
                         'meta' => [
                             'delivery_run_id' => $run->id,
@@ -1098,10 +1156,6 @@ class WarehouseDeliveryService
                 $this->commissionService->createEarningsForStop($stop);
             }
 
-            if ($run->status === DeliveryRun::STATUS_COMPLETED && $run->assignedDriver) {
-                $run->assignedDriver->update(['status' => 'available']);
-            }
-
             return [
                 'success' => true,
                 'message' => $allDelivered
@@ -1130,7 +1184,7 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Delivery stop not found.'];
         }
 
-        if (!in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED], true)) {
+        if (! in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED], true)) {
             return ['success' => false, 'message' => 'Delivery run is not active.'];
         }
 
@@ -1151,7 +1205,7 @@ class WarehouseDeliveryService
                 driver: $driver,
                 ipAddress: $ipAddress
             );
-            if (!$verifyResult['success']) {
+            if (! $verifyResult['success']) {
                 return $verifyResult;
             }
         }
@@ -1222,7 +1276,7 @@ class WarehouseDeliveryService
                     }
 
                     $trackingNotes = match (true) {
-                        $allDelivered => 'Package delivered to recipient for run ' . $run->run_number . '.',
+                        $allDelivered => 'Package delivered to recipient for run '.$run->run_number.'.',
                         $noneDelivered => 'Package could not be delivered; returned to destination warehouse.',
                         default => "Partial package delivery ({$packagesDelivered}/{$totalPackages}); flagged for warehouse review.",
                     };
@@ -1282,15 +1336,11 @@ class WarehouseDeliveryService
                 $this->commissionService->createEarningsForStop($stop);
             }
 
-            if ($run->status === DeliveryRun::STATUS_COMPLETED && $run->assignedDriver) {
-                $run->assignedDriver->update(['status' => 'available']);
-            }
-
             // Optional in-field delivery fee the driver collected on arrival
             // (recipient→parcelman, due_stage=at_delivery, already paid). Only
             // recorded when the stop was at least partially delivered — we
             // don't bill a failed delivery.
-            if ($inFieldDeliveryFee !== null && $inFieldDeliveryFee > 0 && !$noneDelivered) {
+            if ($inFieldDeliveryFee !== null && $inFieldDeliveryFee > 0 && ! $noneDelivered) {
                 $this->recordInFieldDeliveryFeeForStop(
                     uniqueShipments: $uniqueShipments,
                     runItems: $runItems,
@@ -1317,8 +1367,8 @@ class WarehouseDeliveryService
      * lines. Only create new paid delivery-fee charges when the stop had no
      * prior delivery-fee record.
      *
-     * @param Collection<int, Shipment> $uniqueShipments
-     * @param Collection<int, DeliveryRunItem> $runItems
+     * @param  Collection<int, Shipment>  $uniqueShipments
+     * @param  Collection<int, DeliveryRunItem>  $runItems
      */
     private function recordInFieldDeliveryFeeForStop(
         Collection $uniqueShipments,
@@ -1341,11 +1391,11 @@ class WarehouseDeliveryService
                 $allocated += $amount;
 
                 $charge->update(array_filter([
-                    'amount'                 => $amount,
-                    'delivery_run_stop_id'   => $charge->delivery_run_stop_id ?: $stop->id,
-                    'recorded_by_driver_id'  => $driver->id,
-                    'notes'                  => $chargeCount > 1
-                        ? "Rider collected delivery fee on arrival (split from GHS " . number_format($inFieldDeliveryFee, 2) . " across {$chargeCount} existing charge(s))"
+                    'amount' => $amount,
+                    'delivery_run_stop_id' => $charge->delivery_run_stop_id ?: $stop->id,
+                    'recorded_by_driver_id' => $driver->id,
+                    'notes' => $chargeCount > 1
+                        ? 'Rider collected delivery fee on arrival (split from GHS '.number_format($inFieldDeliveryFee, 2)." across {$chargeCount} existing charge(s))"
                         : 'Rider collected delivery fee on arrival',
                 ]));
 
@@ -1367,21 +1417,21 @@ class WarehouseDeliveryService
             $itemCount = $billableRunItems->count();
             $share = round($inFieldDeliveryFee / $itemCount, 2);
             $noteSuffix = $itemCount > 1
-                ? " (split from GHS " . number_format($inFieldDeliveryFee, 2) . " across {$itemCount} package(s) delivered at this stop)"
+                ? ' (split from GHS '.number_format($inFieldDeliveryFee, 2)." across {$itemCount} package(s) delivered at this stop)"
                 : '';
 
             foreach ($billableRunItems as $runItem) {
                 $shipmentItem = $runItem->shipmentItem;
                 $this->chargesService->addCharge($shipmentItem->shipment, [
-                    'shipment_item_id'      => $shipmentItem->id,
-                    'charge_type'           => ShipmentCharge::TYPE_DELIVERY_FEE,
-                    'payer_type'            => ShipmentCharge::PAYER_RECIPIENT,
-                    'due_stage'             => ShipmentCharge::STAGE_AT_DELIVERY,
-                    'amount'                => $share,
-                    'status'                => ShipmentCharge::STATUS_PAID,
-                    'payment_method'        => 'cash',
-                    'delivery_run_stop_id'  => $stop->id,
-                    'notes'                 => "Rider collected delivery fee on arrival{$noteSuffix}",
+                    'shipment_item_id' => $shipmentItem->id,
+                    'charge_type' => ShipmentCharge::TYPE_DELIVERY_FEE,
+                    'payer_type' => ShipmentCharge::PAYER_RECIPIENT,
+                    'due_stage' => ShipmentCharge::STAGE_AT_DELIVERY,
+                    'amount' => $share,
+                    'status' => ShipmentCharge::STATUS_PAID,
+                    'payment_method' => 'cash',
+                    'delivery_run_stop_id' => $stop->id,
+                    'notes' => "Rider collected delivery fee on arrival{$noteSuffix}",
                 ], $driver);
             }
 
@@ -1391,19 +1441,19 @@ class WarehouseDeliveryService
         $shipmentCount = $uniqueShipments->count();
         $share = round($inFieldDeliveryFee / $shipmentCount, 2);
         $noteSuffix = $shipmentCount > 1
-            ? " (split from GHS " . number_format($inFieldDeliveryFee, 2) . " across {$shipmentCount} shipments delivered at this stop)"
+            ? ' (split from GHS '.number_format($inFieldDeliveryFee, 2)." across {$shipmentCount} shipments delivered at this stop)"
             : '';
 
         foreach ($uniqueShipments as $shipment) {
             $this->chargesService->addCharge($shipment, [
-                'charge_type'          => ShipmentCharge::TYPE_DELIVERY_FEE,
-                'payer_type'           => ShipmentCharge::PAYER_RECIPIENT,
-                'due_stage'            => ShipmentCharge::STAGE_AT_DELIVERY,
-                'amount'               => $share,
-                'status'               => ShipmentCharge::STATUS_PAID,
-                'payment_method'       => 'cash',
+                'charge_type' => ShipmentCharge::TYPE_DELIVERY_FEE,
+                'payer_type' => ShipmentCharge::PAYER_RECIPIENT,
+                'due_stage' => ShipmentCharge::STAGE_AT_DELIVERY,
+                'amount' => $share,
+                'status' => ShipmentCharge::STATUS_PAID,
+                'payment_method' => 'cash',
                 'delivery_run_stop_id' => $stop->id,
-                'notes'                => "Rider collected delivery fee on arrival{$noteSuffix}",
+                'notes' => "Rider collected delivery fee on arrival{$noteSuffix}",
             ], $driver);
         }
     }
@@ -1411,7 +1461,7 @@ class WarehouseDeliveryService
     /**
      * Outstanding delivery-fee charges relevant to a direct-delivery stop.
      *
-     * @param Collection<int, DeliveryRunItem> $runItems
+     * @param  Collection<int, DeliveryRunItem>  $runItems
      * @return Collection<int, ShipmentCharge>
      */
     private function outstandingDeliveryFeeChargesForStop(?int $stopId, Collection $runItems): Collection
@@ -1428,7 +1478,7 @@ class WarehouseDeliveryService
             ->unique()
             ->values();
 
-        if (!$stopId && $shipmentIds->isEmpty() && $shipmentItemIds->isEmpty()) {
+        if (! $stopId && $shipmentIds->isEmpty() && $shipmentItemIds->isEmpty()) {
             return collect();
         }
 
@@ -1474,7 +1524,7 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Delivery stop not found.'];
         }
 
-        if (!in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED, DeliveryRun::STATUS_ASSIGNED], true)) {
+        if (! in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED, DeliveryRun::STATUS_ASSIGNED], true)) {
             return ['success' => false, 'message' => 'Delivery run is not active.'];
         }
 
@@ -1607,19 +1657,19 @@ class WarehouseDeliveryService
                 $shipmentCount = $uniqueShipments->count();
                 $share = round($stationFee / $shipmentCount, 2);
                 $noteSuffix = $shipmentCount > 1
-                    ? " (split from GHS " . number_format($stationFee, 2) . " across {$shipmentCount} shipments handed off together)"
+                    ? ' (split from GHS '.number_format($stationFee, 2)." across {$shipmentCount} shipments handed off together)"
                     : '';
 
                 foreach ($uniqueShipments as $shipment) {
                     $this->chargesService->addCharge($shipment, [
-                        'charge_type'           => ShipmentCharge::TYPE_STATION_FEE,
-                        'payer_type'            => ShipmentCharge::PAYER_PARCELMAN,
-                        'due_stage'             => ShipmentCharge::STAGE_AT_HANDOFF,
-                        'amount'                => $share,
-                        'status'                => ShipmentCharge::STATUS_PAID,
-                        'payment_method'        => 'cash',
-                        'delivery_run_stop_id'  => $stop->id,
-                        'notes'                 => "Rider paid bus courier at handoff{$noteSuffix}",
+                        'charge_type' => ShipmentCharge::TYPE_STATION_FEE,
+                        'payer_type' => ShipmentCharge::PAYER_PARCELMAN,
+                        'due_stage' => ShipmentCharge::STAGE_AT_HANDOFF,
+                        'amount' => $share,
+                        'status' => ShipmentCharge::STATUS_PAID,
+                        'payment_method' => 'cash',
+                        'delivery_run_stop_id' => $stop->id,
+                        'notes' => "Rider paid bus courier at handoff{$noteSuffix}",
                     ], $driver);
                 }
             }
@@ -1649,7 +1699,7 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Delivery stop not found.'];
         }
 
-        if (!in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED], true)) {
+        if (! in_array($run->status, [DeliveryRun::STATUS_OUT_FOR_DELIVERY, DeliveryRun::STATUS_PARTIALLY_DELIVERED], true)) {
             return ['success' => false, 'message' => 'Delivery run is not active.'];
         }
 
@@ -1691,7 +1741,7 @@ class WarehouseDeliveryService
                         'shipment_item_id' => $runItem->shipmentItem->id,
                         'status' => ItemStatus::AT_DESTINATION->value,
                         'location' => $stop->town ?: $stop->gh_post_address ?: $stop->landmark,
-                        'notes' => 'Delivery failed for run ' . $run->run_number . ': ' . $reason,
+                        'notes' => 'Delivery failed for run '.$run->run_number.': '.$reason,
                         'meta' => [
                             'delivery_run_id' => $run->id,
                             'delivery_run_number' => $run->run_number,
@@ -1767,7 +1817,7 @@ class WarehouseDeliveryService
         $prefix = "DR-{$year}-{$warehouseCode}-";
 
         $last = DeliveryRun::query()
-            ->where('run_number', 'like', $prefix . '%')
+            ->where('run_number', 'like', $prefix.'%')
             ->latest('id')
             ->first();
 
@@ -1777,16 +1827,16 @@ class WarehouseDeliveryService
             $next = ((int) end($parts)) + 1;
         }
 
-        return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 
     private function buildCourierLabel(?string $name, ?string $vehicle, ?string $phone): string
     {
         $head = $name ?: '';
-        $bits = array_filter([$vehicle, $phone], fn($v) => $v !== null && $v !== '');
+        $bits = array_filter([$vehicle, $phone], fn ($v) => $v !== null && $v !== '');
 
-        if ($head !== '' && !empty($bits)) {
-            return $head . ' (' . implode(', ', $bits) . ')';
+        if ($head !== '' && ! empty($bits)) {
+            return $head.' ('.implode(', ', $bits).')';
         }
 
         if ($head !== '') {
@@ -1805,7 +1855,6 @@ class WarehouseDeliveryService
         $failedStops = $run->stops->where('status', DeliveryRunStop::STATUS_FAILED)->count();
         $handedOffStops = $run->stops->where('status', DeliveryRunStop::STATUS_HANDED_OFF)->count();
         // handed_off counts as "driver done" but NOT "delivery complete" — run stays partially_delivered
-        $driverDoneStops = $deliveredStops + $failedStops + $handedOffStops;
         $completedStops = $deliveredStops + $failedStops;
 
         if ($totalStops > 0 && $completedStops === $totalStops) {
@@ -1813,22 +1862,20 @@ class WarehouseDeliveryService
                 'status' => DeliveryRun::STATUS_COMPLETED,
                 'completed_at' => now(),
             ]);
-            return;
-        }
-
-        if ($completedStops > 0) {
+        } elseif ($completedStops > 0 || $handedOffStops > 0) {
             $run->update(['status' => DeliveryRun::STATUS_PARTIALLY_DELIVERED]);
-            return;
+        } elseif ($run->status !== DeliveryRun::STATUS_OUT_FOR_DELIVERY) {
+            $run->update(['status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY]);
         }
 
-        if ($run->status !== DeliveryRun::STATUS_OUT_FOR_DELIVERY) {
-            $run->update(['status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY]);
+        if ($run->assigned_driver_id) {
+            $this->workloads()->syncStatus($run->assigned_driver_id);
         }
     }
 
     private function syncShipmentOutForDeliveryStatus(Shipment $shipment): void
     {
-        $allOutOrBeyond = !$shipment->items()
+        $allOutOrBeyond = ! $shipment->items()
             ->whereNotIn('status', [
                 ItemStatus::OUT_FOR_DELIVERY->value,
                 ItemStatus::DELIVERED->value,
@@ -1843,7 +1890,7 @@ class WarehouseDeliveryService
 
     private function syncShipmentDeliveryStatus(Shipment $shipment): void
     {
-        $allDelivered = !$shipment->items()
+        $allDelivered = ! $shipment->items()
             ->whereNotIn('status', [
                 ItemStatus::DELIVERED->value,
                 ItemStatus::RETURNED->value,
@@ -1854,6 +1901,7 @@ class WarehouseDeliveryService
             if ($shipment->status !== ShipmentStatus::DELIVERED) {
                 $shipment->update(['status' => ShipmentStatus::DELIVERED]);
             }
+
             return;
         }
 
@@ -1865,11 +1913,22 @@ class WarehouseDeliveryService
             if ($shipment->status !== ShipmentStatus::OUT_FOR_DELIVERY) {
                 $shipment->update(['status' => ShipmentStatus::OUT_FOR_DELIVERY]);
             }
+
             return;
         }
 
         if ($shipment->status === ShipmentStatus::DELIVERED || $shipment->status === ShipmentStatus::OUT_FOR_DELIVERY) {
             $shipment->update(['status' => ShipmentStatus::AT_DESTINATION]);
         }
+    }
+
+    private function workloads(): DriverWorkloadService
+    {
+        return $this->workloads ??= app(DriverWorkloadService::class);
+    }
+
+    private function assignmentAudit(): RiderAssignmentAuditService
+    {
+        return $this->assignmentAudit ??= app(RiderAssignmentAuditService::class);
     }
 }

@@ -12,8 +12,11 @@ class Driver extends Authenticatable
     use HasApiTokens;
 
     public const CAPABILITY_PICKUP = 'pickup';
+
     public const CAPABILITY_TRANSPORT = 'transport';
+
     public const CAPABILITY_DELIVERY = 'delivery';
+
     public const CAPABILITY_BUS_HANDOFF = 'bus_handoff';
 
     public const CAPABILITIES = [
@@ -59,7 +62,11 @@ class Driver extends Authenticatable
     public function getCapabilities(): array
     {
         $raw = $this->task_capabilities;
-        if (!is_array($raw)) {
+        if ($raw === null) {
+            return [self::CAPABILITY_PICKUP];
+        }
+
+        if (! is_array($raw)) {
             return [];
         }
 
@@ -111,6 +118,11 @@ class Driver extends Authenticatable
     public function deliveryRuns(): HasMany
     {
         return $this->hasMany(DeliveryRun::class, 'assigned_driver_id');
+    }
+
+    public function assignmentEvents(): HasMany
+    {
+        return $this->hasMany(RiderAssignmentEvent::class);
     }
 
     public function riderTeamMemberships(): HasMany

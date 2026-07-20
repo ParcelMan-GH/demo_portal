@@ -2510,6 +2510,7 @@ class ShipmentController extends Controller
                 }
 
                 $shipment->update(['status' => ShipmentStatus::PICKED_UP]);
+                app(\App\Services\DriverWorkloadService::class)->syncStatus($assignment->driver_id);
             }
 
             return $assignment->fresh(['targetWarehouse', 'warehouseReceipt.items']);

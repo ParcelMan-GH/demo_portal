@@ -8,14 +8,18 @@
 use App\Models\Driver;
 $deliveryDelayService = $deliveryDelayService ?? app(\App\Services\DeliveryDelayService::class);
 $delayReasons = collect($delayReasons ?? $deliveryDelayService->activeReasons())->values();
-$deliveryDrivers = $deliveryDrivers ?? Driver::where('is_active', true)->orderBy('name')->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']);
-$deliveryDriverOptions = $deliveryDrivers->map(fn ($driver) => [
-    'id' => $driver->id,
-    'name' => $driver->name,
-    'phone' => $driver->phone,
-    'vehicle_type' => $driver->vehicle_type,
-    'vehicle_number' => $driver->vehicle_number,
-    'meta' => collect([$driver->phone, $driver->vehicle_type, $driver->vehicle_number])->filter()->implode(' / '),
+$deliveryDrivers = $deliveryDrivers ?? app(\App\Services\DriverWorkloadService::class)->assignmentOptions(Driver::CAPABILITY_DELIVERY);
+$deliveryDriverOptions = collect($deliveryDrivers)->map(fn ($driver) => [
+    'id' => data_get($driver, 'id'),
+    'name' => data_get($driver, 'name'),
+    'phone' => data_get($driver, 'phone'),
+    'vehicle_type' => data_get($driver, 'vehicle_type'),
+    'vehicle_number' => data_get($driver, 'vehicle_number'),
+    'status' => data_get($driver, 'status'),
+    'is_busy' => (bool) data_get($driver, 'is_busy', false),
+    'active_work_count' => (int) data_get($driver, 'active_work_count', 0),
+    'active_work' => data_get($driver, 'active_work', ['pickups' => 0, 'transports' => 0, 'deliveries' => 0]),
+    'meta' => collect([data_get($driver, 'phone'), data_get($driver, 'vehicle_type'), data_get($driver, 'vehicle_number')])->filter()->implode(' / '),
 ])->values();
 $deliveryRunRoutes = $deliveryRunRoutes ?? [
     'indexUrl' => route('admin.delivery-runs.index'),
@@ -154,8 +158,10 @@ $itemStatusColors = [
             selectedReceiptItemIds: [],
             selectedDriverId: '',
             selectedDriverLabel: '',
-            driverSearch: '',
-            driverDropdownOpen: false,
+            reassignmentReason: '',
+	            driverSearch: '',
+	            driverDropdownOpen: false,
+	            driverActiveIndex: -1,
             drivers: [],
             currentDriverId: @js($run->assigned_driver_id),
             proofViewer: {
@@ -323,32 +329,46 @@ $itemStatusColors = [
                 }
             },
             openAssignRiderModal() {
-                this.selectedDriverId = '';
-                this.selectedDriverLabel = '';
-                this.driverSearch = '';
+                const current = this.drivers.find((driver) => Number(driver.id) === Number(this.currentDriverId));
+                this.selectedDriverId = current?.id || '';
+                this.selectedDriverLabel = current?.name || '';
+                this.driverSearch = current ? (current.meta ? `${current.name} / ${current.meta}` : current.name) : '';
+                this.reassignmentReason = '';
                 this.driverDropdownOpen = false;
                 this.showAssignModal = true;
             },
             filteredDrivers() {
                 const query = String(this.driverSearch || '').trim().toLowerCase();
-                const availableDrivers = this.drivers.filter((driver) => Number(driver.id) !== Number(this.currentDriverId));
-                if (!query) return availableDrivers;
-                return availableDrivers.filter((driver) => {
+                if (!query) return this.drivers;
+                return this.drivers.filter((driver) => {
                     return [driver.name, driver.phone, driver.vehicle_type, driver.vehicle_number, driver.meta]
                         .filter(Boolean)
                         .some((value) => String(value).toLowerCase().includes(query));
                 });
             },
-            selectDriver(driver) {
-                this.selectedDriverId = driver.id;
-                this.selectedDriverLabel = driver.name;
-                this.driverSearch = driver.meta ? `${driver.name} / ${driver.meta}` : driver.name;
-                this.driverDropdownOpen = false;
-            },
+	            selectDriver(driver) {
+	                this.selectedDriverId = driver.id;
+	                this.selectedDriverLabel = driver.name;
+	                this.driverSearch = driver.meta ? `${driver.name} / ${driver.meta}` : driver.name;
+	                this.driverDropdownOpen = false;
+	                this.driverActiveIndex = -1;
+	            },
+	            moveDriverFocus(direction) {
+	                const drivers = this.filteredDrivers();
+	                if (!drivers.length) return;
+	                this.driverDropdownOpen = true;
+	                this.driverActiveIndex = this.driverActiveIndex < 0
+	                    ? (direction > 0 ? 0 : drivers.length - 1)
+	                    : (this.driverActiveIndex + direction + drivers.length) % drivers.length;
+	            },
+	            selectActiveDriver() {
+	                const driver = this.filteredDrivers()[this.driverActiveIndex];
+	                if (driver) this.selectDriver(driver);
+	            },
             confirmDispatch() {
                 this.showDispatchConfirm = true;
             },
-            async assignDriver() {
+            async assignDriver(confirmBusy = false) {
                 if (!this.selectedDriverId) {
                     window.showToast?.('Please select a rider first.', 'warning');
                     return;
@@ -363,9 +383,21 @@ $itemStatusColors = [
                             'X-CSRF-TOKEN': this.csrfToken(),
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ driver_id: Number(this.selectedDriverId) }),
+                        body: JSON.stringify({
+                            driver_id: Number(this.selectedDriverId),
+                            confirm_busy_assignment: confirmBusy,
+                            reassignment_reason: this.reassignmentReason.trim() || null,
+                        }),
                     });
                     const result = await response.json();
+                    if (response.status === 409 && result.code === 'rider_busy' && !confirmBusy) {
+                        const counts = result.data?.active_work || {};
+                        const detail = `${counts.pickups || 0} pickup, ${counts.transports || 0} transport, ${counts.deliveries || 0} delivery`;
+                        if (window.confirm(`${result.message}\n\nCurrent workload: ${detail}.\n\nAssign this rider anyway?`)) {
+                            this.actionLoading = false;
+                            return this.assignDriver(true);
+                        }
+                    }
                     if (!response.ok || !result.success) {
                         throw new Error(result.message || 'Failed to assign rider.');
                     }
@@ -1890,7 +1922,16 @@ $itemStatusColors = [
 	                                type="search"
 	                                x-model="driverSearch"
 	                                @@focus="driverDropdownOpen = true"
-	                                @@input="driverDropdownOpen = true; selectedDriverId = ''; selectedDriverLabel = ''"
+	                                @@input="driverDropdownOpen = true; driverActiveIndex = -1; selectedDriverId = ''; selectedDriverLabel = ''"
+	                                @@keydown.arrow-down.prevent="moveDriverFocus(1)"
+	                                @@keydown.arrow-up.prevent="moveDriverFocus(-1)"
+	                                @@keydown.enter.prevent="selectActiveDriver()"
+	                                @@keydown.escape.stop.prevent="driverDropdownOpen = false; driverActiveIndex = -1"
+	                                role="combobox"
+	                                aria-autocomplete="list"
+	                                aria-controls="delivery-rider-listbox"
+	                                :aria-expanded="driverDropdownOpen"
+	                                :aria-activedescendant="driverActiveIndex >= 0 ? `delivery-rider-option-${filteredDrivers()[driverActiveIndex]?.id}` : null"
 	                                placeholder="Search rider name, phone, vehicle..."
 	                                class="h-14 w-full rounded-2xl border-2 border-slate-200 bg-white px-4 pr-12 text-base font-black text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 sm:text-sm"
 	                                :class="driverDropdownOpen ? 'rounded-b-none border-orange-500 ring-4 ring-orange-100' : ''"
@@ -1907,17 +1948,27 @@ $itemStatusColors = [
 	                            class="absolute left-0 right-0 z-40 -mt-0.5 overflow-hidden rounded-b-2xl border-2 border-t-0 border-orange-500 bg-white shadow-xl shadow-orange-900/10"
 	                            style="display: none;"
 	                        >
-	                            <div class="max-h-72 overflow-y-auto border-t border-orange-100">
-	                                <template x-for="driver in filteredDrivers()" :key="driver.id">
+	                            <div id="delivery-rider-listbox" role="listbox" aria-label="Delivery riders" class="max-h-72 overflow-y-auto border-t border-orange-100">
+	                                <template x-for="(driver, index) in filteredDrivers()" :key="driver.id">
 	                                    <button
 	                                        type="button"
+	                                        :id="`delivery-rider-option-${driver.id}`"
 	                                        @@click="selectDriver(driver)"
+	                                        @@mouseenter="driverActiveIndex = index"
+	                                        role="option"
+	                                        :aria-selected="Number(selectedDriverId) === Number(driver.id)"
 	                                        class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-orange-50"
-	                                        :class="Number(selectedDriverId) === Number(driver.id) ? 'bg-orange-50' : ''"
+	                                        :class="Number(currentDriverId) === Number(driver.id) ? 'bg-orange-50 ring-1 ring-inset ring-orange-200' : ((Number(selectedDriverId) === Number(driver.id) || driverActiveIndex === index) ? 'bg-orange-50' : '')"
 	                                    >
 	                                        <div class="min-w-0">
 	                                            <p class="truncate text-sm font-black text-slate-900" x-text="driver.name"></p>
 	                                            <p class="mt-0.5 truncate text-xs font-semibold text-slate-500" x-text="driver.meta || 'No vehicle details'"></p>
+	                                            <div class="mt-1 flex flex-wrap gap-1.5">
+	                                                <span x-show="Number(currentDriverId) === Number(driver.id)" class="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-black text-orange-700">Assigned here</span>
+	                                                <span x-show="driver.is_busy && Number(currentDriverId) !== Number(driver.id)" class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700" x-text="`Busy · ${driver.active_work_count} active ${Number(driver.active_work_count) === 1 ? 'job' : 'jobs'}`"></span>
+	                                                <span x-show="!driver.is_busy" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">Available</span>
+	                                            </div>
+	                                            <p x-show="driver.is_busy && Number(currentDriverId) !== Number(driver.id)" class="mt-1 text-[10px] font-semibold text-amber-700" x-text="`${driver.active_work?.pickups || 0} pickups · ${driver.active_work?.transports || 0} transports · ${driver.active_work?.deliveries || 0} deliveries`"></p>
 	                                        </div>
 	                                        <svg x-show="Number(selectedDriverId) === Number(driver.id)" class="h-4 w-4 shrink-0 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 	                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -1930,6 +1981,10 @@ $itemStatusColors = [
 	                            </div>
 	                        </div>
 	                    </div>
+	                </div>
+	                <div class="mt-4">
+	                    <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">Reassignment reason <span class="font-semibold normal-case text-slate-400">(optional)</span></label>
+	                    <textarea x-model="reassignmentReason" maxlength="500" rows="2" placeholder="Add context for the old and new rider..." class="w-full resize-none rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-100"></textarea>
 	                </div>
 	            </div>
             <!-- Modal Footer -->

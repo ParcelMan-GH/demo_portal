@@ -19,23 +19,21 @@ class SendDriverAssignmentNotification
         $shipmentNumber = $assignment->shipment?->shipment_number ?? 'N/A';
         $warehouseName  = $assignment->targetWarehouse?->name;
 
-        // 1. Notify the driver
-        if ($driver->fcm_token) {
-            $body = $warehouseName
-                ? "Pick up shipment {$shipmentNumber} and deliver to {$warehouseName}."
-                : "You have been assigned to pick up shipment {$shipmentNumber}.";
+        $body = $warehouseName
+            ? "Pick up parcel {$shipmentNumber} and deliver it to {$warehouseName}."
+            : "You have been assigned to pick up parcel {$shipmentNumber}.";
 
-            $this->pushService->sendToDriver(
-                driver: $driver,
-                title: 'New Pickup Assignment',
-                body: $body,
-                data: [
-                    'assignment_id'   => (string) $assignment->id,
-                    'shipment_number' => $shipmentNumber,
-                ],
-                type: 'driver_assigned'
-            );
-        }
+        $this->pushService->sendToDriver(
+            driver: $driver,
+            title: 'New Pickup Assignment',
+            body: $body,
+            data: [
+                'pickup_id'        => (string) $assignment->id,
+                'assignment_id'    => (string) $assignment->id,
+                'shipment_number'  => $shipmentNumber,
+            ],
+            type: 'pickup_assigned'
+        );
 
         // 2. Notify warehouse managers at the target warehouse
         if ($assignment->targetWarehouse) {

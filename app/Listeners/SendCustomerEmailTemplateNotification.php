@@ -93,6 +93,10 @@ class SendCustomerEmailTemplateNotification
 
     private function pickupAssigned(DriverAssignedToPickup $event): void
     {
+        if (!$event->notifyCustomer) {
+            return;
+        }
+
         $assignment = $event->assignment->loadMissing(['shipment.vendor', 'targetWarehouse']);
         $shipment = $assignment->shipment;
         $vendor = $shipment?->vendor;

@@ -11,7 +11,10 @@ class DriverAuthService
 {
     protected DriverActivityLogService $activityLogService;
 
-    public function __construct(DriverActivityLogService $activityLogService)
+    public function __construct(
+        DriverActivityLogService $activityLogService,
+        private DriverWorkloadService $workloads,
+    )
     {
         $this->activityLogService = $activityLogService;
     }
@@ -55,6 +58,7 @@ class DriverAuthService
         }
 
         $driver->save();
+        $driver = $this->workloads->syncStatus($driver);
 
         // Create token
         $token = $driver->createToken('driver-app')->plainTextToken;

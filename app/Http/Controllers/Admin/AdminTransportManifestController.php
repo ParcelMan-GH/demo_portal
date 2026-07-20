@@ -14,6 +14,7 @@ use App\Models\TransportManifest;
 use App\Models\TransportManifestItem;
 use App\Models\Warehouse;
 use App\Services\BackOfficeAccess;
+use App\Services\DriverWorkloadService;
 use App\Services\Warehouse\BarcodeService;
 use App\Services\Warehouse\PackageContactService;
 use App\Services\Warehouse\WarehouseTransportReceivingService;
@@ -239,10 +240,10 @@ class AdminTransportManifestController extends Controller
         $statusLabel = $this->formatStatusLabel($manifest->status);
         $deleteState = $this->transportService->deleteState($manifest);
 
-        $transportDrivers = Driver::where('is_active', true)
-            ->whereJsonContains('task_capabilities', Driver::CAPABILITY_TRANSPORT)
-            ->orderBy('name')
-            ->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']);
+        $transportDrivers = app(DriverWorkloadService::class)->assignmentOptions(
+            Driver::CAPABILITY_TRANSPORT,
+            includeDriverIds: [$manifest->assigned_driver_id],
+        );
 
         $manifestConfig = [
             'assign_driver_endpoint'   => route('admin.transport-manifests.assign-driver', $manifest),
@@ -470,6 +471,8 @@ class AdminTransportManifestController extends Controller
     {
         $validated = $request->validate([
             'driver_id' => ['required', 'integer', 'exists:drivers,id'],
+            'confirm_busy_assignment' => ['sometimes', 'boolean'],
+            'reassignment_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         // For admin, use the manifest's own origin warehouse (no warehouse-scoped auth needed)
@@ -479,9 +482,16 @@ class AdminTransportManifestController extends Controller
         }
 
         $driver = Driver::findOrFail((int) $validated['driver_id']);
-        $result = $this->transportService->assignDriver($manifest, $driver, $warehouse, Auth::guard('admin')->user());
+        $result = $this->transportService->assignDriver(
+            $manifest,
+            $driver,
+            $warehouse,
+            Auth::guard('admin')->user(),
+            (bool) ($validated['confirm_busy_assignment'] ?? false),
+            $validated['reassignment_reason'] ?? null,
+        );
 
-        return response()->json($result, $result['success'] ? 200 : 422);
+        return response()->json($result, ($result['success'] ?? false) ? 200 : (($result['code'] ?? null) === 'rider_busy' ? 409 : 422));
     }
 
     /**

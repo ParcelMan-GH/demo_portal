@@ -23,9 +23,13 @@ use Illuminate\Support\Str;
 class BusHandoffConfirmationService
 {
     public const CODE_LENGTH = 6;
+
     public const CODE_TTL_MINUTES = 15;
+
     public const CODE_MAX_ATTEMPTS = 5;
+
     public const CODE_RESEND_SECONDS = 60;
+
     public const LINK_TTL_DAYS = 14;
 
     private const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -34,8 +38,8 @@ class BusHandoffConfirmationService
         private SmsService $smsService,
         private VendorCommissionService $commissionService,
         private StorageService $storageService,
-    ) {
-    }
+        private DriverWorkloadService $workloads,
+    ) {}
 
     public function ensureForRunItem(DeliveryRunItem $runItem, ?Driver $driver = null): BusHandoffConfirmation
     {
@@ -88,7 +92,7 @@ class BusHandoffConfirmationService
         $query = $this->driverQuery($driver)
             ->with($this->payloadRelations());
 
-        if (!empty($validated['status'])) {
+        if (! empty($validated['status'])) {
             if ($validated['status'] === 'open') {
                 $query->whereIn('status', [
                     BusHandoffConfirmation::STATUS_PENDING,
@@ -183,7 +187,7 @@ class BusHandoffConfirmationService
             ->with($this->payloadRelations())
             ->first();
 
-        if (!$confirmation) {
+        if (! $confirmation) {
             return ['success' => false, 'message' => 'Bus handoff package not found.', 'status' => 404];
         }
 
@@ -199,7 +203,7 @@ class BusHandoffConfirmationService
             ->with(['shipmentItem.shipment.vendor', 'stop'])
             ->first();
 
-        if (!$confirmation) {
+        if (! $confirmation) {
             return ['success' => false, 'message' => 'Bus handoff package not found.', 'status' => 404];
         }
 
@@ -220,7 +224,7 @@ class BusHandoffConfirmationService
         }
 
         $target = $this->resolveTarget($confirmation, $targetType);
-        if (!$target['phone']) {
+        if (! $target['phone']) {
             return ['success' => false, 'message' => 'No phone number is available for this target.', 'status' => 422];
         }
 
@@ -268,7 +272,7 @@ class BusHandoffConfirmationService
             ->with(['runItem.shipmentItem.shipment', 'stop'])
             ->first();
 
-        if (!$confirmation) {
+        if (! $confirmation) {
             return ['success' => false, 'message' => 'Bus handoff package not found.', 'status' => 404];
         }
 
@@ -277,7 +281,7 @@ class BusHandoffConfirmationService
         }
 
         $verification = $this->verifyCode($confirmation, $code);
-        if (!$verification['success']) {
+        if (! $verification['success']) {
             return $verification;
         }
 
@@ -304,7 +308,7 @@ class BusHandoffConfirmationService
     public function reportIssue(Driver $driver, DeliveryRunItem $runItem, int $reasonId, ?string $notes = null): array
     {
         $confirmation = $this->confirmationForDriver($driver, $runItem)->first();
-        if (!$confirmation) {
+        if (! $confirmation) {
             return ['success' => false, 'message' => 'Bus handoff package not found.', 'status' => 404];
         }
 
@@ -313,7 +317,7 @@ class BusHandoffConfirmationService
         }
 
         $reason = DeliveryFailureReason::query()->whereKey($reasonId)->where('is_active', true)->first();
-        if (!$reason) {
+        if (! $reason) {
             return ['success' => false, 'message' => 'Select a valid reason.', 'status' => 422];
         }
 
@@ -332,7 +336,7 @@ class BusHandoffConfirmationService
     public function publicPayload(string $token): ?array
     {
         $confirmation = $this->confirmationByToken($token);
-        if (!$confirmation) {
+        if (! $confirmation) {
             return null;
         }
 
@@ -346,7 +350,7 @@ class BusHandoffConfirmationService
     public function publicConfirm(string $token, ?string $notes = null): array
     {
         $confirmation = $this->confirmationByToken($token);
-        if (!$confirmation) {
+        if (! $confirmation) {
             return ['success' => false, 'message' => 'This confirmation link is invalid or expired.', 'status' => 404];
         }
 
@@ -376,7 +380,7 @@ class BusHandoffConfirmationService
     public function publicIssue(string $token, int $reasonId, ?string $notes = null): array
     {
         $confirmation = $this->confirmationByToken($token);
-        if (!$confirmation) {
+        if (! $confirmation) {
             return ['success' => false, 'message' => 'This confirmation link is invalid or expired.', 'status' => 404];
         }
 
@@ -385,7 +389,7 @@ class BusHandoffConfirmationService
         }
 
         $reason = DeliveryFailureReason::query()->whereKey($reasonId)->where('is_active', true)->first();
-        if (!$reason) {
+        if (! $reason) {
             return ['success' => false, 'message' => 'Select a valid reason.', 'status' => 422];
         }
 
@@ -449,7 +453,7 @@ class BusHandoffConfirmationService
                     'issue_notes' => null,
                 ]);
 
-                $this->markDelivered($confirmation->fresh($this->payloadRelations()), 'Delivery confirmed by admin. ' . ($notes ?? ''));
+                $this->markDelivered($confirmation->fresh($this->payloadRelations()), 'Delivery confirmed by admin. '.($notes ?? ''));
 
                 return ['success' => true, 'message' => 'Delivery confirmed.'];
             }
@@ -497,7 +501,7 @@ class BusHandoffConfirmationService
         $shipmentItem = $confirmation->shipmentItem;
         $now = now();
 
-        if (!$runItem || !$stop || !$shipmentItem) {
+        if (! $runItem || ! $stop || ! $shipmentItem) {
             return;
         }
 
@@ -535,7 +539,7 @@ class BusHandoffConfirmationService
         $stop = $confirmation->stop;
         $shipmentItem = $confirmation->shipmentItem;
 
-        if (!$runItem || !$stop || !$shipmentItem) {
+        if (! $runItem || ! $stop || ! $shipmentItem) {
             return;
         }
 
@@ -557,7 +561,7 @@ class BusHandoffConfirmationService
         $stop = $confirmation->stop;
         $shipmentItem = $confirmation->shipmentItem;
 
-        if (!$runItem || !$stop || !$shipmentItem) {
+        if (! $runItem || ! $stop || ! $shipmentItem) {
             return;
         }
 
@@ -607,7 +611,7 @@ class BusHandoffConfirmationService
         }
 
         $run = $stop->run()->with('stops')->first();
-        if (!$run || $run->status === DeliveryRun::STATUS_CANCELLED) {
+        if (! $run || $run->status === DeliveryRun::STATUS_CANCELLED) {
             return;
         }
 
@@ -623,17 +627,22 @@ class BusHandoffConfirmationService
         } else {
             $run->update(['status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY, 'completed_at' => null]);
         }
+
+        if ($run->assigned_driver_id) {
+            $this->workloads->syncStatus($run->assigned_driver_id);
+        }
     }
 
     private function refreshShipmentStatus(?Shipment $shipment): void
     {
-        if (!$shipment) {
+        if (! $shipment) {
             return;
         }
 
         $items = $shipment->items()->get(['status']);
         if ($items->isNotEmpty() && $items->every(fn ($item) => $item->status === ItemStatus::DELIVERED)) {
             $shipment->update(['status' => ShipmentStatus::DELIVERED]);
+
             return;
         }
 
@@ -646,7 +655,7 @@ class BusHandoffConfirmationService
     {
         $code = strtoupper(trim($code));
 
-        if (!$confirmation->confirmation_code_hash || !$confirmation->confirmation_code_expires_at) {
+        if (! $confirmation->confirmation_code_hash || ! $confirmation->confirmation_code_expires_at) {
             return ['success' => false, 'message' => 'No confirmation code has been sent yet.', 'status' => 422, 'code' => 'missing'];
         }
 
@@ -658,8 +667,9 @@ class BusHandoffConfirmationService
             return ['success' => false, 'message' => 'Too many attempts. Please resend a new code.', 'status' => 422, 'code' => 'exhausted'];
         }
 
-        if (!hash_equals((string) $confirmation->confirmation_code_hash, $this->hashValue($code))) {
+        if (! hash_equals((string) $confirmation->confirmation_code_hash, $this->hashValue($code))) {
             $confirmation->increment('confirmation_attempts');
+
             return ['success' => false, 'message' => 'Invalid confirmation code.', 'status' => 422, 'code' => 'invalid'];
         }
 
@@ -674,6 +684,7 @@ class BusHandoffConfirmationService
         if ($targetType === BusHandoffConfirmation::TARGET_VENDOR) {
             $vendor = $shipment?->vendor;
             $phone = $vendor?->phone;
+
             return [
                 'name' => $vendor?->business_name ?: $vendor?->name,
                 'phone' => $phone ? (PhoneHelper::format($phone) ?? $phone) : null,
@@ -848,6 +859,7 @@ class BusHandoffConfirmationService
         for ($i = 0; $i < self::CODE_LENGTH; $i++) {
             $code .= $alphabet[random_int(0, $max)];
         }
+
         return $code;
     }
 
@@ -865,16 +877,16 @@ class BusHandoffConfirmationService
         $configuredUrl = (string) (config('app.public_url') ?: config('app.url'));
         $parts = parse_url($configuredUrl);
 
-        if (is_array($parts) && !empty($parts['scheme']) && !empty($parts['host'])) {
-            $baseUrl = $parts['scheme'] . '://' . $parts['host'];
+        if (is_array($parts) && ! empty($parts['scheme']) && ! empty($parts['host'])) {
+            $baseUrl = $parts['scheme'].'://'.$parts['host'];
 
-            if (!empty($parts['port'])) {
-                $baseUrl .= ':' . $parts['port'];
+            if (! empty($parts['port'])) {
+                $baseUrl .= ':'.$parts['port'];
             }
         } else {
             $baseUrl = request()->getSchemeAndHttpHost();
         }
 
-        return rtrim($baseUrl, '/') . '/h/' . rawurlencode($token);
+        return rtrim($baseUrl, '/').'/h/'.rawurlencode($token);
     }
 }

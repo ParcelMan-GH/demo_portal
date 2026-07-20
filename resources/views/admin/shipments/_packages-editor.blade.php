@@ -785,13 +785,42 @@
             <div class="px-6 py-5 space-y-3">
                 <div>
                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Rider <span class="text-rose-500">*</span></label>
-                    <select x-model="assignModal.driver_id"
-                            class="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all">
-                        <option value="">Choose a rider...</option>
-                        <template x-for="d in assignModal.drivers" :key="d.id">
-                            <option :value="d.id" x-text="d.name + ' (' + d.phone + ')'"></option>
-                        </template>
-                    </select>
+                    <div class="relative" @@click.outside="assignModal.driverPickerOpen = false">
+                        <input type="search" x-model="assignModal.driverSearch"
+                               @@focus="assignModal.driverPickerOpen = true"
+                               @@input="assignModal.driverPickerOpen = true; assignModal.driverActiveIndex = -1; assignModal.driver_id = ''"
+                               @@keydown.arrow-down.prevent="moveAssignmentDriverFocus(1)"
+                               @@keydown.arrow-up.prevent="moveAssignmentDriverFocus(-1)"
+                               @@keydown.enter.prevent="selectActiveAssignmentDriver()"
+                               @@keydown.escape.stop.prevent="assignModal.driverPickerOpen = false; assignModal.driverActiveIndex = -1"
+                               role="combobox" aria-autocomplete="list" aria-controls="package-editor-rider-listbox"
+                               :aria-expanded="assignModal.driverPickerOpen"
+                               :aria-activedescendant="assignModal.driverActiveIndex >= 0 ? `package-editor-rider-${filteredAssignmentDrivers()[assignModal.driverActiveIndex]?.id}` : null"
+                               placeholder="Search rider name, phone, vehicle..."
+                               class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-sm outline-none transition-all focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100">
+                        <div x-show="assignModal.driverPickerOpen" x-cloak class="absolute left-0 right-0 z-40 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                            <div id="package-editor-rider-listbox" role="listbox" aria-label="Pickup riders" class="max-h-64 overflow-y-auto">
+                                <template x-for="(driver, index) in filteredAssignmentDrivers()" :key="driver.id">
+                                    <button type="button" :id="`package-editor-rider-${driver.id}`" role="option"
+                                            :aria-selected="Number(assignModal.driver_id) === Number(driver.id)"
+                                            @@mouseenter="assignModal.driverActiveIndex = index" @@click="selectAssignmentDriver(driver)"
+                                            class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-3 text-left last:border-0 hover:bg-orange-50"
+                                            :class="assignModal.isEdit && Number(currentAssignment?.driver_id) === Number(driver.id) ? 'bg-orange-50 ring-1 ring-inset ring-orange-200' : ((Number(assignModal.driver_id) === Number(driver.id) || assignModal.driverActiveIndex === index) ? 'bg-orange-50' : '')">
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-sm font-bold text-slate-900" x-text="driver.name"></span>
+                                            <span class="block truncate text-xs text-slate-500" x-text="[driver.phone, driver.vehicle_type, driver.vehicle_number].filter(Boolean).join(' · ')"></span>
+                                            <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                                  :class="assignModal.isEdit && Number(currentAssignment?.driver_id) === Number(driver.id) ? 'bg-orange-100 text-orange-700' : (driver.is_busy ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')"
+                                                  x-text="assignModal.isEdit && Number(currentAssignment?.driver_id) === Number(driver.id) ? 'Assigned here' : (driver.is_busy ? `Busy · ${driver.active_work_count} active jobs` : 'Available')"></span>
+                                            <span x-show="driver.is_busy && (!assignModal.isEdit || Number(currentAssignment?.driver_id) !== Number(driver.id))" class="mt-1 block text-[10px] font-semibold text-amber-700" x-text="`${driver.active_work?.pickups || 0} pickups · ${driver.active_work?.transports || 0} transports · ${driver.active_work?.deliveries || 0} deliveries`"></span>
+                                        </span>
+                                        <span x-show="Number(assignModal.driver_id) === Number(driver.id)" class="text-lg font-bold text-orange-600">✓</span>
+                                    </button>
+                                </template>
+                                <p x-show="filteredAssignmentDrivers().length === 0" class="px-3 py-6 text-center text-sm text-slate-400">No matching riders.</p>
+                            </div>
+                        </div>
+                    </div>
                     <p x-show="assignModal.drivers.length === 0 && !assignModal.loading" class="mt-1.5 text-xs text-amber-600 flex items-center gap-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                         No available riders
@@ -812,6 +841,10 @@
                     <textarea x-model="assignModal.notes" rows="2"
                               class="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all resize-none"
                               placeholder="Pickup notes for the rider..."></textarea>
+                </div>
+                <div x-show="assignModal.isEdit">
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Reassignment reason <span class="text-slate-300 font-normal normal-case">(optional)</span></label>
+                    <textarea x-model="assignModal.reassignment_reason" maxlength="500" rows="2" class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-sm outline-none transition-all focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/20" placeholder="Add context for the old and new rider..."></textarea>
                 </div>
                 <div class="flex justify-end gap-2 pt-1">
                     <button @@click="assignModal.open = false"
@@ -900,7 +933,7 @@ function shipmentEditor() {
         splitModal: { open: false, packageId: null, photos: [], selectedIds: [] },
         currentAssignment: null,
         canEditShipmentFields: true,
-        assignModal: { open: false, isEdit: false, driver_id: '', warehouse_id: '', notes: '', drivers: [], warehouses: [], loading: false, submitting: false },
+        assignModal: { open: false, isEdit: false, driver_id: '', warehouse_id: '', notes: '', reassignment_reason: '', drivers: [], warehouses: [], loading: false, submitting: false, driverSearch: '', driverPickerOpen: false, driverActiveIndex: -1 },
 
         init() {
             this.config = JSON.parse(this.$root.dataset.editConfig);
@@ -1370,6 +1403,10 @@ function shipmentEditor() {
             this.assignModal.driver_id = isEdit && this.currentAssignment ? String(this.currentAssignment.driver_id) : '';
             this.assignModal.warehouse_id = isEdit && this.currentAssignment ? String(this.currentAssignment.target_warehouse_id) : '';
             this.assignModal.notes = '';
+            this.assignModal.reassignment_reason = '';
+            this.assignModal.driverSearch = '';
+            this.assignModal.driverPickerOpen = false;
+            this.assignModal.driverActiveIndex = -1;
             this.assignModal.loading = true;
             try {
                 const [driversRes, warehousesRes] = await Promise.all([
@@ -1378,11 +1415,50 @@ function shipmentEditor() {
                 ]);
                 this.assignModal.drivers = driversRes.data || driversRes || [];
                 this.assignModal.warehouses = warehousesRes.data || warehousesRes || [];
+                if (isEdit && this.currentAssignment?.driver_id && !this.assignModal.drivers.some((driver) => Number(driver.id) === Number(this.currentAssignment.driver_id))) {
+                    this.assignModal.drivers.unshift({ id: this.currentAssignment.driver_id, name: this.currentAssignment.driver_name || 'Current rider', phone: this.currentAssignment.driver_phone || '', is_busy: true, active_work_count: 1, active_work: { pickups: 1, transports: 0, deliveries: 0 } });
+                }
+                const current = this.assignModal.drivers.find((driver) => Number(driver.id) === Number(this.assignModal.driver_id));
+                this.assignModal.driverSearch = current ? `${current.name}${current.phone ? ` / ${current.phone}` : ''}` : '';
             } catch (e) { this._toast('Failed to load riders/warehouses.', 'error'); }
             finally { this.assignModal.loading = false; }
         },
 
-        async submitAssignment() {
+        assignmentDriverLabel(driver) {
+            const current = this.assignModal.isEdit && Number(driver.id) === Number(this.currentAssignment?.driver_id);
+            const state = current ? '✓ Assigned here' : (driver.is_busy ? `Busy · ${driver.active_work_count} active job${Number(driver.active_work_count) === 1 ? '' : 's'}` : 'Available');
+            return `${state} — ${driver.name}${driver.phone ? ` (${driver.phone})` : ''}`;
+        },
+
+        filteredAssignmentDrivers() {
+            const query = String(this.assignModal.driverSearch || '').trim().toLowerCase();
+            if (!query) return this.assignModal.drivers;
+            return this.assignModal.drivers.filter((driver) => [driver.name, driver.phone, driver.vehicle_type, driver.vehicle_number]
+                .filter(Boolean).some((value) => String(value).toLowerCase().includes(query)));
+        },
+
+        selectAssignmentDriver(driver) {
+            this.assignModal.driver_id = driver.id;
+            this.assignModal.driverSearch = `${driver.name}${driver.phone ? ` / ${driver.phone}` : ''}`;
+            this.assignModal.driverPickerOpen = false;
+            this.assignModal.driverActiveIndex = -1;
+        },
+
+        moveAssignmentDriverFocus(direction) {
+            const drivers = this.filteredAssignmentDrivers();
+            if (!drivers.length) return;
+            this.assignModal.driverPickerOpen = true;
+            this.assignModal.driverActiveIndex = this.assignModal.driverActiveIndex < 0
+                ? (direction > 0 ? 0 : drivers.length - 1)
+                : (this.assignModal.driverActiveIndex + direction + drivers.length) % drivers.length;
+        },
+
+        selectActiveAssignmentDriver() {
+            const driver = this.filteredAssignmentDrivers()[this.assignModal.driverActiveIndex];
+            if (driver) this.selectAssignmentDriver(driver);
+        },
+
+        async submitAssignment(confirmBusy = false) {
             this.assignModal.submitting = true;
             const isEdit = this.assignModal.isEdit;
             const url = isEdit ? this.config.updateAssignmentEndpointTemplate : this.config.assignDriverEndpoint;
@@ -1394,8 +1470,17 @@ function shipmentEditor() {
                         driver_id: this.assignModal.driver_id,
                         target_warehouse_id: this.assignModal.warehouse_id,
                         notes: this.assignModal.notes || null,
+                        reassignment_reason: this.assignModal.reassignment_reason?.trim() || null,
+                        confirm_busy_assignment: confirmBusy,
                     })
                 });
+                if (res.code === 'rider_busy' && !confirmBusy) {
+                    const work = res.data?.active_work || {};
+                    if (window.confirm(`${res.message}\n\n${work.pickups || 0} pickup, ${work.transports || 0} transport, ${work.deliveries || 0} delivery.\n\nAssign anyway?`)) {
+                        this.assignModal.submitting = false;
+                        return this.submitAssignment(true);
+                    }
+                }
                 if (res.success) {
                     this.assignModal.open = false;
                     this.shipment.status = 'pickup_assigned';

@@ -119,6 +119,9 @@ function shipmentShow() {
         // Available riders
         availableDrivers: [],
         availableWarehouses: [],
+        assignmentDriverSearch: '',
+        assignmentDriverPickerOpen: false,
+        assignmentDriverActiveIndex: -1,
 
         // Modal states
         assignDriverModalOpen: false,
@@ -132,11 +135,15 @@ function shipmentShow() {
         editAssignmentForm: {
             driver_id: '',
             target_warehouse_id: '',
+            reassignment_reason: '',
             submitting: false,
             loadingDrivers: false,
             loadingWarehouses: false,
         },
         availableDriversForEdit: [],
+        editDriverSearch: '',
+        editDriverPickerOpen: false,
+        editDriverActiveIndex: -1,
 
         // Tracking state
         tracking: {
@@ -3083,6 +3090,24 @@ function shipmentShow() {
             return !this.assignment || this.canEditCurrentAssignment();
         },
 
+        canEditCurrentAssignment() {
+            if (!this.assignment) return false;
+            const status = String(this.assignment.status?.value || this.assignment.status || '');
+            return !this.assignment.picked_up_at
+                && !this.assignment.completed_at
+                && !['completed', 'cancelled'].includes(status);
+        },
+
+        canUnassignCurrentAssignment() {
+            return this.canEditCurrentAssignment();
+        },
+
+        canReceiveCurrentAssignment() {
+            if (!this.assignment || this.assignment.received_at) return false;
+            const status = String(this.assignment.status?.value || this.assignment.status || '');
+            return Boolean(this.assignment.picked_up_at || this.assignment.completed_at || status === 'completed');
+        },
+
         canCreatePickupAssignment() {
             return !this.assignment && this.canManagePickupAssignment();
         },
@@ -3133,6 +3158,9 @@ function shipmentShow() {
                 loadingDrivers: false,
                 loadingWarehouses: false
             };
+            this.assignmentDriverSearch = '';
+            this.assignmentDriverPickerOpen = false;
+            this.assignmentDriverActiveIndex = -1;
         },
 
         async openAssignPickupDriver() {
@@ -3231,6 +3259,7 @@ function shipmentShow() {
         async openEditAssignment() {
             this.editAssignmentForm.driver_id = this.assignment?.driver_id ?? '';
             this.editAssignmentForm.target_warehouse_id = this.assignment?.target_warehouse_id ?? '';
+            this.editAssignmentForm.reassignment_reason = '';
             this.editAssignmentOpen = true;
 
             // Load available riders for the edit form (all active, not busy — server filters)
@@ -3255,6 +3284,10 @@ function shipmentShow() {
                 }
                 this.availableDriversForEdit = drivers;
                 this.availableWarehouses = warehousesData.data || [];
+                const selected = drivers.find((driver) => Number(driver.id) === Number(currentDriverId));
+                this.editDriverSearch = selected ? `${selected.name}${selected.phone ? ` / ${selected.phone}` : ''}` : '';
+                this.editDriverPickerOpen = false;
+                this.editDriverActiveIndex = -1;
             } catch (e) {
                 console.error('Failed to load edit assignment options:', e);
             } finally {
@@ -3263,7 +3296,55 @@ function shipmentShow() {
             }
         },
 
-        async updateAssignment() {
+        driverOptionLabel(driver, currentDriverId = null) {
+            const current = Number(driver.id) === Number(currentDriverId);
+            const state = current
+                ? '✓ Assigned here'
+                : (driver.is_busy ? `Busy · ${driver.active_work_count} active job${Number(driver.active_work_count) === 1 ? '' : 's'}` : 'Available');
+            return `${state} — ${driver.name}${driver.phone ? ` (${driver.phone})` : ''}`;
+        },
+
+        filteredAssignmentDrivers(edit = false) {
+            const drivers = edit ? this.availableDriversForEdit : this.availableDrivers;
+            const query = String(edit ? this.editDriverSearch : this.assignmentDriverSearch).trim().toLowerCase();
+            if (!query) return drivers;
+            return drivers.filter((driver) => [driver.name, driver.phone, driver.vehicle_type, driver.vehicle_number]
+                .filter(Boolean)
+                .some((value) => String(value).toLowerCase().includes(query)));
+        },
+
+        selectAssignmentDriver(driver, edit = false) {
+            if (edit) {
+                this.editAssignmentForm.driver_id = driver.id;
+                this.editDriverSearch = `${driver.name}${driver.phone ? ` / ${driver.phone}` : ''}`;
+                this.editDriverPickerOpen = false;
+                this.editDriverActiveIndex = -1;
+                return;
+            }
+            this.assignmentForm.driver_id = driver.id;
+            this.assignmentDriverSearch = `${driver.name}${driver.phone ? ` / ${driver.phone}` : ''}`;
+            this.assignmentDriverPickerOpen = false;
+            this.assignmentDriverActiveIndex = -1;
+        },
+
+        moveAssignmentDriverFocus(direction, edit = false) {
+            const drivers = this.filteredAssignmentDrivers(edit);
+            if (!drivers.length) return;
+            const key = edit ? 'editDriverActiveIndex' : 'assignmentDriverActiveIndex';
+            this[key] = this[key] < 0
+                ? (direction > 0 ? 0 : drivers.length - 1)
+                : (this[key] + direction + drivers.length) % drivers.length;
+            if (edit) this.editDriverPickerOpen = true;
+            else this.assignmentDriverPickerOpen = true;
+        },
+
+        selectActiveAssignmentDriver(edit = false) {
+            const index = edit ? this.editDriverActiveIndex : this.assignmentDriverActiveIndex;
+            const driver = this.filteredAssignmentDrivers(edit)[index];
+            if (driver) this.selectAssignmentDriver(driver, edit);
+        },
+
+        async updateAssignment(confirmBusy = false) {
             if (!this.assignment || !this.assignment.id || !this.canEditCurrentAssignment()) {
                 return;
             }
@@ -3281,10 +3362,19 @@ function shipmentShow() {
                     body: JSON.stringify({
                         driver_id: this.editAssignmentForm.driver_id || null,
                         target_warehouse_id: this.editAssignmentForm.target_warehouse_id || null,
+                        reassignment_reason: this.editAssignmentForm.reassignment_reason?.trim() || null,
+                        confirm_busy_assignment: confirmBusy,
                     }),
                 });
 
                 const result = await response.json();
+                if (response.status === 409 && result.code === 'rider_busy' && !confirmBusy) {
+                    const work = result.data?.active_work || {};
+                    if (window.confirm(`${result.message}\n\n${work.pickups || 0} pickup, ${work.transports || 0} transport, ${work.deliveries || 0} delivery.\n\nAssign anyway?`)) {
+                        this.editAssignmentForm.submitting = false;
+                        return this.updateAssignment(true);
+                    }
+                }
 
                 if (result.success) {
                     this.applyAssignmentResponse(result);
@@ -3440,7 +3530,7 @@ function shipmentShow() {
             }
         },
 
-        async assignDriver() {
+        async assignDriver(confirmBusy = false) {
             this.assignmentForm.submitting = true;
             try {
                 const response = await fetch(this.config.assignDriverEndpoint, {
@@ -3453,11 +3543,19 @@ function shipmentShow() {
                     body: JSON.stringify({
                         driver_id: this.assignmentForm.driver_id,
                         target_warehouse_id: this.assignmentForm.target_warehouse_id,
-                        notes: this.assignmentForm.notes
+                        notes: this.assignmentForm.notes,
+                        confirm_busy_assignment: confirmBusy,
                     })
                 });
 
                 const data = await response.json();
+                if (response.status === 409 && data.code === 'rider_busy' && !confirmBusy) {
+                    const work = data.data?.active_work || {};
+                    if (window.confirm(`${data.message}\n\n${work.pickups || 0} pickup, ${work.transports || 0} transport, ${work.deliveries || 0} delivery.\n\nAssign anyway?`)) {
+                        this.assignmentForm.submitting = false;
+                        return this.assignDriver(true);
+                    }
+                }
 
                 if (!response.ok) {
                     throw new Error(data.message || 'Failed to assign rider');

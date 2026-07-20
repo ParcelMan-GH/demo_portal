@@ -19,9 +19,12 @@ use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceiptItemLabel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use App\Services\DriverWorkloadService;
 
 class WarehouseTransportReceivingService
 {
+    public function __construct(private DriverWorkloadService $workloads) {}
+
     public function scanReceive(
         TransportManifest $manifest,
         ShipmentItem $shipmentItem,
@@ -219,7 +222,7 @@ class WarehouseTransportReceivingService
             $this->createWarehouseReceiptFromManifest($manifest, $warehouse, $user);
 
             if ($manifest->assignedDriver) {
-                $manifest->assignedDriver->update(['status' => 'available']);
+                $this->workloads->syncStatus($manifest->assignedDriver);
             }
 
             return [

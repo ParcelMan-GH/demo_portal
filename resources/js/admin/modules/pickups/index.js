@@ -54,9 +54,12 @@ function buildPickupsTable(config) {
         showEditModal: false,
         editSaving: false,
         editTarget: null,
-        editForm: { driver_id: '', target_warehouse_id: '' },
+        editForm: { driver_id: '', target_warehouse_id: '', reassignment_reason: '' },
         availableDrivers: [],
         availableWarehouses: [],
+        editDriverSearch: '',
+        editDriverPickerOpen: false,
+        editDriverActiveIndex: -1,
 
         // Cancel modal
         showCancelModal: false,
@@ -217,8 +220,24 @@ function buildPickupsTable(config) {
             this.editTarget = assignment;
             this.editForm.driver_id = assignment.driver_id;
             this.editForm.target_warehouse_id = assignment.target_warehouse_id;
+            this.editForm.reassignment_reason = '';
             this.showEditModal = true;
             await this.loadDropdownData();
+            if (assignment.driver_id && !this.availableDrivers.some((driver) => Number(driver.id) === Number(assignment.driver_id))) {
+                this.availableDrivers.unshift({
+                    id: assignment.driver_id,
+                    name: assignment.driver_name || 'Current rider',
+                    phone: assignment.driver_phone || '',
+                    status: 'busy',
+                    is_busy: true,
+                    active_work_count: 1,
+                    active_work: { pickups: 1, transports: 0, deliveries: 0 },
+                });
+            }
+            const current = this.availableDrivers.find((driver) => Number(driver.id) === Number(assignment.driver_id));
+            this.editDriverSearch = current ? `${current.name}${current.phone ? ` / ${current.phone}` : ''}` : '';
+            this.editDriverPickerOpen = false;
+            this.editDriverActiveIndex = -1;
         },
 
         async loadDropdownData() {
@@ -237,7 +256,44 @@ function buildPickupsTable(config) {
             }
         },
 
-        async saveEdit() {
+        driverOptionLabel(driver) {
+            const current = Number(driver.id) === Number(this.editTarget?.driver_id);
+            const state = current
+                ? '✓ Assigned here'
+                : (driver.is_busy ? `Busy · ${driver.active_work_count} active job${Number(driver.active_work_count) === 1 ? '' : 's'}` : 'Available');
+            return `${state} — ${driver.name}${driver.phone ? ` (${driver.phone})` : ''}`;
+        },
+
+        filteredEditDrivers() {
+            const query = String(this.editDriverSearch || '').trim().toLowerCase();
+            if (!query) return this.availableDrivers;
+            return this.availableDrivers.filter((driver) => [driver.name, driver.phone, driver.vehicle_type, driver.vehicle_number]
+                .filter(Boolean)
+                .some((value) => String(value).toLowerCase().includes(query)));
+        },
+
+        selectEditDriver(driver) {
+            this.editForm.driver_id = driver.id;
+            this.editDriverSearch = `${driver.name}${driver.phone ? ` / ${driver.phone}` : ''}`;
+            this.editDriverPickerOpen = false;
+            this.editDriverActiveIndex = -1;
+        },
+
+        moveEditDriverFocus(direction) {
+            const drivers = this.filteredEditDrivers();
+            if (!drivers.length) return;
+            this.editDriverPickerOpen = true;
+            this.editDriverActiveIndex = this.editDriverActiveIndex < 0
+                ? (direction > 0 ? 0 : drivers.length - 1)
+                : (this.editDriverActiveIndex + direction + drivers.length) % drivers.length;
+        },
+
+        selectActiveEditDriver() {
+            const driver = this.filteredEditDrivers()[this.editDriverActiveIndex];
+            if (driver) this.selectEditDriver(driver);
+        },
+
+        async saveEdit(confirmBusy = false) {
             this.editSaving = true;
             try {
                 const url = this.updateEndpointTemplate.replace('__ID__', this.editTarget.id);
@@ -248,9 +304,16 @@ function buildPickupsTable(config) {
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': this.csrfToken,
                     },
-                    body: JSON.stringify(this.editForm),
+                    body: JSON.stringify({ ...this.editForm, confirm_busy_assignment: confirmBusy }),
                 });
                 const data = await response.json();
+                if (response.status === 409 && data.code === 'rider_busy' && !confirmBusy) {
+                    const work = data.data?.active_work || {};
+                    if (window.confirm(`${data.message}\n\n${work.pickups || 0} pickup, ${work.transports || 0} transport, ${work.deliveries || 0} delivery.\n\nAssign anyway?`)) {
+                        this.editSaving = false;
+                        return this.saveEdit(true);
+                    }
+                }
                 if (data.success) {
                     this.showEditModal = false;
                     this.loadData();

@@ -1057,7 +1057,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                         <select x-model="assignmentForm.driver_id" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 text-sm text-slate-900 transition-all cursor-pointer appearance-none" required>
                                             <option value="">Choose a rider...</option>
                                             <template x-for="driver in availableDrivers" :key="driver.id">
-                                                <option :value="driver.id" x-text="driver.name + ' (' + driver.phone + ')'"></option>
+                                                <option :value="driver.id" x-text="driverOptionLabel(driver)"></option>
                                             </template>
                                         </select>
                                         <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -1140,7 +1140,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                         <select x-model="editAssignmentForm.driver_id" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm text-slate-900 transition-all cursor-pointer appearance-none">
                                             <option value="">Choose a rider...</option>
                                             <template x-for="driver in availableDriversForEdit" :key="driver.id">
-                                                <option :value="driver.id" x-text="driver.name + ' (' + driver.phone + ')'"></option>
+                                                <option :value="driver.id" x-text="driverOptionLabel(driver, assignment?.driver_id)"></option>
                                             </template>
                                         </select>
                                         <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -1150,6 +1150,10 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                     <template x-if="editAssignmentForm.loadingDrivers">
                                         <p class="mt-1.5 text-xs text-slate-400">Loading riders...</p>
                                     </template>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="mb-2 block text-sm font-semibold text-slate-700">Reassignment reason <span class="font-normal text-slate-400">(optional)</span></label>
+                                    <textarea x-model="editAssignmentForm.reassignment_reason" maxlength="500" rows="2" class="w-full resize-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Add context for the old and new rider..."></textarea>
                                 </div>
                                 <div class="mb-6">
                                     <label class="block text-sm font-semibold text-slate-700 mb-2">Target Warehouse</label>
@@ -3436,15 +3440,38 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                 <div class="max-h-[calc(100vh-240px)] space-y-5 overflow-y-auto px-6 py-6">
                     <div class="mb-4">
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Select Rider <span class="text-rose-500">*</span></label>
-                        <div class="relative">
-                            <select x-model="assignmentForm.driver_id" class="w-full appearance-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100" required>
-                                <option value="">Choose a rider...</option>
-                                <template x-for="driver in availableDrivers" :key="driver.id">
-                                    <option :value="driver.id" x-text="driver.name + ' (' + driver.phone + ')'"></option>
-                                </template>
-                            </select>
-                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        <div class="relative" @@click.outside="assignmentDriverPickerOpen = false">
+                            <input type="search" x-model="assignmentDriverSearch"
+                                   @@focus="assignmentDriverPickerOpen = true"
+                                   @@input="assignmentDriverPickerOpen = true; assignmentDriverActiveIndex = -1; assignmentForm.driver_id = ''"
+                                   @@keydown.arrow-down.prevent="moveAssignmentDriverFocus(1)"
+                                   @@keydown.arrow-up.prevent="moveAssignmentDriverFocus(-1)"
+                                   @@keydown.enter.prevent="selectActiveAssignmentDriver()"
+                                   @@keydown.escape.stop.prevent="assignmentDriverPickerOpen = false; assignmentDriverActiveIndex = -1"
+                                   role="combobox" aria-autocomplete="list" aria-controls="shipment-assign-rider-listbox"
+                                   :aria-expanded="assignmentDriverPickerOpen"
+                                   :aria-activedescendant="assignmentDriverActiveIndex >= 0 ? `shipment-assign-rider-${filteredAssignmentDrivers()[assignmentDriverActiveIndex]?.id}` : null"
+                                   placeholder="Search rider name, phone, vehicle..."
+                                   class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <div x-show="assignmentDriverPickerOpen" x-cloak class="absolute left-0 right-0 z-40 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                                <div id="shipment-assign-rider-listbox" role="listbox" aria-label="Pickup riders" class="max-h-64 overflow-y-auto">
+                                    <template x-for="(driver, index) in filteredAssignmentDrivers()" :key="driver.id">
+                                        <button type="button" :id="`shipment-assign-rider-${driver.id}`" role="option"
+                                                :aria-selected="Number(assignmentForm.driver_id) === Number(driver.id)"
+                                                @@mouseenter="assignmentDriverActiveIndex = index" @@click="selectAssignmentDriver(driver)"
+                                                class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-3 text-left last:border-0 hover:bg-orange-50"
+                                                :class="(Number(assignmentForm.driver_id) === Number(driver.id) || assignmentDriverActiveIndex === index) ? 'bg-orange-50' : ''">
+                                            <span class="min-w-0">
+                                                <span class="block truncate text-sm font-bold text-slate-900" x-text="driver.name"></span>
+                                                <span class="block truncate text-xs text-slate-500" x-text="[driver.phone, driver.vehicle_type, driver.vehicle_number].filter(Boolean).join(' · ')"></span>
+                                                <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold" :class="driver.is_busy ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'" x-text="driver.is_busy ? `Busy · ${driver.active_work_count} active jobs` : 'Available'"></span>
+                                                <span x-show="driver.is_busy" class="mt-1 block text-[10px] font-semibold text-amber-700" x-text="`${driver.active_work?.pickups || 0} pickups · ${driver.active_work?.transports || 0} transports · ${driver.active_work?.deliveries || 0} deliveries`"></span>
+                                            </span>
+                                            <span x-show="Number(assignmentForm.driver_id) === Number(driver.id)" class="text-lg font-bold text-orange-600">✓</span>
+                                        </button>
+                                    </template>
+                                    <p x-show="filteredAssignmentDrivers().length === 0" class="px-3 py-6 text-center text-sm text-slate-400">No matching riders.</p>
+                                </div>
                             </div>
                         </div>
                         <template x-if="availableDrivers.length === 0 && !assignmentForm.loadingDrivers">
@@ -3539,20 +3566,49 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                 <div class="max-h-[calc(100vh-240px)] space-y-5 overflow-y-auto px-6 py-6">
                     <div class="mb-4">
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Rider</label>
-                        <div class="relative">
-                            <select x-model="editAssignmentForm.driver_id" class="w-full appearance-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                <option value="">Choose a rider...</option>
-                                <template x-for="driver in availableDriversForEdit" :key="driver.id">
-                                    <option :value="driver.id" x-text="driver.name + ' (' + driver.phone + ')'"></option>
-                                </template>
-                            </select>
-                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        <div class="relative" @@click.outside="editDriverPickerOpen = false">
+                            <input type="search" x-model="editDriverSearch"
+                                   @@focus="editDriverPickerOpen = true"
+                                   @@input="editDriverPickerOpen = true; editDriverActiveIndex = -1; editAssignmentForm.driver_id = ''"
+                                   @@keydown.arrow-down.prevent="moveAssignmentDriverFocus(1, true)"
+                                   @@keydown.arrow-up.prevent="moveAssignmentDriverFocus(-1, true)"
+                                   @@keydown.enter.prevent="selectActiveAssignmentDriver(true)"
+                                   @@keydown.escape.stop.prevent="editDriverPickerOpen = false; editDriverActiveIndex = -1"
+                                   role="combobox" aria-autocomplete="list" aria-controls="shipment-edit-rider-listbox"
+                                   :aria-expanded="editDriverPickerOpen"
+                                   :aria-activedescendant="editDriverActiveIndex >= 0 ? `shipment-edit-rider-${filteredAssignmentDrivers(true)[editDriverActiveIndex]?.id}` : null"
+                                   placeholder="Search rider name, phone, vehicle..."
+                                   class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <div x-show="editDriverPickerOpen" x-cloak class="absolute left-0 right-0 z-40 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                                <div id="shipment-edit-rider-listbox" role="listbox" aria-label="Pickup riders" class="max-h-64 overflow-y-auto">
+                                    <template x-for="(driver, index) in filteredAssignmentDrivers(true)" :key="driver.id">
+                                        <button type="button" :id="`shipment-edit-rider-${driver.id}`" role="option"
+                                                :aria-selected="Number(editAssignmentForm.driver_id) === Number(driver.id)"
+                                                @@mouseenter="editDriverActiveIndex = index" @@click="selectAssignmentDriver(driver, true)"
+                                                class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-3 text-left last:border-0 hover:bg-orange-50"
+                                                :class="Number(assignment?.driver_id) === Number(driver.id) ? 'bg-orange-50 ring-1 ring-inset ring-orange-200' : ((Number(editAssignmentForm.driver_id) === Number(driver.id) || editDriverActiveIndex === index) ? 'bg-orange-50' : '')">
+                                            <span class="min-w-0">
+                                                <span class="block truncate text-sm font-bold text-slate-900" x-text="driver.name"></span>
+                                                <span class="block truncate text-xs text-slate-500" x-text="[driver.phone, driver.vehicle_type, driver.vehicle_number].filter(Boolean).join(' · ')"></span>
+                                                <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                                      :class="Number(assignment?.driver_id) === Number(driver.id) ? 'bg-orange-100 text-orange-700' : (driver.is_busy ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')"
+                                                      x-text="Number(assignment?.driver_id) === Number(driver.id) ? 'Assigned here' : (driver.is_busy ? `Busy · ${driver.active_work_count} active jobs` : 'Available')"></span>
+                                                <span x-show="driver.is_busy && Number(assignment?.driver_id) !== Number(driver.id)" class="mt-1 block text-[10px] font-semibold text-amber-700" x-text="`${driver.active_work?.pickups || 0} pickups · ${driver.active_work?.transports || 0} transports · ${driver.active_work?.deliveries || 0} deliveries`"></span>
+                                            </span>
+                                            <span x-show="Number(editAssignmentForm.driver_id) === Number(driver.id)" class="text-lg font-bold text-orange-600">✓</span>
+                                        </button>
+                                    </template>
+                                    <p x-show="filteredAssignmentDrivers(true).length === 0" class="px-3 py-6 text-center text-sm text-slate-400">No matching riders.</p>
+                                </div>
                             </div>
                         </div>
                         <template x-if="editAssignmentForm.loadingDrivers">
                             <p class="mt-1.5 text-xs text-slate-400">Loading riders...</p>
                         </template>
+                    </div>
+                    <div class="mb-4">
+                        <label class="mb-2 block text-sm font-semibold text-slate-700">Reassignment reason <span class="font-normal text-slate-400">(optional)</span></label>
+                        <textarea x-model="editAssignmentForm.reassignment_reason" maxlength="500" rows="2" class="w-full resize-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Add context for the old and new rider..."></textarea>
                     </div>
                     <div class="mb-6">
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Target Warehouse</label>

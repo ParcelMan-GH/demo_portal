@@ -5,8 +5,10 @@ namespace App\Providers;
 use App\Events\DeliveryRunStopStatusChanged;
 use App\Events\DriverAssignedToPickup;
 use App\Events\DriverAssignedToTransport;
+use App\Events\DriverAssignedToDelivery;
 use App\Events\DriverUnassignedFromPickup;
 use App\Events\DriverUnassignedFromTransport;
+use App\Events\DriverUnassignedFromDelivery;
 use App\Events\PickupAssignmentStatusChanged;
 use App\Events\ShipmentCollected;
 use App\Events\ShipmentReadyForCollection;
@@ -21,6 +23,7 @@ use App\Listeners\SendAdminTransportNotification;
 use App\Listeners\SendAdminVendorRegisteredNotification;
 use App\Listeners\SendDriverAssignmentNotification;
 use App\Listeners\SendDriverTransportNotification;
+use App\Listeners\SendDriverDeliveryNotification;
 use App\Listeners\SendDriverUnassignedNotification;
 use App\Listeners\SendCollectionNotifications;
 use App\Listeners\SendCustomerEmailTemplateNotification;
@@ -58,6 +61,13 @@ class EventServiceProvider extends ServiceProvider
             SendDriverTransportNotification::class,
         ],
         DriverUnassignedFromTransport::class => [
+            SendDriverUnassignedNotification::class,
+        ],
+
+        DriverAssignedToDelivery::class => [
+            SendDriverDeliveryNotification::class,
+        ],
+        DriverUnassignedFromDelivery::class => [
             SendDriverUnassignedNotification::class,
         ],
 

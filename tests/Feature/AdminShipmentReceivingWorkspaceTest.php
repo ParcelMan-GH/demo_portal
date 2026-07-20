@@ -1497,7 +1497,9 @@ test('admin receiving auto-completes pickup when assigned driver has not confirm
         'description' => 'Auto pickup package',
         'quantity' => 2,
     ]);
-    $assignment = rwCreateAssignment($shipment, rwCreateDriver(), $warehouse, [
+    $driver = rwCreateDriver();
+    $driver->update(['status' => 'busy']);
+    $assignment = rwCreateAssignment($shipment, $driver, $warehouse, [
         'status' => 'assigned',
         'picked_up_at' => null,
         'completed_at' => null,
@@ -1529,7 +1531,8 @@ test('admin receiving auto-completes pickup when assigned driver has not confirm
         'status' => 'completed',
     ]);
     expect($assignment->fresh()->picked_up_at)->not->toBeNull()
-        ->and($assignment->fresh()->completed_at)->not->toBeNull();
+        ->and($assignment->fresh()->completed_at)->not->toBeNull()
+        ->and($driver->fresh()->status)->toBe('available');
 
     $this->assertDatabaseHas('shipments', [
         'id' => $shipment->id,

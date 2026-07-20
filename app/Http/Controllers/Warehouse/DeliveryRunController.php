@@ -3,23 +3,24 @@
 namespace App\Http\Controllers\Warehouse;
 
 use App\Http\Controllers\Controller;
+use App\Models\DeliveryDelayReason;
 use App\Models\DeliveryRun;
 use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
-use App\Models\DeliveryDelayReason;
 use App\Models\Driver;
+use App\Models\OtpCode;
 use App\Models\SortBatch;
+use App\Services\BusHandoffConfirmationService;
 use App\Services\DeliveryDelayService;
+use App\Services\DriverWorkloadService;
 use App\Services\Warehouse\WarehouseDeliveryService;
 use App\Services\Warehouse\WarehousePortalService;
 use App\Services\Warehouse\WarehouseSortingService;
-use App\Services\BusHandoffConfirmationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
-use App\Models\OtpCode;
 use Illuminate\View\View;
 
 class DeliveryRunController extends Controller
@@ -29,9 +30,9 @@ class DeliveryRunController extends Controller
         private WarehouseDeliveryService $deliveryService,
         private WarehouseSortingService $sortingService,
         private BusHandoffConfirmationService $busHandoffConfirmationService,
-        private DeliveryDelayService $deliveryDelayService
-    ) {
-    }
+        private DeliveryDelayService $deliveryDelayService,
+        private DriverWorkloadService $driverWorkloads,
+    ) {}
 
     public function index(): View
     {
@@ -183,7 +184,7 @@ class DeliveryRunController extends Controller
             'sort_batch_id' => ['nullable', 'integer', 'exists:sort_batches,id'],
         ]);
 
-        if (!empty($validated['sort_batch_id'])) {
+        if (! empty($validated['sort_batch_id'])) {
             $batch = SortBatch::query()->findOrFail((int) $validated['sort_batch_id']);
             $result = $this->deliveryService->createRun($batch, $warehouse, Auth::guard('admin')->user());
         } else {
@@ -353,12 +354,21 @@ class DeliveryRunController extends Controller
 
         $validated = $request->validate([
             'driver_id' => ['required', 'integer', 'exists:drivers,id'],
+            'confirm_busy_assignment' => ['sometimes', 'boolean'],
+            'reassignment_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         $driver = Driver::query()->findOrFail((int) $validated['driver_id']);
-        $result = $this->deliveryService->assignDriver($run, $driver, $warehouse);
+        $result = $this->deliveryService->assignDriver(
+            $run,
+            $driver,
+            $warehouse,
+            Auth::guard('admin')->user(),
+            (bool) ($validated['confirm_busy_assignment'] ?? false),
+            $validated['reassignment_reason'] ?? null,
+        );
 
-        return response()->json($result, $result['success'] ? 200 : 422);
+        return response()->json($result, ($result['success'] ?? false) ? 200 : (($result['code'] ?? null) === 'rider_busy' ? 409 : 422));
     }
 
     public function dispatch(DeliveryRun $run): JsonResponse
@@ -404,11 +414,10 @@ class DeliveryRunController extends Controller
             'items.delayEvents.reason',
         ]);
 
-        $deliveryDrivers = Driver::query()
-            ->where('is_active', true)
-            ->whereJsonContains('task_capabilities', Driver::CAPABILITY_DELIVERY)
-            ->orderBy('name')
-            ->get(['id', 'name', 'phone', 'vehicle_type', 'vehicle_number']);
+        $deliveryDrivers = app(DriverWorkloadService::class)->assignmentOptions(
+            Driver::CAPABILITY_DELIVERY,
+            includeDriverIds: [$run->assigned_driver_id],
+        );
 
         $user = Auth::guard('admin')->user();
         $statusLabel = $this->formatStatusLabel($run->status);
@@ -488,7 +497,7 @@ class DeliveryRunController extends Controller
         $notifyVendor = filter_var($validated['notify_vendor'] ?? true, FILTER_VALIDATE_BOOLEAN);
         $notifyVendorSms = filter_var($validated['notify_vendor_sms'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-        if (!$notifyRecipient && !$notifyVendor && !$notifyVendorSms) {
+        if (! $notifyRecipient && ! $notifyVendor && ! $notifyVendorSms) {
             return response()->json([
                 'success' => false,
                 'message' => 'Select at least one person to notify.',
@@ -499,7 +508,7 @@ class DeliveryRunController extends Controller
             ->where('is_active', true)
             ->find((int) $validated['reason_id']);
 
-        if (!$reason) {
+        if (! $reason) {
             return response()->json([
                 'success' => false,
                 'message' => 'Select an active delivery delay reason.',
@@ -517,7 +526,7 @@ class DeliveryRunController extends Controller
         ]);
 
         $delay = $this->deliveryDelayService->snapshot($item);
-        if (!($delay['can_notify'] ?? false)) {
+        if (! ($delay['can_notify'] ?? false)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Delay notices can only be sent for active delivery packages.',
@@ -528,7 +537,7 @@ class DeliveryRunController extends Controller
             item: $item,
             admin: Auth::guard('admin')->user(),
             reason: $reason,
-            revisedEta: !empty($validated['revised_eta']) ? Carbon::parse($validated['revised_eta']) : null,
+            revisedEta: ! empty($validated['revised_eta']) ? Carbon::parse($validated['revised_eta']) : null,
             notifyRecipient: $notifyRecipient,
             notifyVendor: $notifyVendor,
             notifyVendorSms: $notifyVendorSms,
@@ -598,7 +607,7 @@ class DeliveryRunController extends Controller
     private function authorizePermission(string $permission): void
     {
         $user = Auth::guard('admin')->user();
-        if (!$user || !$user->hasPermission($permission)) {
+        if (! $user || ! $user->hasPermission($permission)) {
             abort(403, 'Unauthorized action.');
         }
     }
@@ -746,13 +755,13 @@ class DeliveryRunController extends Controller
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('recipient_name', 'like', "%{$search}%")
-                  ->orWhere('recipient_phone', 'like', "%{$search}%")
-                  ->orWhere('handoff_courier_name', 'like', "%{$search}%")
-                  ->orWhere('handoff_vehicle_number', 'like', "%{$search}%")
-                  ->orWhere('bus_station_name', 'like', "%{$search}%")
-                  ->orWhereHas('items.shipmentItem', fn ($itemQuery) => $itemQuery
-                      ->where('tracking_code', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%"));
+                    ->orWhere('recipient_phone', 'like', "%{$search}%")
+                    ->orWhere('handoff_courier_name', 'like', "%{$search}%")
+                    ->orWhere('handoff_vehicle_number', 'like', "%{$search}%")
+                    ->orWhere('bus_station_name', 'like', "%{$search}%")
+                    ->orWhereHas('items.shipmentItem', fn ($itemQuery) => $itemQuery
+                        ->where('tracking_code', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%"));
             });
         }
 
@@ -812,37 +821,37 @@ class DeliveryRunController extends Controller
                 $confirmations = $stop->busHandoffConfirmations;
 
                 return [
-                'id' => $stop->id,
-                'run_id' => $stop->delivery_run_id,
-                'run_number' => $stop->run?->run_number,
-                'run_url' => $stop->run ? route('warehouse.deliveries.runs.show', $stop->run) : null,
-                'recipient_name' => $stop->recipient_name,
-                'recipient_phone' => $stop->recipient_phone,
-                'town' => $stop->town,
-                'destination_town' => $stop->town,
-                'region' => $stop->region?->name,
-                'district' => $stop->district?->name,
-                'destination_district' => $stop->district?->name,
-                'courier_name' => $stop->handoff_courier_name,
-                'courier_phone' => $stop->handoff_courier_phone,
-                'vehicle_number' => $stop->handoff_vehicle_number,
-                'handoff_at' => $stop->handoff_at?->format('d M Y, h:i A'),
-                'handed_off_at' => $stop->handoff_at?->format('d M Y, h:i A'),
-                'hours_since_handoff' => $stop->handoff_at ? round($stop->handoff_at->diffInHours($now), 1) : null,
-                'hours_ago' => $stop->handoff_at ? round($stop->handoff_at->diffInHours($now), 1) : null,
-                'needs_followup' => $stop->handoff_at && $stop->handoff_at->diffInHours($now) >= 24,
-                'total_packages' => (int) $stop->total_packages,
-                'packages_count' => (int) $stop->total_packages,
-                'confirmation_summary' => [
-                    'pending' => $confirmations->whereIn('status', ['pending', 'code_sent'])->count(),
-                    'issues' => $confirmations->where('status', 'issue_reported')->count(),
-                    'confirmed' => $confirmations->whereIn('status', ['confirmed', 'admin_confirmed'])->count(),
-                    'failed' => $confirmations->where('status', 'failed')->count(),
-                    'latest_status' => $confirmations->sortByDesc('updated_at')->first()?->status,
-                    'latest_source' => $confirmations->sortByDesc('updated_at')->first()?->source,
-                    'latest_reason' => $confirmations->sortByDesc('updated_at')->first()?->reason?->label,
-                ],
-            ];
+                    'id' => $stop->id,
+                    'run_id' => $stop->delivery_run_id,
+                    'run_number' => $stop->run?->run_number,
+                    'run_url' => $stop->run ? route('warehouse.deliveries.runs.show', $stop->run) : null,
+                    'recipient_name' => $stop->recipient_name,
+                    'recipient_phone' => $stop->recipient_phone,
+                    'town' => $stop->town,
+                    'destination_town' => $stop->town,
+                    'region' => $stop->region?->name,
+                    'district' => $stop->district?->name,
+                    'destination_district' => $stop->district?->name,
+                    'courier_name' => $stop->handoff_courier_name,
+                    'courier_phone' => $stop->handoff_courier_phone,
+                    'vehicle_number' => $stop->handoff_vehicle_number,
+                    'handoff_at' => $stop->handoff_at?->format('d M Y, h:i A'),
+                    'handed_off_at' => $stop->handoff_at?->format('d M Y, h:i A'),
+                    'hours_since_handoff' => $stop->handoff_at ? round($stop->handoff_at->diffInHours($now), 1) : null,
+                    'hours_ago' => $stop->handoff_at ? round($stop->handoff_at->diffInHours($now), 1) : null,
+                    'needs_followup' => $stop->handoff_at && $stop->handoff_at->diffInHours($now) >= 24,
+                    'total_packages' => (int) $stop->total_packages,
+                    'packages_count' => (int) $stop->total_packages,
+                    'confirmation_summary' => [
+                        'pending' => $confirmations->whereIn('status', ['pending', 'code_sent'])->count(),
+                        'issues' => $confirmations->where('status', 'issue_reported')->count(),
+                        'confirmed' => $confirmations->whereIn('status', ['confirmed', 'admin_confirmed'])->count(),
+                        'failed' => $confirmations->where('status', 'failed')->count(),
+                        'latest_status' => $confirmations->sortByDesc('updated_at')->first()?->status,
+                        'latest_source' => $confirmations->sortByDesc('updated_at')->first()?->source,
+                        'latest_reason' => $confirmations->sortByDesc('updated_at')->first()?->reason?->label,
+                    ],
+                ];
             })->values(),
             'meta' => [
                 'total' => $total,
@@ -859,7 +868,7 @@ class DeliveryRunController extends Controller
 
     private function getStopOtpCode(DeliveryRunStop $stop): ?string
     {
-        if ($stop->status === 'delivered' || !$stop->verification_code_sent_at) {
+        if ($stop->status === 'delivered' || ! $stop->verification_code_sent_at) {
             return null;
         }
 
@@ -910,22 +919,20 @@ class DeliveryRunController extends Controller
                 'status' => DeliveryRun::STATUS_COMPLETED,
                 'completed_at' => $run->completed_at ?? now(),
             ]);
-
-            return;
-        }
-
-        if ($completedStops > 0) {
+        } elseif ($completedStops > 0) {
             $run->update([
                 'status' => DeliveryRun::STATUS_PARTIALLY_DELIVERED,
                 'completed_at' => null,
             ]);
-
-            return;
+        } else {
+            $run->update([
+                'status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY,
+                'completed_at' => null,
+            ]);
         }
 
-        $run->update([
-            'status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY,
-            'completed_at' => null,
-        ]);
+        if ($run->assigned_driver_id) {
+            $this->driverWorkloads->syncStatus($run->assigned_driver_id);
+        }
     }
 }

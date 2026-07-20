@@ -1,8 +1,8 @@
 <?php
 
-use App\Models\Driver;
 use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
+use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
 use App\Models\RiderPackageTransfer;
 use App\Models\RiderTeamHandoverItem;
@@ -26,6 +26,7 @@ function driverPackageRouteIntentBuildSchema(): void
         'delivery_run_items',
         'delivery_run_stops',
         'delivery_runs',
+        'rider_assignment_events',
         'delivery_failure_reasons',
         'delivery_delay_reasons',
         'shipment_charges',
@@ -183,10 +184,23 @@ function driverPackageRouteIntentBuildSchema(): void
         $table->unsignedBigInteger('warehouse_id')->nullable();
         $table->string('status')->default('draft');
         $table->unsignedBigInteger('assigned_driver_id')->nullable();
+        $table->timestamp('assigned_at')->nullable();
         $table->timestamp('dispatched_at')->nullable();
         $table->timestamp('completed_at')->nullable();
         $table->unsignedBigInteger('created_by_user_id')->nullable();
         $table->text('notes')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('rider_assignment_events', function (Blueprint $table) {
+        $table->id();
+        $table->string('job_type', 32);
+        $table->unsignedBigInteger('job_id');
+        $table->string('event_type', 32);
+        $table->unsignedBigInteger('previous_driver_id')->nullable();
+        $table->unsignedBigInteger('driver_id')->nullable();
+        $table->unsignedBigInteger('performed_by_user_id')->nullable();
+        $table->string('reason', 500)->nullable();
         $table->timestamps();
     });
 
@@ -627,6 +641,8 @@ test('starting deliveries can immediately load the delivery detail response', fu
 
     $startResponse->assertOk()
         ->assertJsonPath('success', true);
+
+    expect($this->driver->fresh()->status)->toBe('busy');
 
     $runId = $startResponse->json('data.delivery_run_id');
     $runItem = DeliveryRunItem::query()

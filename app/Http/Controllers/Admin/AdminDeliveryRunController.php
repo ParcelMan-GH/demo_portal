@@ -11,6 +11,7 @@ use App\Models\SortBatch;
 use App\Models\Warehouse;
 use App\Services\BackOfficeAccess;
 use App\Services\BusHandoffConfirmationService;
+use App\Services\DriverWorkloadService;
 use App\Services\Warehouse\WarehouseDeliveryService;
 use App\Services\Warehouse\WarehouseSortingService;
 use App\Support\GenericPdfExporter;
@@ -25,9 +26,8 @@ class AdminDeliveryRunController extends Controller
     public function __construct(
         private readonly BackOfficeAccess $access,
         private readonly BusHandoffConfirmationService $busHandoffConfirmationService,
-    )
-    {
-    }
+        private readonly DriverWorkloadService $driverWorkloads,
+    ) {}
 
     /**
      * Display the delivery runs index page.
@@ -93,9 +93,9 @@ class AdminDeliveryRunController extends Controller
         }
 
         // Sorting
-        $sortBy        = $request->get('sort', 'created_at');
+        $sortBy = $request->get('sort', 'created_at');
         $sortDirection = $request->get('direction', 'desc');
-        $allowedSorts  = ['run_number', 'status', 'created_at', 'assigned_at', 'dispatched_at', 'completed_at', 'stops_count', 'items_count'];
+        $allowedSorts = ['run_number', 'status', 'created_at', 'assigned_at', 'dispatched_at', 'completed_at', 'stops_count', 'items_count'];
 
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
@@ -105,40 +105,40 @@ class AdminDeliveryRunController extends Controller
 
         // Pagination
         $perPage = min((int) $request->get('per_page', 25), 100);
-        $page    = (int) $request->get('page', 1);
-        $offset  = ($page - 1) * $perPage;
+        $page = (int) $request->get('page', 1);
+        $offset = ($page - 1) * $perPage;
 
         $total = $query->count();
-        $runs  = $query->skip($offset)->take($perPage)->get();
+        $runs = $query->skip($offset)->take($perPage)->get();
 
         $data = $runs->map(function (DeliveryRun $run) {
             return [
-                'id'              => $run->id,
-                'run_number'      => $run->run_number,
-                'status'          => $run->status,
-                'status_label'    => $this->formatStatusLabel($run->status),
-                'warehouse_name'  => $run->warehouse?->name,
-                'warehouse_code'  => $run->warehouse?->code,
-                'driver_name'     => $run->assignedDriver?->name,
-                'driver_phone'    => $run->assignedDriver?->phone,
-                'stops_count'     => $run->stops_count,
-                'items_count'     => $run->items_count,
-                'assigned_at'     => $run->assigned_at?->format('Y-m-d H:i:s'),
-                'dispatched_at'   => $run->dispatched_at?->format('Y-m-d H:i:s'),
-                'completed_at'    => $run->completed_at?->format('Y-m-d H:i:s'),
-                'created_at'      => $run->created_at->format('Y-m-d H:i:s'),
+                'id' => $run->id,
+                'run_number' => $run->run_number,
+                'status' => $run->status,
+                'status_label' => $this->formatStatusLabel($run->status),
+                'warehouse_name' => $run->warehouse?->name,
+                'warehouse_code' => $run->warehouse?->code,
+                'driver_name' => $run->assignedDriver?->name,
+                'driver_phone' => $run->assignedDriver?->phone,
+                'stops_count' => $run->stops_count,
+                'items_count' => $run->items_count,
+                'assigned_at' => $run->assigned_at?->format('Y-m-d H:i:s'),
+                'dispatched_at' => $run->dispatched_at?->format('Y-m-d H:i:s'),
+                'completed_at' => $run->completed_at?->format('Y-m-d H:i:s'),
+                'created_at' => $run->created_at->format('Y-m-d H:i:s'),
             ];
         });
 
         return response()->json([
             'data' => $data,
             'meta' => [
-                'total'        => $total,
-                'per_page'     => $perPage,
+                'total' => $total,
+                'per_page' => $perPage,
                 'current_page' => $page,
-                'last_page'    => (int) ceil($total / $perPage) ?: 1,
-                'from'         => $total > 0 ? $offset + 1 : 0,
-                'to'           => min($offset + $perPage, $total),
+                'last_page' => (int) ceil($total / $perPage) ?: 1,
+                'from' => $total > 0 ? $offset + 1 : 0,
+                'to' => min($offset + $perPage, $total),
             ],
         ]);
     }
@@ -166,7 +166,12 @@ class AdminDeliveryRunController extends Controller
 
         $statusLabel = $this->formatStatusLabel($run->status);
 
-        return view('admin.delivery-runs.show', compact('run', 'statusLabel'));
+        $deliveryDrivers = app(DriverWorkloadService::class)->assignmentOptions(
+            Driver::CAPABILITY_DELIVERY,
+            includeDriverIds: [$run->assigned_driver_id],
+        );
+
+        return view('admin.delivery-runs.show', compact('run', 'statusLabel', 'deliveryDrivers'));
     }
 
     /**
@@ -182,8 +187,8 @@ class AdminDeliveryRunController extends Controller
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('run_number', 'like', "%{$search}%")
-                    ->orWhereHas('warehouse', fn($wq) => $wq->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('assignedDriver', fn($dq) => $dq->where('name', 'like', "%{$search}%"));
+                    ->orWhereHas('warehouse', fn ($wq) => $wq->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('assignedDriver', fn ($dq) => $dq->where('name', 'like', "%{$search}%"));
             });
         }
 
@@ -205,27 +210,27 @@ class AdminDeliveryRunController extends Controller
 
         $runs = $query->orderBy('created_at', 'desc')->get();
 
-        $rows = $runs->map(fn(DeliveryRun $run) => [
-            'Run #'          => $run->run_number,
-            'Warehouse'      => $run->warehouse?->name ?? '—',
-            'Rider'          => $run->assignedDriver?->name ?? '—',
-            'Rider Phone'   => $run->assignedDriver?->phone ?? '—',
-            'Stops'          => $run->stops_count,
-            'Items'          => $run->items_count,
-            'Status'         => $this->formatStatusLabel($run->status),
-            'Dispatched At'  => $run->dispatched_at?->format('Y-m-d H:i:s') ?? '—',
-            'Completed At'   => $run->completed_at?->format('Y-m-d H:i:s') ?? '—',
-            'Created At'     => $run->created_at->format('Y-m-d H:i:s'),
+        $rows = $runs->map(fn (DeliveryRun $run) => [
+            'Run #' => $run->run_number,
+            'Warehouse' => $run->warehouse?->name ?? '—',
+            'Rider' => $run->assignedDriver?->name ?? '—',
+            'Rider Phone' => $run->assignedDriver?->phone ?? '—',
+            'Stops' => $run->stops_count,
+            'Items' => $run->items_count,
+            'Status' => $this->formatStatusLabel($run->status),
+            'Dispatched At' => $run->dispatched_at?->format('Y-m-d H:i:s') ?? '—',
+            'Completed At' => $run->completed_at?->format('Y-m-d H:i:s') ?? '—',
+            'Created At' => $run->created_at->format('Y-m-d H:i:s'),
         ])->values()->toArray();
 
         $format = $request->input('format', 'json');
 
         if ($format === 'excel') {
-            return Excel::download(new DriversExport($rows), 'delivery_runs_' . date('Y-m-d_His') . '.xlsx');
+            return Excel::download(new DriversExport($rows), 'delivery_runs_'.date('Y-m-d_His').'.xlsx');
         }
 
         if ($format === 'pdf') {
-            return GenericPdfExporter::download($rows, 'delivery_runs_' . date('Y-m-d_His') . '.pdf', 'Delivery Runs');
+            return GenericPdfExporter::download($rows, 'delivery_runs_'.date('Y-m-d_His').'.pdf', 'Delivery Runs');
         }
 
         return response()->json(['data' => $rows]);
@@ -237,13 +242,13 @@ class AdminDeliveryRunController extends Controller
     private function formatStatusLabel(string $status): string
     {
         return match ($status) {
-            DeliveryRun::STATUS_DRAFT               => 'Draft',
-            DeliveryRun::STATUS_ASSIGNED            => 'Assigned',
-            DeliveryRun::STATUS_OUT_FOR_DELIVERY    => 'Out for Delivery',
+            DeliveryRun::STATUS_DRAFT => 'Draft',
+            DeliveryRun::STATUS_ASSIGNED => 'Assigned',
+            DeliveryRun::STATUS_OUT_FOR_DELIVERY => 'Out for Delivery',
             DeliveryRun::STATUS_PARTIALLY_DELIVERED => 'Partially Delivered',
-            DeliveryRun::STATUS_COMPLETED           => 'Completed',
-            DeliveryRun::STATUS_CANCELLED           => 'Cancelled',
-            default                                 => ucwords(str_replace('_', ' ', $status)),
+            DeliveryRun::STATUS_COMPLETED => 'Completed',
+            DeliveryRun::STATUS_CANCELLED => 'Cancelled',
+            default => ucwords(str_replace('_', ' ', $status)),
         };
     }
 
@@ -294,18 +299,22 @@ class AdminDeliveryRunController extends Controller
 
         $validated = $request->validate([
             'driver_id' => ['required', 'exists:drivers,id'],
+            'confirm_busy_assignment' => ['sometimes', 'boolean'],
+            'reassignment_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $run->update([
-            'assigned_driver_id' => (int) $validated['driver_id'],
-            'status' => DeliveryRun::STATUS_ASSIGNED,
-        ]);
+        $this->access->assertCanUseWarehouse(Auth::guard('admin')->user(), (int) $run->warehouse_id, 'warehouse');
+        $driver = Driver::query()->findOrFail((int) $validated['driver_id']);
+        $result = app(WarehouseDeliveryService::class)->assignDriver(
+            $run,
+            $driver,
+            $run->warehouse,
+            Auth::guard('admin')->user(),
+            (bool) ($validated['confirm_busy_assignment'] ?? false),
+            $validated['reassignment_reason'] ?? null,
+        );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Rider assigned to delivery run.',
-            'data' => ['run' => $run->fresh()],
-        ]);
+        return response()->json($result, ($result['success'] ?? false) ? 200 : (($result['code'] ?? null) === 'rider_busy' ? 409 : 422));
     }
 
     public function dispatch(DeliveryRun $run): JsonResponse
@@ -316,7 +325,7 @@ class AdminDeliveryRunController extends Controller
         $admin = Auth::guard('admin')->user();
         $warehouse = $run->warehouse;
 
-        if (!$warehouse) {
+        if (! $warehouse) {
             return response()->json(['success' => false, 'message' => 'No warehouse found for this run.'], 422);
         }
 
@@ -332,7 +341,7 @@ class AdminDeliveryRunController extends Controller
         $deliveryService = app(WarehouseDeliveryService::class);
         $warehouse = $run->warehouse;
 
-        if (!$warehouse) {
+        if (! $warehouse) {
             return response()->json(['success' => false, 'message' => 'No warehouse found.'], 422);
         }
 
@@ -434,7 +443,7 @@ class AdminDeliveryRunController extends Controller
     private function authorizePermission(string $permission): void
     {
         $user = Auth::guard('admin')->user();
-        if (!$user || !$user->hasPermission($permission)) {
+        if (! $user || ! $user->hasPermission($permission)) {
             abort(403, 'Unauthorized action.');
         }
     }
@@ -466,22 +475,20 @@ class AdminDeliveryRunController extends Controller
                 'status' => DeliveryRun::STATUS_COMPLETED,
                 'completed_at' => $run->completed_at ?? now(),
             ]);
-
-            return;
-        }
-
-        if ($completedStops > 0) {
+        } elseif ($completedStops > 0) {
             $run->update([
                 'status' => DeliveryRun::STATUS_PARTIALLY_DELIVERED,
                 'completed_at' => null,
             ]);
-
-            return;
+        } else {
+            $run->update([
+                'status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY,
+                'completed_at' => null,
+            ]);
         }
 
-        $run->update([
-            'status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY,
-            'completed_at' => null,
-        ]);
+        if ($run->assigned_driver_id) {
+            $this->driverWorkloads->syncStatus($run->assigned_driver_id);
+        }
     }
 }

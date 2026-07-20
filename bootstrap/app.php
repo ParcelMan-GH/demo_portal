@@ -7,6 +7,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
+    ->withEvents(discover: false)
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -22,12 +23,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
             $backOfficePrefix = trim((string) config('backoffice.prefix', 'admin'), '/');
 
-            if ($request->is($backOfficePrefix . '/*')
+            if ($request->is($backOfficePrefix.'/*')
                 || $request->is($backOfficePrefix)
                 || $request->is('admin/*')
                 || $request->is('admin')) {
                 return route('admin.login');
             }
+
             return route('login');
         });
 

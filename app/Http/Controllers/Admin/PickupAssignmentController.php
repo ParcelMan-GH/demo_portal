@@ -163,6 +163,7 @@ class PickupAssignmentController extends Controller
             'driver_id' => ['required', 'exists:drivers,id'],
             'target_warehouse_id' => ['required', 'exists:warehouses,id'],
             'notes' => ['nullable', 'string'],
+            'confirm_busy_assignment' => ['sometimes', 'boolean'],
         ]);
 
         // Validate shipment readiness
@@ -205,10 +206,11 @@ class PickupAssignmentController extends Controller
             $driver,
             $admin,
             $validated['notes'] ?? null,
-            (int) $validated['target_warehouse_id']
+            (int) $validated['target_warehouse_id'],
+            (bool) ($validated['confirm_busy_assignment'] ?? false),
         );
 
-        return response()->json($result, $result['success'] ? 200 : 422);
+        return response()->json($result, $this->assignmentResponseStatus($result));
     }
 
     /**
@@ -221,16 +223,28 @@ class PickupAssignmentController extends Controller
         $validated = $request->validate([
             'driver_id'           => ['nullable', 'exists:drivers,id'],
             'target_warehouse_id' => ['nullable', 'exists:warehouses,id'],
+            'confirm_busy_assignment' => ['sometimes', 'boolean'],
+            'reassignment_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         $result = $this->pickupAssignmentService->updateAssignment(
             assignment:       $pickupAssignment,
             newDriverId:      isset($validated['driver_id']) ? (int) $validated['driver_id'] : null,
             newWarehouseId:   isset($validated['target_warehouse_id']) ? (int) $validated['target_warehouse_id'] : null,
-            pushService:      app(PushNotificationService::class)
+            pushService:      app(PushNotificationService::class),
+            actor:            Auth::guard('admin')->user(),
+            confirmBusyAssignment: (bool) ($validated['confirm_busy_assignment'] ?? false),
+            reassignmentReason: $validated['reassignment_reason'] ?? null,
         );
 
-        return response()->json($result, $result['success'] ? 200 : 422);
+        return response()->json($result, $this->assignmentResponseStatus($result));
+    }
+
+    private function assignmentResponseStatus(array $result): int
+    {
+        if ($result['success'] ?? false) return 200;
+
+        return ($result['code'] ?? null) === 'rider_busy' ? 409 : 422;
     }
 
     /**
@@ -244,7 +258,11 @@ class PickupAssignmentController extends Controller
             'cancellation_reason' => ['required', 'string', 'min:3', 'max:1000'],
         ]);
 
-        $result = $this->pickupAssignmentService->cancel($pickupAssignment, $validated['cancellation_reason']);
+        $result = $this->pickupAssignmentService->cancel(
+            $pickupAssignment,
+            $validated['cancellation_reason'],
+            Auth::guard('admin')->user(),
+        );
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }
