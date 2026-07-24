@@ -253,9 +253,13 @@ class Shipment extends Model
      * Check if shipment can have a driver assigned.
      */
     public function canBeAssigned(): bool
-    {
-        return in_array($this->status, [ShipmentStatus::SUBMITTED, ShipmentStatus::PROCESSING]);
-    }
+{
+    return in_array($this->status, [
+        ShipmentStatus::SUBMITTED,
+        ShipmentStatus::PROCESSING,
+        ShipmentStatus::PICKUP_ASSIGNED, // <-- Added this
+    ]);
+}
 
     /**
      * Check if shipment can be edited.

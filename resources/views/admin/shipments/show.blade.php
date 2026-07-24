@@ -3398,6 +3398,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
     {{-- ═══════════════════════════════════════════════════════════════════ --}}
 
     <!-- ══ MODAL: Assign Rider ════════════════════════════════════════ -->
+    <!-- ══ MODAL: Assign Rider (Multi-Select) ════════════════════════════════════════ -->
     <div x-show="assignDriverModalOpen" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="assignDriverModalOpen = false">
         <div x-show="assignDriverModalOpen"
              x-transition:enter="transition ease-out duration-200"
@@ -3409,117 +3410,138 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
              class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
              @@click="assignDriverModalOpen = false"></div>
         <div class="flex min-h-full items-center justify-center p-4">
-        <div x-show="assignDriverModalOpen"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0 scale-95"
-             x-transition:enter-end="opacity-100 scale-100"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="opacity-100 scale-100"
-             x-transition:leave-end="opacity-0 scale-95"
-             @@click.stop
-             class="relative z-10 w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
-            <div class="relative border-b border-slate-200 px-6 py-5">
-                <div class="flex items-start justify-between">
-                    <div class="flex items-start gap-4">
-                        <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
-                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a8.25 8.25 0 0 1 15 0"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-slate-900" x-text="assignment ? 'Reassign Rider' : 'Assign Rider'"></h3>
-                        <p class="mt-1 text-sm text-slate-500">Select the pickup rider and receiving warehouse.</p>
+            <div x-show="assignDriverModalOpen"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-95"
+                 @@click.stop
+                 class="relative z-10 w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+                <div class="relative border-b border-slate-200 px-6 py-5">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
+                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a8.25 8.25 0 0 1 15 0"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-slate-900" x-text="assignment ? 'Reassign / Add Riders' : 'Assign Riders'"></h3>
+                                <p class="mt-1 text-sm text-slate-500">Select one or more pickup riders and the target warehouse.</p>
+                            </div>
+                        </div>
+                        <button type="button" @@click="assignDriverModalOpen = false" class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
                     </div>
                 </div>
-                <button @@click="assignDriverModalOpen = false" class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700">
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-                </div>
-            </div>
-            <form @@submit.prevent="assignDriver()">
-                <div class="max-h-[calc(100vh-240px)] space-y-5 overflow-y-auto px-6 py-6">
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Select Rider <span class="text-rose-500">*</span></label>
-                        <div class="relative" @@click.outside="assignmentDriverPickerOpen = false">
-                            <input type="search" x-model="assignmentDriverSearch"
-                                   @@focus="assignmentDriverPickerOpen = true"
-                                   @@input="assignmentDriverPickerOpen = true; assignmentDriverActiveIndex = -1; assignmentForm.driver_id = ''"
-                                   @@keydown.arrow-down.prevent="moveAssignmentDriverFocus(1)"
-                                   @@keydown.arrow-up.prevent="moveAssignmentDriverFocus(-1)"
-                                   @@keydown.enter.prevent="selectActiveAssignmentDriver()"
-                                   @@keydown.escape.stop.prevent="assignmentDriverPickerOpen = false; assignmentDriverActiveIndex = -1"
-                                   role="combobox" aria-autocomplete="list" aria-controls="shipment-assign-rider-listbox"
-                                   :aria-expanded="assignmentDriverPickerOpen"
-                                   :aria-activedescendant="assignmentDriverActiveIndex >= 0 ? `shipment-assign-rider-${filteredAssignmentDrivers()[assignmentDriverActiveIndex]?.id}` : null"
-                                   placeholder="Search rider name, phone, vehicle..."
-                                   class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                            <div x-show="assignmentDriverPickerOpen" x-cloak class="absolute left-0 right-0 z-40 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-                                <div id="shipment-assign-rider-listbox" role="listbox" aria-label="Pickup riders" class="max-h-64 overflow-y-auto">
-                                    <template x-for="(driver, index) in filteredAssignmentDrivers()" :key="driver.id">
-                                        <button type="button" :id="`shipment-assign-rider-${driver.id}`" role="option"
-                                                :aria-selected="Number(assignmentForm.driver_id) === Number(driver.id)"
-                                                @@mouseenter="assignmentDriverActiveIndex = index" @@click="selectAssignmentDriver(driver)"
-                                                class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-3 text-left last:border-0 hover:bg-orange-50"
-                                                :class="(Number(assignmentForm.driver_id) === Number(driver.id) || assignmentDriverActiveIndex === index) ? 'bg-orange-50' : ''">
-                                            <span class="min-w-0">
-                                                <span class="block truncate text-sm font-bold text-slate-900" x-text="driver.name"></span>
-                                                <span class="block truncate text-xs text-slate-500" x-text="[driver.phone, driver.vehicle_type, driver.vehicle_number].filter(Boolean).join(' · ')"></span>
-                                                <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold" :class="driver.is_busy ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'" x-text="driver.is_busy ? `Busy · ${driver.active_work_count} active jobs` : 'Available'"></span>
-                                                <span x-show="driver.is_busy" class="mt-1 block text-[10px] font-semibold text-amber-700" x-text="`${driver.active_work?.pickups || 0} pickups · ${driver.active_work?.transports || 0} transports · ${driver.active_work?.deliveries || 0} deliveries`"></span>
-                                            </span>
-                                            <span x-show="Number(assignmentForm.driver_id) === Number(driver.id)" class="text-lg font-bold text-orange-600">✓</span>
+                <form @@submit.prevent="assignDriver()">
+                    <div class="max-h-[calc(100vh-240px)] space-y-5 overflow-y-auto px-6 py-6">
+                        
+                        <!-- Selected Riders Chips -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Selected Riders <span class="text-rose-500">*</span></label>
+                            
+                            <div x-show="selectedAssignmentDrivers && selectedAssignmentDrivers.length > 0" class="mb-3 flex flex-wrap gap-2">
+                                <template x-for="sDriver in selectedAssignmentDrivers" :key="sDriver.id">
+                                    <span class="inline-flex items-center gap-1.5 rounded-xl bg-orange-50 border border-orange-200 px-3 py-1.5 text-xs font-bold text-orange-800 shadow-sm">
+                                        <span x-text="sDriver.name"></span>
+                                        <button type="button" @@click="toggleAssignmentDriver(sDriver)" class="ml-1 text-orange-500 hover:text-orange-800 focus:outline-none font-black text-sm">
+                                            &times;
                                         </button>
-                                    </template>
-                                    <p x-show="filteredAssignmentDrivers().length === 0" class="px-3 py-6 text-center text-sm text-slate-400">No matching riders.</p>
+                                    </span>
+                                </template>
+                            </div>
+
+                            <div class="relative" @@click.outside="assignmentDriverPickerOpen = false">
+                                <input type="search" x-model="assignmentDriverSearch"
+                                       @@focus="assignmentDriverPickerOpen = true"
+                                       @@input="assignmentDriverPickerOpen = true; assignmentDriverActiveIndex = -1"
+                                       @@keydown.arrow-down.prevent="moveAssignmentDriverFocus(1)"
+                                       @@keydown.arrow-up.prevent="moveAssignmentDriverFocus(-1)"
+                                       @@keydown.enter.prevent="selectActiveAssignmentDriver()"
+                                       @@keydown.escape.stop.prevent="assignmentDriverPickerOpen = false; assignmentDriverActiveIndex = -1"
+                                       role="combobox" aria-autocomplete="list" aria-controls="shipment-assign-rider-listbox"
+                                       :aria-expanded="assignmentDriverPickerOpen"
+                                       placeholder="Search and click to add riders..."
+                                       class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                
+                                <div x-show="assignmentDriverPickerOpen" x-cloak class="absolute left-0 right-0 z-40 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                                    <div id="shipment-assign-rider-listbox" role="listbox" aria-label="Pickup riders" class="max-h-64 overflow-y-auto">
+                                        <template x-for="(driver, index) in filteredAssignmentDrivers()" :key="driver.id">
+                                            <button type="button" :id="`shipment-assign-rider-${driver.id}`" role="option"
+                                                    :aria-selected="isDriverSelected(driver.id)"
+                                                    @@mouseenter="assignmentDriverActiveIndex = index" 
+                                                    @@click="toggleAssignmentDriver(driver)"
+                                                    class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-3 text-left last:border-0 hover:bg-orange-50 transition-colors"
+                                                    :class="(isDriverSelected(driver.id) || assignmentDriverActiveIndex === index) ? 'bg-orange-50' : ''">
+                                                <span class="min-w-0">
+                                                    <span class="block truncate text-sm font-bold text-slate-900" x-text="driver.name"></span>
+                                                    <span class="block truncate text-xs text-slate-500" x-text="[driver.phone, driver.vehicle_type, driver.vehicle_number].filter(Boolean).join(' · ')"></span>
+                                                    <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold" :class="driver.is_busy ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'" x-text="driver.is_busy ? `Busy · ${driver.active_work_count} active jobs` : 'Available'"></span>
+                                                    <span x-show="driver.is_busy" class="mt-1 block text-[10px] font-semibold text-amber-700" x-text="`${driver.active_work?.pickups || 0} pickups · ${driver.active_work?.transports || 0} transports · ${driver.active_work?.deliveries || 0} deliveries`"></span>
+                                                </span>
+                                                <span x-show="isDriverSelected(driver.id)" class="text-lg font-bold text-orange-600">✓</span>
+                                            </button>
+                                        </template>
+                                        <p x-show="filteredAssignmentDrivers().length === 0" class="px-3 py-6 text-center text-sm text-slate-400">No matching riders.</p>
+                                    </div>
                                 </div>
                             </div>
+                            <template x-if="availableDrivers.length === 0 && !assignmentForm.loadingDrivers">
+                                <p class="mt-1.5 text-xs text-amber-600">No available riders right now</p>
+                            </template>
+                            <template x-if="assignmentForm.loadingDrivers">
+                                <p class="mt-1.5 text-xs text-slate-400">Loading riders...</p>
+                            </template>
                         </div>
-                        <template x-if="availableDrivers.length === 0 && !assignmentForm.loadingDrivers">
-                            <p class="mt-1.5 text-xs text-amber-600">No available riders right now</p>
-                        </template>
-                        <template x-if="assignmentForm.loadingDrivers">
-                            <p class="mt-1.5 text-xs text-slate-400">Loading riders...</p>
-                        </template>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Target Warehouse <span class="text-rose-500">*</span></label>
-                        <div class="relative">
-                            <select x-model="assignmentForm.target_warehouse_id" class="w-full appearance-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100" required>
-                                <option value="">Choose warehouse...</option>
-                                <template x-for="warehouse in availableWarehouses" :key="warehouse.id">
-                                    <option :value="warehouse.id" x-text="warehouse.name + (warehouse.code ? ' (' + warehouse.code + ')' : '')"></option>
-                                </template>
-                            </select>
-                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+
+                        <!-- Target Warehouse -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Target Warehouse <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <select x-model="assignmentForm.target_warehouse_id" class="w-full appearance-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100" required>
+                                    <option value="">Choose warehouse...</option>
+                                    <template x-for="warehouse in availableWarehouses" :key="warehouse.id">
+                                        <option :value="warehouse.id" x-text="warehouse.name + (warehouse.code ? ' (' + warehouse.code + ')' : '')"></option>
+                                    </template>
+                                </select>
+                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </div>
                             </div>
+                            <template x-if="availableWarehouses.length === 0 && !assignmentForm.loadingWarehouses">
+                                <p class="mt-1.5 text-xs text-amber-600">No active warehouses found</p>
+                            </template>
+                            <template x-if="assignmentForm.loadingWarehouses">
+                                <p class="mt-1.5 text-xs text-slate-400">Loading warehouses...</p>
+                            </template>
                         </div>
-                        <template x-if="availableWarehouses.length === 0 && !assignmentForm.loadingWarehouses">
-                            <p class="mt-1.5 text-xs text-amber-600">No active warehouses found</p>
-                        </template>
-                        <template x-if="assignmentForm.loadingWarehouses">
-                            <p class="mt-1.5 text-xs text-slate-400">Loading warehouses...</p>
-                        </template>
+
+                        <!-- Notes -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Notes <span class="text-slate-400 font-normal">(optional)</span></label>
+                            <textarea x-model="assignmentForm.notes" rows="3" class="w-full resize-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Optional pickup notes for the rider(s)..."></textarea>
+                        </div>
                     </div>
-                    <div class="mb-6">
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Notes <span class="text-slate-400 font-normal">(optional)</span></label>
-                        <textarea x-model="assignmentForm.notes" rows="3" class="w-full resize-none rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Optional pickup notes for the rider..."></textarea>
-                    </div>
-                </div>
+
+                    <!-- Footer Actions -->
                     <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-5">
                         <button type="button" @@click="assignDriverModalOpen = false" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50">
                             Cancel
                         </button>
-                        <button type="submit" :disabled="assignmentForm.submitting || !assignmentForm.driver_id || !assignmentForm.target_warehouse_id" class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition-all hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none">
+                        <button type="submit" :disabled="assignmentForm.submitting || (!selectedAssignmentDrivers || selectedAssignmentDrivers.length === 0) || !assignmentForm.target_warehouse_id" class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition-all hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none">
                             <svg x-show="assignmentForm.submitting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            <span x-text="assignmentForm.submitting ? 'Saving...' : (assignment ? 'Save Rider' : 'Assign Rider')"></span>
+                            <span x-text="assignmentForm.submitting ? 'Saving...' : 'Assign Rider(s)'"></span>
                         </button>
                     </div>
                 </form>
-        </div>
+            </div>
         </div>
     </div>
 

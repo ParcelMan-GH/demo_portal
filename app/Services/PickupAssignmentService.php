@@ -58,7 +58,8 @@ class PickupAssignmentService
             $lockedShipment = Shipment::query()->lockForUpdate()->findOrFail($shipment->id);
             $lockedDriver = Driver::query()->lockForUpdate()->findOrFail($driver->id);
 
-            if (! $lockedShipment->canBeAssigned() || $lockedShipment->pickupAssignment()->exists()) {
+            // Removed the strict exists() check to allow multiple rider assignments
+            if (! $lockedShipment->canBeAssigned()) {
                 return ['success' => false, 'message' => 'Shipment cannot be assigned in its current status.'];
             }
 
@@ -503,7 +504,17 @@ class PickupAssignmentService
                 ]);
             });
 
-            $assignment->shipment->update(['status' => ShipmentStatus::PICKED_UP]);
+            // Check if there are any other pending assignments for this shipment
+            $hasPendingAssignments = PickupAssignment::query()
+                ->where('shipment_id', $assignment->shipment_id)
+                ->whereNotIn('status', [PickupAssignmentStatus::COMPLETED, PickupAssignmentStatus::CANCELLED])
+                ->where('id', '!=', $assignment->id)
+                ->exists();
+
+            if (! $hasPendingAssignments) {
+                $assignment->shipment->update(['status' => ShipmentStatus::PICKED_UP]);
+            }
+            
             $this->workloads->syncStatus($assignment->driver_id);
 
             return [
@@ -580,8 +591,6 @@ class PickupAssignmentService
                 'receive_notes' => $receiveNotes,
             ]);
 
-            $lockedAssignment->shipment->update(['status' => ShipmentStatus::AT_WAREHOUSE]);
-
             $locationLabel = optional($lockedAssignment->receivedWarehouse)->name
                 ?? optional($lockedAssignment->targetWarehouse)->name;
 
@@ -598,6 +607,18 @@ class PickupAssignmentService
                     'created_at' => $now,
                 ]);
             });
+
+            // Check if there are other riders still expected at the warehouse
+            $hasPendingWarehouseDeliveries = PickupAssignment::query()
+                ->where('shipment_id', $lockedAssignment->shipment_id)
+                ->whereNull('received_at')
+                ->where('status', '!=', PickupAssignmentStatus::CANCELLED)
+                ->where('id', '!=', $lockedAssignment->id)
+                ->exists();
+
+            if (! $hasPendingWarehouseDeliveries) {
+                $lockedAssignment->shipment->update(['status' => ShipmentStatus::AT_WAREHOUSE]);
+            }
 
             if ($lockedAssignment->driver) {
                 $this->workloads->syncStatus($lockedAssignment->driver);
@@ -653,7 +674,19 @@ class PickupAssignmentService
                 'cancelled_at' => now(),
                 'cancellation_reason' => $reason,
             ]);
-            $assignment->shipment->update(['status' => ShipmentStatus::SUBMITTED]);
+            
+            // Note: If you cancel an assignment, you only revert the Shipment to SUBMITTED 
+            // if there are NO OTHER active assignments left.
+            $hasOtherActiveAssignments = PickupAssignment::query()
+                ->where('shipment_id', $assignment->shipment_id)
+                ->where('status', '!=', PickupAssignmentStatus::CANCELLED)
+                ->where('id', '!=', $assignment->id)
+                ->exists();
+
+            if (! $hasOtherActiveAssignments) {
+                $assignment->shipment->update(['status' => ShipmentStatus::SUBMITTED]);
+            }
+
             $this->assignmentAudit->record('pickup', $assignment->id, 'unassigned', $driver?->id, null, $actor, $reason);
 
             if ($driver) {
