@@ -634,7 +634,8 @@ Route::prefix(config('backoffice.prefix', 'admin').'/operations')
     ->name('warehouse.')
     ->middleware(['auth:admin', 'admin.audit', 'backoffice.user'])
     ->group(function () {
-        Route::get('/', [WarehouseDashboardController::class, 'index'])->name('dashboard');
+        // Route::get('/', [WarehouseDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/', fn () => redirect()->route('admin.dashboard'))->name('dashboard');
 
         // Walk-in Vendor Shipments
         Route::get('walkin', [WarehouseWalkinController::class, 'create'])->name('walkin.create');

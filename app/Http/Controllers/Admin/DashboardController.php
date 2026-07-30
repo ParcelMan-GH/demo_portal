@@ -30,13 +30,13 @@ class DashboardController extends Controller
             'settings.view',
         ])->contains(fn (string $permission) => $access->canUsePermission($admin, $permission));
 
-        if (!$canUseHqDashboard) {
-            if ($admin->hasPermission('warehouse.recipient_payments.view')) {
-                return redirect()->route('warehouse.recipient-payments.index');
-            }
+        // if (!$canUseHqDashboard) {
+        //     if ($admin->hasPermission('warehouse.recipient_payments.view')) {
+        //         return redirect()->route('warehouse.recipient-payments.index');
+        //     }
 
-            return redirect()->route('warehouse.dashboard');
-        }
+        //     return redirect()->route('warehouse.dashboard');
+        // }
 
         $today = now()->toDateString();
         $monthStart = now()->startOfMonth();
