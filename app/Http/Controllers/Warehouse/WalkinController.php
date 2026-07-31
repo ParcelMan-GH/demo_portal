@@ -38,13 +38,34 @@ class WalkinController extends Controller
             ])
             ->values();
 
-        // Query walk-in shipments strictly by source string
+        // Query walk-in shipments and map formatted attributes for Alpine JS `@json()`
         $recentWalkins = Shipment::query()
             ->where('source', 'warehouse_walkin')
             ->with(['vendor', 'items'])
             ->latest()
             ->take(10)
-            ->get();
+            ->get()
+            ->map(function ($shipment) {
+                return [
+                    'id' => $shipment->id,
+                    'shipment_number' => $shipment->shipment_number,
+                    'vendor' => $shipment->vendor ? [
+                        'id' => $shipment->vendor->id,
+                        'name' => $shipment->vendor->name,
+                        'phone' => $shipment->vendor->phone,
+                    ] : null,
+                    'items_count' => $shipment->items->count(),
+                    'items' => $shipment->items->map(fn ($item) => [
+                        'id' => $item->id,
+                        'delivery_fee' => (float) $item->delivery_fee,
+                    ]),
+                    'total_fee' => (float) $shipment->items->sum('delivery_fee'),
+                    'status' => is_object($shipment->status) && property_exists($shipment->status, 'value') 
+                        ? $shipment->status->value 
+                        : (string) $shipment->status,
+                    'time_formatted' => $shipment->created_at ? $shipment->created_at->format('h:i A') : 'Just now',
+                ];
+            });
 
         return view('warehouse.walkin.create', compact('warehouse', 'transferWarehouses', 'recentWalkins'));
     }

@@ -6,20 +6,18 @@ use App\Events\WalkinShipmentReceived;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class SendWalkinShipmentNotifications
+class SendWalkinSmsNotification
 {
     /**
-     * Handle the WalkinShipmentReceived event.
+     * Handle the event when a walk-in shipment is received.
      */
     public function handle(WalkinShipmentReceived $event): void
     {
         $shipment = $event->shipment;
         $warehouseName = $event->warehouse->name;
 
-        // Ensure relationship items are loaded
-        $items = $shipment->items ?? [];
-
-        foreach ($items as $item) {
+        // Loop through each package inside the shipment
+        foreach ($shipment->items as $item) {
             $phone = $item->delivery_recipient_phone;
             $name = $item->delivery_recipient_name ?: 'Customer';
             $trackingCode = $item->tracking_code;
@@ -28,38 +26,29 @@ class SendWalkinShipmentNotifications
                 continue;
             }
 
-            // Convert local Ghana phone (024xxxxxxx) to 23324xxxxxxx
+            // Standardize Ghana phone number format to international format (233XXXXXXXXX)
             $formattedPhone = $this->formatGhanaPhone($phone);
 
             if (! $formattedPhone) {
-                Log::warning("Skipped SMS: Invalid Ghana phone number [{$phone}]");
                 continue;
             }
 
             $message = "Hello {$name}, your package ({$item->description}) tracking number is {$trackingCode}. Received at {$warehouseName}.";
 
             try {
-                $apiKey = config('services.arkesel.api_key') ?? env('ARKESEL_API_KEY');
-                $senderId = config('services.arkesel.sender_id') ?? env('ARKESEL_SENDER_ID', 'Parcelman');
-
-                if (empty($apiKey)) {
-                    Log::warning('Arkesel API key missing in config or .env');
-                    continue;
-                }
-
                 $response = Http::withHeaders([
-                    'api-key' => $apiKey,
+                    'api-key' => config('services.arkesel.api_key'),
                     'Content-Type' => 'application/json',
                 ])->post('https://sms.arkesel.com/api/v2/sms/send', [
-                    'sender' => $senderId,
+                    'sender' => config('services.arkesel.sender_id', 'Parcelman'),
                     'message' => $message,
                     'recipients' => [$formattedPhone],
                 ]);
 
                 if ($response->successful()) {
-                    Log::info("Walk-in SMS sent via Arkesel to {$formattedPhone}");
+                    Log::info("SMS sent via Arkesel to {$formattedPhone} for tracking {$trackingCode}");
                 } else {
-                    Log::error("Arkesel SMS delivery failed status {$response->status()}: " . $response->body());
+                    Log::error("Arkesel SMS failed ({$response->status()}): " . $response->body());
                 }
             } catch (\Exception $e) {
                 Log::error("Arkesel SMS Exception: " . $e->getMessage());
@@ -67,6 +56,9 @@ class SendWalkinShipmentNotifications
         }
     }
 
+    /**
+     * Helper to format Ghana local numbers (024xxxxxxx) to 23324xxxxxxx.
+     */
     private function formatGhanaPhone(string $phone): ?string
     {
         $cleaned = preg_replace('/\D/', '', $phone);

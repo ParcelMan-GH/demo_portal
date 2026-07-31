@@ -343,10 +343,27 @@
 
                     {{-- Description, Quantity, and Price Field Row --}}
                     <div class="grid gap-3 sm:grid-cols-12">
-                        <!-- Description -->
-                        <div class="sm:col-span-5">
+                        <!-- Description with Auto-complete Dropdown -->
+                        <div class="relative sm:col-span-5" @click.outside="showDescDropdown = false">
                             <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Description <span class="text-rose-500">*</span></label>
-                            <input x-model="packageForm.description" placeholder="e.g. Package 1" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <input x-model="packageForm.description" 
+                                   @focus="showDescDropdown = true"
+                                   @input="showDescDropdown = true"
+                                   placeholder="e.g. Package 1, Shoes..." 
+                                   class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            
+                            <!-- Suggestions Dropdown -->
+                            <div x-show="showDescDropdown && filteredSuggestions().length > 0" 
+                                 x-transition.opacity 
+                                 class="absolute left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                                <template x-for="item in filteredSuggestions()" :key="item">
+                                    <button type="button" 
+                                            @click="packageForm.description = item; showDescDropdown = false" 
+                                            class="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-orange-50 hover:text-orange-700 transition">
+                                        <span x-text="item"></span>
+                                    </button>
+                                </template>
+                            </div>
                         </div>
 
                         <!-- Quantity -->
@@ -483,7 +500,7 @@
                             <td class="px-5 py-3.5 text-center">
                                 <span class="rounded-md bg-slate-100 px-2 py-1 font-bold text-slate-700" x-text="order.items_count || order.items?.length || 0"></span>
                             </td>
-                            <td class="px-5 py-3.5 text-right font-mono font-bold text-emerald-600" x-text="'GH₵ ' + (parseFloat(order.total_fee || order.items?.reduce((s,i) => s + (parseFloat(i.delivery_fee)||0), 0) || 0)).toFixed(2)"></td>
+                            <td class="px-5 py-3.5 text-right font-mono font-bold text-emerald-600" x-text="'GH₵ ' + (parseFloat(order.total_fee || (order.items ? order.items.reduce((s,i) => s + (parseFloat(i.delivery_fee)||0), 0) : 0))).toFixed(2)"></td>
                             <td class="px-5 py-3.5">
                                 <span class="inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-200/50 uppercase" x-text="order.status || 'Received'"></span>
                             </td>
@@ -539,6 +556,27 @@ function walkinShipment() {
         activePhotoIndex: 0,
         recentOrders: @json($recentWalkins ?? []),
 
+        // Auto-complete suggestion properties
+        showDescDropdown: false,
+        descSuggestions: [
+            'Clothes & Apparel',
+            'Dresses',
+            'Shoes & Footwear',
+            'Electronics',
+            'Cosmetics & Beauty',
+            'Food Items',
+            'Documents / Envelope',
+            'Accessories',
+            'Bags & Luggage',
+            'Home & Living'
+        ],
+
+        filteredSuggestions() {
+            const query = (this.packageForm?.description || '').trim().toLowerCase();
+            if (!query) return this.descSuggestions;
+            return this.descSuggestions.filter(item => item.toLowerCase().includes(query));
+        },
+
         init() {
             this.config = JSON.parse(this.$el.dataset.walkinConfig);
             this.transferWarehouses = Array.isArray(this.config.transferWarehouses) ? this.config.transferWarehouses : [];
@@ -567,7 +605,7 @@ function walkinShipment() {
             this.itemSeed += 1;
             return {
                 key: `package-${Date.now()}-${this.itemSeed}`,
-                description: `Package ${this.itemSeed}`,
+                description: '',
                 quantity: 1,
                 delivery_fee: '',
                 delivery_method: 'direct',
@@ -594,6 +632,7 @@ function walkinShipment() {
         cloneItem(item) {
             return {
                 ...item,
+                delivery_fee: parseFloat(item.delivery_fee || 0),
                 delivery: { ...item.delivery, locationResults: [], _showDropdown: false },
                 photos: [...(item.photos || [])],
             };
@@ -604,12 +643,14 @@ function walkinShipment() {
             this.packageForm = index === null ? this.makeItem() : this.cloneItem(this.items[index]);
             this.packageForm.send_to_bus_station = this.packageForm.delivery_method === 'bus_handoff';
             this.validateDeliveryPhone(this.packageForm.delivery, false);
+            this.showDescDropdown = false;
             this.packageModalOpen = true;
         },
 
         closePackageModal() {
             this.packageModalOpen = false;
             this.packageModalIndex = null;
+            this.showDescDropdown = false;
             this.packageForm = this.emptyPackageForm();
         },
 
@@ -619,6 +660,7 @@ function walkinShipment() {
                 return;
             }
             const item = this.cloneItem(this.packageForm);
+            item.delivery_fee = parseFloat(this.packageForm.delivery_fee) || 0;
             item.delivery.recipient_name = item.delivery.recipient_name?.trim() || 'Recipient';
             item.delivery_method = item.send_to_bus_station ? 'bus_handoff' : 'direct';
             item.forward_to_warehouse_id = item.send_to_bus_station
@@ -951,7 +993,7 @@ function walkinShipment() {
             const items = this.items.map(item => ({
                 description: item.description,
                 quantity: item.quantity,
-                delivery_fee: item.delivery_fee,
+                delivery_fee: parseFloat(item.delivery_fee) || 0,
                 delivery_method: item.delivery_method,
                 ...(item.delivery_method !== 'bus_handoff' && item.forward_to_warehouse_id
                     ? { forward_to_warehouse_id: item.forward_to_warehouse_id }

@@ -41,6 +41,8 @@ class EventServiceProvider extends ServiceProvider
             SendCustomerEmailTemplateNotification::class,
         ],
 
+        
+
         // Pickup events
         DriverAssignedToPickup::class => [
             SendDriverAssignmentNotification::class,

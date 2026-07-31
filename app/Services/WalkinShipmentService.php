@@ -135,11 +135,18 @@ class WalkinShipmentService
                     $deliveryMethod = ShipmentItem::DELIVERY_METHOD_DIRECT;
                 }
 
+                // Explicitly pull fee regardless of key format passed
+                $rawFee = $itemData['delivery_fee'] 
+                    ?? $itemData['price'] 
+                    ?? $itemData['fee'] 
+                    ?? $itemData['amount'] 
+                    ?? null;
+
                 $itemAttrs = [
                     'shipment_id' => $shipment->id,
                     'description' => $itemData['description'],
                     'quantity' => $itemData['quantity'],
-                    'delivery_fee' => filled($itemData['delivery_fee'] ?? null) ? round((float) $itemData['delivery_fee'], 2) : 0.00,
+                    'delivery_fee' => filled($rawFee) ? round((float) $rawFee, 2) : 0.00,
                     'fulfillment_type' => $fulfillmentType,
                     'delivery_preference' => $itemData['delivery_preference'] ?? $deliveryPreference,
                     'delivery_method' => $deliveryMethod,

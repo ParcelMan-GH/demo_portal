@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'arkesel' => [
+    'api_key' => env('ARKESEL_API_KEY'),
+    'sender_id' => env('ARKESEL_SENDER_ID', 'Parcelman'),
+],
+
 ];

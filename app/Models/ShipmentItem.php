@@ -23,6 +23,7 @@ class ShipmentItem extends Model
         'shipment_id',
         'description',
         'quantity',
+        'delivery_fee',
         'delivery_recipient_name',
         'delivery_recipient_phone',
         'delivery_region_id',
@@ -54,6 +55,7 @@ class ShipmentItem extends Model
      */
     protected $casts = [
         'quantity' => 'integer',
+        'delivery_fee' => 'decimal:2',
         'delivery_latitude' => 'decimal:8',
         'delivery_longitude' => 'decimal:8',
         'fulfillment_type' => FulfillmentType::class,
