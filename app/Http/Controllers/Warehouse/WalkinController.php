@@ -38,13 +38,9 @@ class WalkinController extends Controller
             ])
             ->values();
 
-        // Query walk-in shipments safely via items relationship (avoids missing columns on shipments table)
+        // Query walk-in shipments strictly by source string
         $recentWalkins = Shipment::query()
             ->where('source', 'warehouse_walkin')
-            ->whereHas('items', function ($query) use ($warehouse) {
-                $query->where('warehouse_id', $warehouse->id)
-                      ->orWhere('forward_to_warehouse_id', $warehouse->id);
-            })
             ->with(['vendor', 'items'])
             ->latest()
             ->take(10)
