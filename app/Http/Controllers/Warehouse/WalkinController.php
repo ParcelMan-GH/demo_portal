@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Warehouse;
 use App\Http\Controllers\Controller;
 use App\Helpers\PhoneHelper;
 use App\Models\Location;
+use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\Warehouse;
 use App\Services\WalkinShipmentService;
@@ -24,6 +25,7 @@ class WalkinController extends Controller
     {
         $user = Auth::guard('admin')->user();
         $warehouse = $this->portalService->resolveWarehouse($user);
+
         $transferWarehouses = Warehouse::query()
             ->where('is_active', true)
             ->whereKeyNot($warehouse->id)
@@ -36,7 +38,16 @@ class WalkinController extends Controller
             ])
             ->values();
 
-        return view('warehouse.walkin.create', compact('warehouse', 'transferWarehouses'));
+        // Fetch recent walk-in shipments for this warehouse
+        $recentWalkins = Shipment::query()
+            ->where('warehouse_id', $warehouse->id)
+            ->where('source', 'warehouse_walkin')
+            ->with(['vendor:id,name,phone', 'items:id,shipment_id,description,quantity,delivery_fee'])
+            ->latest()
+            ->take(10)
+            ->get();
+
+        return view('warehouse.walkin.create', compact('warehouse', 'transferWarehouses', 'recentWalkins'));
     }
 
     public function store(Request $request, WalkinShipmentService $service): JsonResponse
@@ -65,7 +76,8 @@ class WalkinController extends Controller
             'destination_mode'                   => 'required|in:single,per_item',
             'items'                              => 'required|array|min:1',
             'items.*.description'                => 'required|string|max:500',
-            'items.*.quantity'                    => 'required|integer|min:1',
+            'items.*.quantity'                   => 'required|integer|min:1',
+            'items.*.delivery_fee'               => 'nullable|numeric|min:0|max:9999999.99', // <--- Validate item price/fee
             'items.*.delivery_method'            => 'nullable|in:direct,bus_handoff',
             'items.*.forward_to_warehouse_id'    => 'nullable|integer|exists:warehouses,id',
             'items.*.delivery.recipient_name'    => 'required_if:destination_mode,per_item|nullable|string|max:255',
@@ -142,6 +154,7 @@ class WalkinController extends Controller
                     'id' => $item->id,
                     'description' => $item->description,
                     'quantity' => $item->quantity,
+                    'delivery_fee' => $item->delivery_fee,
                     'tracking_code' => $item->tracking_code,
                     'delivery_method' => $item->delivery_method,
                     'print_url' => route('warehouse.walkin.items.print-label', $item),

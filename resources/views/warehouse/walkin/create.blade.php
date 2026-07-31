@@ -29,7 +29,7 @@
             </div>
             <div class="flex items-center gap-1 overflow-x-auto rounded-xl bg-slate-50 p-1 text-xs font-black text-slate-500 sm:gap-2">
                 <template x-for="item in stepItems" :key="item.id">
-                    <button type="button" @@click="item.id < step && (step = item.id)"
+                    <button type="button" @click="item.id < step && (step = item.id)"
                             class="flex shrink-0 items-center gap-2 rounded-lg px-2 py-2 transition sm:px-3"
                             :class="step === item.id ? 'bg-orange-600 text-white shadow-sm shadow-orange-600/20' : (item.id < step ? 'text-orange-700 hover:bg-white' : 'cursor-default text-slate-400')">
                         <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-black"
@@ -42,6 +42,7 @@
         </div>
     </section>
 
+    <!-- STEP 1: VENDOR -->
     <section x-show="step === 1" x-transition.opacity class="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div class="border-b border-slate-100 px-4 py-4 sm:px-5">
             <h2 class="text-sm font-extrabold text-slate-950">Vendor</h2>
@@ -51,12 +52,12 @@
             <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
                 <div>
                     <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Vendor phone</label>
-                    <input type="tel" x-model="vendorPhone" @@input="normalizeVendorPhoneInput()" @@blur="validateVendorPhone(true)" @@keydown.enter.prevent="lookupVendor()" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="0241234567"
+                    <input type="tel" x-model="vendorPhone" @input="normalizeVendorPhoneInput()" @blur="validateVendorPhone(true)" @keydown.enter.prevent="lookupVendor()" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="0241234567"
                            class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm"
                            :class="vendorPhoneError ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : ''">
                     <p x-show="vendorPhoneError" x-text="vendorPhoneError" class="mt-1 text-xs font-semibold text-rose-600"></p>
                 </div>
-                <button type="button" @@click="lookupVendor()" :disabled="vendorLoading || !isValidPhone(vendorPhone)"
+                <button type="button" @click="lookupVendor()" :disabled="vendorLoading || !isValidPhone(vendorPhone)"
                         class="mt-auto rounded-xl border-2 border-slate-900 bg-slate-900 px-5 py-3 text-base font-black text-white transition hover:border-slate-800 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm">
                     <span x-show="!vendorLoading">Search</span>
                     <span x-show="vendorLoading">Searching...</span>
@@ -72,7 +73,7 @@
                             <p class="truncate text-xs text-slate-600"><span x-text="vendorData?.business_name || 'No business name'"></span> · <span class="font-mono" x-text="vendorData?.phone"></span></p>
                         </div>
                     </div>
-                    <button type="button" @@click="selectVendor(vendorData)" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700">Continue</button>
+                    <button type="button" @click="selectVendor(vendorData)" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700">Continue</button>
                 </div>
             </div>
 
@@ -86,8 +87,8 @@
                     <input type="text" x-model="newVendor.name" placeholder="Sender name" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                 </div>
                 <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-                    <button type="button" @@click="resetVendor()" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-base font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:text-sm">Cancel</button>
-                    <button type="button" @@click="createVendor()" :disabled="creatingVendor || !newVendor.name"
+                    <button type="button" @click="resetVendor()" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-base font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:text-sm">Cancel</button>
+                    <button type="button" @click="createVendor()" :disabled="creatingVendor || !newVendor.name"
                             class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-base font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:border-orange-300 disabled:bg-orange-300 disabled:shadow-none sm:text-sm">
                         <span x-show="!creatingVendor">Create & continue</span>
                         <span x-show="creatingVendor">Creating...</span>
@@ -99,6 +100,7 @@
         </div>
     </section>
 
+    <!-- STEP 2: PACKAGES TABLE -->
     <section x-show="step === 2" x-transition.opacity class="space-y-5">
         <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="flex flex-row items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:items-center sm:px-5">
@@ -106,7 +108,7 @@
                     <h2 class="text-sm font-extrabold text-slate-950">Packages</h2>
                     <p class="mt-1 text-xs text-slate-500">Each package carries its recipient details. Same recipient phone stays as one drop-off.</p>
                 </div>
-                <button type="button" @@click="openPackageModal()" class="shrink-0 rounded-xl border-2 border-orange-600 bg-orange-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700">Add Package</button>
+                <button type="button" @click="openPackageModal()" class="shrink-0 rounded-xl border-2 border-orange-600 bg-orange-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700">Add Package</button>
             </div>
             <div>
                 <div x-show="items.length === 0" class="px-5 py-12 text-center">
@@ -114,12 +116,13 @@
                 </div>
 
                 <div x-show="items.length > 0" class="overflow-x-auto">
-                    <table class="min-w-[760px] w-full text-left">
+                    <table class="min-w-[820px] w-full text-left">
                         <thead class="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-400">
                             <tr>
                                 <th class="px-4 py-3">#</th>
                                 <th class="px-4 py-3">Package</th>
                                 <th class="px-4 py-3 text-center">Qty</th>
+                                <th class="px-4 py-3 text-right">Price (GHS)</th>
                                 <th class="px-4 py-3">Recipient</th>
                                 <th class="px-4 py-3">Phone</th>
                                 <th class="px-4 py-3">Location</th>
@@ -134,11 +137,14 @@
                                         <span class="inline-flex h-7 min-w-7 items-center justify-center rounded-lg bg-slate-100 px-2 text-xs font-black text-slate-600" x-text="idx + 1"></span>
                                     </td>
                                     <td class="px-4 py-3">
-                                        <p class="max-w-[220px] truncate text-sm font-black text-slate-950" x-text="item.description"></p>
+                                        <p class="max-w-[200px] truncate text-sm font-black text-slate-950" x-text="item.description"></p>
                                         <span x-show="item.delivery_method === 'bus_handoff'" class="mt-1 inline-flex whitespace-nowrap rounded-lg bg-orange-50 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-orange-700 ring-1 ring-orange-100">Bus handoff</span>
                                     </td>
                                     <td class="px-4 py-3 text-center">
                                         <span class="text-sm font-black text-slate-800" x-text="item.quantity"></span>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <span class="font-mono text-sm font-black text-emerald-600" x-text="'GH₵ ' + (parseFloat(item.delivery_fee || 0)).toFixed(2)"></span>
                                     </td>
                                     <td class="px-4 py-3 text-sm font-semibold text-slate-700" x-text="item.delivery.recipient_name || 'Recipient'"></td>
                                     <td class="px-4 py-3 font-mono text-xs font-bold text-slate-600" x-text="item.delivery.recipient_phone || '-'"></td>
@@ -146,9 +152,9 @@
                                     <td class="min-w-28 px-4 py-3 text-sm font-semibold leading-5 text-slate-700" x-text="warehouseLabel(item.forward_to_warehouse_id)"></td>
                                     <td class="px-4 py-3">
                                         <div class="flex justify-end gap-2">
-                                            <button type="button" @@click="openPackagePhotos(item)" class="rounded-xl border border-orange-100 bg-orange-50 px-3 py-2 text-xs font-black text-orange-700 transition hover:bg-orange-100">Photos</button>
-                                            <button type="button" @@click="openPackageModal(idx)" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50">Edit</button>
-                                            <button type="button" @@click="removeItem(idx)" class="rounded-xl border border-rose-100 bg-white px-3 py-2 text-xs font-black text-rose-600 transition hover:bg-rose-50">Remove</button>
+                                            <button type="button" @click="openPackagePhotos(item)" class="rounded-xl border border-orange-100 bg-orange-50 px-3 py-2 text-xs font-black text-orange-700 transition hover:bg-orange-100">Photos</button>
+                                            <button type="button" @click="openPackageModal(idx)" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50">Edit</button>
+                                            <button type="button" @click="removeItem(idx)" class="rounded-xl border border-rose-100 bg-white px-3 py-2 text-xs font-black text-rose-600 transition hover:bg-rose-50">Remove</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -160,11 +166,12 @@
         </section>
 
         <div class="flex items-center justify-between gap-3">
-            <button type="button" @@click="step = 1" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:border-slate-300 hover:bg-slate-50">Back</button>
-            <button type="button" @@click="goToReview()" :disabled="!canProceedToReview()" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">Review shipment</button>
+            <button type="button" @click="step = 1" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:border-slate-300 hover:bg-slate-50">Back</button>
+            <button type="button" @click="goToReview()" :disabled="!canProceedToReview()" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">Review shipment</button>
         </div>
     </section>
 
+    <!-- STEP 3: REVIEW -->
     <section x-show="step === 3" x-transition.opacity class="space-y-5">
         <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="border-b border-slate-100 px-4 py-4 sm:px-5">
@@ -188,13 +195,9 @@
                     <p class="mt-1 text-xs text-slate-500"><span x-text="items.filter(i => i.delivery_method === 'bus_handoff').length"></span> bus-station handoff</p>
                 </div>
                 <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-                    <label for="pickup_fee_amount" class="block text-[10px] font-black uppercase tracking-wider text-slate-400">Amount to Charge</label>
-                    <div class="mt-2 flex overflow-hidden rounded-xl border border-slate-200 bg-white">
-                        <span class="flex items-center border-r border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-500">GHS</span>
-                        <input id="pickup_fee_amount" type="number" min="0" max="9999999.99" step="0.01" inputmode="decimal" x-model="pickupFeeAmount" placeholder="0.00"
-                               class="min-w-0 flex-1 border-0 bg-white px-3 py-2 text-sm font-extrabold text-slate-950 outline-none focus:ring-0">
-                    </div>
-                    <p class="mt-1 text-xs text-slate-500">Optional. Leave blank if no counter charge is needed.</p>
+                    <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Item Fees</p>
+                    <p class="mt-2 text-base font-black text-emerald-600 font-mono" x-text="'GH₵ ' + totalItemFees().toFixed(2)"></p>
+                    <p class="mt-1 text-xs text-slate-500">Sum of package fees</p>
                 </div>
             </div>
             <div class="border-t border-slate-100">
@@ -205,6 +208,7 @@
                                 <th class="px-4 py-3">#</th>
                                 <th class="px-4 py-3">Package</th>
                                 <th class="px-4 py-3 text-center">Qty</th>
+                                <th class="px-4 py-3 text-right">Price</th>
                                 <th class="px-4 py-3">Recipient</th>
                                 <th class="px-4 py-3">Phone</th>
                                 <th class="px-4 py-3">Location</th>
@@ -218,6 +222,7 @@
                                     <td class="px-4 py-3 text-xs font-black text-slate-500" x-text="idx + 1"></td>
                                     <td class="px-4 py-3 text-sm font-black text-slate-950" x-text="item.description"></td>
                                     <td class="px-4 py-3 text-center text-sm font-black text-slate-800" x-text="item.quantity"></td>
+                                    <td class="px-4 py-3 text-right text-sm font-black text-emerald-600 font-mono" x-text="'GH₵ ' + (parseFloat(item.delivery_fee || 0)).toFixed(2)"></td>
                                     <td class="px-4 py-3 text-sm font-semibold text-slate-700" x-text="item.delivery.recipient_name || 'Recipient'"></td>
                                     <td class="px-4 py-3 font-mono text-xs font-bold text-slate-600" x-text="item.delivery.recipient_phone || '-'"></td>
                                     <td class="px-4 py-3 text-sm font-semibold leading-5 text-slate-700" x-text="item.delivery.locationQuery || '-'"></td>
@@ -235,8 +240,8 @@
         </div>
 
         <div class="flex items-center justify-between gap-3">
-            <button type="button" @@click="step = 2" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:border-slate-300 hover:bg-slate-50">Edit details</button>
-            <button type="button" @@click="submitShipment()" :disabled="submitting" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">
+            <button type="button" @click="step = 2" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:border-slate-300 hover:bg-slate-50">Edit details</button>
+            <button type="button" @click="submitShipment()" :disabled="submitting" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">
                 <span x-show="!submitting">Submit</span>
                 <span x-show="submitting">Creating...</span>
             </button>
@@ -244,13 +249,14 @@
         <p x-show="submitError" class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700" x-text="submitError"></p>
     </section>
 
+    <!-- STEP 4: LABELS -->
     <section x-show="step === 4" x-transition.opacity class="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div class="flex flex-row items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:items-center sm:px-5">
             <div class="min-w-0">
                 <h2 class="text-sm font-extrabold text-slate-950">Print Labels</h2>
                 <p class="mt-1 text-xs text-slate-500">Print and attach package labels.</p>
             </div>
-            <button type="button" @@click="printAllLabels()" :disabled="printingLabels || !canPrintAnyLabels()"
+            <button type="button" @click="printAllLabels()" :disabled="printingLabels || !canPrintAnyLabels()"
                     class="shrink-0 rounded-xl border-2 border-slate-900 bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-900/10 transition hover:border-slate-800 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40">
                 <span x-show="!printingLabels">Print All</span>
                 <span x-show="printingLabels">Printing...</span>
@@ -281,17 +287,17 @@
                             <td class="px-4 py-4 font-mono text-xs font-bold text-orange-600" x-text="pkg.tracking_code || 'Will generate on print'"></td>
                             <td class="px-4 py-4">
                                 <div class="mx-auto flex w-36 items-center justify-center gap-2">
-                                    <button type="button" @@click="setPackageLabelCount(pkg, Number(pkg.label_count || 1) - 1)" :disabled="printingLabels || Number(pkg.label_count || 1) <= 1"
+                                    <button type="button" @click="setPackageLabelCount(pkg, Number(pkg.label_count || 1) - 1)" :disabled="printingLabels || Number(pkg.label_count || 1) <= 1"
                                             class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">-</button>
-                                    <input type="number" min="1" max="500" x-model.number="pkg.label_count" @@input="setPackageLabelCount(pkg, pkg.label_count)"
+                                    <input type="number" min="1" max="500" x-model.number="pkg.label_count" @input="setPackageLabelCount(pkg, pkg.label_count)"
                                            :disabled="printingLabels"
                                            class="h-9 w-16 rounded-xl border-2 border-slate-200 bg-white text-center text-sm font-black text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-slate-50">
-                                    <button type="button" @@click="setPackageLabelCount(pkg, Number(pkg.label_count || 1) + 1)" :disabled="printingLabels || Number(pkg.label_count || 1) >= 500"
+                                    <button type="button" @click="setPackageLabelCount(pkg, Number(pkg.label_count || 1) + 1)" :disabled="printingLabels || Number(pkg.label_count || 1) >= 500"
                                             class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">+</button>
                                 </div>
                             </td>
                             <td class="px-4 py-4 text-right">
-                                <button type="button" @@click="printLabel(pkg)" :disabled="printingLabels || !Number(pkg.label_count || 0)"
+                                <button type="button" @click="printLabel(pkg)" :disabled="printingLabels || !Number(pkg.label_count || 0)"
                                         class="rounded-xl border-2 border-orange-600 bg-orange-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">
                                     <span x-show="printingPackageId !== pkg.id" x-text="pkg.barcode_print_count ? 'Reprint' : 'Print'"></span>
                                     <span x-show="printingPackageId === pkg.id">Printing...</span>
@@ -304,20 +310,21 @@
         </div>
     </section>
 
+    <!-- ADD / EDIT PACKAGE MODAL WITH CLEAN UI -->
     <template x-teleport="body">
         <div x-show="packageModalOpen" x-cloak x-transition.opacity class="fixed inset-0 z-[110] flex min-h-screen items-center justify-center bg-black/55 px-4 py-6 backdrop-blur-sm sm:p-4" style="display:none">
-            <div @@click.stop class="flex max-h-[calc(100dvh-3rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl sm:max-h-[calc(100vh-2rem)]">
+            <div @click.stop class="flex max-h-[calc(100dvh-3rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl sm:max-h-[calc(100vh-2rem)]">
                 <div class="shrink-0 flex items-start justify-between border-b border-slate-100 p-5">
                     <div class="flex items-start gap-3">
                         <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-700 text-white shadow-lg shadow-orange-500/25">
-                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 8.5l5-3 5 3-5 3-5-3zM4 13l5 3 5-3M10 16l5 3 5-3M4 13l5-3 5 3-5 3-5-3z"/></svg>
+                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 8.5l5-3 5 3-5 3-5-3zM4 13l5 3 5-3M10 16l5 3 5-3M4 13l5 3 5-3M4 13l5 3 5-3-5-3z"/></svg>
                         </div>
                         <div>
                             <h3 class="text-lg font-extrabold text-slate-900" x-text="packageModalIndex === null ? 'Add Package' : 'Edit Package'"></h3>
                             <p class="mt-1 text-sm text-slate-500">Record package details, recipient info, and receipt photos.</p>
                         </div>
                     </div>
-                    <button type="button" @@click="closePackageModal()" class="shrink-0 rounded-xl border border-slate-200 p-2 text-slate-400 hover:text-slate-700">
+                    <button type="button" @click="closePackageModal()" class="shrink-0 rounded-xl border border-slate-200 p-2 text-slate-400 hover:text-slate-700">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -330,18 +337,31 @@
                                 <span class="block text-xs font-medium text-slate-400">PNG, JPG or WEBP up to 12MB each</span>
                             </span>
                             <span class="inline-flex w-fit shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-black text-orange-700 shadow-sm ring-1 ring-orange-100">Take Photo</span>
-                            <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" capture="environment" multiple class="hidden" @@change="handlePackagePhotos($event)">
+                            <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" capture="environment" multiple class="hidden" @change="handlePackagePhotos($event)">
                         </label>
                     </div>
 
-                    <div class="grid gap-4 sm:grid-cols-12">
-                        <div class="sm:col-span-9">
+                    {{-- Description, Quantity, and Price Field Row --}}
+                    <div class="grid gap-3 sm:grid-cols-12">
+                        <!-- Description -->
+                        <div class="sm:col-span-5">
                             <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Description <span class="text-rose-500">*</span></label>
-                            <input x-model="packageForm.description" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                            <input x-model="packageForm.description" placeholder="e.g. Package 1" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                         </div>
+
+                        <!-- Quantity -->
                         <div class="sm:col-span-3">
                             <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Quantity <span class="text-rose-500">*</span></label>
-                            <input type="number" min="1" x-model.number="packageForm.quantity" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-black text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
+                            <input type="number" min="1" x-model.number="packageForm.quantity" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-center text-sm font-black text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                        </div>
+
+                        <!-- Price / Fee with Embedded Prefix -->
+                        <div class="sm:col-span-4">
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Price / Fee <span class="text-rose-500">*</span></label>
+                            <div class="relative flex items-center overflow-hidden rounded-xl border-2 border-slate-200 bg-white transition focus-within:border-orange-400 focus-within:ring-4 focus-within:ring-orange-100">
+                                <span class="flex h-full select-none items-center bg-slate-100 px-2.5 text-xs font-extrabold text-slate-500 border-r border-slate-200">GH₵</span>
+                                <input type="number" step="0.01" min="0" x-model.number="packageForm.delivery_fee" placeholder="0.00" class="w-full border-0 bg-transparent px-2.5 py-3 text-sm font-black text-slate-900 outline-none focus:ring-0">
+                            </div>
                         </div>
                     </div>
 
@@ -353,18 +373,18 @@
                             </div>
                             <div>
                                 <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Recipient phone <span class="text-rose-500">*</span></label>
-                                <input type="tel" x-model="packageForm.delivery.recipient_phone" @@input="normalizeDeliveryPhoneInput(packageForm.delivery)" @@blur="validateDeliveryPhone(packageForm.delivery, true)" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="0241234567"
+                                <input type="tel" x-model="packageForm.delivery.recipient_phone" @input="normalizeDeliveryPhoneInput(packageForm.delivery)" @blur="validateDeliveryPhone(packageForm.delivery, true)" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="0241234567"
                                        class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm"
                                        :class="packageForm.delivery.phoneError ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : ''">
                                 <p x-show="packageForm.delivery.phoneError" x-text="packageForm.delivery.phoneError" class="mt-1 text-xs font-semibold text-rose-600"></p>
                             </div>
-                            <div class="relative sm:col-span-2" @@click.outside="packageForm.delivery._showDropdown = false" @@focusout="closeLocationDropdownSoon(packageForm.delivery)">
+                            <div class="relative sm:col-span-2" @click.outside="packageForm.delivery._showDropdown = false" @focusout="closeLocationDropdownSoon(packageForm.delivery)">
                                 <label class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Location <span class="text-rose-500">*</span></label>
-                                <input x-model="packageForm.delivery.locationQuery" @@input="searchLocation(packageForm.delivery)" @@focus="packageForm.delivery.locationResults.length && (packageForm.delivery._showDropdown = true)"
+                                <input x-model="packageForm.delivery.locationQuery" @input="searchLocation(packageForm.delivery)" @focus="packageForm.delivery.locationResults.length && (packageForm.delivery._showDropdown = true)"
                                        class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
                                 <div x-show="packageForm.delivery._showDropdown && packageForm.delivery.locationResults.length" class="absolute z-40 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
                                     <template x-for="loc in packageForm.delivery.locationResults" :key="loc.id">
-                                        <button type="button" @@click="selectLocation(packageForm.delivery, loc)" class="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-orange-50">
+                                        <button type="button" @click="selectLocation(packageForm.delivery, loc)" class="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-orange-50">
                                             <span x-text="loc.display"></span>
                                         </button>
                                     </template>
@@ -384,7 +404,7 @@
                                 <span class="block text-xs font-bold uppercase tracking-wide text-slate-500">Bus station</span>
                                 <span class="block text-sm font-black text-slate-900">Send to bus station</span>
                             </span>
-                            <input type="checkbox" x-model="packageForm.send_to_bus_station" @@change="if (packageForm.send_to_bus_station) packageForm.forward_to_warehouse_id = ''" class="h-5 w-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
+                            <input type="checkbox" x-model="packageForm.send_to_bus_station" @change="if (packageForm.send_to_bus_station) packageForm.forward_to_warehouse_id = ''" class="h-5 w-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500">
                         </label>
 
                         <div x-show="!packageForm.send_to_bus_station" class="rounded-xl border-2 border-orange-100 bg-orange-50/40 px-3 py-3" style="display:none">
@@ -401,24 +421,24 @@
 
                 </div>
                 <div class="shrink-0 flex justify-end gap-3 border-t border-slate-100 bg-slate-50 p-4">
-                    <button type="button" @@click="closePackageModal()" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-base font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:text-sm">Cancel</button>
-                    <button type="button" @@click="savePackageFromModal()" :disabled="!canSavePackageForm()" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-base font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:border-orange-300 disabled:bg-orange-300 disabled:shadow-none sm:text-sm" x-text="packageModalIndex === null ? 'Add Package' : 'Save Package'"></button>
+                    <button type="button" @click="closePackageModal()" class="rounded-xl border-2 border-slate-200 bg-white px-5 py-3 text-base font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:text-sm">Cancel</button>
+                    <button type="button" @click="savePackageFromModal()" :disabled="!canSavePackageForm()" class="rounded-xl border-2 border-orange-600 bg-orange-600 px-5 py-3 text-base font-black text-white shadow-lg shadow-orange-600/20 transition hover:border-orange-700 hover:bg-orange-700 disabled:cursor-not-allowed disabled:border-orange-300 disabled:bg-orange-300 disabled:shadow-none sm:text-sm" x-text="packageModalIndex === null ? 'Add Package' : 'Save Package'"></button>
                 </div>
             </div>
         </div>
     </template>
 
     <template x-teleport="body">
-        <div x-show="photoPreviewOpen" x-cloak x-transition.opacity @@click="closePackagePhotos()" @@keydown.window.escape="closePackagePhotos()" @@keydown.window.arrow-left="previousPackagePhoto()" @@keydown.window.arrow-right="nextPackagePhoto()"
+        <div x-show="photoPreviewOpen" x-cloak x-transition.opacity @click="closePackagePhotos()" @keydown.window.escape="closePackagePhotos()" @keydown.window.arrow-left="previousPackagePhoto()" @keydown.window.arrow-right="nextPackagePhoto()"
              class="fixed inset-0 z-[130] flex cursor-zoom-out items-center justify-center bg-black/85 p-8 backdrop-blur-sm" style="display:none">
-            <button type="button" @@click.stop="closePackagePhotos()" class="absolute right-4 top-4 z-20 rounded-full bg-black/45 p-3 text-white/80 transition hover:bg-black/70 hover:text-white">
+            <button type="button" @click.stop="closePackagePhotos()" class="absolute right-4 top-4 z-20 rounded-full bg-black/45 p-3 text-white/80 transition hover:bg-black/70 hover:text-white">
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
-            <button type="button" x-show="photoPreviewUrls.length > 1" @@click.stop="previousPackagePhoto()" class="absolute left-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white/80 transition hover:bg-black/70 hover:text-white">
+            <button type="button" x-show="photoPreviewUrls.length > 1" @click.stop="previousPackagePhoto()" class="absolute left-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white/80 transition hover:bg-black/70 hover:text-white">
                 <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
             </button>
-            <img @@click.stop :src="activePackagePhoto()?.url" :alt="activePackagePhoto()?.name || 'Package photo'" class="max-h-full max-w-full rounded-2xl object-contain shadow-2xl ring-1 ring-white/10">
-            <button type="button" x-show="photoPreviewUrls.length > 1" @@click.stop="nextPackagePhoto()" class="absolute right-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white/80 transition hover:bg-black/70 hover:text-white">
+            <img @click.stop :src="activePackagePhoto()?.url" :alt="activePackagePhoto()?.name || 'Package photo'" class="max-h-full max-w-full rounded-2xl object-contain shadow-2xl ring-1 ring-white/10">
+            <button type="button" x-show="photoPreviewUrls.length > 1" @click.stop="nextPackagePhoto()" class="absolute right-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white/80 transition hover:bg-black/70 hover:text-white">
                 <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </button>
             <div class="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white/90">
@@ -427,6 +447,58 @@
             </div>
         </div>
     </template>
+
+    <!-- ═══════════ RECENT WALK-IN ORDERS TABLE ═══════════ -->
+    <section class="mt-8 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 bg-slate-50/50">
+            <div>
+                <h2 class="text-sm font-extrabold text-slate-950">Recent Walk-in Orders</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Walk-in shipments logged at this counter</p>
+            </div>
+            <span class="rounded-lg bg-orange-100 px-2.5 py-1 text-xs font-black text-orange-700">
+                <span x-text="recentOrders.length"></span> Recent
+            </span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    <tr>
+                        <th class="px-5 py-3">Tracking / Code</th>
+                        <th class="px-5 py-3">Vendor / Sender</th>
+                        <th class="px-5 py-3 text-center">Packages</th>
+                        <th class="px-5 py-3 text-right">Total Price</th>
+                        <th class="px-5 py-3">Status</th>
+                        <th class="px-5 py-3">Time</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white text-xs font-medium text-slate-700">
+                    <template x-for="(order, idx) in recentOrders" :key="'recent-' + idx">
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="px-5 py-3.5 font-mono font-bold text-orange-600" x-text="order.shipment_number || ('#' + order.id)"></td>
+                            <td class="px-5 py-3.5">
+                                <p class="font-extrabold text-slate-950" x-text="order.vendor?.name || 'Walk-in Vendor'"></p>
+                                <p class="text-[11px] text-slate-400 font-mono" x-text="order.vendor?.phone || '-'"></p>
+                            </td>
+                            <td class="px-5 py-3.5 text-center">
+                                <span class="rounded-md bg-slate-100 px-2 py-1 font-bold text-slate-700" x-text="order.items_count || order.items?.length || 0"></span>
+                            </td>
+                            <td class="px-5 py-3.5 text-right font-mono font-bold text-emerald-600" x-text="'GH₵ ' + (parseFloat(order.total_fee || order.items?.reduce((s,i) => s + (parseFloat(i.delivery_fee)||0), 0) || 0)).toFixed(2)"></td>
+                            <td class="px-5 py-3.5">
+                                <span class="inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-200/50 uppercase" x-text="order.status || 'Received'"></span>
+                            </td>
+                            <td class="px-5 py-3.5 text-slate-400" x-text="order.time_formatted || 'Just now'"></td>
+                        </tr>
+                    </template>
+                    <tr x-show="recentOrders.length === 0">
+                        <td colspan="6" class="px-5 py-8 text-center text-slate-400">
+                            No previous walk-in shipments recorded yet.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
 </div>
 @endsection
 
@@ -465,6 +537,7 @@ function walkinShipment() {
         photoPreviewPackage: null,
         photoPreviewUrls: [],
         activePhotoIndex: 0,
+        recentOrders: @json($recentWalkins ?? []),
 
         init() {
             this.config = JSON.parse(this.$el.dataset.walkinConfig);
@@ -496,6 +569,7 @@ function walkinShipment() {
                 key: `package-${Date.now()}-${this.itemSeed}`,
                 description: `Package ${this.itemSeed}`,
                 quantity: 1,
+                delivery_fee: '',
                 delivery_method: 'direct',
                 forward_to_warehouse_id: '',
                 delivery: this.makeDelivery(),
@@ -508,6 +582,7 @@ function walkinShipment() {
                 key: 'package-form-empty',
                 description: '',
                 quantity: 1,
+                delivery_fee: '',
                 delivery_method: 'direct',
                 forward_to_warehouse_id: '',
                 delivery: this.makeDelivery(),
@@ -568,6 +643,10 @@ function walkinShipment() {
                 && delivery.locationQuery?.trim()
                 && (this.packageForm.photos || []).length > 0
             );
+        },
+
+        totalItemFees() {
+            return this.items.reduce((sum, i) => sum + (parseFloat(i.delivery_fee) || 0), 0);
         },
 
         removeItem(index) {
@@ -872,6 +951,7 @@ function walkinShipment() {
             const items = this.items.map(item => ({
                 description: item.description,
                 quantity: item.quantity,
+                delivery_fee: item.delivery_fee,
                 delivery_method: item.delivery_method,
                 ...(item.delivery_method !== 'bus_handoff' && item.forward_to_warehouse_id
                     ? { forward_to_warehouse_id: item.forward_to_warehouse_id }
@@ -918,6 +998,20 @@ function walkinShipment() {
                 }
                 const json = response.json;
                 this.createdPackages = (json.packages || []).map(pkg => this.prepareCreatedPackage(pkg));
+
+                // Real-time update to the Recent Walk-in Orders table
+                if (json.shipment) {
+                    this.recentOrders.unshift({
+                        shipment_number: json.shipment.shipment_number,
+                        id: json.shipment.id,
+                        vendor: this.vendorData,
+                        items_count: this.items.length,
+                        total_fee: this.totalItemFees(),
+                        status: 'Received',
+                        time_formatted: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                    });
+                }
+
                 this.step = 4;
             } catch (error) {
                 if (this.config.debug) {
