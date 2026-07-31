@@ -38,10 +38,13 @@ class WalkinController extends Controller
             ])
             ->values();
 
-        // Safe query loading full vendor and items models to avoid missing column select errors
+        // Query shipments via items relationship to avoid column name mismatches on shipments table
         $recentWalkins = Shipment::query()
-            ->where('origin_warehouse_id', $warehouse->id)
             ->where('source', 'warehouse_walkin')
+            ->whereHas('items', function ($query) use ($warehouse) {
+                $query->where('warehouse_id', $warehouse->id)
+                      ->orWhere('forward_to_warehouse_id', $warehouse->id);
+            })
             ->with(['vendor', 'items'])
             ->latest()
             ->take(10)
