@@ -38,9 +38,9 @@ class WalkinController extends Controller
             ])
             ->values();
 
-        // Fetch recent walk-in shipments for this warehouse
+        // Query shipments using origin_warehouse_id instead of warehouse_id
         $recentWalkins = Shipment::query()
-            ->where('warehouse_id', $warehouse->id)
+            ->where('origin_warehouse_id', $warehouse->id)
             ->where('source', 'warehouse_walkin')
             ->with(['vendor:id,name,phone', 'items:id,shipment_id,description,quantity,delivery_fee'])
             ->latest()
@@ -77,7 +77,7 @@ class WalkinController extends Controller
             'items'                              => 'required|array|min:1',
             'items.*.description'                => 'required|string|max:500',
             'items.*.quantity'                   => 'required|integer|min:1',
-            'items.*.delivery_fee'               => 'nullable|numeric|min:0|max:9999999.99', // <--- Validate item price/fee
+            'items.*.delivery_fee'               => 'nullable|numeric|min:0|max:9999999.99',
             'items.*.delivery_method'            => 'nullable|in:direct,bus_handoff',
             'items.*.forward_to_warehouse_id'    => 'nullable|integer|exists:warehouses,id',
             'items.*.delivery.recipient_name'    => 'required_if:destination_mode,per_item|nullable|string|max:255',
