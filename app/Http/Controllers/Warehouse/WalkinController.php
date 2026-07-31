@@ -38,11 +38,11 @@ class WalkinController extends Controller
             ])
             ->values();
 
-        // Query shipments using origin_warehouse_id instead of warehouse_id
+        // Safe query loading full vendor and items models to avoid missing column select errors
         $recentWalkins = Shipment::query()
             ->where('origin_warehouse_id', $warehouse->id)
             ->where('source', 'warehouse_walkin')
-            ->with(['vendor:id,name,phone', 'items:id,shipment_id,description,quantity,delivery_fee'])
+            ->with(['vendor', 'items'])
             ->latest()
             ->take(10)
             ->get();
