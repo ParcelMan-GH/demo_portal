@@ -63,24 +63,34 @@ class WalkinController extends Controller
             }
         };
 
+        // 1. Extract items from JSON or raw POST array
+        $rawItems = [];
         if ($request->filled('items_json')) {
-            $decodedItems = json_decode((string) $request->input('items_json'), true);
-            if (is_array($decodedItems)) {
-                $normalizedItems = array_map(function (array $item) {
-                    $fee = $item['delivery_fee'] 
-                        ?? $item['price'] 
-                        ?? $item['fee'] 
-                        ?? $item['amount'] 
-                        ?? ($item['delivery']['fee'] ?? null);
-
-                    $item['delivery_fee'] = filled($fee) ? (float) $fee : 0.00;
-                    return $item;
-                }, $decodedItems);
-
-                $request->merge(['items' => $normalizedItems]);
-            }
+            $decoded = json_decode((string) $request->input('items_json'), true);
+            $rawItems = is_array($decoded) ? $decoded : [];
+        } elseif (is_array($request->input('items'))) {
+            $rawItems = $request->input('items');
         }
 
+        // 2. Normalize delivery_fee key across every possible frontend naming convention
+        $normalizedItems = array_map(function (array $item) {
+            $fee = $item['delivery_fee'] 
+                ?? $item['price'] 
+                ?? $item['fee'] 
+                ?? $item['amount'] 
+                ?? $item['delivery_price']
+                ?? ($item['delivery']['fee'] ?? null)
+                ?? ($item['delivery']['price'] ?? null);
+
+            $item['delivery_fee'] = filled($fee) ? (float) $fee : 0.00;
+            return $item;
+        }, $rawItems);
+
+        if (!empty($normalizedItems)) {
+            $request->merge(['items' => $normalizedItems]);
+        }
+
+        // 3. Validate request
         $validated = $request->validate([
             'vendor_id'                          => 'required|exists:vendors,id',
             'fulfillment_type'                   => 'nullable|in:warehouse,self_pickup,direct',
@@ -90,6 +100,8 @@ class WalkinController extends Controller
             'items.*.description'                => 'required|string|max:500',
             'items.*.quantity'                   => 'required|integer|min:1',
             'items.*.delivery_fee'               => 'nullable|numeric|min:0|max:9999999.99',
+            'items.*.price'                      => 'nullable|numeric|min:0|max:9999999.99',
+            'items.*.fee'                        => 'nullable|numeric|min:0|max:9999999.99',
             'items.*.delivery_method'            => 'nullable|in:direct,bus_handoff',
             'items.*.forward_to_warehouse_id'    => 'nullable|integer|exists:warehouses,id',
             'items.*.delivery.recipient_name'    => 'required_if:destination_mode,per_item|nullable|string|max:255',
@@ -116,7 +128,18 @@ class WalkinController extends Controller
         $validated['source']             = 'warehouse_walkin';
         $validated['created_by_user_id'] = $user->id;
         $validated['item_photos']        = $request->file('item_photos', []);
-        $validated['items'] = collect($validated['items'])->map(function (array $item) use ($warehouse) {
+
+        // 4. Force delivery_fee persistence into $validated['items'] array
+        $validated['items'] = collect($validated['items'])->map(function (array $item, int $index) use ($warehouse, $normalizedItems) {
+            $fallbackFee = $normalizedItems[$index]['delivery_fee'] ?? 0.00;
+            
+            $fee = $item['delivery_fee'] 
+                ?? $item['price'] 
+                ?? $item['fee'] 
+                ?? $fallbackFee;
+
+            $item['delivery_fee'] = (float) $fee;
+
             if (($item['delivery_method'] ?? 'direct') === 'bus_handoff') {
                 $item['forward_to_warehouse_id'] = null;
             }
