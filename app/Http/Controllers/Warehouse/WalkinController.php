@@ -65,7 +65,20 @@ class WalkinController extends Controller
 
         if ($request->filled('items_json')) {
             $decodedItems = json_decode((string) $request->input('items_json'), true);
-            $request->merge(['items' => is_array($decodedItems) ? $decodedItems : []]);
+            if (is_array($decodedItems)) {
+                $normalizedItems = array_map(function (array $item) {
+                    $fee = $item['delivery_fee'] 
+                        ?? $item['price'] 
+                        ?? $item['fee'] 
+                        ?? $item['amount'] 
+                        ?? ($item['delivery']['fee'] ?? null);
+
+                    $item['delivery_fee'] = filled($fee) ? (float) $fee : 0.00;
+                    return $item;
+                }, $decodedItems);
+
+                $request->merge(['items' => $normalizedItems]);
+            }
         }
 
         $validated = $request->validate([
