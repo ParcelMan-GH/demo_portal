@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Shipment;
 
 class DeliveryRun extends Model
 {
@@ -66,5 +67,9 @@ class DeliveryRun extends Model
     {
         return $this->hasMany(DeliveryRunItem::class);
     }
-}
 
+    public function shipments(): HasMany
+    {
+        return $this->hasMany(Shipment::class);
+    }
+}
