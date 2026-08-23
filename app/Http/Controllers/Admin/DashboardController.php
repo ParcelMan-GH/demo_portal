@@ -69,7 +69,7 @@ class DashboardController extends Controller
 
         // ── Active Riders (REAL DATA MAPPING) ─────────────────────────────
         // Fetch runs actively on the road, eager load the driver and shipments to calculate stats
-        $activeRuns = DeliveryRun::with(['assignedDriver', 'shipments'])
+        $activeRuns = DeliveryRun::with(['assignedDriver', 'items'])
                                  ->where('status', 'out_for_delivery')
                                  ->get();
 
@@ -77,8 +77,8 @@ class DashboardController extends Controller
             $driverName = $run->assignedDriver ? $run->assignedDriver->name : 'Unknown Rider';
             
             // Calculate real stats from the run's shipments
-            $totalAssigned = $run->shipments ? $run->shipments->count() : 0;
-            $totalDelivered = $run->shipments ? $run->shipments->where('status', 'delivered')->count() : 0;
+            $totalAssigned = $run->items? $run->items->count() : 0;
+            $totalDelivered = $run->items ? $run->items->where('status', 'delivered')->count() : 0;
             $remaining = $totalAssigned - $totalDelivered;
             $progress = $totalAssigned > 0 ? round(($totalDelivered / $totalAssigned) * 100) : 0;
 
