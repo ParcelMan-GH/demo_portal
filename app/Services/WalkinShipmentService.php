@@ -23,7 +23,10 @@ use App\Services\Warehouse\BarcodeService;
 use App\Services\Warehouse\PackageLabelHtmlRenderer;
 use App\Services\Warehouse\WarehouseSortingService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
+use Throwable;
 
 class WalkinShipmentService
 {
@@ -154,8 +157,7 @@ class WalkinShipmentService
                     'tracking_code' => $trackingCode,
                 ];
 
-                // Keep item-level delivery details populated so warehouse screens, sorting,
-                // and delivery runs can work from the package record directly.
+                // Keep item-level delivery details populated
                 $del = null;
                 if ($destMode === ShipmentDestinationMode::PER_ITEM && ! empty($itemData['delivery'])) {
                     $del = $itemData['delivery'];
@@ -197,20 +199,37 @@ class WalkinShipmentService
                     ]);
                 }
 
+                // Process item photos safely with local storage fallback
                 foreach (($data['item_photos'][$itemIndex] ?? []) as $photo) {
                     if (! $photo) {
                         continue;
                     }
 
-                    $storedPhoto = $this->storageService->upload($photo, 'warehouse-receipts/'.$receipt->id);
-                    WarehouseReceiptItemPhoto::create([
-                        'warehouse_receipt_item_id' => $receiptItem->id,
-                        'path' => $storedPhoto['path'],
-                        'original_name' => $storedPhoto['original_name'],
-                        'size' => $storedPhoto['size'],
-                        'photo_type' => 'proof',
-                        'created_by_user_id' => $data['created_by_user_id'],
-                    ]);
+                    try {
+                        // Check if default disk is valid; otherwise fallback to public disk directly
+                        $defaultDisk = config('filesystems.default', 'public');
+                        if ($defaultDisk === 's3' && empty(config('filesystems.disks.s3.key'))) {
+                            $path = $photo->store('warehouse-receipts/'.$receipt->id, 'public');
+                            $storedPhoto = [
+                                'path' => $path,
+                                'original_name' => $photo->getClientOriginalName(),
+                                'size' => $photo->getSize(),
+                            ];
+                        } else {
+                            $storedPhoto = $this->storageService->upload($photo, 'warehouse-receipts/'.$receipt->id);
+                        }
+
+                        WarehouseReceiptItemPhoto::create([
+                            'warehouse_receipt_item_id' => $receiptItem->id,
+                            'path' => $storedPhoto['path'],
+                            'original_name' => $storedPhoto['original_name'],
+                            'size' => $storedPhoto['size'],
+                            'photo_type' => 'proof',
+                            'created_by_user_id' => $data['created_by_user_id'],
+                        ]);
+                    } catch (Throwable $e) {
+                        Log::warning('Skipping item photo upload due to storage configuration error: ' . $e->getMessage());
+                    }
                 }
 
                 // Tracking entry
