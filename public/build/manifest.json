@@ -1,0 +1,90 @@
+{
+  "_incoming-show-CswEZ_v3.js": {
+    "file": "assets/incoming-show-CswEZ_v3.js",
+    "name": "incoming-show"
+  },
+  "_module.esm-L4ggBBWN.js": {
+    "file": "assets/module.esm-L4ggBBWN.js",
+    "name": "module.esm"
+  },
+  "resources/css/app.css": {
+    "file": "assets/app-DyEICk92.css",
+    "src": "resources/css/app.css",
+    "isEntry": true,
+    "name": "app",
+    "names": [
+      "app.css"
+    ]
+  },
+  "resources/css/pages/driver-portal.css": {
+    "file": "assets/driver-portal-DPNuKGyY.css",
+    "src": "resources/css/pages/driver-portal.css",
+    "isEntry": true,
+    "name": "driver-portal",
+    "names": [
+      "driver-portal.css"
+    ]
+  },
+  "resources/css/pages/vendor-portal.css": {
+    "file": "assets/vendor-portal-DB1G4mqf.css",
+    "src": "resources/css/pages/vendor-portal.css",
+    "isEntry": true,
+    "name": "vendor-portal",
+    "names": [
+      "vendor-portal.css"
+    ]
+  },
+  "resources/css/pages/warehouse-portal.css": {
+    "file": "assets/warehouse-portal-CaF-rrFQ.css",
+    "src": "resources/css/pages/warehouse-portal.css",
+    "isEntry": true,
+    "name": "warehouse-portal",
+    "names": [
+      "warehouse-portal.css"
+    ]
+  },
+  "resources/js/access/sign-in.js": {
+    "file": "assets/sign-in-50uMRVnk.js",
+    "name": "sign-in",
+    "src": "resources/js/access/sign-in.js",
+    "isEntry": true,
+    "imports": [
+      "_module.esm-L4ggBBWN.js"
+    ],
+    "css": [
+      "assets/sign-in-DToZja8O.css"
+    ]
+  },
+  "resources/js/admin/app.js": {
+    "file": "assets/app-D5-knhwk.js",
+    "name": "app",
+    "src": "resources/js/admin/app.js",
+    "isEntry": true,
+    "imports": [
+      "_module.esm-L4ggBBWN.js",
+      "_incoming-show-CswEZ_v3.js"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-BRi1tG51.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/warehouse/app.js": {
+    "file": "assets/app-UyYDQtRC.js",
+    "name": "app",
+    "src": "resources/js/warehouse/app.js",
+    "isEntry": true,
+    "imports": [
+      "_module.esm-L4ggBBWN.js",
+      "_incoming-show-CswEZ_v3.js"
+    ]
+  },
+  "resources/js/web/firebase-push.js": {
+    "file": "assets/firebase-push-CRzyGc5n.js",
+    "name": "firebase-push",
+    "src": "resources/js/web/firebase-push.js",
+    "isEntry": true
+  }
+}

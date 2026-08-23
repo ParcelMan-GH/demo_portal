@@ -13,6 +13,7 @@ use App\Services\Warehouse\WarehousePortalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Throwable;
@@ -38,7 +39,54 @@ class WalkinController extends Controller
             ])
             ->values();
 
-        // Query walk-in shipments and map formatted attributes for Alpine JS `@json()`
+        // ── DASHBOARD METRICS CALCULATION ─────────────────────────────────
+        $today = now()->toDateString();
+        $yesterday = now()->subDay()->toDateString();
+        $monthStart = now()->startOfMonth();
+        $lastMonthStart = now()->subMonth()->startOfMonth();
+        $lastMonthEnd = now()->subMonth()->endOfMonth();
+
+        $calcChange = function ($current, $previous) {
+            if ($previous == 0) return $current > 0 ? 100 : 0;
+            return round((($current - $previous) / $previous) * 100, 2);
+        };
+
+        // 1. Total Walk-ins (This Month)
+        $totalWalkinsMonth = Shipment::where('source', 'warehouse_walkin')->where('created_at', '>=', $monthStart)->count();
+        $lastMonthWalkins = Shipment::where('source', 'warehouse_walkin')->whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])->count();
+        $totalWalkinsChange = $calcChange($totalWalkinsMonth, $lastMonthWalkins);
+
+        // 2. Today Walk-ins
+        $todayWalkins = Shipment::where('source', 'warehouse_walkin')->whereDate('created_at', $today)->count();
+        $yesterdayWalkins = Shipment::where('source', 'warehouse_walkin')->whereDate('created_at', $yesterday)->count();
+        $todayWalkinsChange = $calcChange($todayWalkins, $yesterdayWalkins);
+
+        // 3. Amount Made (Sum of Delivery Fees for Walk-ins)
+        $amountMadeMonth = ShipmentItem::whereHas('shipment', function($q) use ($monthStart) {
+            $q->where('source', 'warehouse_walkin')->where('created_at', '>=', $monthStart);
+        })->sum('delivery_fee');
+
+        $lastMonthAmount = ShipmentItem::whereHas('shipment', function($q) use ($lastMonthStart, $lastMonthEnd) {
+            $q->where('source', 'warehouse_walkin')->whereBetween('created_at', [$lastMonthStart, $lastMonthEnd]);
+        })->sum('delivery_fee');
+        $amountMadeChange = $calcChange($amountMadeMonth, $lastMonthAmount);
+
+        // 4. On Time Delivery
+        $deliveredThisMonth = Shipment::where('source', 'warehouse_walkin')->where('status', 'delivered')->where('updated_at', '>=', $monthStart)->count();
+        $onTimeThisMonth = Shipment::where('source', 'warehouse_walkin')->where('status', 'delivered')
+            ->where('updated_at', '>=', $monthStart)
+            ->where(function ($query) {
+                if (DB::connection()->getDriverName() === 'sqlite') {
+                    $query->whereRaw('(julianday(updated_at) - julianday(created_at)) <= 2');
+                } else {
+                    $query->whereRaw('TIMESTAMPDIFF(HOUR, created_at, updated_at) <= 48');
+                }
+            })->count();
+
+        $onTimeDeliveryRate = $deliveredThisMonth > 0 ? round(($onTimeThisMonth / $deliveredThisMonth) * 100, 1) : 100;
+        $onTimeChange = 0; // Mocked historical SLA change
+
+        // ── RECENT WALKINS ────────────────────────────────────────────────
         $recentWalkins = Shipment::query()
             ->where('source', 'warehouse_walkin')
             ->with(['vendor', 'items'])
@@ -67,7 +115,12 @@ class WalkinController extends Controller
                 ];
             });
 
-        return view('warehouse.walkin.create', compact('warehouse', 'transferWarehouses', 'recentWalkins'));
+        return view('warehouse.walkin.create', compact(
+            'warehouse', 'transferWarehouses', 'recentWalkins',
+            'totalWalkinsMonth', 'totalWalkinsChange', 'todayWalkins', 
+            'todayWalkinsChange', 'amountMadeMonth', 'amountMadeChange', 
+            'onTimeDeliveryRate', 'onTimeChange'
+        ));
     }
 
     public function store(Request $request, WalkinShipmentService $service): JsonResponse
@@ -113,36 +166,36 @@ class WalkinController extends Controller
 
         // 3. Validate request
         $validated = $request->validate([
-            'vendor_id'                          => 'required|exists:vendors,id',
-            'fulfillment_type'                   => 'nullable|in:warehouse,self_pickup,direct',
-            'delivery_preference'                => 'nullable|in:deliver,self_pickup',
-            'destination_mode'                   => 'required|in:single,per_item',
-            'items'                              => 'required|array|min:1',
-            'items.*.description'                => 'required|string|max:500',
-            'items.*.quantity'                   => 'required|integer|min:1',
-            'items.*.delivery_fee'               => 'nullable|numeric|min:0|max:9999999.99',
-            'items.*.price'                      => 'nullable|numeric|min:0|max:9999999.99',
-            'items.*.fee'                        => 'nullable|numeric|min:0|max:9999999.99',
-            'items.*.delivery_method'            => 'nullable|in:direct,bus_handoff',
-            'items.*.forward_to_warehouse_id'    => 'nullable|integer|exists:warehouses,id',
-            'items.*.delivery.recipient_name'    => 'required_if:destination_mode,per_item|nullable|string|max:255',
-            'items.*.delivery.recipient_phone'   => ['required_if:destination_mode,per_item', 'nullable', 'string', 'max:20', $ghanaPhoneRule],
-            'items.*.delivery.region_id'         => 'nullable|integer',
-            'items.*.delivery.district_id'       => 'nullable|integer',
-            'items.*.delivery.town'              => 'nullable|string|max:255',
-            'items.*.delivery.landmark'          => 'nullable|string|max:255',
-            'items.*.delivery.instructions'      => 'nullable|string|max:1000',
-            'delivery.recipient_name'            => 'required_if:destination_mode,single|nullable|string|max:255',
-            'delivery.recipient_phone'           => ['required_if:destination_mode,single', 'nullable', 'string', 'max:20', $ghanaPhoneRule],
-            'delivery.region_id'                 => 'nullable|integer',
-            'delivery.district_id'               => 'nullable|integer',
-            'delivery.town'                      => 'required_if:destination_mode,single|nullable|string|max:255',
-            'delivery.landmark'                  => 'nullable|string|max:255',
-            'delivery.instructions'              => 'nullable|string|max:1000',
-            'pickup_fee_amount'                  => 'nullable|numeric|min:0|max:9999999.99',
-            'item_photos'                        => 'nullable|array',
-            'item_photos.*'                      => 'nullable|array',
-            'item_photos.*.*'                    => 'file|image|max:12288',
+            'vendor_id'                  => 'required|exists:vendors,id',
+            'fulfillment_type'           => 'nullable|in:warehouse,self_pickup,direct',
+            'delivery_preference'        => 'nullable|in:deliver,self_pickup',
+            'destination_mode'           => 'required|in:single,per_item',
+            'items'                      => 'required|array|min:1',
+            'items.*.description'        => 'required|string|max:500',
+            'items.*.quantity'           => 'required|integer|min:1',
+            'items.*.delivery_fee'       => 'nullable|numeric|min:0|max:9999999.99',
+            'items.*.price'              => 'nullable|numeric|min:0|max:9999999.99',
+            'items.*.fee'                => 'nullable|numeric|min:0|max:9999999.99',
+            'items.*.delivery_method'    => 'nullable|in:direct,bus_handoff',
+            'items.*.forward_to_warehouse_id' => 'nullable|integer|exists:warehouses,id',
+            'items.*.delivery.recipient_name' => 'required_if:destination_mode,per_item|nullable|string|max:255',
+            'items.*.delivery.recipient_phone'=> ['required_if:destination_mode,per_item', 'nullable', 'string', 'max:20', $ghanaPhoneRule],
+            'items.*.delivery.region_id'      => 'nullable|integer',
+            'items.*.delivery.district_id'    => 'nullable|integer',
+            'items.*.delivery.town'           => 'nullable|string|max:255',
+            'items.*.delivery.landmark'       => 'nullable|string|max:255',
+            'items.*.delivery.instructions'   => 'nullable|string|max:1000',
+            'delivery.recipient_name'         => 'required_if:destination_mode,single|nullable|string|max:255',
+            'delivery.recipient_phone'        => ['required_if:destination_mode,single', 'nullable', 'string', 'max:20', $ghanaPhoneRule],
+            'delivery.region_id'              => 'nullable|integer',
+            'delivery.district_id'            => 'nullable|integer',
+            'delivery.town'                   => 'required_if:destination_mode,single|nullable|string|max:255',
+            'delivery.landmark'               => 'nullable|string|max:255',
+            'delivery.instructions'           => 'nullable|string|max:1000',
+            'pickup_fee_amount'               => 'nullable|numeric|min:0|max:9999999.99',
+            'item_photos'                     => 'nullable|array',
+            'item_photos.*'                   => 'nullable|array',
+            'item_photos.*.*'                 => 'file|image|max:12288',
         ]);
 
         $validated['warehouse_id']       = $warehouse->id;
@@ -232,7 +285,7 @@ class WalkinController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Server error while creating shipment.',
+                'message' => 'Server error while creating shipment. ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -311,14 +364,13 @@ class WalkinController extends Controller
                 'required',
                 'string',
                 'min:9',
-                'unique:vendors,phone',
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     if (!PhoneHelper::hasValidPrefix((string) $value)) {
                         $fail('Please enter a valid Ghana phone number.');
                     }
                 },
             ],
-            'email'         => 'nullable|email|unique:vendors,email',
+            'email'         => 'nullable|email',
         ]);
 
         $vendor = $service->createVendorInline($validated);
@@ -364,5 +416,44 @@ class WalkinController extends Controller
                 'display'  => "{$l->name}, {$l->district->name}, {$l->region->name}",
             ]),
         ]);
+    }
+
+    public function destroy($id): JsonResponse
+    {
+        try {
+            $user = Auth::guard('admin')->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+
+            $shipment = Shipment::find($id);
+
+            if (!$shipment) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Shipment not found.',
+                ], 404);
+            }
+
+            if (method_exists($shipment, 'items')) {
+                $shipment->items()->delete();
+            }
+
+            $shipment->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Walk-in shipment deleted successfully.',
+            ], 200);
+        } catch (Throwable $e) {
+            Log::error('Walkin shipment deletion failed', ['id' => $id, 'error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete shipment: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 }

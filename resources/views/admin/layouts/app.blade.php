@@ -12,16 +12,25 @@
     @stack('head-scripts')
     @vite(['resources/css/app.css', 'resources/css/pages/warehouse-portal.css', 'resources/js/admin/app.js'])
     @stack('styles')
+    
+    <style>
+        /* Custom scrollbar for a cleaner look */
+        .wh-sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .wh-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+        .wh-sidebar-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .wh-sidebar-scroll:hover::-webkit-scrollbar-thumb { background: #94a3b8; }
+    </style>
 </head>
-<body class="warehouse-portal bg-slate-50 text-sm antialiased"
+<body class="bg-[#FCF9F6] text-sm antialiased text-slate-800"
       x-data="{ sidebarOpen: false, sidebarCollapsed: localStorage.getItem('whSidebarCollapsed') === 'true' }"
       x-init="$watch('sidebarCollapsed', val => localStorage.setItem('whSidebarCollapsed', val))">
+    
     @php
         $authUser = Auth::guard('admin')->user();
         $warehouse = $backOfficeSelectedWarehouse ?? $backOfficeCurrentWarehouse ?? $authUser?->warehouse;
         $warehouseLabel = $backOfficeScopeLabel ?? ($warehouse?->name ?? 'Warehouse');
-        $linkCls = 'wh-nav-link relative';
 
+        // Permissions
         $canDashboard = $authUser?->hasPermission('warehouse.dashboard.view') || $authUser?->hasPermission('dashboard.view');
         $canReceiving = $authUser?->hasPermission('warehouse.receiving.manage') || $authUser?->hasPermission('shipments.view');
         $canItems = $authUser?->hasPermission('warehouse.items.scan') || $authUser?->hasPermission('shipments.view');
@@ -31,6 +40,7 @@
         $canContacts = $authUser?->hasPermission('warehouse.contacts.manage') || $authUser?->hasPermission('shipments.view');
         $canRecipientPayments = $authUser?->hasPermission('warehouse.recipient_payments.view') || $authUser?->hasPermission('recipient_payments.view');
         $canUsers = $authUser?->hasPermission('warehouse.users.view') || $authUser?->hasPermission('users.view');
+        
         $backOfficeAccess = app(\App\Services\BackOfficeAccess::class);
         $canRoles = $authUser ? $backOfficeAccess->canUsePermission($authUser, 'roles.view') : false;
         $canOrders = $authUser ? $backOfficeAccess->canUsePermission($authUser, 'shipments.view') : false;
@@ -38,501 +48,320 @@
                 ->contains(fn (string $permission) => $backOfficeAccess->canUsePermission($authUser, $permission));
         $canHqControls = $authUser && collect(['shipments.view', 'vendors.view', 'vendors.manage', 'drivers.view', 'warehouses.view', 'settings.view'])
                 ->contains(fn (string $permission) => $backOfficeAccess->canUsePermission($authUser, $permission));
+
+        // Styling Helpers
+        $baseLinkCls = "relative flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 group mb-1 w-full text-left";
+        $activeCls = "bg-[#ea580c] text-white shadow-md shadow-orange-500/20";
+        $inactiveCls = "text-slate-500 hover:bg-orange-50 hover:text-orange-600";
+
+        // Active States for Dropdowns
+        $isWhActive = request()->routeIs('admin.warehouses.*') || request()->routeIs('admin.locations.*') || request()->routeIs('warehouse.packages.*') || request()->routeIs('warehouse.receipts.pending.*') || request()->routeIs('warehouse.pickups.received.*');
+        $isWorkersActive = request()->routeIs('warehouse.users.*') || request()->routeIs('admin.admins.*') || request()->routeIs('admin.roles.*');
+        $isHqActive = request()->routeIs('admin.orders.*') || request()->routeIs('admin.vendors.*');
+        $isSettingsActive = request()->routeIs('admin.settings.*');
+
+        $initialDropdown = $isWhActive ? 'warehouses' : ($isWorkersActive ? 'workers' : ($isHqActive ? 'hq' : ($isSettingsActive ? 'settings' : '')));
     @endphp
 
     <div class="min-h-screen flex">
+        
+        {{-- ═══ SIDEBAR ═══ --}}
         <aside
-            class="fixed inset-y-0 left-0 z-50 wh-sidebar transition-all duration-300 ease-in-out flex flex-col"
-            :class="[sidebarCollapsed ? 'w-[72px]' : 'w-[280px]', sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0']"
+            class="fixed inset-y-0 left-0 z-50 bg-[#FCF9F6] border-r border-slate-200/60 transition-all duration-300 ease-in-out flex flex-col"
+            :class="[sidebarCollapsed ? 'w-[80px]' : 'w-[260px]', sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0']"
         >
-            <div class="flex items-center h-[60px] transition-all duration-300" :class="sidebarCollapsed ? 'px-4 justify-center' : 'px-5'">
-                <div class="wh-logo-mark flex-shrink-0 rounded-lg overflow-hidden flex items-center justify-center" style="width:38px;height:38px;">
-                    <img src="{{ asset('logo.png') }}" alt="Parcelman" style="transform:scale(1.8);transform-origin:center 40%;">
+            {{-- Logo Area --}}
+            <div class="flex items-center h-[72px] transition-all duration-300" :class="sidebarCollapsed ? 'px-4 justify-center' : 'px-6'">
+                <div class="flex-shrink-0 rounded-lg overflow-hidden flex items-center justify-center w-10 h-10 bg-white border border-slate-200 shadow-sm">
+                    <img src="{{ asset('logo.png') }}" alt="Parcelman" class="w-7 h-7 object-contain">
                 </div>
-                <div class="ml-3 min-w-0 overflow-hidden transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'w-auto opacity-100'">
-                    <span class="text-white text-[16px] font-extrabold tracking-tight block whitespace-nowrap">Parcelman</span>
-                    <span class="wh-brand-kicker block max-w-[190px] truncate text-[10px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap" title="{{ $warehouseLabel }}">{{ $warehouseLabel }}</span>
+                <div class="ml-3 min-w-0 overflow-hidden transition-all duration-300 flex flex-col justify-center" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'w-auto opacity-100'">
+                    <span class="text-slate-900 text-[17px] font-extrabold tracking-tight block whitespace-nowrap leading-none">Parcelman</span>
+                    <span class="text-orange-600 text-[10px] font-bold uppercase tracking-[0.1em] whitespace-nowrap mt-1 leading-none">Express</span>
                 </div>
             </div>
 
-            <div class="h-px transition-all duration-300" :class="sidebarCollapsed ? 'mx-3' : 'mx-5'" style="background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);"></div>
+            <div class="h-px mx-6 bg-slate-200/60 transition-all duration-300" :class="sidebarCollapsed ? 'mx-4' : 'mx-6'"></div>
 
-            <nav class="flex-1 overflow-y-auto warehouse-sidebar-scroll py-4 px-3">
+            {{-- Navigation Links --}}
+            <nav class="flex-1 overflow-y-auto wh-sidebar-scroll py-6 px-4" x-data="{ activeDropdown: '{{ $initialDropdown }}' }">
+                
                 @if($canDashboard)
-                    <a href="{{ route('warehouse.dashboard') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.dashboard') || request()->routeIs('admin.dashboard') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                        <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg></div>
-                        <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Dashboard</span>
-                        <template x-if="sidebarCollapsed"><span class="wh-tooltip">Dashboard</span></template>
-                    </a>
+                    <div class="mb-6">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-2" x-show="!sidebarCollapsed">Operations</div>
+                        
+                        <a href="{{ route('warehouse.dashboard') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('warehouse.dashboard') || request()->routeIs('admin.dashboard') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                            <div class="flex items-center gap-3">
+                                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+                                <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Dashboard</span>
+                            </div>
+                        </a>
+
+                        @if($canReceiving)
+                            <a href="{{ route('warehouse.walkin.create') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('warehouse.walkin.*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                                    <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Walk-ins</span>
+                                </div>
+                            </a>
+                        @endif
+
+                        @if($canContacts)
+                            <a href="{{ route('warehouse.contacts.index') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('warehouse.contacts.*') || request()->routeIs('admin.contacts.*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                                    <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Recipient Desk</span>
+                                </div>
+                            </a>
+                        @endif
+
+                        @if($canRecipientPayments)
+                            <a href="{{ route('warehouse.recipient-payments.index') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('warehouse.recipient-payments.*') || request()->routeIs('admin.recipient-payments.*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 9V7a5 5 0 00-10 0v2M5 9h14l-1 11H6L5 9zm5 4h4"/></svg>
+                                    <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Payment Collection</span>
+                                </div>
+                            </a>
+                        @endif
+
+                        {{-- Smart Call Allocation --}}
+                        <a href="{{ route('admin.agents.allocation') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('admin.agents.allocation*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                            <div class="flex items-center gap-3">
+                                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Call Allocation</span>
+                            </div>
+                        </a>
+
+                        {{-- Commission Ledger --}}
+<a href="{{ route('admin.agents.ledger') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('admin.agents.ledger*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+    <div class="flex items-center gap-3">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Commission Ledger</span>
+    </div>
+</a>
+
+                        {{-- Warehouses Dropdown --}}
+                        @hasPermission('warehouses.view')
+                            <div>
+                                <button type="button" @click="activeDropdown = activeDropdown === 'warehouses' ? null : 'warehouses'" class="{{ $baseLinkCls }} {{ $isWhActive ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                    <div class="flex items-center gap-3">
+                                        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 21h18M4 10h16v11H4V10Zm-.5-3L12 3l8.5 4M8 14v3m4-3v3m4-3v3"/></svg>
+                                        <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Warehouses</span>
+                                    </div>
+                                    <svg x-show="!sidebarCollapsed" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="activeDropdown === 'warehouses' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                                <div x-show="activeDropdown === 'warehouses' && !sidebarCollapsed" x-transition.opacity x-collapse class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
+                                    <a href="{{ route('warehouse.receipts.pending.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('warehouse.receipts.pending.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">Incoming Packages</a>
+                                    <a href="{{ route('warehouse.pickups.received.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('warehouse.pickups.received.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">Received Pickups</a>
+                                    <a href="{{ route('warehouse.packages.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('warehouse.packages.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">Warehouse Packages</a>
+                                    <a href="{{ route('admin.warehouses.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('admin.warehouses.index') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">Manage Warehouses</a>
+                                </div>
+                            </div>
+                        @endhasPermission
+                    </div>
                 @endif
 
-                @if($canReceiving || $canItems || $canSorting || $canContacts || $canRecipientPayments)
-                    <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">Operations</div>
-                    <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
+                
 
-                    @if($canReceiving)
-                        <a href="{{ route('warehouse.walkin.create') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.walkin.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Walk-in</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Walk-in</span></template>
-                        </a>
-                        <a href="{{ route('warehouse.receipts.pending.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.receipts.pending.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Incoming Packages</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Incoming Packages</span></template>
-                        </a>
-                        <a href="{{ route('warehouse.pickups.received.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.pickups.received.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Received Pickups</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Received Pickups</span></template>
-                        </a>
-                    @endif
+                @if($canManifest || $canDeliveryAssign || $canRiderTeams || $canSorting)
+                    <div class="mb-6">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-2" x-show="!sidebarCollapsed">Transport & Deliveries</div>
+                        <div class="mx-auto w-6 h-px bg-slate-200 mb-4" x-show="sidebarCollapsed" x-cloak></div>
 
-                    @if($canItems)
-                        <a href="{{ route('warehouse.packages.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.packages.*') || request()->routeIs('warehouse.items.received.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Warehouse Packages</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Warehouse Packages</span></template>
-                        </a>
-                        <a href="{{ route('warehouse.package-location-changes.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.package-location-changes.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 21s7-4.35 7-11a7 7 0 10-14 0c0 6.65 7 11 7 11z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10h.01"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Location Changes</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Location Changes</span></template>
-                        </a>
-                        <a href="{{ route('warehouse.rider-package-transfers.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.rider-package-transfers.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h11m0 0l-4-4m4 4l-4 4M17 17H6m0 0l4 4m-4-4l4-4"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Rider Transfers</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Rider Transfers</span></template>
-                        </a>
-                    @endif
-                    @if($canSorting)
-                        <a href="{{ route('warehouse.sorting.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.sorting.*') || request()->routeIs('admin.sort-batches.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Sorting</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Sorting</span></template>
-                        </a>
-                    @endif
-                    @if($canContacts)
-                        <a href="{{ route('warehouse.contacts.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.contacts.*') || request()->routeIs('admin.contacts.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Recipient Desk</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Recipient Desk</span></template>
-                        </a>
-                    @endif
-                    @if($canRecipientPayments)
-                        <a href="{{ route('warehouse.recipient-payments.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.recipient-payments.*') || request()->routeIs('admin.recipient-payments.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a5 5 0 00-10 0v2M5 9h14l-1 11H6L5 9zm5 4h4"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Recipient Payments</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Recipient Payments</span></template>
-                        </a>
-                    @endif
+                        @if($canManifest)
+                            <a href="{{ route('warehouse.manifests.transport.index') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('warehouse.manifests.transport.*') || request()->routeIs('admin.transport-manifests.*') && !request()->routeIs('admin.transport-manifests.incoming.*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                    <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Outgoing Batches</span>
+                                </div>
+                            </a>
+                            <a href="{{ route('warehouse.manifests.incoming.index') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('warehouse.manifests.incoming.*') || request()->routeIs('admin.transport-manifests.incoming.*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8"/></svg>
+                                    <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Incoming Batches</span>
+                                </div>
+                            </a>
+                        @endif
+
+                        @if($canDeliveryAssign)
+                            <a href="{{ route('warehouse.deliveries.runs.index') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('warehouse.deliveries.runs.*') || request()->routeIs('admin.delivery-runs.*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                    <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Delivery Runs</span>
+                                </div>
+                            </a>
+                            <a href="{{ route('warehouse.deliveries.pending-confirmations') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('warehouse.deliveries.pending-confirmations*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                                    <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Confirmations</span>
+                                </div>
+                            </a>
+                        @endif
+
+                        @if($canRiderTeams)
+                            <a href="{{ route('admin.rider-teams.index') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('admin.rider-teams.*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m6-6a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm6 2a3 3 0 1 1-5.196-2.052"/></svg>
+                                    <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Riders Team</span>
+                                </div>
+                            </a>
+                        @endif
+                    </div>
                 @endif
 
-                @if($canManifest || $canDeliveryAssign || $canRiderTeams)
-                    <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">Transport</div>
-                    <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
+                @if($canUsers || $canRoles || $canHqControls)
+                    <div class="mb-6">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-2" x-show="!sidebarCollapsed">Extra</div>
+                        <div class="mx-auto w-6 h-px bg-slate-200 mb-4" x-show="sidebarCollapsed" x-cloak></div>
 
-                    @if($canManifest)
-                        <a href="{{ route('warehouse.manifests.transport.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.manifests.transport.*') || request()->routeIs('admin.transport-manifests.*') && !request()->routeIs('admin.transport-manifests.incoming.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Transport Manifests</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Transport Manifests</span></template>
-                        </a>
-                        <a href="{{ route('warehouse.manifests.incoming.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.manifests.incoming.*') || request()->routeIs('admin.transport-manifests.incoming.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Incoming Manifests</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Incoming Manifests</span></template>
-                        </a>
-                    @endif
-                    @if($canDeliveryAssign)
-                        <a href="{{ route('warehouse.deliveries.runs.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.deliveries.runs.*') || request()->routeIs('admin.delivery-runs.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Delivery Runs</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Delivery Runs</span></template>
-                        </a>
-                        <a href="{{ route('warehouse.deliveries.pending-confirmations') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.deliveries.pending-confirmations*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Pending Confirmations</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Pending Confirmations</span></template>
-                        </a>
-                    @endif
-                    @if($canRiderTeams)
-                        <a href="{{ route('admin.rider-teams.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.rider-teams.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m6-6a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm6 2a3 3 0 1 1-5.196-2.052"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Rider Teams</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Rider Teams</span></template>
-                        </a>
-                    @endif
+                        {{-- Workers Dropdown --}}
+                        @if($canUsers || $canRoles)
+                            <div>
+                                <button type="button" @click="activeDropdown = activeDropdown === 'workers' ? null : 'workers'" class="{{ $baseLinkCls }} {{ $isWorkersActive ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                    <div class="flex items-center gap-3">
+                                        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                        <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Workers</span>
+                                    </div>
+                                    <svg x-show="!sidebarCollapsed" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="activeDropdown === 'workers' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                                <div x-show="activeDropdown === 'workers' && !sidebarCollapsed" x-transition.opacity x-collapse class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
+                                    @if($canUsers)
+                                        <a href="{{ route('warehouse.users.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('warehouse.users.*') || request()->routeIs('admin.admins.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">All Workers</a>
+                                    @endif
+                                    @if($canRoles)
+                                        <a href="{{ route('admin.roles.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('admin.roles.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">Roles & Permissions</a>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- HQ Control Dropdown --}}
+                        @if($canHqControls)
+                            <div>
+                                <button type="button" @click="activeDropdown = activeDropdown === 'hq' ? null : 'hq'" class="{{ $baseLinkCls }} {{ $isHqActive ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                    <div class="flex items-center gap-3">
+                                        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                        <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">HQ Control</span>
+                                    </div>
+                                    <svg x-show="!sidebarCollapsed" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="activeDropdown === 'hq' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                                <div x-show="activeDropdown === 'hq' && !sidebarCollapsed" x-transition.opacity x-collapse class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
+                                    <a href="{{ route('admin.orders.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('admin.orders.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">All Orders</a>
+                                    <a href="{{ route('admin.vendors.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('admin.vendors.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">Vendors</a>
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Settings Dropdown --}}
+                        @hasPermission('settings.view')
+                            <div>
+                                <button type="button" @click="activeDropdown = activeDropdown === 'settings' ? null : 'settings'" class="{{ $baseLinkCls }} {{ $isSettingsActive ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                    <div class="flex items-center gap-3">
+                                        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                        <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Settings</span>
+                                    </div>
+                                    <svg x-show="!sidebarCollapsed" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="activeDropdown === 'settings' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                                <div x-show="activeDropdown === 'settings' && !sidebarCollapsed" x-transition.opacity x-collapse class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
+                                    <a href="{{ route('admin.settings.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('admin.settings.index') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">General Settings</a>
+                                </div>
+                            </div>
+                        @endhasPermission
+                    </div>
                 @endif
-
-                @if($canUsers || $canRoles)
-                    <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">Team</div>
-                    <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
-                    @if($canUsers)
-                    <a href="{{ route('warehouse.users.index') }}" class="{{ $linkCls }} {{ request()->routeIs('warehouse.users.*') || request()->routeIs('admin.admins.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                        <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
-                        <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Users</span>
-                        <template x-if="sidebarCollapsed"><span class="wh-tooltip">Users</span></template>
-                    </a>
-                    @endif
-                    @if($canRoles)
-                    <a href="{{ route('admin.roles.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.roles.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                        <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2Zm10-10V7a4 4 0 00-8 0v4"/></svg></div>
-                        <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Roles</span>
-                        <template x-if="sidebarCollapsed"><span class="wh-tooltip">Roles</span></template>
-                    </a>
-                    @endif
-                @endif
-
-                @if($canHqControls)
-                    <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">HQ Controls</div>
-                    <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
-
-                    @if($canOrders)
-                    <a href="{{ route('admin.orders.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.orders.*') || request()->routeIs('admin.operations.orders.*') || request()->routeIs('admin.operations.shipments.*') || request()->routeIs('admin.shipments.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                        <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></div>
-                        <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Orders</span>
-                        <template x-if="sidebarCollapsed"><span class="wh-tooltip">Orders</span></template>
-                    </a>
-                    @endif
-                    @hasPermission('vendors.view')
-                        <a href="{{ route('admin.vendors.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.vendors.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Vendors</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Vendors</span></template>
-                        </a>
-                    @endhasPermission
-                    @hasPermission('vendors.manage')
-                        <a href="{{ route('admin.vendor-payouts.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.vendor-payouts.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 10v2m8-6a8 8 0 11-16 0 8 8 0 0116 0z"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Commission Payouts</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Commission Payouts</span></template>
-                        </a>
-                    @endhasPermission
-                    @hasPermission('drivers.view')
-                        <a href="{{ route('admin.drivers.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.drivers.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Riders</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Riders</span></template>
-                        </a>
-                    @endhasPermission
-                    @hasPermission('warehouses.view')
-                        <a href="{{ route('admin.warehouses.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.warehouses.*') || request()->routeIs('admin.locations.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 21h18M4 10h16v11H4V10Zm-.5-3L12 3l8.5 4M8 14v3m4-3v3m4-3v3"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Warehouses</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Warehouses</span></template>
-                        </a>
-                    @endhasPermission
-                    @hasPermission('settings.view')
-                        <a href="{{ route('admin.marketing.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.marketing.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Marketing</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Marketing</span></template>
-                        </a>
-                        <a href="{{ route('admin.settings.index') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                            <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
-                            <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Settings</span>
-                            <template x-if="sidebarCollapsed"><span class="wh-tooltip">Settings</span></template>
-                        </a>
-                    @endhasPermission
-                @endif
-
-                <div class="wh-nav-section-label mt-3" x-show="!sidebarCollapsed">Help</div>
-                <div class="mt-4 mx-auto w-6 h-px" style="background:rgba(255,255,255,0.1);" x-show="sidebarCollapsed" x-cloak></div>
-
-                <a href="{{ route('admin.manual') }}" class="{{ $linkCls }} {{ request()->routeIs('admin.manual') ? 'active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-                    <div class="wh-nav-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg></div>
-                    <span class="wh-nav-text transition-all duration-300" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">System Manual</span>
-                    <template x-if="sidebarCollapsed"><span class="wh-tooltip">System Manual</span></template>
-                </a>
             </nav>
         </aside>
 
-        <div
-            x-show="sidebarOpen"
-            x-cloak
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            @click="sidebarOpen = false"
-            class="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden"
-        ></div>
+        {{-- Mobile Overlay Backdrop --}}
+        <div x-show="sidebarOpen" x-cloak x-transition.opacity @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm lg:hidden"></div>
 
-        <div class="flex-1 min-w-0 flex flex-col transition-all duration-300" :class="sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[280px]'" x-data="{ userMenuOpen: false }">
-            <header class="wh-header sticky top-0 z-30 h-[56px] flex items-center px-4 lg:px-6">
-                <div class="flex items-center gap-2 min-w-0">
-                    <button type="button" @click="sidebarOpen = !sidebarOpen" class="lg:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100/80 hover:bg-slate-200/80 text-slate-500 hover:text-slate-700 transition-all">
-                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"/></svg>
+        {{-- ═══ MAIN CONTENT WRAPPER ═══ --}}
+        <div class="flex-1 min-w-0 flex flex-col transition-all duration-300" :class="sidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[260px]'" x-data="{ userMenuOpen: false }">
+            
+            {{-- ═══ TOP NAVBAR ═══ --}}
+            <header class="sticky top-0 z-30 h-[72px] flex items-center px-4 lg:px-8 bg-[#FCF9F6]">
+                
+                {{-- Left: Breadcrumbs / Mobile Toggle --}}
+                <div class="flex items-center gap-4 min-w-0 flex-1">
+                    <button type="button" @click="sidebarOpen = !sidebarOpen" class="lg:hidden flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-orange-600 transition-all">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"/></svg>
                     </button>
-                    <button type="button" @click="sidebarCollapsed = !sidebarCollapsed" class="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200/60 bg-white shadow-sm hover:shadow hover:border-slate-300/80 text-slate-400 hover:text-slate-600 transition-all active:scale-95">
-                        <div class="relative w-[14px] h-[10px] flex flex-col justify-between">
-                            <span class="block h-[1.5px] rounded-full bg-current w-full"></span>
-                            <span class="block h-[1.5px] rounded-full bg-current w-3/4"></span>
-                            <span class="block h-[1.5px] rounded-full bg-current w-1/2"></span>
-                        </div>
+                    <button type="button" @click="sidebarCollapsed = !sidebarCollapsed" class="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-200/50 hover:text-slate-600 transition-all active:scale-95">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
                     </button>
-                    @php
-                        $breadcrumbParent = html_entity_decode(trim($__env->yieldContent('breadcrumb-parent')) ?: 'Back Office', ENT_QUOTES, 'UTF-8');
-                        $breadcrumbTitle = html_entity_decode(trim($__env->yieldContent('page-title')) ?: (trim($__env->yieldContent('breadcrumb-current')) ?: 'Dashboard'), ENT_QUOTES, 'UTF-8');
-                    @endphp
-                    <nav class="hidden sm:flex items-center text-[13px] min-w-0">
-                        <span class="text-slate-400 font-medium">{{ $breadcrumbParent }}</span>
-                        @if(View::hasSection('page-title') || View::hasSection('breadcrumb-current'))
-                            <svg class="w-3.5 h-3.5 mx-2 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                            <span class="text-slate-800 font-semibold truncate">{{ $breadcrumbTitle }}</span>
-                        @endif
-                    </nav>
                 </div>
 
-                <div class="flex flex-1 justify-end md:justify-center px-2 md:px-8"
-                     x-data="adminGlobalSearch(@js(route('admin.search')), @js(route('admin.search.results')))"
-                     x-init="init()"
-                     @keydown.escape.window="close()">
-                    <div class="hidden md:block relative w-full max-w-md" @click.away="open = false">
-                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                            <svg x-show="!searching" class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                            <svg x-show="searching" x-cloak class="w-4 h-4 text-orange-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                        </div>
-                        <input
-                            x-ref="desktopInput"
-                            id="admin-global-search-input"
-                            type="text"
-                            x-model="query"
-                            @input="search()"
-                            @focus="if (query.length >= 2) open = true"
-                            @keydown.arrow-down.prevent="next()"
-                            @keydown.arrow-up.prevent="previous()"
-                            @keydown.enter.prevent="openActive()"
-                            role="combobox"
-                            aria-autocomplete="list"
-                            aria-controls="admin-global-search-results"
-                            :aria-expanded="open ? 'true' : 'false'"
-                            placeholder="Search shipments, packages, payments, vendors..."
-                            class="w-full h-9 pl-10 pr-16 text-[13px] bg-slate-50/80 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-600/20 focus:border-orange-400 focus:bg-white transition-all placeholder-slate-400">
-                        <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
-                            <span class="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded-md border border-slate-200/60 font-medium tracking-wide">⌘K</span>
-                        </div>
-                        <div x-show="open" x-cloak x-transition id="admin-global-search-results" role="listbox" class="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-xl rounded-xl shadow-xl shadow-slate-200/60 border border-slate-100/80 z-50 max-h-[420px] overflow-y-auto">
-                            <div class="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b border-slate-100/80 bg-slate-50/60">
-                                <button type="button" @click="setType(null)" :class="!activeType ? 'bg-orange-600 text-white' : 'bg-white text-slate-500 hover:text-orange-700 border border-slate-200/70'" class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide transition">All</button>
-                                <template x-for="group in groups" :key="'chip-' + group">
-                                    <button type="button" @click="setType(group)" :class="activeType === group ? 'bg-orange-600 text-white' : 'bg-white text-slate-500 hover:text-orange-700 border border-slate-200/70'" class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide transition" x-text="groupLabels[group]"></button>
-                                </template>
-                            </div>
-                            <template x-if="error">
-                                <div class="px-4 py-3 text-[12px] text-red-600 bg-red-50 border-b border-red-100" x-text="error"></div>
-                            </template>
-                            <template x-for="group in orderedGroups()" :key="group">
-                                <template x-if="results[group] && results[group].length">
-                                    <div>
-                                        <div class="px-3 pt-2 pb-1"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider" x-text="groupLabels[group]"></span></div>
-                                        <template x-for="(item, index) in results[group]" :key="group + item.id">
-                                            <a :href="item.url" @click="close()" role="option" :aria-selected="isActive(group, index) ? 'true' : 'false'" :class="isActive(group, index) ? 'bg-orange-50' : ''" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors">
-                                                <div class="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0 text-orange-600">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                                                </div>
-                                                <div class="flex-1 min-w-0">
-                                                    <div class="flex items-center gap-2 min-w-0">
-                                                        <p class="text-[12px] font-semibold text-slate-800 truncate" x-text="item.label"></p>
-                                                        <span x-show="item.status" class="text-[10px] text-slate-400 flex-shrink-0" x-text="item.status"></span>
-                                                    </div>
-                                                    <p class="text-[11px] text-slate-400 truncate" x-text="item.sub"></p>
-                                                </div>
-                                            </a>
-                                        </template>
-                                    </div>
-                                </template>
-                            </template>
-                            <template x-if="open && !searching && !error && !hasResults()">
-                                <div class="px-4 py-6 text-center"><p class="text-[12px] text-slate-400">No results for "<span x-text="query"></span>"</p></div>
-                            </template>
-                            <template x-if="query.trim().length >= 2">
-                                <a :href="resultsPageHref()" @click="close()" class="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-slate-100/80 bg-slate-50/60 text-[11px] font-black text-orange-700 hover:bg-orange-50 transition-colors">
-                                    <span>View all results &amp; filters</span>
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                                </a>
-                            </template>
-                        </div>
-                    </div>
-                    <button type="button" @click="openMobile()" class="md:hidden w-9 h-9 rounded-xl border border-slate-200/70 bg-slate-50/80 text-slate-500 flex items-center justify-center hover:bg-white hover:text-orange-600 transition-colors" aria-label="Open search">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    </button>
-                    <div x-show="mobileOpen" x-cloak class="fixed inset-0 z-[60] md:hidden bg-slate-950/35" @click="close()"></div>
-                    <div x-show="mobileOpen" x-cloak x-transition class="fixed left-3 right-3 top-3 z-[70] md:hidden bg-white rounded-2xl border border-slate-100 shadow-2xl shadow-slate-900/20 overflow-hidden">
-                        <div class="relative border-b border-slate-100">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                <svg x-show="!searching" class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                <svg x-show="searching" x-cloak class="w-4 h-4 text-orange-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                            </div>
-                            <input
-                                x-ref="mobileInput"
-                                type="text"
-                                x-model="query"
-                                @input="search()"
-                                @keydown.arrow-down.prevent="next()"
-                                @keydown.arrow-up.prevent="previous()"
-                                @keydown.enter.prevent="openActive()"
-                                role="combobox"
-                                aria-autocomplete="list"
-                                aria-controls="admin-global-search-mobile-results"
-                                :aria-expanded="mobileOpen ? 'true' : 'false'"
-                                placeholder="Search shipments, packages, payments, vendors..."
-                                class="w-full h-12 pl-10 pr-12 text-[14px] bg-white focus:outline-none placeholder-slate-400">
-                            <button type="button" @click="close()" class="absolute inset-y-0 right-0 px-4 text-slate-400 hover:text-slate-700" aria-label="Close search">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                            </button>
-                        </div>
-                        <div id="admin-global-search-mobile-results" role="listbox" class="max-h-[70vh] overflow-y-auto">
-                            <div class="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
-                                <button type="button" @click="setType(null)" :class="!activeType ? 'bg-orange-600 text-white' : 'bg-white text-slate-500 border border-slate-200/70'" class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide transition">All</button>
-                                <template x-for="group in groups" :key="'mobile-chip-' + group">
-                                    <button type="button" @click="setType(group)" :class="activeType === group ? 'bg-orange-600 text-white' : 'bg-white text-slate-500 border border-slate-200/70'" class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide transition" x-text="groupLabels[group]"></button>
-                                </template>
-                            </div>
-                            <template x-if="error">
-                                <div class="px-4 py-3 text-[12px] text-red-600 bg-red-50 border-b border-red-100" x-text="error"></div>
-                            </template>
-                            <template x-for="group in orderedGroups()" :key="group">
-                                <template x-if="results[group] && results[group].length">
-                                    <div>
-                                        <div class="px-4 pt-3 pb-1"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider" x-text="groupLabels[group]"></span></div>
-                                        <template x-for="(item, index) in results[group]" :key="'mobile-' + group + item.id">
-                                            <a :href="item.url" @click="close()" role="option" :aria-selected="isActive(group, index) ? 'true' : 'false'" :class="isActive(group, index) ? 'bg-orange-50' : ''" class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
-                                                <div class="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0 text-orange-600">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                                                </div>
-                                                <div class="flex-1 min-w-0">
-                                                    <p class="text-[13px] font-semibold text-slate-800 truncate" x-text="item.label"></p>
-                                                    <p class="text-[11px] text-slate-400 truncate" x-text="item.sub"></p>
-                                                </div>
-                                            </a>
-                                        </template>
-                                    </div>
-                                </template>
-                            </template>
-                            <template x-if="mobileOpen && !searching && !error && query.length >= 2 && !hasResults()">
-                                <div class="px-4 py-8 text-center"><p class="text-[12px] text-slate-400">No results for "<span x-text="query"></span>"</p></div>
-                            </template>
-                            <template x-if="query.trim().length >= 2">
-                                <a :href="resultsPageHref()" @click="close()" class="flex items-center justify-between gap-2 px-4 py-3 border-t border-slate-100 bg-slate-50/60 text-[12px] font-black text-orange-700 transition-colors">
-                                    <span>View all results &amp; filters</span>
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                                </a>
-                            </template>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-1.5 ml-auto">
-                    <div class="hidden lg:flex items-center text-[12px] text-slate-500 px-3 py-1.5 rounded-xl bg-slate-50/80 border border-slate-100/80">
-                        <svg class="w-3.5 h-3.5 mr-1.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        <span x-data x-text="new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })"></span>
-                        <span class="mx-1.5 text-slate-300">|</span>
-                        <span x-data x-init="setInterval(() => $el.textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), 1000)"></span>
-                    </div>
-                    @include('admin.shared.warehouse-context-selector')
-                    <div
-                        class="relative"
-                        x-data="adminNotifications({
-                            indexUrl: @js(route('admin.in-app-notifications.index')),
-                            readAllUrl: @js(route('admin.in-app-notifications.read-all')),
-                            markReadUrlTemplate: @js(route('admin.in-app-notifications.mark-read', ['notification' => '__ID__'])),
-                            csrfToken: @js(csrf_token()),
-                        })"
-                        x-init="init()"
-                    >
-                        <button
-                            type="button"
-                            @click="toggle()"
-                            class="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/70 bg-slate-50/80 text-slate-500 transition-colors hover:bg-white hover:text-orange-600"
-                            aria-label="Open notifications"
-                            :aria-expanded="open ? 'true' : 'false'"
-                        >
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
-                            </svg>
-                            <span x-show="unreadCount > 0" x-cloak class="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-orange-600 px-1.5 py-0.5 text-center text-[9px] font-black leading-none text-white ring-2 ring-white" x-text="badgeText()"></span>
+                {{-- Right: Controls & Profile --}}
+                <div class="flex items-center gap-4 ml-auto">
+                    
+                    {{-- Global Search --}}
+                    <div x-data="adminGlobalSearch(@js(route('admin.search')), @js(route('admin.search.results')))" x-init="init()" @keydown.escape.window="close()" class="hidden md:block relative">
+                        <button type="button" @click="openMobile()" class="w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-500 flex items-center justify-center hover:text-orange-600 transition-colors shadow-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         </button>
-                        <div x-show="open" x-cloak x-transition @click.away="open = false" class="absolute right-0 mt-2 w-[340px] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl shadow-slate-900/10 z-50">
-                            <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-                                <div>
-                                    <p class="text-[13px] font-black text-slate-900">Notifications</p>
-                                    <p class="text-[11px] font-semibold text-slate-400"><span x-text="unreadCount"></span> unread</p>
-                                </div>
-                                <button type="button" @click="markAllRead()" x-show="unreadCount > 0" x-cloak class="rounded-lg bg-orange-50 px-2.5 py-1.5 text-[11px] font-bold text-orange-700 transition-colors hover:bg-orange-100">Mark all read</button>
+                        <div x-show="mobileOpen" x-cloak class="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm" @click="close()"></div>
+                        <div x-show="mobileOpen" x-cloak x-transition class="fixed left-3 right-3 top-3 z-[70] bg-white rounded-2xl border border-slate-100 shadow-2xl overflow-hidden">
+                            <div class="relative border-b border-slate-100">
+                                <input x-ref="mobileInput" type="text" x-model="query" @input="search()" placeholder="Search..." class="w-full h-14 pl-5 pr-12 text-[15px] bg-white focus:outline-none">
+                                <button type="button" @click="close()" class="absolute right-0 inset-y-0 px-4 text-slate-400 hover:text-slate-700">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
                             </div>
+                        </div>
+                    </div>
 
-                            <template x-if="error">
-                                <div class="border-b border-red-100 bg-red-50 px-4 py-3 text-[12px] font-semibold text-red-600" x-text="error"></div>
-                            </template>
+                    {{-- Warehouse Context Selector --}}
+                    <div class="hidden sm:block">
+                        @include('admin.shared.warehouse-context-selector')
+                    </div>
 
-                            <div class="max-h-[380px] overflow-y-auto">
-                                <template x-if="loading && notifications.length === 0">
-                                    <div class="px-4 py-8 text-center text-[12px] font-semibold text-slate-400">Loading notifications...</div>
-                                </template>
-
-                                <template x-if="!loading && notifications.length === 0">
-                                    <div class="px-4 py-8 text-center">
-                                        <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-400">
-                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h16" /></svg>
-                                        </div>
-                                        <p class="text-[13px] font-bold text-slate-700">No notifications</p>
-                                        <p class="mt-1 text-[11px] font-medium text-slate-400">New vendor orders will appear here.</p>
-                                    </div>
-                                </template>
-
-                                <template x-for="notification in notifications" :key="notification.id">
-                                    <button type="button" @click="openNotification(notification)" class="flex w-full gap-3 border-b border-slate-100 px-4 py-3 text-left transition-colors hover:bg-slate-50" :class="notification.read_at ? 'bg-white' : 'bg-orange-50/40'">
-                                        <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-700">
-                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" /></svg>
-                                        </span>
-                                        <span class="min-w-0 flex-1">
-                                            <span class="flex items-center gap-2">
-                                                <span class="truncate text-[12px] font-black text-slate-900" x-text="notification.title"></span>
-                                                <span x-show="!notification.read_at" x-cloak class="h-2 w-2 shrink-0 rounded-full bg-orange-600"></span>
-                                            </span>
-                                            <span class="mt-1 line-clamp-2 block text-[11px] font-medium leading-5 text-slate-500" x-text="notification.body"></span>
-                                            <span class="mt-1 block text-[10px] font-bold text-slate-400" x-text="notification.created_at_label || ''"></span>
-                                        </span>
-                                    </button>
+                    {{-- Notifications --}}
+                    <div class="relative" x-data="adminNotifications({ indexUrl: @js(route('admin.in-app-notifications.index')), readAllUrl: @js(route('admin.in-app-notifications.read-all')), markReadUrlTemplate: @js(route('admin.in-app-notifications.mark-read', ['notification' => '__ID__'])), csrfToken: @js(csrf_token()) })" x-init="init()">
+                        <button type="button" @click="toggle()" class="relative flex h-10 w-10 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 shadow-sm transition-colors hover:text-orange-600">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9" /></svg>
+                            <span x-show="unreadCount > 0" x-cloak class="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white"></span>
+                        </button>
+                        <div x-show="open" x-cloak x-transition @click.away="open = false" class="absolute right-0 mt-3 w-80 rounded-2xl border border-slate-100 bg-white shadow-2xl z-50 overflow-hidden">
+                            <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                <span class="font-bold text-slate-800">Notifications</span>
+                                <button @click="markAllRead()" x-show="unreadCount > 0" class="text-[11px] text-orange-600 font-semibold hover:underline">Mark all read</button>
+                            </div>
+                            <div class="max-h-72 overflow-y-auto">
+                                <template x-if="notifications.length === 0">
+                                    <div class="px-4 py-8 text-center text-slate-400 text-sm">No new notifications</div>
                                 </template>
                             </div>
                         </div>
                     </div>
-                    <div class="relative">
-                        <button @click="userMenuOpen = !userMenuOpen" class="flex items-center gap-2 py-1 px-1.5 rounded-xl hover:bg-slate-50/80 transition-all">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[12px] font-bold shadow-sm ring-1 ring-slate-200/50 bg-gradient-to-br from-slate-700 to-slate-900">{{ substr($authUser?->name ?? 'U', 0, 1) }}</div>
-                            <div class="hidden lg:block text-left mr-1">
-                                <p class="text-[12px] font-semibold text-slate-700 leading-tight">{{ $authUser?->name }}</p>
-                                <p class="text-[10px] text-slate-400 leading-tight">{{ $authUser?->roles->first()?->name ?? 'Staff' }}</p>
+
+                    {{-- User Profile Dropdown --}}
+                    <div class="relative flex items-center gap-2">
+                        <button @click="userMenuOpen = !userMenuOpen" class="flex items-center gap-3 py-1 px-1.5 rounded-full hover:bg-slate-200/50 transition-all">
+                            <div class="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm flex items-center justify-center bg-[#FFE8DA] text-orange-600 font-bold text-lg">
+                                {{ substr($authUser?->name ?? 'A', 0, 1) }}
                             </div>
-                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            <div class="hidden lg:flex flex-col text-left pr-2">
+                                <p class="text-[13px] font-bold text-slate-900 leading-tight">{{ $authUser?->name ?? 'Admin' }}</p>
+                                <p class="text-[11px] font-semibold text-slate-400 leading-tight uppercase mt-0.5">{{ $authUser?->roles->first()?->name ?? 'Administrator' }}</p>
+                            </div>
                         </button>
-                        <div x-show="userMenuOpen" x-cloak x-transition @click.away="userMenuOpen = false" class="absolute right-0 mt-2 w-56 wh-dropdown py-1.5 z-50">
-                            <div class="px-4 py-2.5 border-b border-slate-100/80">
-                                <p class="text-[13px] font-semibold text-slate-800">{{ $authUser?->name }}</p>
-                                <p class="text-[11px] text-slate-400 mt-0.5">{{ $authUser?->email }}</p>
+
+                        <div x-show="userMenuOpen" x-cloak x-transition @click.away="userMenuOpen = false" class="absolute right-0 top-[110%] mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50">
+                            <div class="px-4 py-3 border-b border-slate-100">
+                                <p class="text-[13px] font-bold text-slate-900">{{ $authUser?->name }}</p>
+                                <p class="text-[11px] text-slate-500 mt-0.5">{{ $authUser?->email }}</p>
                             </div>
-                            <div class="px-4 py-2 border-b border-slate-100/80">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-2 h-2 rounded-full bg-orange-500"></div>
-                                    <span class="text-[11px] font-medium text-slate-500">{{ $warehouseLabel }}</span>
-                                </div>
-                            </div>
-                            <div class="py-1">
-                                <a href="{{ route('admin.profile.edit') }}" class="wh-dropdown-item">
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                            <div class="py-2">
+                                <a href="{{ route('admin.profile.edit') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-orange-600 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                     My Profile
                                 </a>
                             </div>
-                            <div class="border-t border-slate-100/80 pt-1 mt-0.5">
+                            <div class="border-t border-slate-100 pt-2">
                                 <form action="{{ route('admin.logout') }}" method="POST">
                                     @csrf
-                                    <button type="submit" class="wh-dropdown-item danger w-full">
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                                    <button type="submit" class="flex items-center gap-3 w-full px-4 py-2 text-sm text-red-600 font-medium hover:bg-red-50 transition-colors">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                                         Logout
                                     </button>
                                 </form>
@@ -544,12 +373,14 @@
 
             @include('shared.impersonation-banner')
 
-            <main class="flex-1 p-4 lg:p-6">
+            {{-- Main Content Area --}}
+            <main class="flex-1 lg:px-2 pb-10">
                 @yield('content')
             </main>
         </div>
     </div>
 
+    {{-- System Toasts & Firebase Push Scripts --}}
     <div id="admin-toast-container"
          class="fixed top-5 right-5 z-[9999] flex w-full max-w-sm flex-col gap-3 pointer-events-none"
          data-flash-success="{{ session('success') }}"

@@ -30,6 +30,8 @@ use App\Listeners\SendCustomerEmailTemplateNotification;
 use App\Listeners\SendVendorShipmentNotification;
 use App\Listeners\SendWalkinShipmentNotifications;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use App\Models\RecipientPaymentTask;
+use App\Observers\RecipientPaymentTaskObserver;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -102,6 +104,6 @@ class EventServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        //
+        RecipientPaymentTask::observe(RecipientPaymentTaskObserver::class);
     }
 }

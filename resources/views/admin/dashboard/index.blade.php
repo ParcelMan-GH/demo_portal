@@ -3,339 +3,321 @@
 @section('title', 'Dashboard')
 
 @section('content')
-<div class="max-w-[1400px] mx-auto" x-data="{ quickActionsOpen: false }">
+
+{{-- Map CSS & Custom Marker Styles --}}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    /* Custom Map Marker styles based on your image */
+    .custom-map-marker {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: -30px;
+    }
+    .marker-label {
+        background: white;
+        padding: 2px 10px;
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #334155;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 4px;
+        white-space: nowrap;
+    }
+    .marker-pin {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background-color: #64748b; /* Gray default */
+        border: 3px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        position: relative;
+    }
+    .marker-pin::after {
+        content: '';
+        position: absolute;
+        bottom: -6px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 2px;
+        height: 6px;
+        background-color: #64748b;
+    }
+    /* Active State for Marker */
+    .custom-map-marker.active .marker-pin,
+    .custom-map-marker.active .marker-pin::after {
+        background-color: #0f172a; /* Black/Dark slate when selected */
+    }
+</style>
+
+<!-- Add Alpine Data Object to wrap the content -->
+<div class="max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8" x-data="dashboardController()">
 
     {{-- Header --}}
-    <div class="flex items-end justify-between mb-8 gap-4">
-        <div>
-            <h1 class="text-2xl font-bold text-slate-900">
-                @php $hour = now()->hour; @endphp
-                {{ $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good evening') }}, {{ $admin->name }}
-            </h1>
-            <p class="text-sm text-slate-500 mt-1">{{ now()->format('l, F j, Y') }}</p>
-        </div>
-        <button type="button" @@click="quickActionsOpen = true"
-            class="group relative inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold text-sm shadow-lg shadow-orange-500/30 hover:shadow-xl hover:shadow-orange-500/40 hover:-translate-y-0.5 transition-all">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            <span>Quick Actions</span>
-        </button>
+    <div class="mb-8">
+        <h1 class="text-3xl font-semibold text-slate-900">
+            @php $hour = now()->hour; @endphp
+            {{ $hour < 12 ? 'Good Morning' : ($hour < 17 ? 'Good Afternoon' : 'Good Evening') }}, {{ $admin->name ?? 'Admin' }}
+        </h1>
+        <p class="text-slate-500 mt-1">It's {{ now()->format('l, M j, Y') }}.</p>
     </div>
-
-    {{-- ═══ QUICK ACTIONS MODAL ═══ --}}
-    <div x-show="quickActionsOpen" x-cloak
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="fixed inset-0 z-50 overflow-y-auto"
-         style="display: none;">
-        <div class="fixed inset-0">
-            {{-- Backdrop --}}
-            <div @@click="quickActionsOpen = false" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
-
-            {{-- Fullscreen Modal --}}
-            <div x-show="quickActionsOpen"
-                 x-transition:enter="transition ease-out duration-200 delay-75"
-                 x-transition:enter-start="opacity-0 scale-95"
-                 x-transition:enter-end="opacity-100 scale-100"
-                 class="relative flex flex-col h-full w-full bg-gradient-to-br from-white to-orange-50/30">
-
-                {{-- Modal Header --}}
-                <div class="relative px-8 py-6 bg-gradient-to-r from-orange-500 to-orange-600 text-white overflow-hidden flex-shrink-0">
-                    <div class="absolute -right-6 -top-6 w-40 h-40 opacity-20">
-                        <img src="{{ asset('images/undraw/quick-action.svg') }}" class="w-full h-full object-contain" alt="" onerror="this.style.display='none'">
-                    </div>
-                    <div class="relative flex items-center justify-between max-w-[1400px] mx-auto">
-                        <div>
-                            <h2 class="text-2xl font-bold">Quick Actions</h2>
-                            <p class="text-sm text-orange-100 mt-1">What do you want to do?</p>
-                        </div>
-                        <button type="button" @@click="quickActionsOpen = false" class="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
-                    </div>
-                </div>
-
-                {{-- Modal Body --}}
-                <div class="flex-1 overflow-y-auto p-8">
-                <div class="max-w-[1400px] mx-auto">
-
-                    {{-- RECEIVING --}}
-                    <div class="mb-8">
-                        <div class="flex items-center gap-2 mb-4">
-                            <span class="text-xs font-bold text-orange-600 uppercase tracking-wider">Receiving</span>
-                            <div class="flex-1 h-px bg-gradient-to-r from-orange-200 to-transparent"></div>
-                        </div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            @php
-                                $receiving = [
-                                    ['title' => 'Walk-in', 'desc' => 'Create shipment', 'img' => 'new-parcel.svg', 'route' => route('warehouse.walkin.create')],
-                                    ['title' => 'Receive Packages', 'desc' => 'In pickup queue', 'img' => 'receive-package.svg', 'route' => route('admin.pickups.index')],
-                                    ['title' => 'Package Tracking', 'desc' => 'Custody history', 'img' => 'print-labels.svg', 'route' => route('admin.package-tracking.index')],
-                                    ['title' => 'Mark Picked Up', 'desc' => 'Pickup list', 'img' => 'pickup-confirm.svg', 'route' => route('admin.pickups.index')],
-                                ];
-                            @endphp
-                            @foreach($receiving as $action)
-                                @include('admin.dashboard.partials.quick-action-tile', $action)
-                            @endforeach
-                        </div>
-                    </div>
-
-                    {{-- DISPATCH --}}
-                    <div class="mb-8">
-                        <div class="flex items-center gap-2 mb-4">
-                            <span class="text-xs font-bold text-orange-600 uppercase tracking-wider">Dispatch</span>
-                            <div class="flex-1 h-px bg-gradient-to-r from-orange-200 to-transparent"></div>
-                        </div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            @php
-                                $dispatch = [
-                                    ['title' => 'Assign Pickup Rider', 'desc' => 'Pickup assignments', 'img' => 'assign-driver.svg', 'route' => route('admin.pickups.index')],
-                                    ['title' => 'Sort Batch', 'desc' => 'Sort parcels', 'img' => 'sort-batch.svg', 'route' => route('admin.sort-batches.index')],
-                                    ['title' => 'Delivery Run', 'desc' => 'Outbound runs', 'img' => 'delivery-run.svg', 'route' => route('admin.delivery-runs.index')],
-                                    ['title' => 'Transport Manifest', 'desc' => 'Inter-warehouse', 'img' => 'transport-manifest.svg', 'route' => route('admin.transport-manifests.index')],
-                                ];
-                            @endphp
-                            @foreach($dispatch as $action)
-                                @include('admin.dashboard.partials.quick-action-tile', $action)
-                            @endforeach
-                        </div>
-                    </div>
-
-                    {{-- OPERATIONS --}}
-                    <div class="mb-2">
-                        <div class="flex items-center gap-2 mb-4">
-                            <span class="text-xs font-bold text-orange-600 uppercase tracking-wider">Operations</span>
-                            <div class="flex-1 h-px bg-gradient-to-r from-orange-200 to-transparent"></div>
-                        </div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            @php
-                                $operations = [
-                                    ['title' => 'Package Tracking', 'desc' => 'Custody history', 'img' => 'package-tracking.svg', 'route' => route('admin.package-tracking.index')],
-                                    ['title' => 'Collection Center', 'desc' => 'Self-pickup', 'img' => 'collection-center.svg', 'route' => route('admin.collection-center.index')],
-                                    ['title' => 'Active Deliveries', 'desc' => 'On the road', 'img' => 'active-deliveries.svg', 'route' => route('admin.delivery-runs.index')],
-                                    ['title' => 'Send Broadcast', 'desc' => 'Push notification', 'img' => 'send-broadcast.svg', 'route' => route('admin.marketing.index')],
-                                ];
-                            @endphp
-                            @foreach($operations as $action)
-                                @include('admin.dashboard.partials.quick-action-tile', $action)
-                            @endforeach
-                        </div>
-                    </div>
-
-                </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- ═══ NEEDS ATTENTION ═══ --}}
-    @if($totalNeedsAttention > 0)
-    <div class="mb-8 bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden">
-        <div class="px-5 py-3 flex items-center justify-between border-b border-amber-100">
-            <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                <h2 class="text-sm font-bold text-amber-900">{{ $totalNeedsAttention }} parcel{{ $totalNeedsAttention > 1 ? 's' : '' }} need{{ $totalNeedsAttention === 1 ? 's' : '' }} your attention</h2>
-            </div>
-            <a href="{{ route('admin.orders.index') }}?status=submitted" class="text-xs font-semibold text-amber-700 hover:text-amber-900">View all &rarr;</a>
-        </div>
-        <div class="divide-y divide-amber-100">
-            @foreach($needsAttention as $parcel)
-            <a href="{{ route('admin.orders.edit', $parcel) }}" class="flex items-center gap-4 px-5 py-3 hover:bg-amber-100/50 transition-colors">
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm font-bold text-slate-900">{{ $parcel->shipment_number }}</span>
-                        <span class="text-xs text-slate-500">from {{ $parcel->vendor?->name ?? 'Unknown' }}</span>
-                    </div>
-                    @if($parcel->sender_notes)
-                    <p class="text-xs text-amber-700 mt-0.5 truncate">"{{ $parcel->sender_notes }}"</p>
-                    @endif
-                </div>
-                <span class="text-xs text-slate-400">{{ $parcel->created_at->diffForHumans() }}</span>
-                <svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-            </a>
-            @endforeach
-        </div>
-    </div>
-    @endif
 
     {{-- ═══ STATS GRID ═══ --}}
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div class="bg-white rounded-2xl border border-slate-200 p-5">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        
+        {{-- Total Deliveries --}}
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col justify-between shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <span class="text-sm text-slate-500">Total Deliveries</span>
+                <a href="{{ route('admin.orders.index') ?? '#' }}" class="text-xs text-orange-600 hover:text-orange-700 font-medium">See All</a>
             </div>
-            <p class="text-3xl font-bold text-slate-900">{{ number_format($todayShipments) }}</p>
-            <p class="text-xs text-slate-500 mt-1">New parcels today</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-5">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
-                </div>
+            <div class="text-4xl font-normal text-slate-900 mb-6">{{ number_format($totalShipmentsMonth) }}</div>
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">vs last month</span>
+                <span class="{{ $shipmentsChange >= 0 ? 'text-emerald-500' : 'text-rose-500' }} font-medium">
+                    {{ $shipmentsChange > 0 ? '+' : '' }}{{ $shipmentsChange }}%
+                </span>
             </div>
-            <p class="text-3xl font-bold text-slate-900">{{ number_format($pendingPickups) }}</p>
-            <p class="text-xs text-slate-500 mt-1">Awaiting pickup</p>
         </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-5">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0m-10 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
-                </div>
+
+        {{-- Active Deliveries --}}
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col justify-between shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <span class="text-sm text-slate-500">Active Deliveries (Today)</span>
+                <a href="{{ route('admin.delivery-runs.index') ?? '#' }}" class="text-xs text-orange-600 hover:text-orange-700 font-medium">See All</a>
             </div>
-            <p class="text-3xl font-bold text-slate-900">{{ number_format($outForDelivery) }}</p>
-            <p class="text-xs text-slate-500 mt-1">Out for delivery</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-5">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
+            <div class="text-4xl font-normal text-slate-900 mb-6">{{ number_format($outForDelivery) }}</div>
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">vs yesterday</span>
+                <span class="{{ $activeDeliveriesChange >= 0 ? 'text-emerald-500' : 'text-rose-500' }} font-medium">
+                    {{ $activeDeliveriesChange > 0 ? '+' : '' }}{{ $activeDeliveriesChange }}%
+                </span>
             </div>
-            <p class="text-3xl font-bold text-slate-900">{{ number_format($deliveredToday) }}</p>
-            <p class="text-xs text-slate-500 mt-1">Delivered today</p>
         </div>
+
+        {{-- Total Vendors --}}
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col justify-between shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <span class="text-sm text-slate-500">Total Vendors</span>
+                <a href="#" class="text-xs text-orange-600 hover:text-orange-700 font-medium">See All</a>
+            </div>
+            <div class="text-4xl font-normal text-slate-900 mb-6">{{ number_format($totalVendors) }}</div>
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">vs last month</span>
+                <span class="{{ $vendorsChange >= 0 ? 'text-emerald-500' : 'text-rose-500' }} font-medium">
+                    {{ $vendorsChange > 0 ? '+' : '' }}{{ $vendorsChange }}%
+                </span>
+            </div>
+        </div>
+
+        {{-- On Time Delivery --}}
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col justify-between shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <span class="text-sm text-slate-500">On Time Delivery</span>
+                <a href="#" class="text-xs text-orange-600 hover:text-orange-700 font-medium">See All</a>
+            </div>
+            <div class="text-4xl font-normal text-slate-900 mb-6">{{ $onTimeDeliveryRate }}%</div>
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">vs last month</span>
+                <span class="{{ $onTimeChange >= 0 ? 'text-emerald-500' : 'text-rose-500' }} font-medium">
+                    {{ $onTimeChange > 0 ? '+' : '' }}{{ $onTimeChange }}%
+                </span>
+            </div>
+        </div>
+
     </div>
 
-    {{-- ═══ MAIN CONTENT ═══ --}}
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+    {{-- ═══ MAIN CONTENT GRID ═══ --}}
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-        {{-- Left: Recent Parcels --}}
-        <div class="lg:col-span-3">
-            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                <div class="px-5 py-4 flex items-center justify-between border-b border-slate-100">
-                    <h2 class="text-sm font-bold text-slate-900">Recent Parcels</h2>
-                    <a href="{{ route('admin.orders.index') }}" class="text-xs font-semibold text-blue-600 hover:text-blue-800">View all &rarr;</a>
+        {{-- Left: Live Tracking Map --}}
+        <div class="xl:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+            <div class="px-6 py-4 flex items-center justify-between border-b border-slate-100 z-10">
+                <h2 class="text-sm font-medium text-slate-700">Live Tracking</h2>
+                <div class="flex items-center gap-3">
+                    <div class="relative">
+                        <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" placeholder="Search" class="pl-9 pr-4 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 w-48 transition-all">
+                    </div>
                 </div>
-                <div class="divide-y divide-slate-50">
+            </div>
+            
+            {{-- Map Area --}}
+            <div class="relative flex-1 min-h-[500px] bg-slate-100 rounded-b-2xl overflow-hidden z-0" id="map-container" wire:ignore>
+               
+               {{-- EXACT FIXED SIDE PANEL FROM YOUR SCREENSHOT --}}
+               <div x-show="selectedRider" style="display: none;"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 translate-x-4"
+                    x-transition:enter-end="opacity-100 translate-x-0"
+                    class="absolute top-4 right-4 bottom-4 w-80 bg-slate-50/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200 p-6 z-[1000] overflow-y-auto">
+                    
+                    <div class="absolute right-4 top-4 text-slate-400 cursor-pointer hover:text-slate-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
+                    </div>
+
+                    <!-- Carousel Arrows & Avatar -->
+                    <div class="flex items-center justify-between mb-4 mt-2">
+                        <button class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-slate-400 hover:text-slate-600 border border-slate-100">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        </button>
+                        <div class="w-20 h-20 rounded-full bg-white border-2 border-white shadow-md overflow-hidden flex items-center justify-center">
+                            <!-- Real Avatar bound from selectedRider -->
+                            <img :src="selectedRider?.avatar" class="w-full h-full object-cover">
+                        </div>
+                        <button class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-slate-400 hover:text-slate-600 border border-slate-100">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="text-center mb-6">
+                        <h3 class="text-xl font-bold text-slate-900" x-text="selectedRider?.name">Vincent</h3>
+                        <span class="inline-block mt-1 text-xs font-semibold text-blue-800 bg-blue-100 px-3 py-0.5 rounded-full">Rider</span>
+                    </div>
+
+                    <!-- Stats Row -->
+                    <div class="flex items-center justify-center gap-2 text-[11px] text-slate-500 mb-8">
+                        <span><strong class="text-slate-900" x-text="selectedRider?.assigned">0</strong> Assigned</span>
+                        <span>•</span>
+                        <span><strong class="text-slate-900" x-text="selectedRider?.delivered">0</strong> Delivered</span>
+                        <span>•</span>
+                        <span><strong class="text-slate-900" x-text="selectedRider?.remaining">0</strong> Remaining</span>
+                    </div>
+
+                    <!-- Delivery Progress -->
+                    <div class="mb-8">
+                        <div class="flex justify-between items-center text-xs mb-2">
+                            <span class="font-medium flex items-center gap-1.5"><span class="text-orange-500 text-sm">🔥</span> Delivery Progress</span>
+                            <span class="font-bold text-slate-900" x-text="`${selectedRider?.progress}%`">0%</span>
+                        </div>
+                        <div class="w-full bg-white rounded-full h-2.5 shadow-inner">
+                            <div class="bg-orange-500 h-2.5 rounded-full" :style="`width: ${selectedRider?.progress}%`"></div>
+                        </div>
+                    </div>
+
+                    <!-- Timeline -->
+                    <div class="relative pl-6 space-y-5 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-300">
+                        <div class="relative">
+                            <div class="absolute -left-[29px] top-0.5 w-4 h-4 bg-slate-900 rounded-full border-[3px] border-slate-50"></div>
+                            <p class="text-sm font-bold text-slate-900">Current Location</p>
+                            <p class="text-xs text-slate-500 mt-0.5" x-text="selectedRider?.current_location">Unknown</p>
+                        </div>
+                        
+                        <div class="relative">
+                            <div class="absolute -left-[29px] top-0.5 w-4 h-4 bg-orange-500 rounded-full border-[3px] border-slate-50"></div>
+                            <p class="text-sm font-bold text-slate-900">Next Stop</p>
+                            <p class="text-xs text-slate-500 mt-0.5" x-text="selectedRider?.next_stop">Pending</p>
+                        </div>
+                    </div>
+
+               </div>
+               {{-- END FIXED SIDE PANEL --}}
+            </div>
+        </div>
+
+        {{-- Right: Activities Feed --}}
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+            <div class="px-6 py-4 flex items-center justify-between border-b border-slate-100">
+                <h2 class="text-sm font-medium text-slate-700">Activities Feed</h2>
+                <button class="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
+                    Today
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto max-h-[600px]">
+                <div class="relative space-y-6 before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-100 before:to-transparent">
+                    
                     @forelse($recentShipments as $shipment)
-                    <a href="{{ route('admin.orders.show', $shipment) }}" class="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
-                        <div class="flex-1 min-w-0">
-                            <span class="text-sm font-semibold text-slate-900">{{ $shipment->shipment_number }}</span>
-                            <span class="text-xs text-slate-400 ml-2">{{ $shipment->vendor?->name }}</span>
+                        @php
+                            $rawStatus = $shipment->status instanceof \BackedEnum ? $shipment->status->value : $shipment->status;
+                            $cleanStatus = strtolower((string) $rawStatus);
+
+                            $statusColor = match($cleanStatus) {
+                                'delivered' => 'bg-emerald-500',
+                                'in_transit' => 'bg-amber-500',
+                                'at_warehouse' => 'bg-purple-500',
+                                'submitted' => 'bg-blue-500',
+                                default => 'bg-slate-400',
+                            };
+                            
+                            $dateObj = $shipment->updated_at ?? $shipment->created_at;
+                        @endphp
+                        <div class="relative flex items-start gap-4">
+                            <div class="w-4 h-4 rounded-full border-4 border-white shadow-sm {{ $statusColor }} flex-shrink-0 mt-1 z-10 relative"></div>
+                            <div class="flex-1 min-w-0 border-b border-slate-100 pb-4">
+                                <p class="text-sm text-slate-900 font-medium truncate">
+                                    {{ $shipment->shipment_number }} advanced to <span class="capitalize">{{ str_replace('_', ' ', $cleanStatus) }}</span>
+                                </p>
+                                <p class="text-xs text-slate-400 mt-1">{{ $dateObj ? $dateObj->diffForHumans() : 'Recently' }}</p>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-1.5 flex-shrink-0">
-                            @php
-                                $dotColor = match($shipment->status->value) {
-                                    'submitted' => 'bg-blue-500',
-                                    'pickup_assigned' => 'bg-violet-500',
-                                    'picked_up' => 'bg-indigo-500',
-                                    'at_warehouse' => 'bg-purple-500',
-                                    'sorted' => 'bg-cyan-500',
-                                    'in_transit' => 'bg-orange-500',
-                                    'out_for_delivery' => 'bg-amber-500',
-                                    'delivered' => 'bg-emerald-500',
-                                    'cancelled' => 'bg-red-500',
-                                    default => 'bg-slate-400',
-                                };
-                            @endphp
-                            <span class="w-1.5 h-1.5 rounded-full {{ $dotColor }}"></span>
-                            <span class="text-xs text-slate-500">{{ ucwords(str_replace('_', ' ', $shipment->status->value)) }}</span>
-                        </div>
-                        <span class="text-xs text-slate-400 flex-shrink-0 w-16 text-right">{{ $shipment->created_at->diffForHumans(null, true, true) }}</span>
-                    </a>
                     @empty
-                    <div class="px-5 py-10 text-center text-sm text-slate-400">No parcels yet</div>
+                        <div class="text-center text-sm text-slate-400 mt-4 relative z-10">No recent activity.</div>
                     @endforelse
                 </div>
             </div>
         </div>
-
-        {{-- Right Column --}}
-        <div class="lg:col-span-2 space-y-6">
-
-            {{-- Operations --}}
-            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                <div class="px-5 py-4 border-b border-slate-100">
-                    <h2 class="text-sm font-bold text-slate-900">Operations</h2>
-                </div>
-                <div class="p-5 space-y-3">
-                    <a href="{{ route('admin.orders.index') }}?status=submitted" class="flex items-center justify-between py-1 group">
-                        <span class="text-sm text-slate-600 group-hover:text-slate-900">Submitted</span>
-                        <span class="text-sm font-bold text-slate-900">{{ number_format($submitted) }}</span>
-                    </a>
-                    <a href="{{ route('admin.orders.index') }}?status=pickup_assigned" class="flex items-center justify-between py-1 group">
-                        <span class="text-sm text-slate-600 group-hover:text-slate-900">Pickup assigned</span>
-                        <span class="text-sm font-bold text-slate-900">{{ number_format($pendingPickups) }}</span>
-                    </a>
-                    <a href="{{ route('admin.orders.index') }}?status=at_warehouse" class="flex items-center justify-between py-1 group">
-                        <span class="text-sm text-slate-600 group-hover:text-slate-900">At warehouse</span>
-                        <span class="text-sm font-bold text-slate-900">{{ number_format($atWarehouse) }}</span>
-                    </a>
-                    <a href="{{ route('admin.orders.index') }}?status=out_for_delivery" class="flex items-center justify-between py-1 group">
-                        <span class="text-sm text-slate-600 group-hover:text-slate-900">Out for delivery</span>
-                        <span class="text-sm font-bold text-orange-600">{{ number_format($outForDelivery) }}</span>
-                    </a>
-                </div>
-            </div>
-
-            {{-- Active Deliveries --}}
-            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                <div class="px-5 py-4 flex items-center justify-between border-b border-slate-100">
-                    <h2 class="text-sm font-bold text-slate-900">Active Deliveries</h2>
-                    <a href="{{ route('admin.delivery-runs.index') }}" class="text-xs font-semibold text-blue-600 hover:text-blue-800">View all &rarr;</a>
-                </div>
-                @if($activeDeliveryRuns->count() > 0)
-                <div class="divide-y divide-slate-50">
-                    @foreach($activeDeliveryRuns as $run)
-                    <a href="{{ route('admin.delivery-runs.show', $run) }}" class="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
-                        <div class="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
-                            <svg class="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0m-10 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm font-semibold text-slate-900">{{ $run->run_number }}</p>
-                            <p class="text-xs text-slate-400">{{ $run->assignedDriver?->name ?? 'No rider' }}</p>
-                        </div>
-                        <svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    </a>
-                    @endforeach
-                </div>
-                @else
-                <div class="px-5 py-8 text-center text-sm text-slate-400">No active deliveries</div>
-                @endif
-            </div>
-
-            {{-- This Month --}}
-            <div class="bg-slate-900 rounded-2xl p-5 text-white">
-                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">This Month</h2>
-                <div class="space-y-4">
-                    <div>
-                        <p class="text-2xl font-bold">{{ number_format($totalShipmentsMonth) }}</p>
-                        <p class="text-xs text-slate-400 mt-0.5">Total parcels</p>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-lg font-bold text-emerald-400">{{ number_format($totalVendors) }}</p>
-                            <p class="text-xs text-slate-400 mt-0.5">Total vendors</p>
-                        </div>
-                        <div>
-                            <p class="text-lg font-bold">{{ number_format($activeVendorsMonth) }}</p>
-                            <p class="text-xs text-slate-400 mt-0.5">Active vendors</p>
-                        </div>
-                    </div>
-                    <div class="pt-3 border-t border-slate-700 grid grid-cols-3 gap-3">
-                        <div>
-                            <p class="text-sm font-bold">{{ number_format($totalVendors) }}</p>
-                            <p class="text-[10px] text-slate-500">Vendors</p>
-                        </div>
-                        <div>
-                            <p class="text-sm font-bold">{{ number_format($totalDrivers) }}</p>
-                            <p class="text-[10px] text-slate-500">Riders</p>
-                        </div>
-                        <div>
-                            <p class="text-sm font-bold">{{ number_format($totalLabels) }}</p>
-                            <p class="text-[10px] text-slate-500">Labels</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
     </div>
 
 </div>
+
+{{-- Scripts --}}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('dashboardController', () => ({
+            selectedRider: null,
+            riders: @json($activeRiders),
+            markers: {},
+
+            init() {
+                // Initialize Map centered on Accra
+                const map = L.map('map-container', {
+                    zoomControl: false 
+                }).setView([5.6200, -0.1700], 12);
+
+                // Add Carto Light Map theme (matches the gray map style)
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; OpenStreetMap &copy; CARTO',
+                    subdomains: 'abcd',
+                    maxZoom: 20
+                }).addTo(map);
+
+                // Add markers
+                this.riders.forEach(rider => {
+                    const el = document.createElement('div');
+                    el.className = 'custom-map-marker';
+                    el.innerHTML = `
+                        <div class="marker-label">${rider.name}</div>
+                        <div class="marker-pin"></div>
+                    `;
+
+                    const icon = L.divIcon({ html: el, className: '', iconSize: [40, 40], iconAnchor: [20, 20] });
+                    const marker = L.marker([rider.lat, rider.lng], { icon }).addTo(map);
+                    
+                    this.markers[rider.id] = el;
+
+                    // Click event sets active rider in Alpine
+                    marker.on('click', () => {
+                        this.selectRider(rider.id);
+                    });
+                });
+            },
+
+            selectRider(id) {
+                this.selectedRider = this.riders.find(r => r.id === id);
+                
+                // Reset all markers
+                Object.values(this.markers).forEach(el => el.classList.remove('active'));
+                
+                // Set clicked marker to active (turns black)
+                if(this.markers[id]) {
+                    this.markers[id].classList.add('active');
+                }
+            }
+        }))
+    });
+</script>
 @endsection

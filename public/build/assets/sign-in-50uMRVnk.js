@@ -1,0 +1,1 @@
+import{m as i}from"./module.esm-L4ggBBWN.js";window.Alpine=i;const e=()=>{i.data("accessSignInPage",()=>({showPassword:!1,isSubmitting:!1,handleSubmit(t){if(this.isSubmitting){t.preventDefault();return}this.isSubmitting=!0}}))};window.Alpine&&e();i.start();

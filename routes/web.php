@@ -44,6 +44,21 @@ use App\Http\Controllers\Warehouse\UserController as WarehouseUserController;
 use App\Http\Controllers\Warehouse\WalkinController as WarehouseWalkinController;
 use App\Http\Controllers\Warehouse\WarehouseShipmentChargesController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\AgentAllocationController;
+use App\Http\Controllers\Warehouse\MobileCameraController;
+use App\Http\Controllers\Admin\CommissionLedgerController;
+
+// Commission Ledger & Overrides
+Route::get('/agents/ledger', [CommissionLedgerController::class, 'index'])->name('admin.agents.ledger');
+Route::post('/agents/ledger/{quota}/override', [CommissionLedgerController::class, 'override'])->name('admin.agents.ledger.override');
+
+// Smart Allocation Panel
+Route::get('/agents/allocation', [AgentAllocationController::class, 'index'])->name('admin.agents.allocation');
+Route::post('/agents/allocation/assign', [AgentAllocationController::class, 'assignTasks'])->name('admin.agents.allocation.assign');
+
+// Mobile Handoff Routes (No Auth Required)
+Route::get('/mobile-camera/{sessionId}', [MobileCameraController::class, 'show'])->name('mobile-camera.show');
+Route::post('/mobile-camera/{sessionId}/upload', [MobileCameraController::class, 'upload'])->name('mobile-camera.upload');
 
 Route::get('/', function () {
     return view('web.landing');
@@ -166,7 +181,6 @@ Route::prefix('driver')->name('web.driver.')->group(function () {
     });
 });
 
-// API Tester (no auth required)
 /*
 |--------------------------------------------------------------------------
 | Admin Routes
@@ -634,12 +648,12 @@ Route::prefix(config('backoffice.prefix', 'admin').'/operations')
     ->name('warehouse.')
     ->middleware(['auth:admin', 'admin.audit', 'backoffice.user'])
     ->group(function () {
-        // Route::get('/', [WarehouseDashboardController::class, 'index'])->name('dashboard');
         Route::get('/', fn () => redirect()->route('admin.dashboard'))->name('dashboard');
 
         // Walk-in Vendor Shipments
         Route::get('walkin', [WarehouseWalkinController::class, 'create'])->name('walkin.create');
         Route::post('walkin', [WarehouseWalkinController::class, 'store'])->name('walkin.store');
+        Route::delete('walkin/{id}', [WarehouseWalkinController::class, 'destroy'])->name('walkin.destroy');
         Route::post('walkin/print-labels', [WarehouseWalkinController::class, 'printLabels'])->name('walkin.print-labels');
         Route::post('walkin/items/{shipmentItem}/print-label', [WarehouseWalkinController::class, 'printLabel'])->name('walkin.items.print-label');
         Route::get('walkin/vendor-lookup', [WarehouseWalkinController::class, 'vendorLookup'])->name('walkin.vendor-lookup');
