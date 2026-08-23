@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use App\Models\Shipment;
 
 class DeliveryRun extends Model
@@ -68,8 +69,15 @@ class DeliveryRun extends Model
         return $this->hasMany(DeliveryRunItem::class);
     }
 
-    public function shipments(): HasMany
+    public function shipments(): HasManyThrough
     {
-        return $this->hasMany(Shipment::class);
+        return $this->hasManyThrough(
+            Shipment::class,
+            DeliveryRunItem::class,
+            'delivery_run_id', // Foreign key on delivery_run_items table
+            'id',              // Foreign key on shipments table
+            'id',              // Local key on delivery_runs table
+            'shipment_id'      // Local key on delivery_run_items table
+        );
     }
 }
