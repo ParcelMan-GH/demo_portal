@@ -70,15 +70,11 @@
             class="fixed inset-y-0 left-0 z-50 bg-[#FCF9F6] border-r border-slate-200/60 transition-all duration-300 ease-in-out flex flex-col"
             :class="[sidebarCollapsed ? 'w-[80px]' : 'w-[260px]', sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0']"
         >
-            {{-- Logo Area --}}
-            <div class="flex items-center h-[72px] transition-all duration-300" :class="sidebarCollapsed ? 'px-4 justify-center' : 'px-6'">
-                <div class="flex-shrink-0 rounded-lg overflow-hidden flex items-center justify-center w-10 h-10 bg-white border border-slate-200 shadow-sm">
-                    <img src="{{ asset('logo.png') }}" alt="Parcelman" class="w-7 h-7 object-contain">
-                </div>
-                <div class="ml-3 min-w-0 overflow-hidden transition-all duration-300 flex flex-col justify-center" :class="sidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'w-auto opacity-100'">
-                    <span class="text-slate-900 text-[17px] font-extrabold tracking-tight block whitespace-nowrap leading-none">Parcelman</span>
-                    <span class="text-orange-600 text-[10px] font-bold uppercase tracking-[0.1em] whitespace-nowrap mt-1 leading-none">Express</span>
-                </div>
+            {{-- Logo Area (Icon Only) --}}
+            <div class="flex items-center h-[72px] transition-all duration-300 px-4" :class="sidebarCollapsed ? 'justify-center' : 'justify-start pl-6'">
+                <a href="{{ route('warehouse.dashboard') }}" class="flex items-center overflow-hidden h-12 w-12 justify-center">
+                    <img src="{{ asset('pm-logo.png') }}" alt="ParcelMan Express" class="h-12 w-auto max-w-none object-cover object-left" style="clip-path: inset(0 65% 0 0);">
+                </a>
             </div>
 
             <div class="h-px mx-6 bg-slate-200/60 transition-all duration-300" :class="sidebarCollapsed ? 'mx-4' : 'mx-6'"></div>
@@ -133,12 +129,12 @@
                         </a>
 
                         {{-- Commission Ledger --}}
-<a href="{{ route('admin.agents.ledger') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('admin.agents.ledger*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
-    <div class="flex items-center gap-3">
-        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Commission Ledger</span>
-    </div>
-</a>
+                        <a href="{{ route('admin.agents.ledger') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('admin.agents.ledger*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                            <div class="flex items-center gap-3">
+                                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Commission Ledger</span>
+                            </div>
+                        </a>
 
                         {{-- Warehouses Dropdown --}}
                         @hasPermission('warehouses.view')
@@ -160,8 +156,6 @@
                         @endhasPermission
                     </div>
                 @endif
-
-                
 
                 @if($canManifest || $canDeliveryAssign || $canRiderTeams || $canSorting)
                     <div class="mb-6">
