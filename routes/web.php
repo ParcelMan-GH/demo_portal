@@ -48,6 +48,14 @@ use App\Http\Controllers\Admin\AgentAllocationController;
 use App\Http\Controllers\Warehouse\MobileCameraController;
 use App\Http\Controllers\Admin\CommissionLedgerController;
 
+use App\Http\Controllers\Agent\AgentDashboardController;
+
+// Call Agent Dashboard & Actions
+Route::prefix('agent')->name('agent.')->group(function () {
+    Route::get('/dashboard', [AgentDashboardController::class, 'index'])->name('dashboard');
+    Route::post('/tasks/{task}/approve', [AgentDashboardController::class, 'approvePayment'])->name('tasks.approve');
+});
+
 // Commission Ledger & Overrides
 Route::get('/agents/ledger', [CommissionLedgerController::class, 'index'])->name('admin.agents.ledger');
 Route::post('/agents/ledger/{quota}/override', [CommissionLedgerController::class, 'override'])->name('admin.agents.ledger.override');

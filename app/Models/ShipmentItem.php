@@ -39,6 +39,7 @@ class ShipmentItem extends Model
         'delivery_method',
         'status',
         'tracking_code',
+        'outgoing_batch_id', // <--- Added this line
     ];
 
     public const DELIVERY_METHOD_DIRECT = 'direct';
@@ -140,6 +141,11 @@ class ShipmentItem extends Model
     public function deliveryDistrict(): BelongsTo
     {
         return $this->belongsTo(District::class, 'delivery_district_id');
+    }
+
+    public function outgoingBatch(): BelongsTo
+    {
+        return $this->belongsTo(OutgoingBatch::class);
     }
 
     /**

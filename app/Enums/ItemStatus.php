@@ -7,6 +7,10 @@ enum ItemStatus: string
     case PENDING = 'pending';
     case PICKED_UP = 'picked_up';
     case AT_WAREHOUSE = 'at_warehouse';
+    
+    // --- Our new auto-batching status ---
+    case READY_FOR_HUB_TRANSFER = 'ready_for_hub_transfer'; 
+    
     case SORTED = 'sorted';
     case IN_TRANSIT = 'in_transit';
     case AT_DESTINATION = 'at_destination';
@@ -24,6 +28,10 @@ enum ItemStatus: string
             self::PENDING => 'Pending',
             self::PICKED_UP => 'Picked Up',
             self::AT_WAREHOUSE => 'At Warehouse',
+            
+            // --- The human-readable label ---
+            self::READY_FOR_HUB_TRANSFER => 'Ready for Hub Transfer',
+            
             self::SORTED => 'Sorted',
             self::IN_TRANSIT => 'In Transit',
             self::AT_DESTINATION => 'At Destination',
