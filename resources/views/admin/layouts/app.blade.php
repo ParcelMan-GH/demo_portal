@@ -8,7 +8,10 @@
     <link rel="icon" type="image/jpeg" href="{{ asset('favicon.jpg') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    {{-- Updated Font Link: Bricolage Grotesque --}}
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&display=swap" rel="stylesheet">
+    
     @stack('head-scripts')
     @vite(['resources/css/app.css', 'resources/css/pages/warehouse-portal.css', 'resources/js/admin/app.js'])
     @stack('styles')
@@ -21,7 +24,8 @@
         .wh-sidebar-scroll:hover::-webkit-scrollbar-thumb { background: #94a3b8; }
     </style>
 </head>
-<body class="bg-[#FCF9F6] text-sm antialiased text-slate-800"
+{{-- Added 'font-sans' here to force Tailwind's typography --}}
+<body class="font-sans bg-[#FCF9F6] text-sm antialiased text-slate-800"
       x-data="{ sidebarOpen: false, sidebarCollapsed: localStorage.getItem('whSidebarCollapsed') === 'true' }"
       x-init="$watch('sidebarCollapsed', val => localStorage.setItem('whSidebarCollapsed', val))">
     
@@ -70,10 +74,10 @@
             class="fixed inset-y-0 left-0 z-50 bg-[#FCF9F6] border-r border-slate-200/60 transition-all duration-300 ease-in-out flex flex-col"
             :class="[sidebarCollapsed ? 'w-[80px]' : 'w-[260px]', sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0']"
         >
-            {{-- Logo Area (Icon Only) --}}
+            {{-- Logo Area --}}
             <div class="flex items-center h-[72px] transition-all duration-300 px-4" :class="sidebarCollapsed ? 'justify-center' : 'justify-start pl-6'">
-                <a href="{{ route('warehouse.dashboard') }}" class="flex items-center overflow-hidden h-12 w-12 justify-center">
-                    <img src="{{ asset('pm-logo.png') }}" alt="ParcelMan Express" class="h-12 w-auto max-w-none object-cover object-left" style="clip-path: inset(0 65% 0 0);">
+                <a href="{{ route('warehouse.dashboard') }}" class="flex items-center overflow-hidden transition-all duration-300" :class="sidebarCollapsed ? 'w-12' : 'w-48'">
+                    <img src="{{ asset('pm-logo.png') }}" alt="ParcelMan Express" class="h-12 w-auto max-w-none object-cover object-left block">
                 </a>
             </div>
 
