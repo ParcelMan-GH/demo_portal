@@ -63,7 +63,7 @@
 @endphp
 
 @section('content')
-<div class="space-y-6" x-data="warehouseReceiptShowPage" data-warehouse-receipt-show-config="{{ e(json_encode($receiptConfig, JSON_INVALID_UTF8_SUBSTITUTE)) }}">
+<div class="space-y-6" x-data="warehouseReceiptShowPage" data-warehouse-receipt-show-config="{{ json_encode($receiptConfig, JSON_INVALID_UTF8_SUBSTITUTE) }}">
     <div x-show="!canReceive" x-cloak class="flex items-center gap-3 px-5 py-4 rounded-2xl border border-amber-200/70 bg-amber-50/80 backdrop-blur-sm">
         <div class="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-100">
             <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

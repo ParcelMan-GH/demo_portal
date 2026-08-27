@@ -4,7 +4,7 @@
 @section('page-title', 'Package Detail')
 
 @section('content')
-<div class="space-y-5" x-data="warehousePackageShowPage" data-warehouse-package-show-config="{{ e(json_encode($config, JSON_INVALID_UTF8_SUBSTITUTE)) }}">
+<div class="space-y-5" x-data="warehousePackageShowPage" data-warehouse-package-show-config="{{ json_encode($config, JSON_INVALID_UTF8_SUBSTITUTE) }}">
     <section class="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 shadow-xl shadow-slate-300/20">
         <div class="relative p-5 sm:p-6">
             <div class="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.22),transparent_58%)]"></div>

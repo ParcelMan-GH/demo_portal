@@ -20,7 +20,7 @@
 @endphp
 
 @section('content')
-<div class="space-y-5" x-data="warehouseDeliveryRunsPage" data-warehouse-delivery-runs-config="{{ e(json_encode($config, JSON_INVALID_UTF8_SUBSTITUTE)) }}">
+<div class="space-y-5" x-data="warehouseDeliveryRunsPage" data-warehouse-delivery-runs-config="{{ json_encode($config, JSON_INVALID_UTF8_SUBSTITUTE) }}">
     <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <div class="flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
