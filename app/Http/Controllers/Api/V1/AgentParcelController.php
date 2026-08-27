@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\ShipmentItem; // Or your Parcel model
+use App\Models\ShipmentItem;
 use Illuminate\Http\Request;
 
 class AgentParcelController extends Controller
@@ -29,10 +29,8 @@ class AgentParcelController extends Controller
 
         $agent = $request->user();
 
-        // 1. Locate the parcel by tracking code or barcode
-        $parcel = ShipmentItem::where('barcode', $code)
-            ->orWhere('tracking_code', $code)
-            ->first();
+        // Query using tracking_code instead of barcode
+        $parcel = ShipmentItem::where('tracking_code', $code)->first();
 
         if (!$parcel) {
             return response()->json([
@@ -41,7 +39,7 @@ class AgentParcelController extends Controller
             ], 404);
         }
 
-        // 2. Assign the parcel to the agent and update status
+        // Assign to agent
         $parcel->update([
             'agent_id' => $agent->id,
             'status' => 'claimed_by_agent',
@@ -62,7 +60,6 @@ class AgentParcelController extends Controller
     {
         $agent = $request->user();
 
-        // Retrieve parcels claimed by this specific agent
         $parcels = ShipmentItem::where('agent_id', $agent->id)
             ->where('status', 'claimed_by_agent')
             ->latest()
