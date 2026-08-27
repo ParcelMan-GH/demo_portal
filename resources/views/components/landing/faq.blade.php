@@ -23,7 +23,7 @@
                         <span>{{ $faq[0] }}</span>
                         <span class="pm-faq-icon" x-text="activeFaq === {{ $index }} ? '−' : '+'"></span>
                     </button>
-                    <div class="pm-faq-body" x-show="activeFaq === {{ $index }}" x-collapse>
+                    <div class="pm-faq-body" x-show="activeFaq === {{ $index }}">
                         <p>{{ $faq[1] }}</p>
                     </div>
                 </div>

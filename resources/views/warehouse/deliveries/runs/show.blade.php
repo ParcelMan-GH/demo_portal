@@ -733,7 +733,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                         </svg>
                                     </button>
-                                    <div x-show="expanded" x-collapse class="border-t border-slate-100">
+                                    <div x-show="expanded" class="border-t border-slate-100">
                                         <table class="min-w-full divide-y divide-slate-100 text-xs">
                                             <thead class="bg-slate-50/50">
                                                 <tr>

@@ -402,7 +402,7 @@
                                     </div>
                                 </div>
 
-                                <div x-show="expanded" x-collapse>
+                                <div x-show="expanded">
                                     {{-- Photos section --}}
                                     <div class="px-4 py-3.5 border-b border-slate-100/80 bg-slate-50/30">
                                         <div class="flex items-center justify-between mb-2.5">
