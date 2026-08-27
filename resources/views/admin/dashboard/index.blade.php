@@ -135,6 +135,7 @@
         <div class="xl:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
             <div class="px-6 py-4 flex items-center justify-between border-b border-slate-100 z-10">
                 <h2 class="text-sm font-medium text-slate-700">Live Tracking</h2>
+                <span class="text-xs text-slate-400 font-medium" x-show="riders.length" x-text="lastUpdated ? 'Updated ' + lastUpdated : ''"></span>
                 <div class="flex items-center gap-3">
                     <div class="relative">
                         <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -144,8 +145,18 @@
             </div>
             
             {{-- Map Area --}}
-            <div class="relative flex-1 min-h-[500px] bg-slate-100 rounded-b-2xl overflow-hidden z-0" id="map-container" wire:ignore>
+            <div class="relative flex-1 min-h-[500px] bg-slate-100 rounded-b-2xl overflow-hidden z-0" id="map-container" style="height: 500px;" wire:ignore>
                
+               {{-- Empty state: no active deliveries right now --}}
+               <div x-show="riders.length === 0"
+                    class="absolute inset-0 flex flex-col items-center justify-center text-center bg-slate-50 z-[500]">
+                   <div class="w-14 h-14 rounded-full bg-slate-200 flex items-center justify-center mb-3">
+                       <svg class="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                   </div>
+                   <p class="text-sm font-medium text-slate-700">No active deliveries</p>
+                   <p class="text-xs text-slate-400 mt-1">Riders will appear here automatically when they're out on a run.</p>
+               </div>
+
                {{-- EXACT FIXED SIDE PANEL FROM YOUR SCREENSHOT --}}
                <div x-show="selectedRider" style="display: none;"
                     x-transition:enter="transition ease-out duration-200"
@@ -189,10 +200,10 @@
                     <div class="mb-8">
                         <div class="flex justify-between items-center text-xs mb-2">
                             <span class="font-medium flex items-center gap-1.5"><span class="text-orange-500 text-sm">🔥</span> Delivery Progress</span>
-                            <span class="font-bold text-slate-900" x-text="`${selectedRider?.progress}%`">0%</span>
+                            <span class="font-bold text-slate-900" x-text="`${selectedRider?.progress ?? 0}%`">0%</span>
                         </div>
                         <div class="w-full bg-white rounded-full h-2.5 shadow-inner">
-                            <div class="bg-orange-500 h-2.5 rounded-full" :style="`width: ${selectedRider?.progress}%`"></div>
+                            <div class="bg-orange-500 h-2.5 rounded-full" :style="`width: ${selectedRider?.progress ?? 0}%`"></div>
                         </div>
                     </div>
 
@@ -271,10 +282,13 @@
             selectedRider: null,
             riders: @json($activeRiders),
             markers: {},
+            map: null,
+            lastUpdated: '',
+            pollTimer: null,
 
             init() {
                 // Initialize Map centered on Accra
-                const map = L.map('map-container', {
+                this.map = L.map('map-container', {
                     zoomControl: false 
                 }).setView([5.6200, -0.1700], 12);
 
@@ -283,39 +297,97 @@
                     attribution: '&copy; OpenStreetMap &copy; CARTO',
                     subdomains: 'abcd',
                     maxZoom: 20
-                }).addTo(map);
+                }).addTo(this.map);
+
+                // Recalculate layout after the container has its final size
+                // (prevents the blank grey map caused by a 0-height container)
+                setTimeout(() => this.map.invalidateSize(), 150);
 
                 // Add markers
                 this.riders.forEach(rider => {
-                    const el = document.createElement('div');
-                    el.className = 'custom-map-marker';
-                    el.innerHTML = `
-                        <div class="marker-label">${rider.name}</div>
-                        <div class="marker-pin"></div>
-                    `;
-
-                    const icon = L.divIcon({ html: el, className: '', iconSize: [40, 40], iconAnchor: [20, 20] });
-                    const marker = L.marker([rider.lat, rider.lng], { icon }).addTo(map);
-                    
-                    this.markers[rider.id] = el;
-
-                    // Click event sets active rider in Alpine
-                    marker.on('click', () => {
-                        this.selectRider(rider.id);
-                    });
+                    this.addRiderMarker(rider);
                 });
+
+                // Poll for live position updates every 12 seconds
+                this.pollTimer = setInterval(() => this.refreshRiders(), 12000);
+            },
+
+            addRiderMarker(rider) {
+                const el = document.createElement('div');
+                el.className = 'custom-map-marker';
+                el.innerHTML = `
+                    <div class="marker-label">${rider.name}</div>
+                    <div class="marker-pin"></div>
+                `;
+
+                const icon = L.divIcon({ html: el, className: '', iconSize: [40, 40], iconAnchor: [20, 20] });
+                const marker = L.marker([rider.lat, rider.lng], { icon }).addTo(this.map);
+
+                // Store the Leaflet marker object (not the DOM element)
+                this.markers[rider.id] = marker;
+
+                // Click event sets active rider in Alpine
+                marker.on('click', () => {
+                    this.selectRider(rider.id);
+                });
+            },
+
+            async refreshRiders() {
+                try {
+                    const res = await fetch('/admin/dashboard/live-riders', {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (!res.ok) return;
+                    const riders = await res.json();
+
+                    // Move existing markers to their latest positions
+                    riders.forEach(rider => {
+                        const marker = this.markers[rider.id];
+                        if (marker && rider.lat && rider.lng) {
+                            marker.setLatLng([rider.lat, rider.lng]);
+                        }
+                    });
+
+                    // Remove markers for runs that are no longer active
+                    const activeIds = new Set(riders.map(r => r.id));
+                    Object.keys(this.markers).forEach(id => {
+                        if (!activeIds.has(Number(id))) {
+                            this.map.removeLayer(this.markers[id]);
+                            delete this.markers[id];
+                        }
+                    });
+
+                    this.riders = riders;
+
+                    // Keep the side panel in sync with fresh data
+                    if (this.selectedRider) {
+                        const fresh = riders.find(r => r.id === this.selectedRider.id);
+                        if (fresh) this.selectedRider = fresh;
+                    }
+
+                    this.lastUpdated = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                } catch (e) {
+                    // Silent — the next poll will retry
+                }
             },
 
             selectRider(id) {
                 this.selectedRider = this.riders.find(r => r.id === id);
-                
+
                 // Reset all markers
-                Object.values(this.markers).forEach(el => el.classList.remove('active'));
-                
+                Object.values(this.markers).forEach(marker => {
+                    marker.getElement()?.querySelector('.custom-map-marker')?.classList.remove('active');
+                });
+
                 // Set clicked marker to active (turns black)
-                if(this.markers[id]) {
-                    this.markers[id].classList.add('active');
+                const marker = this.markers[id];
+                if (marker) {
+                    marker.getElement()?.querySelector('.custom-map-marker')?.classList.add('active');
                 }
+            },
+
+            destroy() {
+                if (this.pollTimer) clearInterval(this.pollTimer);
             }
         }))
     });

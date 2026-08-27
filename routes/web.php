@@ -209,6 +209,7 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
     // Authenticated back-office routes
     Route::middleware(['auth:admin', 'admin.audit', 'backoffice.user'])->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('dashboard/live-riders', [DashboardController::class, 'liveRiders'])->name('dashboard.live-riders');
         Route::post('context/warehouse', [BackOfficeContextController::class, 'updateWarehouse'])
             ->name('context.warehouse.update');
         Route::post('impersonation/stop', [ImpersonationController::class, 'stop'])
