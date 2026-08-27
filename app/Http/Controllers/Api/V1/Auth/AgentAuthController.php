@@ -6,51 +6,28 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class AgentAuthController extends Controller
 {
     /**
-     * Send OTP for Agent Phone Authentication
+     * Login Agent via Email and Password
      */
-    public function sendOtp(Request $request)
+    public function login(Request $request)
     {
         $request->validate([
-            'phone' => 'required|string',
+            'email' => 'required|email',
+            'password' => 'required|string',
         ]);
 
-        // Mock OTP response or integrate your SMS gateway (e.g. 123456)
-        return response()->json([
-            'success' => true,
-            'message' => 'OTP sent successfully.',
-            'expires_in' => 300,
-        ]);
-    }
+        // Find the user/agent by email
+        $agent = User::where('email', $request->email)->first();
 
-    /**
-     * Verify Agent Phone / OTP and issue Sanctum token
-     */
-    public function verifyPhone(Request $request)
-    {
-        $request->validate([
-            'phone' => 'required|string',
-            'otp' => 'required|string',
-            'fcm_token' => 'nullable|string',
-        ]);
-
-        // Find existing user/agent by phone
-        $agent = User::where('phone', $request->phone)->first();
-
-        if (!$agent) {
+        // Check if agent exists and password matches
+        if (! $agent || ! Hash::check($request->password, $agent->password)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Agent account not found for this phone number.',
-            ], 404);
-        }
-
-        // Update FCM token if provided
-        if ($request->filled('fcm_token')) {
-            $agent->update(['fcm_token' => $request->fcm_token]);
+                'message' => 'Invalid email or password.',
+            ], 401);
         }
 
         // Generate a fresh Sanctum token bound to this Agent model
@@ -60,7 +37,6 @@ class AgentAuthController extends Controller
             'success' => true,
             'token' => $token,
             'user' => $agent,
-            'user_exists' => true,
         ]);
     }
 

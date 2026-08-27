@@ -41,8 +41,7 @@ Route::prefix('v1/auth/vendor')->group(function () {
 
 // API v1 - Agent Authentication
 Route::prefix('v1/auth/agent')->group(function () {
-    Route::post('send-otp', [AgentAuthController::class, 'sendOtp']);
-    Route::post('verify-phone', [AgentAuthController::class, 'verifyPhone']);
+    Route::post('login', [AgentAuthController::class, 'login']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', [AgentAuthController::class, 'logout']);
