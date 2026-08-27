@@ -276,7 +276,10 @@
                 });
 
                 fetch(`${this.config.data_endpoint}?${params.toString()}`)
-                    .then(res => res.json())
+                    .then(res => {
+                        if (!res.ok) throw new Error('Failed to load batches.');
+                        return res.json();
+                    })
                     .then(res => {
                         this.rows = res.data || [];
                         this.meta = res.meta || this.meta;
@@ -286,6 +289,10 @@
                                 card.count = res.cardCounts[card.region_id] || 0;
                             });
                         }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        window.showToast?.(err.message || 'Unable to load batches.', 'error');
                     })
                     .finally(() => { this.loading = false; });
             },

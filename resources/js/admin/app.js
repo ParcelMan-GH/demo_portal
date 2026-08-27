@@ -25,6 +25,7 @@ import './modules/warehouses/index.js';
 import './modules/pickups/index.js';
 import '../warehouse/modules/manifests/incoming.js';
 import '../warehouse/modules/manifests/incoming-show.js';
+import '../warehouse/modules/deliveries/runs.js';
 
 window.Alpine = Alpine;
 registerAdminNotifications(Alpine);
