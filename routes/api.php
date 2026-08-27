@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\Auth\DriverAuthController;
 use App\Http\Controllers\Api\V1\Auth\VendorAuthController;
+use App\Http\Controllers\Api\V1\AgentParcelController;
 use App\Http\Controllers\Api\V1\DriverAssignmentController;
 use App\Http\Controllers\Api\V1\DriverBusHandoffController;
 use App\Http\Controllers\Api\V1\DriverBusStationController;
@@ -43,10 +44,33 @@ Route::prefix('v1/auth/vendor')->group(function () {
     });
 });
 
+// API v1 - Agent Operations
 Route::prefix('v1/agent')->middleware(['auth:sanctum'])->group(function () {
+    // Scan & Claim Endpoints
     Route::post('/parcels/scan-claim', [AgentParcelController::class, 'scanClaim']);
     Route::post('/parcels/claim', [AgentParcelController::class, 'scanClaim']);
+    Route::post('/scan-claim', [AgentParcelController::class, 'scanClaim']);
     Route::post('/claim', [AgentParcelController::class, 'scanClaim']);
+
+    // Agent Queue
+    Route::get('/parcels/queue', [AgentParcelController::class, 'getQueue']);
+    Route::get('/queue', [AgentParcelController::class, 'getQueue']);
+
+    // Dashboard & Overview Stats
+    Route::get('/overview', [AgentParcelController::class, 'overview']);
+
+    // Call Verification Logging
+    Route::post('/calls/log', [AgentParcelController::class, 'logCall']);
+    Route::post('/parcels/call-log', [AgentParcelController::class, 'logCall']);
+    Route::get('/calls/history', [AgentParcelController::class, 'callHistory']);
+
+    // Agent Notifications
+    Route::get('/notifications', [AgentParcelController::class, 'notifications']);
+    Route::post('/notifications/read-all', [AgentParcelController::class, 'markAllNotificationsRead']);
+    Route::post('/notifications/settings', [AgentParcelController::class, 'updateNotificationSettings']);
+
+    // Agent Earnings
+    Route::get('/earnings', [AgentParcelController::class, 'earnings']);
 });
 
 // API v1 - Vendor Profile (Authenticated)
