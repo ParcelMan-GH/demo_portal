@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\ItemStatus;
 use App\Http\Controllers\Controller;
 use App\Models\ShipmentItem;
 use Illuminate\Http\Request;
@@ -39,10 +40,10 @@ class AgentParcelController extends Controller
             ], 404);
         }
 
-        // Assign to agent
+        // Assign to agent using valid Enum case
         $parcel->update([
             'agent_id' => $agent->id,
-            'status' => 'claimed_by_agent',
+            'status' => ItemStatus::PICKED_UP,
             'claimed_at' => now(),
         ]);
 
@@ -61,7 +62,7 @@ class AgentParcelController extends Controller
         $agent = $request->user();
 
         $parcels = ShipmentItem::where('agent_id', $agent->id)
-            ->where('status', 'claimed_by_agent')
+            ->where('status', ItemStatus::PICKED_UP)
             ->latest()
             ->get();
 
@@ -86,7 +87,7 @@ class AgentParcelController extends Controller
             'success' => true,
             'data' => [
                 'claimed_today' => $claimedToday,
-                'pending_calls' => ShipmentItem::where('agent_id', $agent->id)->where('status', 'claimed_by_agent')->count(),
+                'pending_calls' => ShipmentItem::where('agent_id', $agent->id)->where('status', ItemStatus::PICKED_UP)->count(),
                 'rescheduled' => 0,
             ]
         ]);
