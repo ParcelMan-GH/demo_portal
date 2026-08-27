@@ -5,6 +5,10 @@
 
     RewriteEngine On
 
+    # Enable Authorization header passing for Apache FastCGI / PHP-FPM
+    CGIPassAuth On
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
