@@ -44,7 +44,7 @@
                 </h1>
                 <p class="text-slate-500 mt-1">It's {{ now()->format('l, M j, Y') }}.</p>
             </div>
-            <button @click="showWizard = true; step = 1" class="px-6 py-3 bg-[#ea580c] hover:bg-[#c2410c] text-white text-sm font-semibold rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-2 shrink-0">
+            <button @click="resetForm(); showWizard = true; step = 1" class="px-6 py-3 bg-[#ea580c] hover:bg-[#c2410c] text-white text-sm font-semibold rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-2 shrink-0">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                 New Walk-ins
             </button>
@@ -114,15 +114,15 @@
         </div>
 
         {{-- Recent Activities Table --}}
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
             <div class="px-6 py-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                 <div class="flex items-center gap-3">
                     <h2 class="text-base font-semibold text-slate-900">Recent Activities</h2>
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-left">
+            <div class="overflow-x-auto min-h-[300px]">
+                <table class="w-full text-left border-collapse">
                     <thead class="bg-[#FFF8F3] border-y border-orange-100/50">
                         <tr>
                             <th class="px-6 py-3.5 text-xs font-semibold text-slate-600">Tracking Code</th>
@@ -137,16 +137,60 @@
                     <tbody class="divide-y divide-slate-100 bg-white">
                         <template x-for="(order, idx) in recentOrders" :key="'index-' + (order.id || idx)">
                             <tr class="hover:bg-slate-50/50 transition-colors group cursor-pointer" @click="navigateToPackage(order)">
-                                <td class="px-6 py-4 text-sm text-slate-900" x-text="order.shipment_number || ('#' + order.id)"></td>
+                                <td class="px-6 py-4 text-sm font-mono text-orange-600 font-semibold" x-text="order.shipment_number || ('#' + order.id)"></td>
                                 <td class="px-6 py-4 text-sm text-slate-900" x-text="order.vendor?.name || 'Walk-in Vendor'"></td>
-                                <td class="px-6 py-4 text-sm text-slate-900" x-text="(order.items_count || 1) + ' (' + (order.items_count || 1) + ')'"></td>
+                                <td class="px-6 py-4 text-sm text-slate-900" x-text="(order.items_count || order.items?.length || 1) + ' package(s)'"></td>
                                 <td class="px-6 py-4 text-sm text-slate-900" x-text="order.status || 'At Warehouse'"></td>
-                                <td class="px-6 py-4 text-sm text-slate-900 lowercase" x-text="'gh¢ ' + (parseFloat(order.total_fee || 0)).toFixed(2)"></td>
+                                <td class="px-6 py-4 text-sm lowercase font-mono text-emerald-600 font-bold" x-text="'gh¢ ' + (parseFloat(order.total_fee || 0)).toFixed(2)"></td>
                                 <td class="px-6 py-4 text-sm text-slate-900" x-text="order.time_formatted || '—'"></td>
-                                <td class="px-6 py-4 text-center">
-                                    <button @click.stop="navigateToPackage(order)" class="text-slate-400 hover:text-slate-900 transition-colors p-1 rounded-lg hover:bg-slate-100">
-                                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M5 12a2 2 0 110-4 2 2 0 010 4zm7 0a2 2 0 110-4 2 2 0 010 4zm7 0a2 2 0 110-4 2 2 0 010 4z"/></svg>
+                                
+                                {{-- 3-Dot Action Menu --}}
+                                <td class="px-6 py-4 text-center relative" x-data="{ open: false }" @click.outside="open = false" @click.stop>
+                                    <button type="button" @click.stop="open = !open" class="text-slate-400 hover:text-slate-900 transition-colors p-1.5 rounded-lg hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500/20">
+                                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M5 12a2 2 0 110-4 2 2 0 010 4zm7 0a2 2 0 110-4 2 2 0 010 4zm7 0a2 2 0 110-4 2 2 0 010 4z"/>
+                                        </svg>
                                     </button>
+
+                                    <div x-show="open" 
+                                         x-cloak 
+                                         x-transition:enter="transition ease-out duration-100"
+                                         x-transition:enter-start="transform opacity-0 scale-95"
+                                         x-transition:enter-end="transform opacity-100 scale-100"
+                                         x-transition:leave="transition ease-in duration-75"
+                                         x-transition:leave-start="transform opacity-100 scale-100"
+                                         x-transition:leave-end="transform opacity-0 scale-95"
+                                         class="absolute right-6 top-12 z-[100] w-36 bg-white rounded-xl shadow-xl border border-slate-100 py-1 text-left divide-y divide-slate-100">
+                                        
+                                        <div class="py-1">
+                                            <!-- View Action -->
+                                            <button type="button" @click.stop="open = false; navigateToPackage(order)" class="w-full px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-orange-50 hover:text-[#ea580c] flex items-center gap-2.5 transition-colors group">
+                                                <svg class="w-4 h-4 text-slate-400 group-hover:text-[#ea580c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                                </svg>
+                                                View
+                                            </button>
+
+                                            <!-- Edit Action -->
+                                            <button type="button" @click.stop="open = false; editPackage(order)" class="w-full px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-orange-50 hover:text-[#ea580c] flex items-center gap-2.5 transition-colors group">
+                                                <svg class="w-4 h-4 text-slate-400 group-hover:text-[#ea580c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                                </svg>
+                                                Edit
+                                            </button>
+                                        </div>
+
+                                        <div class="py-1">
+                                            <!-- Print Action -->
+                                            <button type="button" @click.stop="open = false; printPackageLabel(order)" class="w-full px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-orange-50 hover:text-[#ea580c] flex items-center gap-2.5 transition-colors group">
+                                                <svg class="w-4 h-4 text-slate-400 group-hover:text-[#ea580c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                                </svg>
+                                                Print
+                                            </button>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                         </template>
@@ -161,18 +205,18 @@
     {{-- ═══════════ END INDEX VIEW ═══════════ --}}
 
 
-    {{-- ═══════════ FLAT CREATION FORM ═══════════ --}}
+    {{-- ═══════════ FLAT CREATION / EDITING FORM ═══════════ --}}
     <div x-show="showWizard" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="max-w-5xl mx-auto min-h-screen bg-transparent">
         
         <!-- Header -->
         <div class="flex items-center justify-between mb-10 pt-4">
-            <h1 class="text-[28px] font-medium text-slate-900 tracking-tight">Add New Order</h1>
+            <h1 class="text-[28px] font-medium text-slate-900 tracking-tight" x-text="editingOrderId ? ('Edit Walk-in Order #' + editingOrderId) : 'Add New Order'"></h1>
             <div class="flex items-center gap-3">
-                <button @click="showWizard = false" class="px-6 py-2.5 bg-white border border-[#ea580c] text-[#ea580c] rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors shadow-sm">
+                <button @click="resetForm(); showWizard = false" class="px-6 py-2.5 bg-white border border-[#ea580c] text-[#ea580c] rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors shadow-sm">
                     Cancel
                 </button>
                 <button @click="handleSaveOrder()" :disabled="submitting" class="px-6 py-2.5 bg-[#ea580c] text-white rounded-lg text-sm font-medium hover:bg-[#c2410c] transition-colors shadow-md shadow-orange-500/20 disabled:opacity-50 flex items-center gap-2">
-                    <span x-show="!submitting">Save Order</span>
+                    <span x-show="!submitting" x-text="editingOrderId ? 'Update Order' : 'Save Order'"></span>
                     <span x-show="submitting" class="flex items-center gap-2">
                         <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                         Saving...
@@ -229,7 +273,7 @@
                                     <div class="flex flex-wrap items-center gap-3 mb-3">
                                         <template x-for="(photo, photoIdx) in item.photos" :key="photoIdx">
                                             <div class="relative group w-24 h-24 rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-white">
-                                                <img :src="photo.preview" class="w-full h-full object-cover">
+                                                <img :src="photo.preview || photo" class="w-full h-full object-cover">
                                                 <button type="button" @click="removePhoto(item, photoIdx)" class="absolute top-1 right-1 bg-slate-900/70 hover:bg-rose-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                                 </button>
@@ -365,6 +409,7 @@
 function walkinShipment() {
     return {
         showWizard: false, 
+        editingOrderId: null,
 
         config: {},
         transferWarehouses: [],
@@ -414,6 +459,17 @@ function walkinShipment() {
                         }
                     });
             }
+        },
+
+        resetForm() {
+            this.editingOrderId = null;
+            this.vendorPhone = '';
+            this.vendorId = null;
+            this.vendorData = null;
+            this.newVendor = { name: '', business_name: '', phone: '', email: '' };
+            this.vendorError = '';
+            this.submitError = '';
+            this.items = [this.makeItem()];
         },
 
         openQrModal(index) {
@@ -616,6 +672,11 @@ function walkinShipment() {
             formData.append('delivery_preference', 'deliver');
             formData.append('destination_mode', 'per_item');
             formData.append('items_json', JSON.stringify(items));
+
+            if (this.editingOrderId) {
+                formData.append('shipment_id', this.editingOrderId);
+                formData.append('_method', 'PUT');
+            }
             
             this.items.forEach((item, index) => {
                 // Attach local files
@@ -656,10 +717,123 @@ function walkinShipment() {
             }
         },
 
+        /* ---- VIEW, EDIT & PRINT ACTIONS ---- */
         navigateToPackage(order) {
+            if (!order) return;
+
+            // 1. Try to find a direct Package ID from the order object or item list
+            const packageId = order.package_id 
+                || (Array.isArray(order.items) && order.items.length > 0 ? order.items[0].id : null)
+                || order.shipment_item_id;
+
+            if (packageId) {
+                window.location.href = `/admin/operations/packages/${packageId}`;
+                return;
+            }
+
+            // 2. If no direct package ID exists, search package list by tracking code
+            if (order.shipment_number) {
+                window.location.href = `/admin/operations/packages?search=${encodeURIComponent(order.shipment_number)}`;
+                return;
+            }
+
+            // 3. Fallback: Open in-page details/edit wizard
+            this.editPackage(order);
+        },
+
+        editPackage(order) {
+            if (!order) return;
+
+            this.editingOrderId = order.id || null;
+
+            // 1. Populate Vendor Details
+            this.vendorId = order.vendor?.id || order.vendor_id || null;
+            this.vendorPhone = order.vendor?.phone || '';
+            this.newVendor = {
+                name: order.vendor?.name || '',
+                business_name: order.vendor?.business_name || '',
+                phone: order.vendor?.phone || '',
+                email: order.vendor?.email || ''
+            };
+
+            // 2. Populate Package Items
+            const rawItems = order.items || order.packages || [];
+            if (Array.isArray(rawItems) && rawItems.length > 0) {
+                this.items = rawItems.map((item, idx) => ({
+                    key: `package-edit-${item.id || idx}-${Date.now()}`,
+                    description: item.description || item.package_type || '',
+                    quantity: item.quantity || 1,
+                    delivery_fee: item.delivery_fee || item.price || 0,
+                    delivery_method: item.delivery_method || 'direct',
+                    forward_to_warehouse_id: item.forward_to_warehouse_id || '',
+                    delivery: {
+                        recipient_name: item.delivery?.recipient_name || item.recipient_name || '',
+                        recipient_phone: item.delivery?.recipient_phone || item.recipient_phone || '',
+                        locationQuery: item.delivery?.town || item.location || item.destination || '',
+                        locationResults: [],
+                        _showDropdown: false,
+                        region_id: item.delivery?.region_id || '',
+                        district_id: item.delivery?.district_id || '',
+                        town: item.delivery?.town || item.location || '',
+                    },
+                    photos: (item.photos || []).map(p => ({
+                        file: null,
+                        preview: typeof p === 'string' ? (p.startsWith('http') || p.startsWith('/') ? p : `/storage/${p}`) : (p.url || p.preview || ''),
+                        from_mobile: false
+                    })),
+                    mobilePhotos: []
+                }));
+            } else {
+                this.items = [this.makeItem()];
+            }
+
+            // 3. Open Creation/Editing Wizard
+            this.showWizard = true;
+            this.step = 1;
+        },
+
+        async printPackageLabel(order) {
             if (!order.id) return;
             const targetId = order.package_id || order.items?.[0]?.id || order.id;
-            window.location.href = `/admin/operations/packages/${targetId}`;
+
+            try {
+                const res = await fetch(this.config.printLabelsUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        package_id: targetId,
+                        packages: [{ shipment_item_id: targetId, label_count: 1 }]
+                    }),
+                });
+
+                const json = await res.json().catch(() => ({}));
+
+                if (res.ok && json.success !== false) {
+                    const html = json.data?.label_html || json.label_html || json.html;
+                    if (html) {
+                        const popup = window.open('', '_blank', 'width=900,height=650');
+                        if (popup) {
+                            popup.document.open();
+                            popup.document.write(html);
+                            popup.document.close();
+                        }
+                    } else if (json.data?.redirect_url || json.redirect_url) {
+                        window.open(json.data?.redirect_url || json.redirect_url, '_blank');
+                    } else {
+                        window.print();
+                    }
+                } else {
+                    alert(json.message || 'Error generating print label.');
+                }
+            } catch (err) {
+                console.error('Print request error:', err);
+                alert('Network error while requesting print label.');
+            }
         },
     };
 }
