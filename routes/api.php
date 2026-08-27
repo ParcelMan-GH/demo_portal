@@ -43,6 +43,12 @@ Route::prefix('v1/auth/vendor')->group(function () {
     });
 });
 
+Route::prefix('v1/agent')->middleware(['auth:sanctum'])->group(function () {
+    Route::post('/parcels/scan-claim', [AgentParcelController::class, 'scanClaim']);
+    Route::post('/parcels/claim', [AgentParcelController::class, 'scanClaim']);
+    Route::post('/claim', [AgentParcelController::class, 'scanClaim']);
+});
+
 // API v1 - Vendor Profile (Authenticated)
 Route::prefix('v1/vendor')->middleware(['auth:sanctum', 'vendor.active'])->group(function () {
     Route::get('profile', [VendorProfileController::class, 'show']);
