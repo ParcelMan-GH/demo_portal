@@ -22,7 +22,7 @@
 
 @section('content')
 <div x-data="contactQueuePage()" x-init="init()"
-     data-contact-config="{{ e(json_encode($contactConfig, JSON_INVALID_UTF8_SUBSTITUTE)) }}"
+     data-contact-config="{{ json_encode($contactConfig, JSON_INVALID_UTF8_SUBSTITUTE) }}"
      class="max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
 
     <script type="application/json" id="contact-queue-config">@json($contactConfig)</script>

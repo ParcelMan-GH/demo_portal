@@ -22,7 +22,7 @@
 @endphp
 
 @section('content')
-<div class="space-y-6" x-data="warehouseSortingPage" data-warehouse-sorting-config="{{ e(json_encode($config, JSON_INVALID_UTF8_SUBSTITUTE)) }}">
+<div class="space-y-6" x-data="warehouseSortingPage" data-warehouse-sorting-config="{{ json_encode($config, JSON_INVALID_UTF8_SUBSTITUTE) }}">
 
     {{-- ── Batches Datatable ────────────────────────────────────────────────── --}}
     <div class="bg-white/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-lg shadow-slate-300/40 ring-1 ring-slate-100">

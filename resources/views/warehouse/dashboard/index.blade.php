@@ -34,7 +34,7 @@
 @endphp
 
 @section('content')
-<div class="space-y-5" x-data="warehouseDashboardPage" data-warehouse-dashboard-config="{{ e(json_encode($dashboardConfig)) }}">
+<div class="space-y-5" x-data="warehouseDashboardPage" data-warehouse-dashboard-config="{{ json_encode($dashboardConfig) }}">
     @unless($isPaymentOnlyDashboard)
         <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="flex flex-col gap-4 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">

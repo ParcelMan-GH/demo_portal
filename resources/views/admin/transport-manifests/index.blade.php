@@ -17,7 +17,7 @@
 @endphp
 
 @section('content')
-<div class="space-y-6 max-w-7xl mx-auto" x-data="adminTransportManifestsPage" data-admin-transport-manifests-config="{{ e(json_encode($config, JSON_INVALID_UTF8_SUBSTITUTE)) }}">
+<div class="space-y-6 max-w-7xl mx-auto" x-data="adminTransportManifestsPage" data-admin-transport-manifests-config="{{ json_encode($config, JSON_INVALID_UTF8_SUBSTITUTE) }}">
     
     {{-- Header Section matching your exact image layout --}}
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

@@ -30,7 +30,7 @@
 @endphp
 
 @section('content')
-<div class="max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6" x-data="warehouseIncomingManifestsPage" data-warehouse-incoming-manifests-config="{{ e(json_encode($config, JSON_INVALID_UTF8_SUBSTITUTE)) }}">
+<div class="max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6" x-data="warehouseIncomingManifestsPage" data-warehouse-incoming-manifests-config="{{ json_encode($config, JSON_INVALID_UTF8_SUBSTITUTE) }}">
     
     {{-- Header Section --}}
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

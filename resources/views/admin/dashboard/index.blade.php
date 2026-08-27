@@ -292,11 +292,11 @@
                     zoomControl: false 
                 }).setView([5.6200, -0.1700], 12);
 
-                // Add Carto Light Map theme (matches the gray map style)
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                    attribution: '&copy; OpenStreetMap &copy; CARTO',
-                    subdomains: 'abcd',
-                    maxZoom: 20
+                // Free OpenStreetMap tiles (CartoDB now requires an API key and
+                // overlays a "API KEY REQUIRED" watermark without one)
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors',
+                    maxZoom: 19
                 }).addTo(this.map);
 
                 // Recalculate layout after the container has its final size

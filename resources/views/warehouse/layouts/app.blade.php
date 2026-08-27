@@ -146,7 +146,7 @@
                                     </div>
                                     <svg x-show="!sidebarCollapsed" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="activeDropdown === 'warehouses' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </button>
-                                <div x-show="activeDropdown === 'warehouses' && !sidebarCollapsed" x-transition.opacity x-collapse class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
+                                <div x-show="activeDropdown === 'warehouses' && !sidebarCollapsed" x-transition.opacity class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
                                     <a href="{{ route('warehouse.receipts.pending.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('warehouse.receipts.pending.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">Incoming Packages</a>
                                     <a href="{{ route('warehouse.pickups.received.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('warehouse.pickups.received.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">Received Pickups</a>
                                     <a href="{{ route('warehouse.packages.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('warehouse.packages.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">Warehouse Packages</a>
@@ -218,7 +218,7 @@
                                     </div>
                                     <svg x-show="!sidebarCollapsed" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="activeDropdown === 'workers' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </button>
-                                <div x-show="activeDropdown === 'workers' && !sidebarCollapsed" x-transition.opacity x-collapse class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
+                                <div x-show="activeDropdown === 'workers' && !sidebarCollapsed" x-transition.opacity class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
                                     @if($canUsers)
                                         <a href="{{ route('warehouse.users.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('warehouse.users.*') || request()->routeIs('admin.admins.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">All Workers</a>
                                     @endif
@@ -239,7 +239,7 @@
                                     </div>
                                     <svg x-show="!sidebarCollapsed" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="activeDropdown === 'hq' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </button>
-                                <div x-show="activeDropdown === 'hq' && !sidebarCollapsed" x-transition.opacity x-collapse class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
+                                <div x-show="activeDropdown === 'hq' && !sidebarCollapsed" x-transition.opacity class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
                                     <a href="{{ route('admin.orders.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('admin.orders.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">All Orders</a>
                                     <a href="{{ route('admin.vendors.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('admin.vendors.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">Vendors</a>
                                 </div>
@@ -256,7 +256,7 @@
                                     </div>
                                     <svg x-show="!sidebarCollapsed" class="w-4 h-4 transition-transform duration-200 flex-shrink-0" :class="activeDropdown === 'settings' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </button>
-                                <div x-show="activeDropdown === 'settings' && !sidebarCollapsed" x-transition.opacity x-collapse class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
+                                <div x-show="activeDropdown === 'settings' && !sidebarCollapsed" x-transition.opacity class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
                                     <a href="{{ route('admin.settings.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('admin.settings.index') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">General Settings</a>
                                 </div>
                             </div>
