@@ -37,7 +37,8 @@ CREATE INDEX shipment_items_outgoing_batch_id_index ON shipment_items (outgoing_
 
 -- 3) IMPORTANT — record the migration as applied so a later `php artisan migrate`
 --    does NOT try to re-run it (Laravel tracks this in the `migrations` table).
---    Pick a batch number higher than the current max (run:
---    SELECT MAX(batch) FROM migrations; — use that value + 1).
+--    The batch number is computed automatically (current max + 1), so this
+--    statement needs NO manual editing — just run it as-is.
 INSERT INTO migrations (migration, batch)
-VALUES ('2026_08_24_110355_create_outgoing_batches_table', <BATCH_NUMBER>);
+SELECT '2026_08_24_110355_create_outgoing_batches_table', COALESCE(MAX(batch), 0) + 1
+FROM migrations;
