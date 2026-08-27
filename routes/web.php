@@ -536,6 +536,7 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::post('transport-manifests', [AdminTransportManifestController::class, 'store'])->name('transport-manifests.store');
         Route::get('transport-manifests/incoming', [AdminTransportManifestController::class, 'incomingIndex'])->name('transport-manifests.incoming.index');
         Route::get('transport-manifests/incoming-data', [AdminTransportManifestController::class, 'incomingData'])->name('transport-manifests.incoming.data');
+        Route::post('transport-manifests/{batch}/receive', [AdminTransportManifestController::class, 'receiveBatch'])->name('transport-manifests.receive');
         Route::get('transport-manifests/incoming/{manifest}', [AdminTransportManifestController::class, 'incomingShow'])->name('transport-manifests.incoming.show');
         Route::post('transport-manifests/incoming/{manifest}/items/{shipmentItem}/scan-receive', [AdminTransportManifestController::class, 'scanIncomingItem'])->name('transport-manifests.incoming.items.scan');
         Route::post('transport-manifests/incoming/{manifest}/finalize-receipt', [AdminTransportManifestController::class, 'finalizeIncoming'])->name('transport-manifests.incoming.finalize');

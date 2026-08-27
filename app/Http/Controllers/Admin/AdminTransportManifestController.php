@@ -183,6 +183,7 @@ class AdminTransportManifestController extends Controller
             'layoutName'       => 'warehouse.layouts.app',
             'pageTitle'        => 'Incoming Transfers',
             'dataEndpoint'     => route('admin.transport-manifests.incoming.data'),
+            'receiveEndpoint'  => route('admin.transport-manifests.receive', ['batch' => '__BATCH__']),
         ]);
     }
 

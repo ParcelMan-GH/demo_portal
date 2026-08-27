@@ -62,6 +62,15 @@ function registerWarehouseIncomingManifestsPage() {
         return {
             ...page,
             showFilters: false,
+            selectedDateLabel: 'Today',
+            dateFilter: 'today',
+            availableRegions: Array.isArray(config.available_regions) ? config.available_regions : [],
+            activeCards: [
+                { region_id: 1, region_name: 'Kumasi', count: 0 },
+                { region_id: 2, region_name: 'Koforidua', count: 0 },
+                { region_id: 3, region_name: 'Takoradi', count: 0 },
+                { region_id: 4, region_name: 'Tamale', count: 0 },
+            ],
             originWarehouses: Array.isArray(config.origin_warehouses) ? config.origin_warehouses : [],
             transportDrivers: Array.isArray(config.transport_drivers) ? config.transport_drivers : [],
             summary: { total: 0, in_transit: 0, arrived: 0, receiving: 0, received: 0, pending_receipt: 0 },
@@ -114,6 +123,46 @@ function registerWarehouseIncomingManifestsPage() {
                 this.initDateRange();
                 if (new URLSearchParams(window.location.search).get('scanner') === '1') {
                     this.$nextTick(() => this.openScanModal());
+                }
+            },
+
+            setDateFilter(filterKey, label) {
+                this.dateFilter = filterKey;
+                this.selectedDateLabel = label;
+                this.loadData();
+            },
+
+            updateCardRegion(cardIndex, newRegionId, newRegionName) {
+                this.activeCards[cardIndex].region_id = newRegionId;
+                this.activeCards[cardIndex].region_name = newRegionName;
+                this.loadData();
+            },
+
+            async receiveBatch(batchId) {
+                if (!window.confirm('Are you sure you want to receive and unseal this batch?')) return;
+                this.loading = true;
+                try {
+                    const template = config.receive_endpoint || '/warehouse/manifests/incoming/__BATCH__/receive';
+                    const response = await fetch(template.replace('__BATCH__', String(batchId)), {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken(),
+                            'Content-Type': 'application/json',
+                        },
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to receive batch.');
+                    }
+                    window.showToast?.(result.message || 'Batch received successfully.', 'success');
+                    await this.loadData();
+                } catch (error) {
+                    console.error(error);
+                    window.showToast?.(error.message || 'Error receiving batch.', 'error');
+                } finally {
+                    this.loading = false;
                 }
             },
 
@@ -732,7 +781,10 @@ function registerWarehouseIncomingManifestsPage() {
             async loadData() {
                 this.loading = true;
                 try {
-                    const response = await fetch(`${this.endpoint}?${this.buildParams().toString()}`, {
+                    const params = this.buildParams();
+                    params.set('date_filter', this.dateFilter);
+                    params.set('region_ids', this.activeCards.map((card) => card.region_id).join(','));
+                    const response = await fetch(`${this.endpoint}?${params.toString()}`, {
                         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     });
                     const result = await response.json();
@@ -740,6 +792,11 @@ function registerWarehouseIncomingManifestsPage() {
                     this.rows = Array.isArray(result.data) ? result.data : [];
                     this.meta = result.meta || this.meta;
                     this.summary = result.summary || this.summary;
+                    if (result.cardCounts) {
+                        this.activeCards.forEach((card) => {
+                            card.count = result.cardCounts[card.region_id] || 0;
+                        });
+                    }
                 } catch (error) {
                     console.error(error);
                     window.showToast?.(error.message || 'Unable to load incoming transfers.', 'error');
