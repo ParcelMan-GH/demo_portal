@@ -2384,7 +2384,20 @@ class ShipmentController extends Controller
             $assignment->warehouseReceipt->load($itemRelations);
         }
 
-        return $assignment?->warehouseReceipt?->items?->firstWhere('shipment_item_id', $item->id);
+        $receiptItem = $assignment?->warehouseReceipt?->items?->firstWhere('shipment_item_id', $item->id);
+
+        if ($receiptItem) {
+            return $receiptItem;
+        }
+
+        // Walk-ins have no pickup assignment; their receipt is attached straight
+        // to the shipment. Fall back so receipt photos / labels still surface.
+        return WarehouseReceiptItem::query()
+            ->with('photos')
+            ->where('shipment_item_id', $item->id)
+            ->whereHas('receipt', fn ($query) => $query->where('shipment_id', $item->shipment_id))
+            ->latest('id')
+            ->first();
     }
 
     protected function receivingCustodyTablesAvailable(): bool

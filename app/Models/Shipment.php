@@ -69,7 +69,7 @@ class Shipment extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'status' => ShipmentStatus::class,
+        'status' => \App\Casts\TolerantBackedEnumCast::class.':'.ShipmentStatus::class.','.ShipmentStatus::DRAFT->value,
         'source' => ShipmentSource::class,
         'fulfillment_type' => FulfillmentType::class,
         'destination_mode' => ShipmentDestinationMode::class,

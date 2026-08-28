@@ -17,206 +17,271 @@ class PackageLabelHtmlRenderer
     private function css(): string
     {
         return <<<'CSS'
-@page { size: 80mm 120mm; margin: 0; }
+@page { size: 105mm 148mm; margin: 0; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { width: 80mm; min-width: 80mm; background: #fff; }
+html, body { width: 105mm; min-width: 105mm; background: #fff; }
 body {
     font-family: 'Segoe UI', Arial, sans-serif;
-    color: #000;
+    color: #0f172a;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
 }
 .label {
-    width: 80mm;
+    width: 105mm;
+    min-height: 148mm;
     margin: 0;
-    padding: 3.2mm;
+    padding: 4mm;
     background: #fff;
-    color: #000;
+    color: #0f172a;
     overflow: hidden;
     page-break-after: always;
     break-after: page;
 }
-.label-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 3mm;
-    padding-bottom: 2.6mm;
-    border-bottom: 1.5px solid #000;
+
+/* ── Branded orange header ── */
+.header-band {
+    background: #ea580c;
+    border-radius: 3mm;
+    padding: 3.2mm 3.6mm 2.8mm;
 }
-.brandbar {
-    background: #111827;
-    color: #fff;
-    border-radius: 2.5mm;
-    padding: 2.6mm 3mm 2.2mm;
-    margin-bottom: 3mm;
-}
-.brandbar-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 3mm;
-}
-.brandbar .brand-name {
-    font-size: 17px;
-    line-height: 1.1;
-    font-weight: 900;
-    letter-spacing: 1.3px;
-    color: #fff;
-}
-.brandbar .brand-sub {
-    font-size: 8px;
-    line-height: 1.25;
-    font-weight: 800;
-    letter-spacing: 2.6px;
-    color: rgba(255,255,255,0.92);
-    margin-top: 1px;
-}
-.qr-container { flex: 0 0 auto; background: #fff; border-radius: 1.8mm; padding: 1.2mm; }
-.qr-code { width: 14mm; height: 14mm; }
-.qr-code img,
-.qr-code canvas { width: 14mm !important; height: 14mm !important; }
-.brandbar-meta {
+.header-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 1.8mm;
+    gap: 3mm;
 }
-.doctype {
-    font-size: 7.5px;
-    font-weight: 900;
-    letter-spacing: 1.6px;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.85);
-}
-.status-chip {
-    font-size: 7.5px;
-    font-weight: 900;
-    letter-spacing: 1px;
-    text-transform: uppercase;
+.logo-box {
+    width: 9.5mm;
+    height: 9.5mm;
     background: #fff;
-    color: #111827;
-    border-radius: 999px;
-    padding: 0.8mm 2.4mm;
+    border-radius: 1.8mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
 }
-.divider { height: 1.5px; background: #000; margin: 2.8mm 0; }
-.addresses { display: block; }
-.address-block { margin: 0; }
-.address-label {
-    font-size: 10px;
-    line-height: 1.25;
+.logo-box svg { width: 6.8mm; height: 6.8mm; }
+.brand-name {
+    font-size: 19px;
+    line-height: 1.05;
     font-weight: 900;
-    color: #000;
+    color: #fff;
+    letter-spacing: 1.4px;
+    white-space: nowrap;
+}
+.brand-sub {
+    font-size: 8.5px;
+    line-height: 1.2;
+    font-weight: 800;
+    color: rgba(255,255,255,0.95);
+    letter-spacing: 3.4px;
+    margin-top: 1px;
+    white-space: nowrap;
+}
+.qr-wrap {
+    background: #fff;
+    border-radius: 2mm;
+    padding: 1.4mm;
+    flex: 0 0 auto;
+}
+.qr-code { width: 16mm; height: 16mm; }
+.qr-code img,
+.qr-code canvas { width: 16mm !important; height: 16mm !important; }
+.status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2mm;
+    margin-top: 2.6mm;
+}
+.pill-doctype {
+    background: rgba(255,255,255,0.22);
+    color: #fff;
+    font-size: 7.5px;
+    font-weight: 900;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    border-radius: 999px;
+    padding: 1mm 2.8mm;
+}
+.pill-status {
+    background: #fff;
+    color: #ea580c;
+    font-size: 7.5px;
+    font-weight: 900;
     letter-spacing: 1px;
     text-transform: uppercase;
-    margin-bottom: 1.2mm;
+    border-radius: 999px;
+    padding: 1mm 2.8mm;
+    display: inline-flex;
+    align-items: center;
+    gap: 1.6mm;
 }
-.address-name {
-    font-size: 15px;
-    line-height: 1.18;
+.pill-status .dot {
+    width: 2mm;
+    height: 2mm;
+    border-radius: 50%;
+    background: #ea580c;
+}
+
+/* ── From / To cards ── */
+.addr-grid { display: flex; gap: 3mm; margin-top: 3mm; }
+.addr-card {
+    flex: 1;
+    min-width: 0;
+    background: #f1f5f9;
+    border-radius: 2.5mm;
+    padding: 2.8mm 3mm;
+}
+.addr-head { display: flex; align-items: center; gap: 1.4mm; }
+.addr-head svg { width: 3.4mm; height: 3.4mm; color: #ea580c; flex: 0 0 auto; }
+.addr-label {
+    font-size: 8px;
     font-weight: 900;
-    color: #000;
+    letter-spacing: 1.2px;
+    color: #64748b;
+    text-transform: uppercase;
+}
+.addr-name {
+    font-size: 14px;
+    line-height: 1.15;
+    font-weight: 900;
+    color: #0f172a;
+    margin-top: 1.4mm;
     overflow-wrap: anywhere;
 }
-.address-detail {
-    font-size: 13px;
-    line-height: 1.25;
+.addr-sub {
+    font-size: 8px;
     font-weight: 700;
-    color: #000;
-    margin-top: 1mm;
+    color: #94a3b8;
+    margin-top: 0.8mm;
     overflow-wrap: anywhere;
 }
-.address-block-to {
-    padding: 1.5mm 0 0;
+.addr-line {
+    font-size: 9.5px;
+    line-height: 1.3;
+    font-weight: 700;
+    color: #475569;
+    margin-top: 0.8mm;
+    overflow-wrap: anywhere;
 }
-.address-block-to .address-label {
-    font-size: 11px;
-    margin-bottom: 1.6mm;
+.addr-phone {
+    font-size: 9.5px;
+    font-weight: 800;
+    color: #0f172a;
+    margin-top: 1.2mm;
+    overflow-wrap: anywhere;
 }
-.address-block-to .address-name {
-    font-size: 23px;
-    line-height: 1.12;
-}
-.address-block-to .address-detail {
-    font-size: 17px;
-    line-height: 1.2;
-    margin-top: 1.8mm;
-}
-.address-divider { height: 1.5px; background: #000; margin: 2.8mm 0; }
-.pkg-info {
+
+/* ── Details grid ── */
+.details-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 2.2mm 2.8mm;
+    gap: 2.6mm;
+    margin-top: 3mm;
 }
-.pkg-row { min-width: 0; }
-.pkg-label {
-    display: block;
-    color: #000;
+.detail-box {
+    min-width: 0;
+    background: #f1f5f9;
+    border-radius: 2.5mm;
+    padding: 2.4mm 3mm;
+}
+.detail-label {
+    font-size: 7.5px;
     font-weight: 900;
+    letter-spacing: 1.2px;
+    color: #64748b;
     text-transform: uppercase;
-    font-size: 9px;
-    line-height: 1.25;
-    letter-spacing: 0.8px;
 }
-.pkg-value {
-    display: block;
-    color: #000;
-    font-weight: 800;
-    font-size: 13px;
-    line-height: 1.25;
-    margin-top: 0.6mm;
+.detail-value {
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 900;
+    color: #0f172a;
+    margin-top: 0.8mm;
     overflow-wrap: anywhere;
 }
-.pkg-bold {
-    font-size: 14px;
+
+/* ── Tracking ── */
+.scan-to-track {
+    display: flex;
+    align-items: center;
+    gap: 2mm;
+    margin: 3.2mm 0 2.2mm;
+}
+.scan-to-track .dash { flex: 1; border-top: 1px dashed #cbd5e1; }
+.scan-text {
+    font-size: 7px;
     font-weight: 900;
+    letter-spacing: 1.6px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    white-space: nowrap;
 }
-.barcode-section {
-    padding-top: 2.4mm;
+.barcode-card {
+    background: #f1f5f9;
+    border-radius: 2.5mm;
+    padding: 3mm;
     text-align: center;
-    border-top: 1.5px solid #000;
 }
-.barcode-svg { width: 100%; margin: 0 auto; }
-.barcode-svg svg { width: 100%; max-width: 100%; height: 18mm; }
+.barcode-svg svg { width: 100%; max-width: 100%; height: 20mm; }
 .barcode-text {
-    font-size: 18px;
+    font-size: 15px;
     line-height: 1.2;
     font-weight: 900;
     font-family: 'Courier New', monospace;
-    color: #000;
-    margin-top: 1.6mm;
+    color: #0f172a;
+    margin-top: 1.8mm;
     letter-spacing: 0.8px;
     overflow-wrap: anywhere;
 }
 .barcode-sub {
     font-size: 7px;
-    line-height: 1.2;
     font-weight: 800;
-    letter-spacing: 1.2px;
+    letter-spacing: 1.4px;
+    color: #94a3b8;
     text-transform: uppercase;
-    color: #555;
     margin-top: 0.6mm;
 }
+.label-count {
+    font-size: 7.5px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: #64748b;
+    margin-top: 1.4mm;
+    text-transform: uppercase;
+}
+
+/* ── Footer ── */
 .label-foot {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 2.6mm;
-    background: #111827;
+    gap: 2mm;
+    margin-top: 3.4mm;
+    background: #0f172a;
     color: #fff;
-    border-radius: 2mm;
-    padding: 1.6mm 2.6mm;
+    border-radius: 2.5mm;
+    padding: 2.2mm 3mm;
     font-size: 8px;
     font-weight: 800;
-    letter-spacing: 0.6px;
+    letter-spacing: 0.4px;
+}
+.foot-right { text-align: right; }
+.foot-right .support-label {
+    font-size: 6.5px;
+    font-weight: 700;
+    opacity: 0.7;
+    letter-spacing: 1px;
+    text-transform: uppercase;
 }
 script { display: none !important; }
 @media screen {
     body { padding: 0; }
-    .label { border: 1px solid #000; }
+    .label { border: 1px solid #e2e8f0; }
 }
 @media print {
-    html, body { width: 80mm; }
+    html, body { width: 105mm; }
     .label {
         border: 0;
         margin: 0;

@@ -60,7 +60,7 @@ class ShipmentItem extends Model
         'delivery_latitude' => 'decimal:8',
         'delivery_longitude' => 'decimal:8',
         'fulfillment_type' => FulfillmentType::class,
-        'status' => ItemStatus::class,
+        'status' => \App\Casts\TolerantBackedEnumCast::class.':'.ItemStatus::class.','.ItemStatus::PENDING->value,
     ];
 
     /**

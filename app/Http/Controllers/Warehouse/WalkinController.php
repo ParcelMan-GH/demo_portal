@@ -12,6 +12,7 @@ use App\Models\ShipmentItem;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceiptItemPhoto;
 use App\Services\WalkinShipmentService;
+use App\Services\StorageService;
 use App\Services\Warehouse\WarehousePortalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,10 @@ use Throwable;
 
 class WalkinController extends Controller
 {
-    public function __construct(private WarehousePortalService $portalService) {}
+    public function __construct(
+        private WarehousePortalService $portalService,
+        private StorageService $storageService,
+    ) {}
 
     public function create(): View
     {
@@ -94,7 +98,7 @@ class WalkinController extends Controller
         // ── RECENT WALKINS ────────────────────────────────────────────────
         $recentWalkins = Shipment::query()
             ->where('source', 'warehouse_walkin')
-            ->with(['vendor', 'items'])
+            ->with(['vendor', 'items.warehouseReceiptItems.photos'])
             ->latest()
             ->take(10)
             ->get()
@@ -121,10 +125,18 @@ class WalkinController extends Controller
                             'district_id' => $item->delivery_district_id,
                             'town' => $item->delivery_town,
                         ],
+                        'photos' => $item->warehouseReceiptItems
+                            ->flatMap(fn ($receiptItem) => $receiptItem->photos)
+                            ->map(fn ($photo) => [
+                                'id' => $photo->id,
+                                'url' => $this->storageService->getUrl($photo->path),
+                                'original_name' => $photo->original_name,
+                            ])
+                            ->values(),
                     ]),
                     'total_fee' => (float) $shipment->items->sum('delivery_fee'),
-                    'status' => is_object($shipment->status) && property_exists($shipment->status, 'value') 
-                        ? $shipment->status->value 
+                    'status' => is_object($shipment->status) && property_exists($shipment->status, 'value')
+                        ? $shipment->status->value
                         : (string) $shipment->status,
                     'time_formatted' => $shipment->created_at ? $shipment->created_at->format('h:i A') : 'Just now',
                 ];

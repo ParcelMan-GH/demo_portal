@@ -840,7 +840,12 @@ function walkinShipment() {
 
         async printPackageLabel(order) {
             if (!order.id) return;
-            const targetId = order.package_id || order.items?.[0]?.id || order.id;
+            const targetId = order.package_id || order.items?.[0]?.id || null;
+
+            if (!targetId) {
+                alert('No saved package found to print. Save the walk-in first.');
+                return;
+            }
 
             try {
                 const res = await fetch(this.config.printLabelsUrl, {
@@ -852,7 +857,6 @@ function walkinShipment() {
                         'Accept': 'application/json',
                     },
                     body: JSON.stringify({
-                        package_id: targetId,
                         packages: [{ shipment_item_id: targetId, label_count: 1 }]
                     }),
                 });
