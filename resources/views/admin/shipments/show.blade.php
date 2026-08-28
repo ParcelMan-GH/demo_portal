@@ -3418,7 +3418,7 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                  x-transition:leave-start="opacity-100 scale-100"
                  x-transition:leave-end="opacity-0 scale-95"
                  @@click.stop
-                 class="relative z-10 w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+                 class="relative z-10 flex max-h-[calc(100vh-32px)] w-full max-w-lg flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
                 <div class="relative border-b border-slate-200 px-6 py-5">
                     <div class="flex items-start justify-between">
                         <div class="flex items-start gap-4">
@@ -3437,8 +3437,8 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                         </button>
                     </div>
                 </div>
-                <form @@submit.prevent="assignDriver()">
-                    <div class="max-h-[calc(100vh-240px)] space-y-5 overflow-y-auto px-6 py-6">
+                <form @@submit.prevent="assignDriver()" class="flex min-h-0 flex-1 flex-col">
+                    <div class="flex-1 space-y-5 overflow-y-auto px-6 py-6">
                         
                         <!-- Selected Riders Chips -->
                         <div class="mb-4">

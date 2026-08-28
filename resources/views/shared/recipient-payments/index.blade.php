@@ -705,6 +705,7 @@ function recipientPaymentsPage() {
         walletModalOpen: false,
         vendorPhotoModalOpen: false,
         confirmModalOpen: false,
+        confirmMessage: '',
         reconcileDrawerOpen: false,
         
         // Loading States

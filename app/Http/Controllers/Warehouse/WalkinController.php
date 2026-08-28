@@ -375,6 +375,9 @@ class WalkinController extends Controller
             'items.*.delivery.region_id' => 'nullable|integer',
             'items.*.delivery.district_id' => 'nullable|integer',
             'items.*.delivery.town' => 'nullable|string|max:255',
+            'item_photos' => 'nullable|array',
+            'item_photos.*' => 'nullable|array',
+            'item_photos.*.*' => 'file|image|max:12288',
         ]);
 
         $shipment->vendor_id = $validated['vendor_id'];
@@ -411,6 +414,55 @@ class WalkinController extends Controller
                 ShipmentItem::create($attrs);
             }
         }
+
+        // Persist newly uploaded photos from the edit form onto the receipt items
+        $filesByIndex = $request->file('item_photos', []);
+        if (! empty($filesByIndex)) {
+            $user = Auth::guard('admin')->user();
+            $items = $shipment->items()->orderBy('id')->get();
+
+            foreach ($filesByIndex as $index => $photos) {
+                $item = $items[$index] ?? null;
+                $receiptItem = $item?->warehouseReceiptItems()->first();
+                if (! $receiptItem) {
+                    continue;
+                }
+
+                foreach (is_array($photos) ? $photos : [$photos] as $photo) {
+                    if (! $photo instanceof \Illuminate\Http\UploadedFile) {
+                        continue;
+                    }
+
+                    try {
+                        $defaultDisk = config('filesystems.default', 'public');
+                        if ($defaultDisk === 's3' && empty(config('filesystems.disks.s3.key'))) {
+                            $path = $photo->store('warehouse-receipts/'.$receiptItem->warehouse_receipt_id, 'public');
+                            $storedPhoto = [
+                                'path' => $path,
+                                'original_name' => $photo->getClientOriginalName(),
+                                'size' => $photo->getSize(),
+                            ];
+                        } else {
+                            $storedPhoto = $this->storageService->upload($photo, 'warehouse-receipts/'.$receiptItem->warehouse_receipt_id);
+                        }
+
+                        WarehouseReceiptItemPhoto::create([
+                            'warehouse_receipt_item_id' => $receiptItem->id,
+                            'path' => $storedPhoto['path'],
+                            'original_name' => $storedPhoto['original_name'],
+                            'size' => $storedPhoto['size'],
+                            'photo_type' => 'proof',
+                            'created_by_user_id' => $user?->id,
+                        ]);
+                    } catch (Throwable $e) {
+                        Log::warning('Skipping item photo upload during walk-in update: '.$e->getMessage());
+                    }
+                }
+            }
+        }
+
+        // Persist photos captured via the mobile camera during the edit flow
+        $this->persistMobilePhotos($shipment, $request->input('mobile_photos', []));
 
         $shipment->load('items');
 
