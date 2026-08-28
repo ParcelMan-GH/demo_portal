@@ -1,34 +1,35 @@
 <div class="label" style="page-break-after: always;">
-    {{-- Header --}}
-    <div class="label-header">
-        <div class="brand">
-            <div class="brand-name">PARCELMAN</div>
-            <div class="brand-sub">EXPRESS</div>
+    {{-- Header band (prints as solid black on B/W thermal printers) --}}
+    <div class="brandbar">
+        <div class="brandbar-row">
+            <div class="brand">
+                <div class="brand-name">PARCELMAN</div>
+                <div class="brand-sub">EXPRESS</div>
+            </div>
+            <div class="qr-container">
+                <div class="qr-code" id="qr-{{ $labelBarcode ?? $shipmentItem->tracking_code }}"></div>
+            </div>
         </div>
-        <div class="qr-container">
-            <div class="qr-code" id="qr-{{ $labelBarcode ?? $shipmentItem->tracking_code }}"></div>
+        <div class="brandbar-meta">
+            <span class="doctype">Delivery Receipt</span>
+            <span class="status-chip">{{ $shipmentItem->status?->value ?? 'In Transit' }}</span>
         </div>
     </div>
 
-    <div class="divider"></div>
-
-    {{-- From / To --}}
+    {{-- From / To (no phone numbers — privacy on a travelling label) --}}
     <div class="addresses">
-        <div class="address-block address-block-from">
-            <div class="address-label">FROM</div>
+        <div class="address-block">
+            <div class="address-label">From</div>
             <div class="address-name">{{ $shipment?->vendor?->name ?? '-' }}</div>
             <div class="address-detail">
                 @if($shipment?->pickup_town){{ $shipment->pickup_town }}@endif
                 @if($shipment?->pickupDistrict), {{ $shipment->pickupDistrict->name }}@endif
                 @if($shipment?->pickupRegion), {{ $shipment->pickupRegion->name }}@endif
             </div>
-            @if($shipment?->pickup_contact_phone)
-                <div class="address-phone">{{ $shipment->pickup_contact_phone }}</div>
-            @endif
         </div>
         <div class="address-divider"></div>
         <div class="address-block address-block-to">
-            <div class="address-label">TO</div>
+            <div class="address-label">To</div>
             @if($shipment?->isPerItemDestination())
                 <div class="address-name">{{ $shipmentItem->delivery_recipient_name ?: '-' }}</div>
                 <div class="address-detail">
@@ -36,9 +37,6 @@
                     @if($shipmentItem->deliveryDistrict), {{ $shipmentItem->deliveryDistrict->name }}@endif
                     @if($shipmentItem->deliveryRegion), {{ $shipmentItem->deliveryRegion->name }}@endif
                 </div>
-                @if($shipmentItem->delivery_recipient_phone)
-                    <div class="address-phone">{{ $shipmentItem->delivery_recipient_phone }}</div>
-                @endif
             @else
                 <div class="address-name">{{ $shipment?->delivery_recipient_name ?: '-' }}</div>
                 <div class="address-detail">
@@ -46,16 +44,13 @@
                     @if($shipment?->deliveryDistrict), {{ $shipment->deliveryDistrict->name }}@endif
                     @if($shipment?->deliveryRegion), {{ $shipment->deliveryRegion->name }}@endif
                 </div>
-                @if($shipment?->delivery_recipient_phone)
-                    <div class="address-phone">{{ $shipment->delivery_recipient_phone }}</div>
-                @endif
             @endif
         </div>
     </div>
 
     <div class="divider"></div>
 
-    {{-- Package Info --}}
+    {{-- Package / Shipment meta --}}
     <div class="pkg-info">
         <div class="pkg-row">
             <span class="pkg-label">Package</span>
@@ -73,12 +68,17 @@
         @endif
     </div>
 
-    <div class="divider"></div>
-
     {{-- Barcode --}}
     <div class="barcode-section">
         <div class="barcode-svg">{!! $barcodeSvg !!}</div>
         <div class="barcode-text">{{ $labelBarcode ?? $shipmentItem->tracking_code }}</div>
+        <div class="barcode-sub">Tracking Number</div>
+    </div>
+
+    {{-- Footer --}}
+    <div class="label-foot">
+        <span>ParcelMan Express</span>
+        <span>{{ $shipment?->shipment_number }}</span>
     </div>
 </div>
 

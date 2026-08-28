@@ -44,26 +44,61 @@ body {
     padding-bottom: 2.6mm;
     border-bottom: 1.5px solid #000;
 }
-.brand { min-width: 0; flex: 1; }
-.brand-name {
-    font-size: 18px;
+.brandbar {
+    background: #111827;
+    color: #fff;
+    border-radius: 2.5mm;
+    padding: 2.6mm 3mm 2.2mm;
+    margin-bottom: 3mm;
+}
+.brandbar-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 3mm;
+}
+.brandbar .brand-name {
+    font-size: 17px;
     line-height: 1.1;
     font-weight: 900;
-    letter-spacing: 1.4px;
-    color: #000;
+    letter-spacing: 1.3px;
+    color: #fff;
 }
-.brand-sub {
-    font-size: 9px;
+.brandbar .brand-sub {
+    font-size: 8px;
     line-height: 1.25;
     font-weight: 800;
-    letter-spacing: 2.4px;
-    color: #222;
+    letter-spacing: 2.6px;
+    color: rgba(255,255,255,0.92);
     margin-top: 1px;
 }
-.qr-container { flex: 0 0 auto; }
-.qr-code { width: 15mm; height: 15mm; }
+.qr-container { flex: 0 0 auto; background: #fff; border-radius: 1.8mm; padding: 1.2mm; }
+.qr-code { width: 14mm; height: 14mm; }
 .qr-code img,
-.qr-code canvas { width: 15mm !important; height: 15mm !important; }
+.qr-code canvas { width: 14mm !important; height: 14mm !important; }
+.brandbar-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1.8mm;
+}
+.doctype {
+    font-size: 7.5px;
+    font-weight: 900;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.85);
+}
+.status-chip {
+    font-size: 7.5px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: #fff;
+    color: #111827;
+    border-radius: 999px;
+    padding: 0.8mm 2.4mm;
+}
 .divider { height: 1.5px; background: #000; margin: 2.8mm 0; }
 .addresses { display: block; }
 .address-block { margin: 0; }
@@ -91,16 +126,6 @@ body {
     margin-top: 1mm;
     overflow-wrap: anywhere;
 }
-.address-phone {
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    line-height: 1.25;
-    font-weight: 900;
-    color: #000;
-    margin-top: 1mm;
-    letter-spacing: 0.2px;
-    overflow-wrap: anywhere;
-}
 .address-block-to {
     padding: 1.5mm 0 0;
 }
@@ -111,11 +136,6 @@ body {
 .address-block-to .address-name {
     font-size: 23px;
     line-height: 1.12;
-}
-.address-block-to .address-phone {
-    font-size: 19px;
-    line-height: 1.2;
-    margin-top: 1.8mm;
 }
 .address-block-to .address-detail {
     font-size: 17px;
@@ -167,6 +187,28 @@ body {
     margin-top: 1.6mm;
     letter-spacing: 0.8px;
     overflow-wrap: anywhere;
+}
+.barcode-sub {
+    font-size: 7px;
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: #555;
+    margin-top: 0.6mm;
+}
+.label-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2.6mm;
+    background: #111827;
+    color: #fff;
+    border-radius: 2mm;
+    padding: 1.6mm 2.6mm;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
 }
 script { display: none !important; }
 @media screen {

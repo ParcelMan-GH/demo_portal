@@ -274,7 +274,7 @@
                                         <template x-for="(photo, photoIdx) in item.photos" :key="photoIdx">
                                             <div class="relative group w-24 h-24 rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-white">
                                                 <img :src="photo.preview || photo" class="w-full h-full object-cover">
-                                                <button type="button" @click="removePhoto(item, photoIdx)" class="absolute top-1 right-1 bg-slate-900/70 hover:bg-rose-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button type="button" @click="removePhoto(item, photoIdx)" title="Remove photo" class="absolute top-1 right-1 bg-slate-900/80 hover:bg-rose-600 text-white p-1.5 rounded-full shadow-md transition-colors">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                                 </button>
                                                 <span x-show="photo.from_mobile" class="absolute bottom-1 left-1 right-1 bg-orange-600/90 text-[9px] text-white text-center rounded px-1 font-semibold truncate">Phone</span>
