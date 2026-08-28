@@ -721,19 +721,15 @@ function walkinShipment() {
         navigateToPackage(order) {
             if (!order) return;
 
-            // 1. Try to find a direct Package ID from the order object or item list
-            const packageId = order.package_id 
-                || (Array.isArray(order.items) && order.items.length > 0 ? order.items[0].id : null)
-                || order.shipment_item_id;
-
-            if (packageId) {
-                window.location.href = `/admin/operations/packages/${packageId}`;
+            // 1. Prefer the shipment/order detail page (shows every package in the order)
+            if (order.id) {
+                window.location.href = `/admin/operations/shipments/${order.id}`;
                 return;
             }
 
-            // 2. If no direct package ID exists, search package list by tracking code
+            // 2. Otherwise search the package tracking list by shipment number
             if (order.shipment_number) {
-                window.location.href = `/admin/operations/packages?search=${encodeURIComponent(order.shipment_number)}`;
+                window.location.href = `/admin/operations/package-tracking?search=${encodeURIComponent(order.shipment_number)}`;
                 return;
             }
 
