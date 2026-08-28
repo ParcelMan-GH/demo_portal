@@ -16,6 +16,15 @@
     @vite(['resources/css/app.css', 'resources/css/pages/warehouse-portal.css', 'resources/js/admin/app.js'])
     @stack('styles')
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Global SweetAlert2 upgrade: any native alert() across the dashboard
+        // becomes a styled modal instead of the browser default.
+        if (window.Swal) {
+            window.alert = (message) => {
+                Swal.fire({ title: String(message), icon: 'info', confirmButtonColor: '#E2762B', confirmButtonText: 'OK' });
+            };
+        }
+    </script>
     
     <style>
         /* Custom scrollbar for a cleaner look */

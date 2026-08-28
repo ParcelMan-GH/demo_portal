@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Upload Package Photo</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
@@ -82,11 +83,11 @@
                         if (response.ok) {
                             this.status = 'success';
                         } else {
-                            alert('Upload failed. Please try again.');
+                            Swal.fire({ title: 'Upload failed', text: 'Please try again.', icon: 'error', confirmButtonColor: '#E2762B' });
                             this.status = 'idle';
                         }
                     } catch (error) {
-                        alert('Network error. Please try again.');
+                        Swal.fire({ title: 'Network error', text: 'Please try again.', icon: 'error', confirmButtonColor: '#E2762B' });
                         this.status = 'idle';
                     }
                 }
