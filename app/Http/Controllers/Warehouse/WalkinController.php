@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Warehouse;
 
 use App\Enums\ItemStatus;
+use App\Enums\ShipmentSource;
 use App\Http\Controllers\Controller;
 use App\Helpers\PhoneHelper;
 use App\Models\Location;
@@ -303,7 +304,7 @@ class WalkinController extends Controller
         $shipmentId = $request->input('shipment_id');
         $shipment = Shipment::find($shipmentId);
 
-        if (! $shipment || $shipment->source !== 'warehouse_walkin') {
+        if (! $shipment || ($shipment->source?->value ?? $shipment->source) !== ShipmentSource::WAREHOUSE_WALKIN->value) {
             return response()->json(['success' => false, 'message' => 'Walk-in shipment not found.'], 404);
         }
 
