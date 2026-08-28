@@ -15,6 +15,7 @@
     @stack('head-scripts')
     @vite(['resources/css/app.css', 'resources/css/pages/warehouse-portal.css', 'resources/js/admin/app.js'])
     @stack('styles')
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <style>
         /* Custom scrollbar for a cleaner look */

@@ -25,8 +25,28 @@ export function initWarehouseToast() {
         },
     };
 
+    // Prefer SweetAlert2 when it is loaded (nice feedback across the dashboard),
+    // otherwise fall back to the inline toast container.
     window.showToast = (message, type = 'success', timeout = 4000) => {
         if (!message) return;
+
+        if (typeof window.Swal !== 'undefined') {
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: Math.max(1500, Number(timeout) || 4000),
+                timerProgressBar: true,
+                didOpen: (toast) => {
+                    toast.addEventListener('mouseenter', Swal.stopTimer);
+                    toast.addEventListener('mouseleave', Swal.resumeTimer);
+                },
+            });
+
+            const icon = type === 'error' ? 'error' : type === 'warning' ? 'warning' : type === 'info' ? 'info' : 'success';
+            Toast.fire({ icon, title: String(message) });
+            return;
+        }
 
         const config = typeConfig[type] || typeConfig.info;
         const toast = document.createElement('div');
@@ -74,4 +94,25 @@ export function initWarehouseToast() {
         window.showToast(rawError, 'error');
     }
 }
+
+// SweetAlert2 confirmation helper — resolves true/false like window.confirm
+window.showConfirm = (message, title = 'Are you sure?', confirmText = 'Yes, continue') => {
+    if (typeof window.Swal !== 'undefined') {
+        return Swal.fire({
+            title,
+            text: message,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#E2762B',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: confirmText,
+            cancelButtonText: 'Cancel',
+            reverseButtons: true,
+        }).then((result) => result.isConfirmed);
+    }
+    return Promise.resolve(window.confirm(message));
+};
+
+window.showSuccess = (message) => window.showToast(message, 'success');
+window.showError = (message) => window.showToast(message, 'error');
 

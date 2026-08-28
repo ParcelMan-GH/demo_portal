@@ -67,6 +67,7 @@ Route::post('/agents/allocation/assign', [AgentAllocationController::class, 'ass
 // Mobile Handoff Routes (No Auth Required)
 Route::get('/mobile-camera/{sessionId}', [MobileCameraController::class, 'show'])->name('mobile-camera.show');
 Route::post('/mobile-camera/{sessionId}/upload', [MobileCameraController::class, 'upload'])->name('mobile-camera.upload');
+Route::get('/mobile-camera/{sessionId}/photos', [MobileCameraController::class, 'photos'])->name('mobile-camera.photos');
 
 Route::get('/', function () {
     return view('web.landing');

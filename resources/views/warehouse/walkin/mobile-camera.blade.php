@@ -19,13 +19,21 @@
         <h1 class="text-2xl font-bold text-slate-900 mb-2 text-center">Capture Package</h1>
         <p class="text-slate-500 text-center mb-10 text-sm px-4">Take a clear photo of the package receipt or label. It will instantly appear on your desktop.</p>
 
-        <!-- The Camera Button -->
-        <label x-show="status === 'idle'" class="w-full max-w-sm bg-orange-600 active:bg-orange-700 text-white rounded-2xl py-4 px-6 flex items-center justify-center gap-3 text-lg font-bold shadow-xl shadow-orange-600/30 transition-transform active:scale-95 cursor-pointer">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            Open Camera
-            <!-- capture="environment" forces the rear camera -->
-            <input type="file" accept="image/*" capture="environment" class="hidden" @change="uploadPhoto">
-        </label>
+        <!-- Step 1: Choose source -->
+        <div x-show="status === 'idle'" class="w-full max-w-sm space-y-4">
+            <label class="w-full bg-orange-600 active:bg-orange-700 text-white rounded-2xl py-4 px-6 flex items-center justify-center gap-3 text-lg font-bold shadow-xl shadow-orange-600/30 transition-transform active:scale-95 cursor-pointer">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Take Photo
+                <!-- capture="environment" forces the rear camera -->
+                <input type="file" accept="image/*" capture="environment" class="hidden" @change="uploadPhoto">
+            </label>
+
+            <label class="w-full bg-slate-900 active:bg-slate-800 text-white rounded-2xl py-4 px-6 flex items-center justify-center gap-3 text-lg font-bold shadow-xl shadow-slate-900/30 transition-transform active:scale-95 cursor-pointer">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Choose from Gallery
+                <input type="file" accept="image/*" class="hidden" @change="uploadPhoto">
+            </label>
+        </div>
 
         <!-- Loading State -->
         <div x-show="status === 'uploading'" x-cloak class="w-full max-w-sm bg-slate-900 text-white rounded-2xl py-4 px-6 flex items-center justify-center gap-3 text-lg font-bold shadow-xl">

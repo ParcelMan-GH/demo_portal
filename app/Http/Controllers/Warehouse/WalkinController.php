@@ -10,6 +10,7 @@ use App\Models\Location;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\Warehouse;
+use App\Models\WarehouseReceiptItemPhoto;
 use App\Services\WalkinShipmentService;
 use App\Services\Warehouse\WarehousePortalService;
 use Illuminate\Http\JsonResponse;
@@ -17,7 +18,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Throwable;
 use Throwable;
 
 class WalkinController extends Controller
@@ -258,6 +262,9 @@ class WalkinController extends Controller
             $result = $service->createWalkinShipment($validated);
             $shipment = $result['shipment']->load(['items.warehouseReceiptItems.labels', 'items.warehouseReceiptItems.photos']);
 
+            // Persist photos captured via the mobile camera (QR flow) onto the receipt items
+            $this->persistMobilePhotos($shipment, $request->input('mobile_photos', []));
+
             return response()->json([
                 'success'  => true,
                 'message'  => 'Walk-in shipment created successfully.',
@@ -406,6 +413,65 @@ class WalkinController extends Controller
                 'total_fee' => (float) $shipment->items->sum('delivery_fee'),
             ],
         ]);
+    }
+
+    /**
+     * Move photos captured via the mobile QR flow (temp_walkin_photos)
+     * onto the created receipt items so they persist with the walk-in.
+     *
+     * @param  array<int, array<int, string>>  $mobilePhotos  mobile_photos[itemIndex][]
+     */
+    private function persistMobilePhotos(Shipment $shipment, array $mobilePhotos): void
+    {
+        if (empty($mobilePhotos)) {
+            return;
+        }
+
+        $items = $shipment->items()->orderBy('id')->get();
+        $user = Auth::guard('admin')->user();
+        $disk = Storage::disk('public');
+
+        foreach ($mobilePhotos as $index => $paths) {
+            if (empty($paths) || ! is_array($paths)) {
+                continue;
+            }
+
+            $item = $items[$index] ?? null;
+            $receiptItem = $item?->warehouseReceiptItems()->first();
+            if (! $receiptItem) {
+                continue;
+            }
+
+            foreach ($paths as $tempPath) {
+                if (! is_string($tempPath) || ! str_starts_with($tempPath, 'temp_walkin_photos/')) {
+                    continue;
+                }
+
+                try {
+                    if (! $disk->exists($tempPath)) {
+                        continue;
+                    }
+
+                    $filename = basename($tempPath);
+                    $newPath = 'warehouse-receipts/'.$receiptItem->warehouse_receipt_id.'/'.Str::random(8).'_'.$filename;
+
+                    if (! $disk->move($tempPath, $newPath)) {
+                        continue;
+                    }
+
+                    WarehouseReceiptItemPhoto::create([
+                        'warehouse_receipt_item_id' => $receiptItem->id,
+                        'path' => $newPath,
+                        'original_name' => $filename,
+                        'size' => $disk->size($newPath),
+                        'photo_type' => 'proof',
+                        'created_by_user_id' => $user?->id,
+                    ]);
+                } catch (Throwable $e) {
+                    Log::warning('Skipping mobile photo persistence: '.$e->getMessage());
+                }
+            }
+        }
     }
 
     public function printLabel(Request $request, ShipmentItem $shipmentItem, WalkinShipmentService $service): JsonResponse

@@ -373,8 +373,8 @@
     {{-- ═══════════ MOBILE QR HANDOFF MODAL ═══════════ --}}
     <template x-teleport="body">
         <div x-show="qrModalOpen" x-cloak class="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" x-transition.opacity>
-            <div @click.away="qrModalOpen = false" class="bg-white rounded-[2rem] p-8 max-w-sm w-full text-center shadow-2xl relative" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-90" x-transition:enter-end="opacity-100 scale-100">
-                <button @click="qrModalOpen = false" class="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-700 bg-slate-50 rounded-full transition-colors">
+            <div @click.away="closeQrModal()" class="bg-white rounded-[2rem] p-8 max-w-sm w-full text-center shadow-2xl relative" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-90" x-transition:enter-end="opacity-100 scale-100">
+                <button @click="closeQrModal()" class="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-700 bg-slate-50 rounded-full transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
                 
@@ -385,16 +385,23 @@
                 <h3 class="text-xl font-bold text-slate-900 mb-2">Connect Camera</h3>
                 <p class="text-sm text-slate-500 mb-6 leading-relaxed">Point your phone's camera at this QR code to capture photos for <strong class="text-slate-700">Package <span x-text="activePackageIndex + 1"></span></strong>.</p>
                 
-                <div class="inline-block p-4 bg-white border-2 border-slate-100 rounded-2xl shadow-sm mb-6">
-                    {!! $qrCodeSvg !!}
+                <div class="inline-block p-4 bg-white border-2 border-slate-100 rounded-2xl shadow-sm mb-6 relative">
+                    <img x-show="qrPreview" :src="qrPreview" class="w-[200px] h-[200px] object-cover rounded-xl" alt="Uploaded photo">
+                    <div x-show="!qrPreview">
+                        {!! $qrCodeSvg !!}
+                    </div>
+                    <div x-show="qrPreview" class="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-full">Received ✓</div>
                 </div>
                 
-                <div class="flex items-center justify-center gap-2.5 text-sm text-emerald-600 font-medium bg-emerald-50 py-2.5 px-4 rounded-xl inline-flex w-full">
+                <div x-show="!qrPreview" class="flex items-center justify-center gap-2.5 text-sm text-emerald-600 font-medium bg-emerald-50 py-2.5 px-4 rounded-xl inline-flex w-full">
                     <span class="relative flex h-2.5 w-2.5">
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                     </span>
                     Listening for mobile uploads...
+                </div>
+                <div x-show="qrPreview" class="flex items-center justify-center gap-2.5 text-sm text-emerald-600 font-medium bg-emerald-50 py-2.5 px-4 rounded-xl inline-flex w-full">
+                    Photo received — you can close this window.
                 </div>
             </div>
         </div>
@@ -427,6 +434,8 @@ function walkinShipment() {
 
         /* ---- WEBSOCKET HANDOFF ---- */
         qrModalOpen: false,
+        qrPreview: null,
+        qrPollTimer: null,
         activePackageIndex: 0,
 
         init() {
@@ -438,27 +447,66 @@ function walkinShipment() {
             if (typeof window.Echo !== 'undefined') {
                 window.Echo.channel(`walkin-uploads.${this.config.uploadSessionId}`)
                     .listen('.PhotoUploaded', (e) => {
-                        const targetItem = this.items[this.activePackageIndex];
-                        if (targetItem) {
-                            
-                            // 1. Save mobile temp path for submission
-                            targetItem.mobilePhotos = targetItem.mobilePhotos || [];
-                            targetItem.mobilePhotos.push(e.temp_path);
-                            
-                            // 2. Create preview object for UI thumbnails
-                            targetItem.photos = targetItem.photos || [];
-                            targetItem.photos.push({
-                                file: null,
-                                preview: `/storage/${e.temp_path}`,
-                                from_mobile: true,
-                                temp_path: e.temp_path
-                            });
-
-                            // 3. Close the modal automatically
-                            this.qrModalOpen = false;
-                        }
+                        this.handleReceivedPhoto(e.temp_path);
                     });
             }
+        },
+
+        handleReceivedPhoto(tempPath) {
+            if (!tempPath) return;
+            const targetItem = this.items[this.activePackageIndex];
+            if (!targetItem) return;
+
+            // 1. Save mobile temp path for submission
+            targetItem.mobilePhotos = targetItem.mobilePhotos || [];
+            if (targetItem.mobilePhotos.includes(tempPath)) return; // dedupe
+            targetItem.mobilePhotos.push(tempPath);
+
+            // 2. Create preview object for UI thumbnails
+            targetItem.photos = targetItem.photos || [];
+            targetItem.photos.push({
+                file: null,
+                preview: `/storage/${tempPath}`,
+                from_mobile: true,
+                temp_path: tempPath
+            });
+
+            // 3. Show the received photo in place of the QR, then close
+            this.qrPreview = `/storage/${tempPath}`;
+            this.stopQrPolling();
+            setTimeout(() => { this.qrModalOpen = false; }, 1200);
+        },
+
+        startQrPolling() {
+            this.stopQrPolling();
+            this.qrPollTimer = setInterval(() => this.checkForMobilePhotos(), 2500);
+        },
+
+        stopQrPolling() {
+            if (this.qrPollTimer) {
+                clearInterval(this.qrPollTimer);
+                this.qrPollTimer = null;
+            }
+        },
+
+        async checkForMobilePhotos() {
+            try {
+                const res = await fetch(`/mobile-camera/${this.config.uploadSessionId}/photos`, {
+                    headers: { Accept: 'application/json' },
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                (Array.isArray(data.photos) ? data.photos : []).forEach((path) => {
+                    this.handleReceivedPhoto(path);
+                });
+            } catch (e) {
+                // transient network error — keep polling
+            }
+        },
+
+        closeQrModal() {
+            this.stopQrPolling();
+            this.qrModalOpen = false;
         },
 
         resetForm() {
@@ -474,7 +522,9 @@ function walkinShipment() {
 
         openQrModal(index) {
             this.activePackageIndex = index;
+            this.qrPreview = null;
             this.qrModalOpen = true;
+            this.startQrPolling();
         },
 
         makeDelivery() {

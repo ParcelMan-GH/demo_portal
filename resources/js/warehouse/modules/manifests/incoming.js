@@ -139,7 +139,10 @@ function registerWarehouseIncomingManifestsPage() {
             },
 
             async receiveBatch(batchId) {
-                if (!window.confirm('Are you sure you want to receive and unseal this batch?')) return;
+                const ok = typeof window.showConfirm === 'function'
+                    ? await window.showConfirm('This will unseal the batch and move its packages to your warehouse.', 'Receive batch?', 'Yes, receive')
+                    : window.confirm('Are you sure you want to receive and unseal this batch?');
+                if (!ok) return;
                 this.loading = true;
                 try {
                     const template = config.receive_endpoint || '/warehouse/manifests/incoming/__BATCH__/receive';
