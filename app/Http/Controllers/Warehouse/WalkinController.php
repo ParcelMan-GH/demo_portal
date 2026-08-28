@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Warehouse;
 
+use App\Enums\ItemStatus;
 use App\Http\Controllers\Controller;
 use App\Helpers\PhoneHelper;
 use App\Models\Location;
@@ -288,6 +289,85 @@ class WalkinController extends Controller
                 'message' => 'Server error while creating shipment. ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Update an existing walk-in shipment (used by the edit wizard).
+     * Items are matched by position; submitted items update existing rows
+     * in place (description / quantity / delivery_fee / delivery details),
+     * and any extra submitted items are appended as new items. Existing
+     * items are never deleted, so receipts/labels remain intact.
+     */
+    public function update(Request $request): JsonResponse
+    {
+        $shipmentId = $request->input('shipment_id');
+        $shipment = Shipment::find($shipmentId);
+
+        if (! $shipment || $shipment->source !== 'warehouse_walkin') {
+            return response()->json(['success' => false, 'message' => 'Walk-in shipment not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'vendor_id' => 'required|exists:vendors,id',
+            'items' => 'required|array|min:1',
+            'items.*.description' => 'required|string|max:500',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.delivery_fee' => 'nullable|numeric|min:0|max:9999999.99',
+            'items.*.delivery_method' => 'nullable|string',
+            'items.*.delivery.recipient_name' => 'nullable|string|max:255',
+            'items.*.delivery.recipient_phone' => 'nullable|string|max:30',
+            'items.*.delivery.region_id' => 'nullable|integer',
+            'items.*.delivery.district_id' => 'nullable|integer',
+            'items.*.delivery.town' => 'nullable|string|max:255',
+        ]);
+
+        $shipment->vendor_id = $validated['vendor_id'];
+        $shipment->save();
+
+        $existingItems = $shipment->items()->orderBy('id')->get();
+
+        foreach (array_values($validated['items']) as $index => $itemData) {
+            $fee = $itemData['delivery_fee'] ?? $itemData['price'] ?? $itemData['fee'] ?? 0.00;
+
+            $attrs = [
+                'description' => $itemData['description'],
+                'quantity' => (int) $itemData['quantity'],
+                'delivery_fee' => filled($fee) ? round((float) $fee, 2) : 0.00,
+                'delivery_method' => in_array($itemData['delivery_method'] ?? 'direct', ShipmentItem::DELIVERY_METHODS, true)
+                    ? $itemData['delivery_method']
+                    : ShipmentItem::DELIVERY_METHOD_DIRECT,
+            ];
+
+            if (! empty($itemData['delivery'])) {
+                $attrs['delivery_recipient_name'] = $itemData['delivery']['recipient_name'] ?? null;
+                $attrs['delivery_recipient_phone'] = $itemData['delivery']['recipient_phone'] ?? null;
+                $attrs['delivery_region_id'] = $itemData['delivery']['region_id'] ?? null;
+                $attrs['delivery_district_id'] = $itemData['delivery']['district_id'] ?? null;
+                $attrs['delivery_town'] = $itemData['delivery']['town'] ?? null;
+            }
+
+            if (isset($existingItems[$index])) {
+                $existingItems[$index]->update($attrs);
+            } else {
+                $attrs['shipment_id'] = $shipment->id;
+                $attrs['status'] = ItemStatus::AT_WAREHOUSE;
+                $attrs['tracking_code'] = ShipmentItem::generateTrackingCode();
+                ShipmentItem::create($attrs);
+            }
+        }
+
+        $shipment->load('items');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Walk-in shipment updated successfully.',
+            'shipment' => [
+                'id' => $shipment->id,
+                'shipment_number' => $shipment->shipment_number,
+                'items_count' => $shipment->items->count(),
+                'total_fee' => (float) $shipment->items->sum('delivery_fee'),
+            ],
+        ]);
     }
 
     public function printLabel(Request $request, ShipmentItem $shipmentItem, WalkinShipmentService $service): JsonResponse

@@ -663,6 +663,7 @@ Route::prefix(config('backoffice.prefix', 'admin').'/operations')
         // Walk-in Vendor Shipments
         Route::get('walkin', [WarehouseWalkinController::class, 'create'])->name('walkin.create');
         Route::post('walkin', [WarehouseWalkinController::class, 'store'])->name('walkin.store');
+        Route::put('walkin', [WarehouseWalkinController::class, 'update'])->name('walkin.update');
         Route::delete('walkin/{id}', [WarehouseWalkinController::class, 'destroy'])->name('walkin.destroy');
         Route::post('walkin/print-labels', [WarehouseWalkinController::class, 'printLabels'])->name('walkin.print-labels');
         Route::post('walkin/items/{shipmentItem}/print-label', [WarehouseWalkinController::class, 'printLabel'])->name('walkin.items.print-label');
