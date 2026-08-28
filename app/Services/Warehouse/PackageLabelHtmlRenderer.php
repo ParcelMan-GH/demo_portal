@@ -38,9 +38,9 @@ body {
     break-after: page;
 }
 
-/* ── Branded orange header ── */
+/* ── Branded header (solid dark band = B/W & thermal safe) ── */
 .header-band {
-    background: #ea580c;
+    background: #0f172a;
     border-radius: 3mm;
     padding: 3.2mm 3.6mm 2.8mm;
 }
@@ -106,7 +106,7 @@ body {
 }
 .pill-status {
     background: #fff;
-    color: #ea580c;
+    color: #0f172a;
     font-size: 7.5px;
     font-weight: 900;
     letter-spacing: 1px;
@@ -121,20 +121,21 @@ body {
     width: 2mm;
     height: 2mm;
     border-radius: 50%;
-    background: #ea580c;
+    background: #0f172a;
 }
 
-/* ── From / To cards ── */
+/* ── From / To cards (white, light border — grayscale safe) ── */
 .addr-grid { display: flex; gap: 3mm; margin-top: 3mm; }
 .addr-card {
     flex: 1;
     min-width: 0;
-    background: #f1f5f9;
+    background: #fff;
+    border: 0.35mm solid #e2e8f0;
     border-radius: 2.5mm;
     padding: 2.8mm 3mm;
 }
 .addr-head { display: flex; align-items: center; gap: 1.4mm; }
-.addr-head svg { width: 3.4mm; height: 3.4mm; color: #ea580c; flex: 0 0 auto; }
+.addr-head svg { width: 3.4mm; height: 3.4mm; color: #0f172a; flex: 0 0 auto; }
 .addr-label {
     font-size: 8px;
     font-weight: 900;
@@ -182,7 +183,8 @@ body {
 }
 .detail-box {
     min-width: 0;
-    background: #f1f5f9;
+    background: #fff;
+    border: 0.35mm solid #e2e8f0;
     border-radius: 2.5mm;
     padding: 2.4mm 3mm;
 }
@@ -209,6 +211,12 @@ body {
     gap: 2mm;
     margin: 3.2mm 0 2.2mm;
 }
+.scan-to-track .scan-icon {
+    width: 3.4mm;
+    height: 3.4mm;
+    color: #0f172a;
+    flex: 0 0 auto;
+}
 .scan-to-track .dash { flex: 1; border-top: 1px dashed #cbd5e1; }
 .scan-text {
     font-size: 7px;
@@ -219,7 +227,8 @@ body {
     white-space: nowrap;
 }
 .barcode-card {
-    background: #f1f5f9;
+    background: #fff;
+    border: 0.35mm solid #e2e8f0;
     border-radius: 2.5mm;
     padding: 3mm;
     text-align: center;

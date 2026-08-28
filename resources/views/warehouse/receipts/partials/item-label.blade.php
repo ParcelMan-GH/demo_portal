@@ -13,27 +13,21 @@
         ? $status->label()
         : ucwords(str_replace('_', ' ', (string) ($status ?: 'in_transit')));
 
-    $formatPhone = function ($phone) {
-        $digits = preg_replace('/\D+/', '', (string) $phone);
-        if (strlen($digits) === 12 && str_starts_with($digits, '233')) {
-            $digits = substr($digits, 3);
-            return '+233 '.substr($digits, 0, 2).' '.substr($digits, 2, 3).' '.substr($digits, 5, 2).' '.substr($digits, 7, 2);
-        }
-        return $phone ?: '';
-    };
-
-    $supportPhone = \App\Models\PlatformSetting::getValue('platform_phone', '+233 30 000 0000');
     $tracking = $labelBarcode ?? $shipmentItem->tracking_code;
 @endphp
 
 <div class="label" style="page-break-after: always;">
 
-    {{-- Branded orange header --}}
+    {{-- Branded header (solid dark band — B/W & thermal safe) --}}
     <div class="header-band">
         <div class="header-row">
             <div class="logo-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M12 1.8l8.4 4.85v9.7L12 21.2l-8.4-4.85v-9.7L12 1.8z" fill="#fff"/>
+                    <path d="M7.2 9.4l4.8-2.77 4.8 2.77v5.54l-4.8 2.77-4.8-2.77V9.4z" fill="#0f172a"/>
+                    <path d="M12 6.63l4.8 2.77-4.8 2.77-4.8-2.77 4.8-2.77z" fill="#334155"/>
+                    <path d="M7.2 9.4l4.8 2.77v5.54L7.2 14.94V9.4z" fill="#1e293b"/>
+                    <path d="M16.8 9.4l-4.8 2.77v5.54l4.8-2.77V9.4z" fill="#0f172a"/>
                 </svg>
             </div>
             <div>
@@ -50,7 +44,7 @@
         </div>
     </div>
 
-    {{-- From / To cards --}}
+    {{-- From / To cards (no phone numbers — privacy on a travelling label) --}}
     <div class="addr-grid">
         <div class="addr-card">
             <div class="addr-head">
@@ -58,10 +52,7 @@
                 <span class="addr-label">From</span>
             </div>
             <div class="addr-name">{{ $shipment?->vendor?->name ?: '-' }}</div>
-            <div class="addr-sub">{{ $shipment?->vendor?->business_name ?: 'Sender' }}</div>
-            @if($shipment?->vendor?->phone)
-                <div class="addr-phone">{{ $formatPhone($shipment->vendor->phone) }}</div>
-            @endif
+            <div class="addr-sub">Sender · {{ $shipment?->vendor?->business_name ?: 'ParcelMan pickup' }}</div>
         </div>
         <div class="addr-card">
             <div class="addr-head">
@@ -74,9 +65,6 @@
                 @if($destSource?->deliveryDistrict), {{ $destSource->deliveryDistrict->name }}@endif
                 @if($destSource?->deliveryRegion), {{ $destSource->deliveryRegion->name }}@endif
             </div>
-            @if($destSource?->delivery_recipient_phone)
-                <div class="addr-phone">{{ $formatPhone($destSource->delivery_recipient_phone) }}</div>
-            @endif
         </div>
     </div>
 
@@ -102,7 +90,9 @@
 
     {{-- Tracking --}}
     <div class="scan-to-track">
-        <span class="dash"></span>
+        <svg class="scan-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/>
+        </svg>
         <span class="scan-text">Scan to Track</span>
         <span class="dash"></span>
     </div>
@@ -117,11 +107,8 @@
 
     {{-- Footer --}}
     <div class="label-foot">
-        <span>ParcelMan Express - {{ $originName }}</span>
-        <span class="foot-right">
-            <span class="support-label">Support</span><br>
-            {{ $supportPhone }}
-        </span>
+        <span>ParcelMan Express · {{ $originName }}</span>
+        <span class="foot-right">Delivery Receipt · {{ $shipment?->shipment_number }}</span>
     </div>
 </div>
 
