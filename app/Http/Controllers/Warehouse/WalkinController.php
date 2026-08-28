@@ -107,7 +107,17 @@ class WalkinController extends Controller
                     'items_count' => $shipment->items->count(),
                     'items' => $shipment->items->map(fn ($item) => [
                         'id' => $item->id,
+                        'description' => $item->description,
+                        'quantity' => $item->quantity,
                         'delivery_fee' => (float) $item->delivery_fee,
+                        'delivery_method' => $item->delivery_method?->value ?? $item->delivery_method,
+                        'delivery' => [
+                            'recipient_name' => $item->delivery_recipient_name,
+                            'recipient_phone' => $item->delivery_recipient_phone,
+                            'region_id' => $item->delivery_region_id,
+                            'district_id' => $item->delivery_district_id,
+                            'town' => $item->delivery_town,
+                        ],
                     ]),
                     'total_fee' => (float) $shipment->items->sum('delivery_fee'),
                     'status' => is_object($shipment->status) && property_exists($shipment->status, 'value') 

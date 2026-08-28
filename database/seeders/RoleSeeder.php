@@ -45,6 +45,8 @@ class RoleSeeder extends Seeder
                     'warehouse.contacts.manage',
                     'drivers.view',
                     'drivers.assign',
+                    'charges.view',
+                    'charges.manage',
                     'reports.view',
                     'reports.export',
                 ]),
