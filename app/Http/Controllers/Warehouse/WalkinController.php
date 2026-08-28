@@ -308,13 +308,40 @@ class WalkinController extends Controller
             return response()->json(['success' => false, 'message' => 'Walk-in shipment not found.'], 404);
         }
 
+        // Extract items from JSON (same convention as store) and normalize the fee key
+        $rawItems = [];
+        if ($request->filled('items_json')) {
+            $decoded = json_decode((string) $request->input('items_json'), true);
+            $rawItems = is_array($decoded) ? $decoded : [];
+        } elseif (is_array($request->input('items'))) {
+            $rawItems = $request->input('items');
+        }
+
+        $normalizedItems = array_map(function (array $item) {
+            $fee = $item['delivery_fee']
+                ?? $item['price']
+                ?? $item['fee']
+                ?? $item['amount']
+                ?? $item['delivery_price']
+                ?? ($item['delivery']['fee'] ?? null)
+                ?? ($item['delivery']['price'] ?? null);
+
+            $item['delivery_fee'] = filled($fee) ? (float) $fee : 0.00;
+
+            return $item;
+        }, $rawItems);
+
+        if (! empty($normalizedItems)) {
+            $request->merge(['items' => $normalizedItems]);
+        }
+
         $validated = $request->validate([
             'vendor_id' => 'required|exists:vendors,id',
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:500',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.delivery_fee' => 'nullable|numeric|min:0|max:9999999.99',
-            'items.*.delivery_method' => 'nullable|string',
+            'items.*.delivery_method' => 'nullable|in:direct,bus_handoff',
             'items.*.delivery.recipient_name' => 'nullable|string|max:255',
             'items.*.delivery.recipient_phone' => 'nullable|string|max:30',
             'items.*.delivery.region_id' => 'nullable|integer',
