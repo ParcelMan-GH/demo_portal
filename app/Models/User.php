@@ -78,6 +78,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Relationship alias to support singular role eager-loading ($user->load('role')).
+     */
+    public function role(): BelongsToMany
+    {
+        return $this->roles();
+    }
+
+    /**
      * Get the user who created this user.
      */
     public function creator(): BelongsTo
@@ -275,7 +283,7 @@ class User extends Authenticatable
 
     public function isAdministrator(): bool
     {
-        return $this->hasAnyRole(['administrator', 'super_admin']);
+        return $this->hasAnyRole(['admin', 'administrator', 'super_admin']);
     }
 
     public function isHqUser(): bool
