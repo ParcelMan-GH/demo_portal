@@ -30,7 +30,7 @@ class DriverAuthController extends Controller
                 $q->where('phone', $request->phone)
                   ->orWhere('phone', 'like', "%{$phone}");
             })
-            ->with(['role', 'warehouse'])
+            ->with(['roles', 'warehouse'])
             ->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
@@ -45,13 +45,14 @@ class DriverAuthController extends Controller
             ], 403);
         }
 
-        // Verify the user's database role matches the selected app login role
-        $userRoleSlug = strtolower($user->role?->slug ?? '');
+        // Get the primary assigned role model
+        $primaryRole = $user->roles->first();
+        $userRoleSlug = strtolower($primaryRole?->slug ?? '');
         $requestedRole = strtolower($request->role);
 
         if ($userRoleSlug !== $requestedRole) {
             return response()->json([
-                'message' => "Access denied. Your assigned role ({$user->role?->name}) does not match the {$request->role} portal.",
+                'message' => "Access denied. Your assigned role ({$primaryRole?->name}) does not match the {$request->role} portal.",
             ], 403);
         }
 

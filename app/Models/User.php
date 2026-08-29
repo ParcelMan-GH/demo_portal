@@ -80,10 +80,10 @@ class User extends Authenticatable
     /**
      * Relationship alias to support singular role eager-loading ($user->load('role')).
      */
-    public function role(): BelongsToMany
-    {
-        return $this->roles();
-    }
+    public function getRoleAttribute(): ?Role
+{
+    return $this->roles->first();
+}
 
     /**
      * Get the user who created this user.
