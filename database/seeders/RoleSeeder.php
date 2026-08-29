@@ -14,16 +14,16 @@ class RoleSeeder extends Seeder
 
         $roles = [
             [
-                'slug' => 'administrator',
-                'name' => 'Administrator',
-                'description' => 'Administrative role. HQ warehouses can administer the system; other warehouses remain scoped to their own warehouse and granted capabilities.',
+                'slug' => 'admin',
+                'name' => 'Admin',
+                'description' => 'Administrative role with HQ access across system configuration, role management, master settings, and global operations.',
                 'assignable' => false,
                 'permissions' => $allPermissions,
             ],
             [
-                'slug' => 'operations_manager',
-                'name' => 'Operations Manager',
-                'description' => 'Manages receiving, sorting, manifests, deliveries, and operational staff.',
+                'slug' => 'warehouse_supervisor',
+                'name' => 'Warehouse Supervisor',
+                'description' => 'Manages local hub inventory, approves batch dispatches/offloads, handles discrepancies, and oversees local operational staff.',
                 'assignable' => true,
                 'permissions' => $this->permissionIds([
                     'dashboard.view',
@@ -31,38 +31,6 @@ class RoleSeeder extends Seeder
                     'warehouse.users.view',
                     'warehouse.users.create',
                     'warehouse.users.edit',
-                    'warehouse.users.deactivate',
-                    'warehouse.users.assign_roles',
-                    'warehouse.receiving.manage',
-                    'warehouse.receiving.approve_discrepancy',
-                    'warehouse.sorting.manage',
-                    'warehouse.sorting.reopen',
-                    'warehouse.manifest.manage',
-                    'warehouse.transport.assign',
-                    'warehouse.delivery.assign',
-                    'warehouse.delivery.code.reset',
-                    'warehouse.items.scan',
-                    'warehouse.contacts.manage',
-                    'drivers.view',
-                    'drivers.assign',
-                    'charges.view',
-                    'charges.manage',
-                    'reports.view',
-                    'reports.export',
-                ]),
-            ],
-            [
-                'slug' => 'warehouse-manager',
-                'name' => 'Warehouse Manager',
-                'description' => 'Manages local warehouse operations and users. In an HQ warehouse, access can extend system-wide through warehouse HQ privileges.',
-                'assignable' => false,
-                'permissions' => $this->permissionIds([
-                    'dashboard.view',
-                    'warehouse.dashboard.view',
-                    'warehouse.users.view',
-                    'warehouse.users.create',
-                    'warehouse.users.edit',
-                    'warehouse.users.deactivate',
                     'warehouse.users.assign_roles',
                     'warehouse.receiving.manage',
                     'warehouse.receiving.approve_discrepancy',
@@ -78,10 +46,7 @@ class RoleSeeder extends Seeder
                     'warehouse.charges.manage',
                     'warehouse.recipient_payments.view',
                     'warehouse.recipient_payments.process',
-                    'warehouse.recipient_payments.assign',
                     'warehouse.recipient_payments.reconcile',
-                    'warehouse.recipient_payments.override',
-                    'warehouse.recipient_payments.manage_wallets',
                     'drivers.view',
                     'drivers.assign',
                     'reports.view',
@@ -89,113 +54,90 @@ class RoleSeeder extends Seeder
                 ]),
             ],
             [
-                'slug' => 'accounts_officer',
-                'name' => 'Accounts Officer',
-                'description' => 'Manages shipment charges, recipient payments, vendor payouts, and finance reports where the warehouse is allowed.',
-                'assignable' => true,
-                'permissions' => $this->permissionIds([
-                    'dashboard.view',
-                    'warehouse.dashboard.view',
-                    'warehouse.charges.view',
-                    'warehouse.charges.manage',
-                    'warehouse.recipient_payments.view',
-                    'warehouse.recipient_payments.process',
-                    'warehouse.recipient_payments.assign',
-                    'warehouse.recipient_payments.reconcile',
-                    'warehouse.recipient_payments.override',
-                    'warehouse.recipient_payments.manage_wallets',
-                    'charges.view',
-                    'charges.manage',
-                    'vendors.view',
-                    'vendors.manage',
-                    'reports.view',
-                    'reports.export',
-                ]),
-            ],
-            [
-                'slug' => 'warehouse_receiver',
-                'name' => 'Warehouse Receiver',
-                'description' => 'Receives packages into warehouse inventory.',
-                'assignable' => true,
-                'permissions' => $this->permissionIds([
-                    'warehouse.dashboard.view',
-                    'warehouse.receiving.manage',
-                    'warehouse.items.scan',
-                    'warehouse.charges.view',
-                    'warehouse.charges.manage',
-                ]),
-            ],
-            [
-                'slug' => 'warehouse_sorter',
-                'name' => 'Warehouse Sorter',
-                'description' => 'Sorts packages and prepares manifests.',
-                'assignable' => true,
-                'permissions' => $this->permissionIds([
-                    'warehouse.dashboard.view',
-                    'warehouse.sorting.manage',
-                    'warehouse.manifest.manage',
-                    'warehouse.items.scan',
-                ]),
-            ],
-            [
-                'slug' => 'warehouse_dispatcher',
-                'name' => 'Warehouse Dispatcher',
-                'description' => 'Assigns transport and delivery riders.',
-                'assignable' => true,
-                'permissions' => $this->permissionIds([
-                    'warehouse.dashboard.view',
-                    'warehouse.manifest.manage',
-                    'warehouse.transport.assign',
-                    'warehouse.delivery.assign',
-                    'warehouse.delivery.code.reset',
-                    'warehouse.items.scan',
-                    'drivers.view',
-                    'drivers.assign',
-                ]),
-            ],
-            [
-                'slug' => 'warehouse_contact_agent',
+                'slug' => 'contact_agent',
                 'name' => 'Contact Agent',
-                'description' => 'Calls recipients to confirm delivery preference.',
+                'description' => 'Handles branch office counter intake, customer parcel booking, recipient delivery preferences, and counter pick-ups.',
                 'assignable' => true,
                 'permissions' => $this->permissionIds([
                     'warehouse.dashboard.view',
                     'warehouse.contacts.manage',
-                ]),
-            ],
-            [
-                'slug' => 'recipient-payment-agent',
-                'name' => 'Recipient Payment Agent',
-                'description' => 'Records assigned recipient delivery-fee payments.',
-                'assignable' => true,
-                'permissions' => $this->permissionIds([
-                    'warehouse.dashboard.view',
+                    'warehouse.items.scan',
+                    'warehouse.receiving.manage',
                     'warehouse.recipient_payments.view',
                     'warehouse.recipient_payments.process',
                 ]),
             ],
             [
-                'slug' => 'recipient_payment_supervisor',
-                'name' => 'Recipient Payment Supervisor',
-                'description' => 'Assigns recipient payment work and reviews wallet reconciliation.',
+                'slug' => 'external_bus_handoff_agent',
+                'name' => 'External Bus Handoff Agent',
+                'description' => 'Operates at commercial transit station terminals (e.g. STC/VIP), managing bus cargo loading, manifests, and waybill handoffs.',
                 'assignable' => true,
                 'permissions' => $this->permissionIds([
                     'warehouse.dashboard.view',
-                    'warehouse.recipient_payments.view',
-                    'warehouse.recipient_payments.process',
-                    'warehouse.recipient_payments.assign',
-                    'warehouse.recipient_payments.reconcile',
-                    'warehouse.recipient_payments.override',
-                    'warehouse.recipient_payments.manage_wallets',
+                    'warehouse.manifest.manage',
+                    'warehouse.transport.assign',
+                    'warehouse.items.scan',
+                    'drivers.view',
+                    'drivers.assign',
+                ]),
+            ],
+            [
+                'slug' => 'external_hub_agent',
+                'name' => 'External Hub Agent',
+                'description' => 'Manages partner hub operations, regional parcel intake, sorting, and forwarding packages to local delivery teams.',
+                'assignable' => true,
+                'permissions' => $this->permissionIds([
+                    'warehouse.dashboard.view',
+                    'warehouse.receiving.manage',
+                    'warehouse.sorting.manage',
+                    'warehouse.manifest.manage',
+                    'warehouse.items.scan',
+                ]),
+            ],
+            [
+                'slug' => 'transporter',
+                'name' => 'Transporter',
+                'description' => 'Intercity long-haul transport driver executing multi-hub batch movements and warehouse offload scanning.',
+                'assignable' => true,
+                'permissions' => $this->permissionIds([
+                    'warehouse.dashboard.view',
+                    'warehouse.items.scan',
+                    'warehouse.transport.assign',
+                    'drivers.view',
+                ]),
+            ],
+            [
+                'slug' => 'rider',
+                'name' => 'Rider',
+                'description' => 'Local last-mile doorstep delivery driver handling customer OTP verification and cash collection.',
+                'assignable' => true,
+                'permissions' => $this->permissionIds([
+                    'warehouse.dashboard.view',
+                    'warehouse.items.scan',
+                    'warehouse.delivery.assign',
+                    'warehouse.delivery.code.reset',
+                    'drivers.view',
                 ]),
             ],
         ];
 
+        $allowedSlugs = array_column($roles, 'slug');
+
+        // Delete all legacy/obsolete roles not matching our 7 roles
+        $obsoleteRoles = Role::query()->whereNotIn('slug', $allowedSlugs)->get();
+        foreach ($obsoleteRoles as $oldRole) {
+            if (method_exists($oldRole, 'permissions')) {
+                $oldRole->permissions()->detach();
+            }
+            if (method_exists($oldRole, 'users')) {
+                $oldRole->users()->detach();
+            }
+            $oldRole->delete();
+        }
+
+        // Sync exact 7 allowed roles
         foreach ($roles as $definition) {
-            $role = Role::query()
-                ->where('slug', $definition['slug'])
-                ->orWhere('name', $definition['name'])
-                ->first() ?? new Role();
+            $role = Role::query()->where('slug', $definition['slug'])->first() ?? new Role();
 
             $role->fill([
                 'slug' => $definition['slug'],
@@ -211,7 +153,7 @@ class RoleSeeder extends Seeder
             $role->permissions()->sync($definition['permissions']);
         }
 
-        $this->command->info('Successfully seeded warehouse-first roles.');
+        $this->command->info('✓ Deleted obsolete roles and seeded exact 7 Parcelman operational roles.');
     }
 
     /**

@@ -30,7 +30,7 @@ class PermissionSeeder extends Seeder
             ['module' => 'roles', 'action' => 'delete', 'name' => 'roles.delete', 'description' => 'Delete roles', 'sort_order' => 33],
             ['module' => 'roles', 'action' => 'assign', 'name' => 'roles.assign', 'description' => 'Assign roles to users', 'sort_order' => 34],
 
-            // Orders (6)
+            // Orders / Shipments (6)
             ['module' => 'shipments', 'action' => 'view', 'name' => 'shipments.view', 'description' => 'View orders', 'sort_order' => 40],
             ['module' => 'shipments', 'action' => 'create', 'name' => 'shipments.create', 'description' => 'Create orders', 'sort_order' => 41],
             ['module' => 'shipments', 'action' => 'edit', 'name' => 'shipments.edit', 'description' => 'Edit orders', 'sort_order' => 42],
@@ -38,7 +38,7 @@ class PermissionSeeder extends Seeder
             ['module' => 'shipments', 'action' => 'assign_driver', 'name' => 'shipments.assign_driver', 'description' => 'Assign riders to orders', 'sort_order' => 44],
             ['module' => 'shipments', 'action' => 'update_status', 'name' => 'shipments.update_status', 'description' => 'Update order status', 'sort_order' => 45],
 
-            // Vendors (5)
+            // Vendors (6)
             ['module' => 'vendors', 'action' => 'view', 'name' => 'vendors.view', 'description' => 'View vendors list', 'sort_order' => 50],
             ['module' => 'vendors', 'action' => 'create', 'name' => 'vendors.create', 'description' => 'Create new vendors', 'sort_order' => 51],
             ['module' => 'vendors', 'action' => 'edit', 'name' => 'vendors.edit', 'description' => 'Edit existing vendors', 'sort_order' => 52],
@@ -53,7 +53,7 @@ class PermissionSeeder extends Seeder
             ['module' => 'drivers', 'action' => 'delete', 'name' => 'drivers.delete', 'description' => 'Delete riders', 'sort_order' => 63],
             ['module' => 'drivers', 'action' => 'assign', 'name' => 'drivers.assign', 'description' => 'Assign riders to tasks', 'sort_order' => 64],
 
-            // Charges ledger (admin-side: pickup/delivery/station/handling fees per shipment)
+            // Charges ledger (2)
             ['module' => 'charges', 'action' => 'view', 'name' => 'charges.view', 'description' => 'View shipment charges ledger', 'sort_order' => 75],
             ['module' => 'charges', 'action' => 'manage', 'name' => 'charges.manage', 'description' => 'Add / edit / mark paid / waive shipment charges', 'sort_order' => 76],
 
@@ -63,7 +63,7 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouses', 'action' => 'edit', 'name' => 'warehouses.edit', 'description' => 'Edit warehouses', 'sort_order' => 112],
             ['module' => 'warehouses', 'action' => 'delete', 'name' => 'warehouses.delete', 'description' => 'Delete warehouses', 'sort_order' => 113],
 
-            // Warehouse Operations (13)
+            // Warehouse Operations (25)
             ['module' => 'warehouse', 'action' => 'dashboard_view', 'name' => 'warehouse.dashboard.view', 'description' => 'View warehouse dashboard', 'sort_order' => 120],
             ['module' => 'warehouse', 'action' => 'users_view', 'name' => 'warehouse.users.view', 'description' => 'View warehouse users', 'sort_order' => 121],
             ['module' => 'warehouse', 'action' => 'users_create', 'name' => 'warehouse.users.create', 'description' => 'Create warehouse users', 'sort_order' => 122],
@@ -76,7 +76,7 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouse', 'action' => 'sorting_manage', 'name' => 'warehouse.sorting.manage', 'description' => 'Manage warehouse sorting', 'sort_order' => 127],
             ['module' => 'warehouse', 'action' => 'sorting_reopen', 'name' => 'warehouse.sorting.reopen', 'description' => 'Reopen sealed sort batches', 'sort_order' => 1271],
             ['module' => 'warehouse', 'action' => 'manifest_manage', 'name' => 'warehouse.manifest.manage', 'description' => 'Manage transport manifests', 'sort_order' => 128],
-            ['module' => 'warehouse', 'action' => 'transport_assign', 'name' => 'warehouse.transport.assign', 'description' => 'Assign transport riders', 'sort_order' => 129],
+            ['module' => 'warehouse', 'action' => 'transport_assign', 'name' => 'warehouse.transport.assign', 'description' => 'Assign transport drivers', 'sort_order' => 129],
             ['module' => 'warehouse', 'action' => 'delivery_assign', 'name' => 'warehouse.delivery.assign', 'description' => 'Assign delivery riders', 'sort_order' => 130],
             ['module' => 'warehouse', 'action' => 'delivery_code_reset', 'name' => 'warehouse.delivery.code.reset', 'description' => 'Regenerate delivery verification codes', 'sort_order' => 1301],
             ['module' => 'warehouse', 'action' => 'items_scan', 'name' => 'warehouse.items.scan', 'description' => 'Scan warehouse items in/out', 'sort_order' => 131],
@@ -90,7 +90,7 @@ class PermissionSeeder extends Seeder
             ['module' => 'warehouse', 'action' => 'recipient_payments_override', 'name' => 'warehouse.recipient_payments.override', 'description' => 'Override recipient payment dispatch blocks in the warehouse portal', 'sort_order' => 1394],
             ['module' => 'warehouse', 'action' => 'recipient_payments_manage_wallets', 'name' => 'warehouse.recipient_payments.manage_wallets', 'description' => 'Manage approved recipient payment wallets in the warehouse portal', 'sort_order' => 1395],
 
-            // Recipient Payments
+            // Recipient Payments (6)
             ['module' => 'recipient_payments', 'action' => 'view', 'name' => 'recipient_payments.view', 'description' => 'View recipient payment queues', 'sort_order' => 140],
             ['module' => 'recipient_payments', 'action' => 'process', 'name' => 'recipient_payments.process', 'description' => 'Process assigned recipient payments', 'sort_order' => 141],
             ['module' => 'recipient_payments', 'action' => 'assign', 'name' => 'recipient_payments.assign', 'description' => 'Assign recipient payment tasks', 'sort_order' => 142],

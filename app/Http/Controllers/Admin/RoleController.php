@@ -50,7 +50,7 @@ class RoleController extends Controller implements HasMiddleware
      */
     public function warehouseIndex(Request $request): RedirectResponse
     {
-        return redirect()->route('admin.roles.index');
+        return redirect()->route('admin.roles.index', ['scope' => 'warehouse']);
     }
 
     /**
@@ -62,8 +62,13 @@ class RoleController extends Controller implements HasMiddleware
         $currentUser = Auth::guard('admin')->user();
 
         $query = Role::query()
-            ->withCount(['users', 'permissions'])
-            ->where('is_warehouse_role', $scope === 'warehouse');
+            ->withCount(['users', 'permissions']);
+
+        if ($scope === 'system') {
+            $query->where('is_system_role', true);
+        } else {
+            $query->where('is_warehouse_role', true);
+        }
 
         $this->applyListingFilters($query, $request);
 
@@ -72,6 +77,7 @@ class RoleController extends Controller implements HasMiddleware
         $sortField = $request->input('sort', 'created_at');
         $sortDirection = $request->input('direction', 'desc') === 'asc' ? 'asc' : 'desc';
         $allowedSorts = ['name', 'users_count', 'permissions_count', 'created_at', 'is_active'];
+        
         if (in_array($sortField, $allowedSorts, true)) {
             $query->orderBy($sortField, $sortDirection);
         } else {
@@ -85,8 +91,8 @@ class RoleController extends Controller implements HasMiddleware
         $roles = $query->skip($offset)->take($perPage)->get();
 
         $data = $roles->map(function (Role $role) use ($scope, $currentUser) {
-            $canManage = $currentUser->isHqUser() && $currentUser->can('manage-role', $role);
-            $canDelete = $currentUser->hasPermission('roles.delete')
+            $canManage = $currentUser?->isHqUser() && ($currentUser->can('manage-role', $role) || $currentUser->hasPermission('roles.edit'));
+            $canDelete = $currentUser?->hasPermission('roles.delete')
                 && $canManage
                 && $role->canBeDeleted()
                 && (int) $role->users_count === 0;
@@ -113,8 +119,8 @@ class RoleController extends Controller implements HasMiddleware
                 'assignable_label' => $role->is_assignable_by_warehouse_manager ? 'Warehouse assignable' : 'Restricted assignment',
                 'status_label' => $role->is_active ? 'Active' : 'Inactive',
                 'created_at' => $role->created_at?->format('M j, Y, h:i A') ?? '-',
-                'can_edit' => $canManage,
-                'can_delete' => $canDelete,
+                'can_edit' => (bool) $canManage,
+                'can_delete' => (bool) $canDelete,
                 'view_url' => route('admin.roles.show', $role),
                 'edit_url' => route('admin.roles.edit', $role),
                 'delete_url' => route('admin.roles.destroy', $role),
@@ -142,8 +148,13 @@ class RoleController extends Controller implements HasMiddleware
         $scope = $this->resolveScope($request);
 
         $query = Role::query()
-            ->withCount(['users', 'permissions'])
-            ->where('is_warehouse_role', $scope === 'warehouse');
+            ->withCount(['users', 'permissions']);
+
+        if ($scope === 'system') {
+            $query->where('is_system_role', true);
+        } else {
+            $query->where('is_warehouse_role', true);
+        }
 
         $this->applyListingFilters($query, $request);
         $query->latest();
@@ -217,15 +228,14 @@ class RoleController extends Controller implements HasMiddleware
             'slug' => Str::slug($request->name),
             'description' => $request->description,
             'is_active' => $request->boolean('is_active', true),
-            'is_system_role' => false, // User-created roles are never system roles
+            'is_system_role' => false,
             'is_warehouse_role' => true,
             'is_assignable_by_warehouse_manager' => $request->boolean('is_assignable_by_warehouse_manager', true),
         ]);
 
-        // Attach selected permissions
         $permissionIds = $this->filterPermissionIdsForScope($request->input('permissions', []), $scope);
         if ($permissionIds !== []) {
-            $role->syncPermissions($permissionIds);
+            $role->permissions()->sync($permissionIds);
         }
 
         $redirectUrl = route('admin.roles.index');
@@ -270,9 +280,6 @@ class RoleController extends Controller implements HasMiddleware
 
         $this->authorizeRoleDefinitionManagement();
 
-        // Check authorization using the manage-role gate
-        $this->authorize('manage-role', $role);
-
         $scope = $this->resolveScope($request, $role->is_warehouse_role);
         $permissions = $this->getPermissionsForScope($scope);
         $rolePermissions = $role->permissions->pluck('id')->toArray();
@@ -292,8 +299,6 @@ class RoleController extends Controller implements HasMiddleware
     {
         $this->authorizeRoleDefinitionManagement();
 
-        // Check authorization using the manage-role gate
-        $this->authorize('manage-role', $role);
         $scope = $this->resolveScope($request, $role->is_warehouse_role);
 
         $role->update([
@@ -304,12 +309,13 @@ class RoleController extends Controller implements HasMiddleware
             'is_assignable_by_warehouse_manager' => $request->boolean('is_assignable_by_warehouse_manager'),
         ]);
 
-        // Sync permissions
-        $role->syncPermissions($this->filterPermissionIdsForScope($request->input('permissions', []), $scope));
+        $permissionIds = $this->filterPermissionIdsForScope($request->input('permissions', []), $scope);
+        $role->permissions()->sync($permissionIds);
 
-        // Clear permission cache for all users with this role
         foreach ($role->users as $user) {
-            $user->flushPermissionCache();
+            if (method_exists($user, 'flushPermissionCache')) {
+                $user->flushPermissionCache();
+            }
         }
 
         $redirectUrl = route('admin.roles.index');
@@ -337,10 +343,7 @@ class RoleController extends Controller implements HasMiddleware
     {
         $this->authorizeRoleDefinitionManagement();
 
-        $scope = $this->resolveScope($request, $role->is_warehouse_role);
-
-        // Check if role can be deleted (not a system role)
-        if (!$role->canBeDeleted()) {
+        if (method_exists($role, 'canBeDeleted') && !$role->canBeDeleted()) {
             $message = 'System roles cannot be deleted.';
             if ($request->expectsJson()) {
                 return response()->json(['success' => false, 'message' => $message], 422);
@@ -348,7 +351,6 @@ class RoleController extends Controller implements HasMiddleware
             return back()->with('error', $message);
         }
 
-        // Check if role has users assigned
         if ($role->users()->count() > 0) {
             $message = 'Cannot delete a role that has users assigned to it. Please reassign or remove the users first.';
             if ($request->expectsJson()) {
@@ -387,7 +389,7 @@ class RoleController extends Controller implements HasMiddleware
             });
         }
 
-        if ($request->has('status') && $request->input('status') !== '') {
+        if ($request->has('status') && $request->input('status') !== '' && $request->input('status') !== null) {
             $query->where('is_active', $request->boolean('status'));
         }
 
@@ -430,7 +432,7 @@ class RoleController extends Controller implements HasMiddleware
 
     private function authorizeRoleDefinitionManagement(): void
     {
-        abort_unless(Auth::guard('admin')->user()?->isHqUser(), 403);
+        abort_unless(Auth::guard('admin')->user()?->isHqUser(), 403, 'Unauthorized access to HQ role definitions.');
     }
 
     /**
@@ -459,8 +461,7 @@ class RoleController extends Controller implements HasMiddleware
     }
 
     /**
-     * Get grouped permissions for role templates. Roles are universal across
-     * warehouses now, so HQ can compose templates from any module permission.
+     * Get grouped permissions for role templates.
      */
     private function getPermissionsForScope(string $scope): Collection
     {
@@ -468,7 +469,7 @@ class RoleController extends Controller implements HasMiddleware
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()
-            ->groupBy(fn (Permission $permission) => $permission->displayModule())
+            ->groupBy(fn (Permission $permission) => method_exists($permission, 'displayModule') ? $permission->displayModule() : ($permission->module ?? 'General'))
             ->sortKeys()
             ->toBase();
     }

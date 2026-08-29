@@ -22,6 +22,14 @@ use App\Http\Controllers\Api\V1\VendorShipmentItemController;
 use App\Http\Controllers\Api\V1\DriverNotificationController;
 use Illuminate\Support\Facades\Route;
 
+Route::prefix('v1/driver')->group(function () {
+    Route::post('/login', [DriverAuthController::class, 'login']);
+    
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/logout', [DriverAuthController::class, 'logout']);
+    });
+});
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -167,6 +175,10 @@ Route::prefix('v1/driver')->group(function () {
         Route::post('package-transfers/{transfer}/reject', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'rejectTransfer']);
         Route::post('package-transfers/{transfer}/cancel', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'cancelTransfer']);
         Route::post('package-transfers/{transfer}/recall', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'recallTransfer']);
+
+        Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/transporter/location', [App\Http\Controllers\Api\V1\TransporterLocationController::class, 'updateLocation']);
+});
 
         Route::get('rider-teams', [DriverRiderTeamController::class, 'index']);
         Route::get('rider-teams/{team}', [DriverRiderTeamController::class, 'show']);
