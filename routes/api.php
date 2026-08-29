@@ -1,34 +1,28 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AgentParcelController;
+use App\Http\Controllers\Api\V1\Auth\AgentAuthController;
 use App\Http\Controllers\Api\V1\Auth\DriverAuthController;
 use App\Http\Controllers\Api\V1\Auth\VendorAuthController;
-use App\Http\Controllers\Api\V1\Auth\AgentAuthController;
-use App\Http\Controllers\Api\V1\AgentParcelController;
 use App\Http\Controllers\Api\V1\DriverAssignmentController;
 use App\Http\Controllers\Api\V1\DriverBusHandoffController;
 use App\Http\Controllers\Api\V1\DriverBusStationController;
 use App\Http\Controllers\Api\V1\DriverDeliveryController;
+use App\Http\Controllers\Api\V1\DriverNotificationController;
+use App\Http\Controllers\Api\V1\DriverPackageController;
 use App\Http\Controllers\Api\V1\DriverProfileController;
 use App\Http\Controllers\Api\V1\DriverRiderTeamController;
 use App\Http\Controllers\Api\V1\DriverRiderTeamHandoverController;
 use App\Http\Controllers\Api\V1\DriverTransportController;
-use App\Http\Controllers\Api\V1\VendorLocationController;
-use App\Http\Controllers\Api\V1\VendorProfileController;
+use App\Http\Controllers\Api\V1\TransporterLocationController;
 use App\Http\Controllers\Api\V1\VendorEarningsController;
+use App\Http\Controllers\Api\V1\VendorLocationController;
 use App\Http\Controllers\Api\V1\VendorNotificationController;
 use App\Http\Controllers\Api\V1\VendorPickupVehicleTypeController;
+use App\Http\Controllers\Api\V1\VendorProfileController;
 use App\Http\Controllers\Api\V1\VendorShipmentController;
 use App\Http\Controllers\Api\V1\VendorShipmentItemController;
-use App\Http\Controllers\Api\V1\DriverNotificationController;
 use Illuminate\Support\Facades\Route;
-
-Route::prefix('v1/driver')->group(function () {
-    Route::post('/login', [DriverAuthController::class, 'login']);
-    
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::post('/logout', [DriverAuthController::class, 'logout']);
-    });
-});
 
 /*
 |--------------------------------------------------------------------------
@@ -78,7 +72,7 @@ Route::prefix('v1/agent')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/earnings', [AgentParcelController::class, 'earnings']);
 });
 
-// API v1 - Vendor Profile
+// API v1 - Vendor Profile & Operations
 Route::prefix('v1/vendor')->middleware(['auth:sanctum', 'vendor.active'])->group(function () {
     Route::get('profile', [VendorProfileController::class, 'show']);
     Route::put('profile', [VendorProfileController::class, 'update']);
@@ -114,7 +108,7 @@ Route::prefix('v1/vendor')->middleware(['auth:sanctum', 'vendor.active'])->group
     Route::get('payouts', [VendorEarningsController::class, 'payouts']);
 });
 
-// API v1 - Driver Authentication
+// API v1 - Driver Operations (Transporter & Rider)
 Route::prefix('v1/driver')->group(function () {
     Route::post('login', [DriverAuthController::class, 'login']);
 
@@ -162,23 +156,21 @@ Route::prefix('v1/driver')->group(function () {
         Route::post('notifications/read-all', [DriverNotificationController::class, 'markAllAsRead']);
         Route::post('notifications/{notification}/read', [DriverNotificationController::class, 'markAsRead']);
 
-        Route::post('scan-claim', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'scanClaim']);
-        Route::get('my-packages', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'myPackages']);
-        Route::post('release-package', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'releasePackage']);
-        Route::post('start-deliveries', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'startDeliveries']);
-        Route::get('package-history/{barcode}', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'packageHistory']);
-        Route::post('packages/{trackingCode}/location-change', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'changePackageLocation']);
-        Route::post('packages/{trackingCode}/transfer', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'requestTransfer']);
-        Route::get('package-transfers/incoming', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'incomingTransfers']);
-        Route::get('package-transfers/outgoing', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'outgoingTransfers']);
-        Route::post('package-transfers/{transfer}/accept', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'acceptTransfer']);
-        Route::post('package-transfers/{transfer}/reject', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'rejectTransfer']);
-        Route::post('package-transfers/{transfer}/cancel', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'cancelTransfer']);
-        Route::post('package-transfers/{transfer}/recall', [\App\Http\Controllers\Api\V1\DriverPackageController::class, 'recallTransfer']);
+        Route::post('scan-claim', [DriverPackageController::class, 'scanClaim']);
+        Route::get('my-packages', [DriverPackageController::class, 'myPackages']);
+        Route::post('release-package', [DriverPackageController::class, 'releasePackage']);
+        Route::post('start-deliveries', [DriverPackageController::class, 'startDeliveries']);
+        Route::get('package-history/{barcode}', [DriverPackageController::class, 'packageHistory']);
+        Route::post('packages/{trackingCode}/location-change', [DriverPackageController::class, 'changePackageLocation']);
+        Route::post('packages/{trackingCode}/transfer', [DriverPackageController::class, 'requestTransfer']);
+        Route::get('package-transfers/incoming', [DriverPackageController::class, 'incomingTransfers']);
+        Route::get('package-transfers/outgoing', [DriverPackageController::class, 'outgoingTransfers']);
+        Route::post('package-transfers/{transfer}/accept', [DriverPackageController::class, 'acceptTransfer']);
+        Route::post('package-transfers/{transfer}/reject', [DriverPackageController::class, 'rejectTransfer']);
+        Route::post('package-transfers/{transfer}/cancel', [DriverPackageController::class, 'cancelTransfer']);
+        Route::post('package-transfers/{transfer}/recall', [DriverPackageController::class, 'recallTransfer']);
 
-        Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/transporter/location', [App\Http\Controllers\Api\V1\TransporterLocationController::class, 'updateLocation']);
-});
+        Route::post('transporter/location', [TransporterLocationController::class, 'updateLocation']);
 
         Route::get('rider-teams', [DriverRiderTeamController::class, 'index']);
         Route::get('rider-teams/{team}', [DriverRiderTeamController::class, 'show']);
