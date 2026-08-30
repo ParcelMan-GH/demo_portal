@@ -26,33 +26,45 @@ class DriverTransportController extends Controller
             $driver = $request->user();
             $search = trim($request->query('search', ''));
 
+            // Dynamically detect column name (driver_id vs transporter_id)
+            $driverCol = Schema::hasColumn('transport_manifests', 'driver_id') ? 'driver_id' : 'transporter_id';
+
             // Query dispatches assigned to this driver OR unassigned in the pool
             $query = TransportManifest::query()
                 ->with(['originWarehouse', 'destinationWarehouse'])
-                ->where(function ($q) use ($driver) {
-                    $q->where('transporter_id', $driver->id)
-                      ->orWhereNull('transporter_id')
-                      ->orWhere('transporter_id', 0)
-                      ->orWhere('transporter_id', '');
+                ->where(function ($q) use ($driver, $driverCol) {
+                    $q->where($driverCol, $driver->id)
+                      ->orWhereNull($driverCol)
+                      ->orWhere($driverCol, 0)
+                      ->orWhere($driverCol, '');
                 });
 
             if ($search !== '') {
                 $query->where(function ($q) use ($search) {
-                    $q->where('id', $search);
+                    $isFirst = true;
 
-                    if (Schema::hasColumn('transport_manifests', 'manifest_number')) {
-                        $q->orWhere('manifest_number', 'like', "%{$search}%");
+                    if (is_numeric($search)) {
+                        $q->where('id', (int) $search);
+                        $isFirst = false;
                     }
 
-                    if (Schema::hasColumn('transport_manifests', 'batch_number')) {
-                        $q->orWhere('batch_number', 'like', "%{$search}%");
+                    foreach (['batch_number', 'manifest_number', 'code'] as $col) {
+                        if (Schema::hasColumn('transport_manifests', $col)) {
+                            if ($isFirst) {
+                                $q->where($col, 'like', "%{$search}%");
+                                $isFirst = false;
+                            } else {
+                                $q->orWhere($col, 'like', "%{$search}%");
+                            }
+                        }
                     }
 
-                    if (Schema::hasColumn('transport_manifests', 'code')) {
-                        $q->orWhere('code', 'like', "%{$search}%");
+                    if ($isFirst) {
+                        $q->whereHas('containers', fn ($cq) => $cq->where('code', 'like', "%{$search}%"));
+                    } else {
+                        $q->orWhereHas('containers', fn ($cq) => $cq->where('code', 'like', "%{$search}%"));
                     }
 
-                    $q->orWhereHas('containers', fn ($cq) => $cq->where('code', 'like', "%{$search}%"));
                     $q->orWhereHas('items', fn ($iq) => $iq->where('tracking_code', 'like', "%{$search}%"));
                 });
             }
@@ -60,17 +72,17 @@ class DriverTransportController extends Controller
             $manifests = $query->latest()->get();
 
             // Calculate transporter metrics
-            $drivesMade = TransportManifest::where('transporter_id', $driver->id)
+            $drivesMade = TransportManifest::where($driverCol, $driver->id)
                 ->whereIn('status', ['in_transit', 'completed', 'arrived'])
                 ->count();
-            $totalBatches = TransportManifest::where('transporter_id', $driver->id)->count();
+            $totalBatches = TransportManifest::where($driverCol, $driver->id)->count();
             $exceptions = 0;
 
             if (class_exists(TransportLoadingException::class)) {
-                $exceptions = TransportLoadingException::whereHas('manifest', fn ($q) => $q->where('transporter_id', $driver->id))->count();
+                $exceptions = TransportLoadingException::whereHas('manifest', fn ($q) => $q->where($driverCol, $driver->id))->count();
             }
 
-            $recent = $manifests->map(function ($m) {
+            $recent = $manifests->map(function ($m) use ($driverCol, $driver) {
                 $code = $m->batch_number ?? $m->manifest_number ?? $m->code ?? "TRN-{$m->id}";
                 $destinationName = $m->destinationWarehouse?->name 
                     ?? (isset($m->delivery_region_id) ? "Region #{$m->delivery_region_id} / District #{$m->delivery_district_id}" : 'Destination Hub');
@@ -83,7 +95,7 @@ class DriverTransportController extends Controller
                     'package_count' => $m->items_count ?? ($m->relationLoaded('items') ? $m->items->count() : 0),
                     'status' => str_replace('_', ' ', ucfirst($m->status ?? 'pending')),
                     'status_raw' => $m->status ?? 'pending',
-                    'transporter_id' => $m->transporter_id,
+                    'transporter_id' => $m->{$driverCol} ?? $driver->id,
                 ];
             });
 
@@ -182,10 +194,11 @@ class DriverTransportController extends Controller
     public function depart(Request $request, TransportManifest $manifest): JsonResponse
     {
         $driver = $request->user();
+        $driverCol = Schema::hasColumn('transport_manifests', 'driver_id') ? 'driver_id' : 'transporter_id';
 
-        if (!$manifest->transporter_id) {
+        if (!$manifest->{$driverCol}) {
             $manifest->update([
-                'transporter_id' => $driver->id,
+                $driverCol => $driver->id,
             ]);
         }
 
