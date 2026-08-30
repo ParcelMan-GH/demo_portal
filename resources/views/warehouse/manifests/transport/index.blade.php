@@ -9,13 +9,13 @@
         'create_endpoint' => route('admin.transport-manifests.store'),
         'transfer_batches' => collect($transferBatches ?? [])->values(),
         'transport_drivers' => collect($transportDrivers ?? $drivers ?? [])->map(fn ($driver) => [
-            'id' => $driver->id,
-            'name' => $driver->name,
-            'phone' => $driver->phone,
+            'id' => data_get($driver, 'id'),
+            'name' => data_get($driver, 'name'),
+            'phone' => data_get($driver, 'phone'),
         ])->values(),
         'destination_warehouses' => collect($warehouses ?? $destinationWarehouses ?? [])->map(fn ($w) => [
-            'id' => $w->id,
-            'name' => $w->name,
+            'id' => data_get($w, 'id'),
+            'name' => data_get($w, 'name'),
         ])->values(),
         'available_regions' => [
             ['id' => 1, 'name' => 'Kumasi'],
