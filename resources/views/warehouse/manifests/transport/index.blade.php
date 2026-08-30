@@ -18,14 +18,25 @@
             'name' => data_get($w, 'name'),
         ])->values(),
         'available_regions' => [
-            ['id' => 1, 'name' => 'Kumasi'],
-            ['id' => 2, 'name' => 'Koforidua'],
-            ['id' => 3, 'name' => 'Takoradi'],
-            ['id' => 4, 'name' => 'Tamale'],
-            ['id' => 5, 'name' => 'Accra'],
-            ['id' => 6, 'name' => 'Sunyani'],
-            ['id' => 7, 'name' => 'Cape Coast'],
-            ['id' => 8, 'name' => 'Ho'],
+            ['id' => 1, 'name' => 'Ashanti (Kumasi)'],
+            ['id' => 2, 'name' => 'Eastern (Koforidua)'],
+            ['id' => 3, 'name' => 'Western (Takoradi)'],
+            ['id' => 4, 'name' => 'Northern (Tamale)'],
+            ['id' => 5, 'name' => 'Greater Accra'],
+            ['id' => 6, 'name' => 'Bono (Sunyani)'],
+            ['id' => 7, 'name' => 'Central (Cape Coast)'],
+            ['id' => 8, 'name' => 'Volta (Ho)'],
+        ],
+        'available_districts' => [
+            ['id' => 1, 'region_id' => 1, 'name' => 'Kumasi Metro'],
+            ['id' => 2, 'region_id' => 1, 'name' => 'Asokwa Municipal'],
+            ['id' => 3, 'region_id' => 2, 'name' => 'New Juaben South'],
+            ['id' => 4, 'region_id' => 3, 'name' => 'Sekondi Takoradi Metro'],
+            ['id' => 5, 'region_id' => 4, 'name' => 'Tamale Metro'],
+            ['id' => 6, 'region_id' => 5, 'name' => 'Accra Metro'],
+            ['id' => 7, 'region_id' => 6, 'name' => 'Sunyani Municipal'],
+            ['id' => 8, 'region_id' => 7, 'name' => 'Cape Coast Metro'],
+            ['id' => 9, 'region_id' => 8, 'name' => 'Ho Municipal'],
         ]
     ];
 @endphp
@@ -235,6 +246,28 @@
                     </select>
                 </div>
 
+                {{-- Delivery Region --}}
+                <div>
+                    <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Delivery Region *</label>
+                    <select x-model="newBatch.delivery_region_id" @change="onRegionChange()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-orange-500">
+                        <option value="">Select Region</option>
+                        <template x-for="region in availableRegions" :key="region.id">
+                            <option :value="region.id" x-text="region.name"></option>
+                        </template>
+                    </select>
+                </div>
+
+                {{-- Delivery District --}}
+                <div>
+                    <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Delivery District *</label>
+                    <select x-model="newBatch.delivery_district_id" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-orange-500">
+                        <option value="">Select District</option>
+                        <template x-for="district in filteredDistricts" :key="district.id">
+                            <option :value="district.id" x-text="district.name"></option>
+                        </template>
+                    </select>
+                </div>
+
                 {{-- Assign Driver (Optional) --}}
                 <div>
                     <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Assigned Transporter / Driver (Optional)</label>
@@ -245,17 +278,6 @@
                         </template>
                     </select>
                     <p class="text-[11px] text-slate-400 mt-1">If left unassigned, any driver can scan the batch barcode on mobile to start the trip.</p>
-                </div>
-
-                {{-- Delivery Region --}}
-                <div>
-                    <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Target Region (Optional)</label>
-                    <select x-model="newBatch.delivery_region_id" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-orange-500">
-                        <option value="">Select Region</option>
-                        <template x-for="region in availableRegions" :key="region.id">
-                            <option :value="region.id" x-text="region.name"></option>
-                        </template>
-                    </select>
                 </div>
 
                 {{-- Notes / Instructions --}}
@@ -288,12 +310,14 @@
             dateFilter: 'today',
             newBatch: {
                 destination_warehouse_id: '',
+                delivery_region_id: 1,
+                delivery_district_id: 1,
                 transporter_id: '',
-                delivery_region_id: '',
                 notes: ''
             },
             rows: [],
             availableRegions: [],
+            availableDistricts: [],
             destinationWarehouses: [],
             transportDrivers: [],
             activeCards: [
@@ -309,15 +333,32 @@
                 const configAttr = this.$el.getAttribute('data-admin-transport-manifests-config');
                 this.config = configAttr ? JSON.parse(configAttr) : {};
                 this.availableRegions = this.config.available_regions || [];
+                this.availableDistricts = this.config.available_districts || [];
                 this.destinationWarehouses = this.config.destination_warehouses || [];
                 this.transportDrivers = this.config.transport_drivers || [];
                 this.loadData();
             },
+            get filteredDistricts() {
+                if (!this.newBatch.delivery_region_id) {
+                    return this.availableDistricts;
+                }
+                const regionId = Number(this.newBatch.delivery_region_id);
+                return this.availableDistricts.filter(d => d.region_id === regionId);
+            },
+            onRegionChange() {
+                const available = this.filteredDistricts;
+                if (available.length > 0) {
+                    this.newBatch.delivery_district_id = available[0].id;
+                } else {
+                    this.newBatch.delivery_district_id = 1;
+                }
+            },
             openCreateModal() {
                 this.newBatch = {
                     destination_warehouse_id: '',
+                    delivery_region_id: 1,
+                    delivery_district_id: 1,
                     transporter_id: '',
-                    delivery_region_id: '',
                     notes: ''
                 };
                 this.showCreateModal = true;
@@ -368,6 +409,10 @@
             submitCreateBatch() {
                 if (!this.newBatch.destination_warehouse_id) {
                     alert('Please select a destination hub.');
+                    return;
+                }
+                if (!this.newBatch.delivery_district_id) {
+                    alert('Please select a delivery district.');
                     return;
                 }
 
