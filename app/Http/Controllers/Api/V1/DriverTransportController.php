@@ -9,6 +9,8 @@ use App\Services\DriverTransportService;
 use App\Services\Warehouse\WarehouseTransportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 
 class DriverTransportController extends Controller
 {
@@ -20,60 +22,91 @@ class DriverTransportController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $driver = $request->user();
-        $search = trim($request->query('search', ''));
+        try {
+            $driver = $request->user();
+            $search = trim($request->query('search', ''));
 
-        // Query dispatches assigned to this driver OR unassigned in the pool
-        $query = TransportManifest::query()
-            ->with(['originWarehouse', 'destinationWarehouse', 'containers', 'items'])
-            ->where(function ($q) use ($driver) {
-                $q->where('transporter_id', $driver->id)
-                  ->orWhereNull('transporter_id')
-                  ->orWhere('transporter_id', 0)
-                  ->orWhere('transporter_id', '');
+            // Query dispatches assigned to this driver OR unassigned in the pool
+            $query = TransportManifest::query()
+                ->with(['originWarehouse', 'destinationWarehouse'])
+                ->where(function ($q) use ($driver) {
+                    $q->where('transporter_id', $driver->id)
+                      ->orWhereNull('transporter_id')
+                      ->orWhere('transporter_id', 0)
+                      ->orWhere('transporter_id', '');
+                });
+
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $q->where('id', $search);
+
+                    if (Schema::hasColumn('transport_manifests', 'manifest_number')) {
+                        $q->orWhere('manifest_number', 'like', "%{$search}%");
+                    }
+
+                    if (Schema::hasColumn('transport_manifests', 'batch_number')) {
+                        $q->orWhere('batch_number', 'like', "%{$search}%");
+                    }
+
+                    if (Schema::hasColumn('transport_manifests', 'code')) {
+                        $q->orWhere('code', 'like', "%{$search}%");
+                    }
+
+                    $q->orWhereHas('containers', fn ($cq) => $cq->where('code', 'like', "%{$search}%"));
+                    $q->orWhereHas('items', fn ($iq) => $iq->where('tracking_code', 'like', "%{$search}%"));
+                });
+            }
+
+            $manifests = $query->latest()->get();
+
+            // Calculate transporter metrics
+            $drivesMade = TransportManifest::where('transporter_id', $driver->id)
+                ->whereIn('status', ['in_transit', 'completed', 'arrived'])
+                ->count();
+            $totalBatches = TransportManifest::where('transporter_id', $driver->id)->count();
+            $exceptions = 0;
+
+            if (class_exists(TransportLoadingException::class)) {
+                $exceptions = TransportLoadingException::whereHas('manifest', fn ($q) => $q->where('transporter_id', $driver->id))->count();
+            }
+
+            $recent = $manifests->map(function ($m) {
+                $code = $m->batch_number ?? $m->manifest_number ?? $m->code ?? "TRN-{$m->id}";
+                $destinationName = $m->destinationWarehouse?->name 
+                    ?? (isset($m->delivery_region_id) ? "Region #{$m->delivery_region_id} / District #{$m->delivery_district_id}" : 'Destination Hub');
+
+                return [
+                    'id' => (string) $m->id,
+                    'manifest_code' => $code,
+                    'origin' => $m->originWarehouse?->name ?? 'Origin Hub',
+                    'destination' => $destinationName,
+                    'package_count' => $m->items_count ?? ($m->relationLoaded('items') ? $m->items->count() : 0),
+                    'status' => str_replace('_', ' ', ucfirst($m->status ?? 'pending')),
+                    'status_raw' => $m->status ?? 'pending',
+                    'transporter_id' => $m->transporter_id,
+                ];
             });
 
-        if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                $q->where('batch_number', 'like', "%{$search}%")
-                  ->orWhere('manifest_number', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%")
-                  ->orWhere('id', 'like', "%{$search}%")
-                  ->orWhereHas('containers', fn ($cq) => $cq->where('code', 'like', "%{$search}%"))
-                  ->orWhereHas('items', fn ($iq) => $iq->where('tracking_code', 'like', "%{$search}%"));
-            });
+            return response()->json([
+                'success' => true,
+                'metrics' => [
+                    'drives_made' => $drivesMade,
+                    'total_batches' => $totalBatches,
+                    'exceptions' => $exceptions,
+                ],
+                'data' => $recent,
+                'recent_activities' => $recent,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('DriverTransportController Index Error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'data' => [],
+                'recent_activities' => [],
+            ], 500);
         }
-
-        $manifests = $query->latest()->get();
-
-        // Calculate transporter stats
-        $drivesMade = TransportManifest::where('transporter_id', $driver->id)
-            ->whereIn('status', ['in_transit', 'completed', 'arrived'])
-            ->count();
-        $totalBatches = TransportManifest::where('transporter_id', $driver->id)->count();
-        $exceptions = TransportLoadingException::whereHas('manifest', fn ($q) => $q->where('transporter_id', $driver->id))->count();
-
-        $recent = $manifests->map(fn ($m) => [
-            'id' => (string) $m->id,
-            'manifest_code' => $m->batch_number ?? $m->manifest_number ?? $m->code ?? "TRN-{$m->id}",
-            'origin' => $m->originWarehouse?->name ?? 'Origin Hub',
-            'destination' => $m->destinationWarehouse?->name ?? "Region #{$m->delivery_region_id} / District #{$m->delivery_district_id}",
-            'package_count' => $m->items_count ?? $m->items()->count() ?: ($m->containers()->count() ?: 0),
-            'status' => str_replace('_', ' ', ucfirst($m->status)),
-            'status_raw' => $m->status,
-            'transporter_id' => $m->transporter_id,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'metrics' => [
-                'drives_made' => $drivesMade,
-                'total_batches' => $totalBatches,
-                'exceptions' => $exceptions,
-            ],
-            'data' => $recent,
-            'recent_activities' => $recent,
-        ]);
     }
 
     public function show(Request $request, TransportManifest $manifest): JsonResponse
