@@ -34,6 +34,8 @@ class DriverTransportController extends Controller
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 $q->where('manifest_number', 'like', "%{$search}%")
+                  ->orWhere('batch_number', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%")
                   ->orWhere('id', $search)
                   ->orWhereHas('containers', fn ($cq) => $cq->where('code', 'like', "%{$search}%"))
                   ->orWhereHas('items', fn ($iq) => $iq->where('tracking_code', 'like', "%{$search}%"));
@@ -51,14 +53,14 @@ class DriverTransportController extends Controller
 
         $recent = $manifests->map(fn ($m) => [
             'id' => (string) $m->id,
-            'manifest_code' => $m->manifest_number ?? "TRN-{$m->id}",
+            'manifest_code' => $m->batch_number ?? $m->manifest_number ?? $m->code ?? "TRN-{$m->id}",
             'origin' => $m->originWarehouse?->name ?? 'Origin Hub',
-            'destination' => $m->destinationWarehouse?->name ?? 'Destination Hub',
-            'package_count' => $m->items_count ?? $m->items()->count() ?: ($m->containers()->count() ?: 1),
+            'destination' => $m->destinationWarehouse?->name ?? "Region #{$m->delivery_region_id} / District #{$m->delivery_district_id}",
+            'package_count' => $m->items_count ?? $m->items()->count() ?: ($m->containers()->count() ?: 0),
             'status' => str_replace('_', ' ', ucfirst($m->status)),
             'status_raw' => $m->status,
             'transporter_id' => $m->transporter_id,
-          ]);
+        ]);
 
         return response()->json([
             'success' => true,
