@@ -13,7 +13,10 @@
             'name' => $driver->name,
             'phone' => $driver->phone,
         ])->values(),
-        'destination_warehouses' => $warehouses ?? [],
+        'destination_warehouses' => collect($warehouses ?? $destinationWarehouses ?? [])->map(fn ($w) => [
+            'id' => $w->id,
+            'name' => $w->name,
+        ])->values(),
         'available_regions' => [
             ['id' => 1, 'name' => 'Kumasi'],
             ['id' => 2, 'name' => 'Koforidua'],
@@ -51,7 +54,7 @@
         </div>
 
         <div>
-            <button type="button" @click="showCreateModal = true" class="bg-[#E2762B] hover:bg-[#d1651d] text-white font-bold text-sm px-6 py-3 rounded-2xl shadow-md transition-colors flex items-center gap-2">
+            <button type="button" @click="openCreateModal()" class="bg-[#E2762B] hover:bg-[#d1651d] text-white font-bold text-sm px-6 py-3 rounded-2xl shadow-md transition-colors flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                 Manually Create A Batch
             </button>
@@ -65,7 +68,6 @@
                 <div class="flex items-center justify-between gap-2">
                     <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400 truncate" x-text="`Items Heading to ${card.region_name}`"></p>
                     
-                    {{-- Customizable Location Dropdown Selector --}}
                     <div x-data="{ open: false }" class="relative">
                         <button type="button" @click="open = !open" class="text-slate-300 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-white/80">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
@@ -96,7 +98,7 @@
                     <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search Batch</label>
                     <div class="relative">
                         <svg class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        <input type="text" x-model="search" @input.debounce.500ms="meta.current_page = 1; loadData()" placeholder="Search batch number (e.g. BATCH-...)"
+                        <input type="text" x-model="search" @input.debounce.500ms="meta.current_page = 1; loadData()" placeholder="Search batch number (e.g. TM-2026-...)"
                                class="w-full rounded-xl border-2 border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                     </div>
                 </div>
@@ -118,8 +120,9 @@
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Status</label>
                         <select x-model="filters.status" @change="loadData()" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                             <option value="">All statuses</option>
-                            <option value="open">Open</option>
-                            <option value="dispatched">Dispatched</option>
+                            <option value="pending">Pending / Open</option>
+                            <option value="in_transit">In Transit</option>
+                            <option value="completed">Completed / Arrived</option>
                         </select>
                     </div>
                 </div>
@@ -135,9 +138,10 @@
                     <thead class="bg-slate-50/50">
                         <tr>
                             <th class="px-4 py-3 text-left font-extrabold uppercase tracking-wider text-slate-500">Batch Number</th>
-                            <th class="px-4 py-3 text-left font-extrabold uppercase tracking-wider text-slate-500">Destination Context</th>
+                            <th class="px-4 py-3 text-left font-extrabold uppercase tracking-wider text-slate-500">Destination Hub</th>
                             <th class="px-4 py-3 text-center font-extrabold uppercase tracking-wider text-slate-500">Status</th>
                             <th class="px-4 py-3 text-center font-extrabold uppercase tracking-wider text-slate-500">Parcels Count</th>
+                            <th class="px-4 py-3 text-left font-extrabold uppercase tracking-wider text-slate-500">Transporter</th>
                             <th class="px-4 py-3 text-left font-extrabold uppercase tracking-wider text-slate-500">Created At</th>
                             <th class="px-4 py-3 text-right font-extrabold uppercase tracking-wider text-slate-500">Actions</th>
                         </tr>
@@ -145,7 +149,7 @@
                     <tbody class="divide-y divide-slate-100/50">
                         <template x-if="!loading && rows.length === 0">
                             <tr>
-                                <td colspan="6" class="px-4 py-12 text-center text-slate-400 font-bold">
+                                <td colspan="7" class="px-4 py-12 text-center text-slate-400 font-bold">
                                     No outgoing batches match the current query
                                 </td>
                             </tr>
@@ -153,25 +157,36 @@
 
                         <template x-for="row in rows" :key="row.id">
                             <tr class="hover:bg-slate-50/70 transition-colors">
-                                <td class="px-4 py-3 font-extrabold text-slate-900" x-text="row.batch_number"></td>
+                                <td class="px-4 py-3 font-extrabold text-slate-900" x-text="row.manifest_number || row.batch_number"></td>
                                 <td class="px-4 py-3 font-bold text-slate-700" x-text="row.destination_warehouse"></td>
                                 <td class="px-4 py-3 text-center">
                                     <span class="inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider"
-                                          :class="row.status === 'open' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'"
+                                          :class="row.status === 'in_transit' ? 'bg-amber-50 text-amber-800 border-amber-200' : (row.status === 'completed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200')"
                                           x-text="row.status_label"></span>
                                 </td>
                                 <td class="px-4 py-3 text-center">
-                                    <span class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-slate-100 px-2 font-black text-slate-700" x-text="row.items_count"></span>
+                                    <span class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-slate-100 px-2 font-black text-slate-700" x-text="row.items_count || 0"></span>
+                                </td>
+                                <td class="px-4 py-3 font-semibold text-slate-600">
+                                    <template x-if="row.driver_name">
+                                        <div>
+                                            <p class="font-bold text-slate-900" x-text="row.driver_name"></p>
+                                            <p class="text-[10px] text-slate-400" x-text="row.driver_phone"></p>
+                                        </div>
+                                    </template>
+                                    <template x-if="!row.driver_name">
+                                        <span class="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-amber-200">Unassigned (Pool)</span>
+                                    </template>
                                 </td>
                                 <td class="px-4 py-3 font-semibold text-slate-600" x-text="row.created_at"></td>
                                 <td class="px-4 py-3 text-right">
-                                    <template x-if="row.status === 'open'">
+                                    <template x-if="row.status === 'pending' || row.status === 'open'">
                                         <button type="button" @click="closeAndDispatch(row.id)" class="inline-flex items-center gap-1 rounded-xl bg-slate-900 hover:bg-slate-800 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors">
                                             <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                             Close & Dispatch
                                         </button>
                                     </template>
-                                    <template x-if="row.status !== 'open'">
+                                    <template x-if="row.status !== 'pending' && row.status !== 'open'">
                                         <span class="text-xs font-extrabold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl inline-block">Dispatched</span>
                                     </template>
                                 </td>
@@ -199,26 +214,62 @@
 
     {{-- Manually Create Batch Modal --}}
     <div x-show="showCreateModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 border border-slate-100" @click.away="showCreateModal = false">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 border border-slate-100" @click.away="showCreateModal = false">
             <div class="flex justify-between items-center pb-3 border-b border-slate-100">
-                <h3 class="font-extrabold text-slate-900 text-lg">Create Outgoing Batch</h3>
+                <div>
+                    <h3 class="font-extrabold text-slate-900 text-lg">Create Outgoing Batch</h3>
+                    <p class="text-xs text-slate-400 font-medium">Create an intercity transport manifest for driver claiming.</p>
+                </div>
                 <button type="button" @click="showCreateModal = false" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
             </div>
 
             <div class="space-y-4">
+                {{-- Destination Warehouse --}}
                 <div>
-                    <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Delivery Region ID</label>
-                    <input type="number" x-model="newBatch.delivery_region_id" placeholder="e.g. 1" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-orange-500">
+                    <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Destination Hub *</label>
+                    <select x-model="newBatch.destination_warehouse_id" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-orange-500">
+                        <option value="">Select Destination Hub</option>
+                        <template x-for="warehouse in destinationWarehouses" :key="warehouse.id">
+                            <option :value="warehouse.id" x-text="warehouse.name"></option>
+                        </template>
+                    </select>
                 </div>
+
+                {{-- Assign Driver (Optional) --}}
                 <div>
-                    <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Delivery District ID</label>
-                    <input type="number" x-model="newBatch.delivery_district_id" placeholder="e.g. 1" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-orange-500">
+                    <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Assigned Transporter / Driver (Optional)</label>
+                    <select x-model="newBatch.transporter_id" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-orange-500">
+                        <option value="">Leave Unassigned (Driver Claims via Scan)</option>
+                        <template x-for="driver in transportDrivers" :key="driver.id">
+                            <option :value="driver.id" x-text="`${driver.name} (${driver.phone})`"></option>
+                        </template>
+                    </select>
+                    <p class="text-[11px] text-slate-400 mt-1">If left unassigned, any driver can scan the batch barcode on mobile to start the trip.</p>
+                </div>
+
+                {{-- Delivery Region --}}
+                <div>
+                    <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Target Region (Optional)</label>
+                    <select x-model="newBatch.delivery_region_id" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-orange-500">
+                        <option value="">Select Region</option>
+                        <template x-for="region in availableRegions" :key="region.id">
+                            <option :value="region.id" x-text="region.name"></option>
+                        </template>
+                    </select>
+                </div>
+
+                {{-- Notes / Instructions --}}
+                <div>
+                    <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Batch Notes / Waybill Ref</label>
+                    <textarea x-model="newBatch.notes" rows="2" placeholder="Add specific handling notes or waybill details..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-orange-500"></textarea>
                 </div>
             </div>
 
-            <div class="flex justify-end gap-2 pt-2">
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button type="button" @click="showCreateModal = false" class="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
-                <button type="button" @click="submitCreateBatch()" :disabled="creating" class="px-5 py-2.5 rounded-xl bg-[#E2762B] text-white text-xs font-bold shadow-md hover:bg-[#d1651d] disabled:opacity-50">Create Batch</button>
+                <button type="button" @click="submitCreateBatch()" :disabled="creating" class="px-5 py-2.5 rounded-xl bg-[#E2762B] text-white text-xs font-bold shadow-md hover:bg-[#d1651d] disabled:opacity-50">
+                    <span x-text="creating ? 'Creating...' : 'Create Batch'"></span>
+                </button>
             </div>
         </div>
     </div>
@@ -235,9 +286,16 @@
             loading: false,
             selectedDateLabel: 'Today',
             dateFilter: 'today',
-            newBatch: { delivery_region_id: 1, delivery_district_id: 1 },
+            newBatch: {
+                destination_warehouse_id: '',
+                transporter_id: '',
+                delivery_region_id: '',
+                notes: ''
+            },
             rows: [],
             availableRegions: [],
+            destinationWarehouses: [],
+            transportDrivers: [],
             activeCards: [
                 { region_id: 1, region_name: 'Kumasi', count: 0 },
                 { region_id: 2, region_name: 'Koforidua', count: 0 },
@@ -251,7 +309,18 @@
                 const configAttr = this.$el.getAttribute('data-admin-transport-manifests-config');
                 this.config = configAttr ? JSON.parse(configAttr) : {};
                 this.availableRegions = this.config.available_regions || [];
+                this.destinationWarehouses = this.config.destination_warehouses || [];
+                this.transportDrivers = this.config.transport_drivers || [];
                 this.loadData();
+            },
+            openCreateModal() {
+                this.newBatch = {
+                    destination_warehouse_id: '',
+                    transporter_id: '',
+                    delivery_region_id: '',
+                    notes: ''
+                };
+                this.showCreateModal = true;
             },
             setDateFilter(filterKey, label) {
                 this.dateFilter = filterKey;
@@ -297,23 +366,34 @@
                     .finally(() => { this.loading = false; });
             },
             submitCreateBatch() {
+                if (!this.newBatch.destination_warehouse_id) {
+                    alert('Please select a destination hub.');
+                    return;
+                }
+
                 this.creating = true;
                 fetch(this.config.create_endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                     },
                     body: JSON.stringify(this.newBatch)
                 })
                 .then(res => res.json())
                 .then(data => {
-                    if (data.success) {
+                    if (data.success || data.status === 'success') {
                         this.showCreateModal = false;
+                        window.showToast?.('Batch manifest created successfully!', 'success');
                         this.loadData();
                     } else {
-                        alert(data.message || 'Error creating batch.');
+                        alert(data.message || 'Error creating batch manifest.');
                     }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Failed to connect to server. Please try again.');
                 })
                 .finally(() => { this.creating = false; });
             },
@@ -324,13 +404,15 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                     }
                 })
                 .then(res => res.json())
                 .then(data => {
-                    if (data.success) {
+                    if (data.success || data.status === 'success') {
                         this.loadData();
+                        window.showToast?.('Batch dispatched successfully!', 'success');
                     } else {
                         alert(data.message || 'Failed to dispatch batch.');
                     }
