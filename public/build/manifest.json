@@ -8,7 +8,7 @@
     "name": "runs"
   },
   "resources/css/app.css": {
-    "file": "assets/app-Gb6gCaRy.css",
+    "file": "assets/app-CcGt6Tin.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -17,7 +17,7 @@
     ]
   },
   "resources/css/pages/driver-portal.css": {
-    "file": "assets/driver-portal-CgEhCyOU.css",
+    "file": "assets/driver-portal-UTp7n9w9.css",
     "src": "resources/css/pages/driver-portal.css",
     "isEntry": true,
     "name": "driver-portal",
@@ -26,7 +26,7 @@
     ]
   },
   "resources/css/pages/vendor-portal.css": {
-    "file": "assets/vendor-portal-D8ntsFxf.css",
+    "file": "assets/vendor-portal-BNCMuC0S.css",
     "src": "resources/css/pages/vendor-portal.css",
     "isEntry": true,
     "name": "vendor-portal",
@@ -35,7 +35,7 @@
     ]
   },
   "resources/css/pages/warehouse-portal.css": {
-    "file": "assets/warehouse-portal-D7diTlia.css",
+    "file": "assets/warehouse-portal-DDGIFP4S.css",
     "src": "resources/css/pages/warehouse-portal.css",
     "isEntry": true,
     "name": "warehouse-portal",
@@ -66,7 +66,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-DOukvE8V.js",
+    "file": "assets/app-BRi1tG51.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
