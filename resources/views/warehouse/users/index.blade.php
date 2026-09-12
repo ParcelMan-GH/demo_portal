@@ -62,10 +62,10 @@
         <div class="relative min-h-[760px] bg-slate-100/60 p-6">
             <div x-show="loading" x-transition.opacity.duration.150ms class="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px]" style="display: none;"></div>
 
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
                 
-                <!-- LEFT SIDE: Worker Master Roster (Span 4) -->
-                <div class="lg:col-span-4 flex flex-col rounded-3xl border border-slate-200/90 bg-white shadow-sm overflow-hidden min-h-[720px]">
+                <!-- LEFT SIDE: Worker Master Roster (33% width) -->
+                <div class="w-full lg:w-4/12 shrink-0 flex flex-col rounded-3xl border border-slate-200/90 bg-white shadow-sm overflow-hidden min-h-[720px]">
                     
                     <!-- Roster Search & Filter Controls -->
                     <div class="border-b border-slate-100 bg-slate-50/70 p-5 space-y-4">
@@ -173,8 +173,8 @@
                     </div>
                 </div>
 
-                <!-- RIGHT SIDE: Worker Detail Pane (Span 8) -->
-                <div class="lg:col-span-8 flex flex-col rounded-3xl border border-slate-200/90 bg-white shadow-sm overflow-hidden min-h-[720px]">
+                <!-- RIGHT SIDE: Worker Detail Pane (67% width) -->
+                <div class="w-full lg:w-8/12 flex-1 flex flex-col rounded-3xl border border-slate-200/90 bg-white shadow-sm overflow-hidden min-h-[720px]">
                     
                     <!-- Blank Empty State (When No User is Selected) -->
                     <div x-show="!selectedUser" class="flex flex-1 flex-col items-center justify-center p-12 text-center min-h-[680px]">
@@ -273,8 +273,6 @@
 
                         <!-- Clean Detail Body -->
                         <div class="flex-1 p-8 overflow-y-auto space-y-6 bg-slate-50/40">
-                            
-                            <!-- Contact Details Card -->
                             <div class="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm space-y-4">
                                 <h4 class="text-xs font-black uppercase tracking-wider text-slate-400">Contact & Profile Information</h4>
                                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -297,7 +295,6 @@
                                 </div>
                             </div>
 
-                            <!-- Work & System Access Card -->
                             <div class="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm space-y-4">
                                 <h4 class="text-xs font-black uppercase tracking-wider text-slate-400">Warehouse & Role Permissions</h4>
                                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -319,7 +316,6 @@
                                     @endif
                                 </div>
                             </div>
-
                         </div>
                     </div>
                 </div>
@@ -379,7 +375,7 @@
         </div>
         </template>
 
-        <!-- Delete Modal -->
+        <!-- Delete Confirmation Modal -->
         <template x-teleport="body">
         <div x-show="showDeleteModal"
              x-cloak
