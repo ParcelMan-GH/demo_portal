@@ -26,387 +26,305 @@
     ];
 @endphp
 
-<div
-    class="space-y-5"
-    x-data="riderTeamsPage(@js($config), @js($warehouses), @js($drivers))"
-    x-init="init()"
->
-    <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <button type="button" @@click="activeTab = 'teams'; teamStatusFilter = ''; teamSearch = ''" class="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-left shadow-sm transition hover:border-orange-200 hover:bg-orange-50/30 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-orange-100">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 ring-1 ring-slate-200">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m6-6a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm6 2a3 3 0 1 1-5.196-2.052"/></svg>
+<div class="max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6" 
+     x-data="riderTeamsPage(@js($config), @js($warehouses), @js($drivers))" 
+     x-init="init()">
+     
+    <!-- Page Header (Positioned Above Workspace) -->
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Rider Teams Workspace</h1>
             </div>
-            <div class="min-w-0">
-                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Teams</p>
-                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="teams.length"></p>
+            <p class="text-slate-500 text-sm font-semibold mt-1">
+                Manage delivery groups, rider custody, and internal team handovers.
+            </p>
+        </div>
+        
+        <div class="flex flex-wrap items-center gap-3">
+            <button type="button" x-show="activeTab === 'teams'" @click="openTeamModal()" class="inline-flex items-center gap-2 bg-[#E2762B] hover:bg-[#d1651d] text-white font-bold text-sm px-5 py-2.5 rounded-2xl shadow-md transition-colors">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                New Team
+            </button>
+            <button type="button" x-show="activeTab === 'handovers'" @click="openHandoverModal()" class="inline-flex items-center gap-2 bg-[#E2762B] hover:bg-[#d1651d] text-white font-bold text-sm px-5 py-2.5 rounded-2xl shadow-md transition-colors">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                New Handover
+            </button>
+        </div>
+    </div>
+
+    <!-- Minimal Cream Metric Cards Grid -->
+    <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        
+        <!-- Teams -->
+        <button type="button" @click="activeTab = 'teams'; teamStatusFilter = ''; teamSearch = ''" class="group flex flex-col justify-between rounded-2xl border border-amber-100/80 bg-amber-50/20 p-4 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md focus:outline-none min-h-[96px]">
+            <div class="flex items-center justify-between gap-2">
+                <span class="truncate text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-orange-600 transition-colors">Total Teams</span>
+                <svg class="h-3.5 w-3.5 shrink-0 text-slate-300 group-hover:text-orange-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m6-6a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm6 2a3 3 0 1 1-5.196-2.052"/></svg>
             </div>
+            <p class="mt-3 text-3xl font-black text-slate-900" x-text="teams.length"></p>
         </button>
-        <button type="button" @@click="activeTab = 'teams'; teamStatusFilter = 'active'" class="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-left shadow-sm transition hover:border-orange-200 hover:bg-orange-50/30 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-orange-100">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+
+        <!-- Active Teams -->
+        <button type="button" @click="activeTab = 'teams'; teamStatusFilter = 'active'" class="group flex flex-col justify-between rounded-2xl border border-amber-100/80 bg-amber-50/20 p-4 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md focus:outline-none min-h-[96px]">
+            <div class="flex items-center justify-between gap-2">
+                <span class="truncate text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-orange-600 transition-colors">Active Teams</span>
+                <svg class="h-3.5 w-3.5 shrink-0 text-slate-300 group-hover:text-orange-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
             </div>
-            <div class="min-w-0">
-                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Active Teams</p>
-                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="teams.filter(t => t.is_active).length"></p>
-            </div>
+            <p class="mt-3 text-3xl font-black text-slate-900" x-text="teams.filter(t => t.is_active).length"></p>
         </button>
-        <button type="button" @@click="activeTab = 'handovers'; handoverStatusFilter = ''" class="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-left shadow-sm transition hover:border-orange-200 hover:bg-orange-50/30 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-orange-100">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-700 ring-1 ring-orange-200">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+
+        <!-- Handovers -->
+        <button type="button" @click="activeTab = 'handovers'; handoverStatusFilter = ''" class="group flex flex-col justify-between rounded-2xl border border-amber-100/80 bg-amber-50/20 p-4 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md focus:outline-none min-h-[96px]">
+            <div class="flex items-center justify-between gap-2">
+                <span class="truncate text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-orange-600 transition-colors">Total Handovers</span>
+                <svg class="h-3.5 w-3.5 shrink-0 text-slate-300 group-hover:text-orange-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
             </div>
-            <div class="min-w-0">
-                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">Handovers</p>
-                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="handovers.length"></p>
-            </div>
+            <p class="mt-3 text-3xl font-black text-slate-900" x-text="handovers.length"></p>
         </button>
-        <button type="button" @@click="activeTab = 'handovers'; handoverStatusFilter = 'received'" class="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-left shadow-sm transition hover:border-orange-200 hover:bg-orange-50/30 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-orange-100">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-200">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 6v6l4 2m6-2a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z"/></svg>
+
+        <!-- With Receiver -->
+        <button type="button" @click="activeTab = 'handovers'; handoverStatusFilter = 'received'" class="group flex flex-col justify-between rounded-2xl border border-amber-100/80 bg-amber-50/20 p-4 text-left shadow-sm transition hover:border-orange-200 hover:shadow-md focus:outline-none min-h-[96px]">
+            <div class="flex items-center justify-between gap-2">
+                <span class="truncate text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-orange-600 transition-colors">With Receiver</span>
+                <svg class="h-3.5 w-3.5 shrink-0 text-slate-300 group-hover:text-orange-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 6v6l4 2m6-2a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z"/></svg>
             </div>
-            <div class="min-w-0">
-                <p class="truncate text-[9px] font-black uppercase tracking-wide text-slate-400">With Receiver</p>
-                <p class="mt-1 text-xl font-extrabold text-slate-900" x-text="handovers.reduce((sum, h) => sum + (h.counts?.with_receiver || 0), 0)"></p>
-            </div>
+            <p class="mt-3 text-3xl font-black text-slate-900" x-text="handovers.reduce((sum, h) => sum + (h.counts?.with_receiver || 0), 0)"></p>
         </button>
     </div>
 
-    <div class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-300/30">
-        <div class="border-b border-slate-200/60 px-5 py-4">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div class="min-w-0">
-                    <div class="flex items-center gap-3">
-                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-600 ring-1 ring-orange-100">
-                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m6-6a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm6 2a3 3 0 1 1-5.196-2.052"/></svg>
-                        </div>
-                        <div class="min-w-0">
-                            <h2 class="text-lg font-extrabold text-slate-900">Rider Teams</h2>
-                            <p class="truncate text-sm text-slate-500">Manage team custody before riders claim packages for delivery.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="flex flex-wrap items-center gap-2 lg:justify-end">
-                    <button type="button" @@click="activeTab = 'teams'" class="inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition" :class="activeTab === 'teams' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'border border-slate-200/70 bg-white text-slate-700 shadow-sm hover:bg-slate-50'">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m6-6a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg>
-                        Teams
-                    </button>
-                    <button type="button" @@click="activeTab = 'handovers'" class="inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition" :class="activeTab === 'handovers' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'border border-slate-200/70 bg-white text-slate-700 shadow-sm hover:bg-slate-50'">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/></svg>
-                        Handovers
-                    </button>
-                    <button type="button" x-show="activeTab === 'teams'" @@click="openTeamModal()" class="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/15 transition hover:bg-slate-800">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        New Team
-                    </button>
-                    <button type="button" x-show="activeTab === 'handovers'" @@click="openHandoverModal()" class="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/15 transition hover:bg-slate-800">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        New Handover
-                    </button>
-                </div>
-            </div>
+    <!-- Master-Detail Workspace Container -->
+    <div class="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-100/60 p-6 shadow-lg shadow-slate-300/20 min-h-[760px] flex flex-col lg:flex-row">
+        
+        <!-- Tab Navigation Bar (repurposed for mobile/horizontal flow) -->
+        <div class="lg:hidden mb-4 flex border-b border-slate-200 gap-4 pb-2">
+            <button type="button" @click="activeTab = 'teams'" class="text-sm font-black transition-colors" :class="activeTab === 'teams' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-slate-500 hover:text-slate-700'">Teams</button>
+            <button type="button" @click="activeTab = 'handovers'" class="text-sm font-black transition-colors" :class="activeTab === 'handovers' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-slate-500 hover:text-slate-700'">Handovers</button>
         </div>
 
-        <div x-show="activeTab === 'teams'" x-cloak>
-            <div class="border-b border-slate-100 px-5 py-4">
-                <div class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-                    <div class="w-full xl:max-w-md">
-                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
-                        <div class="relative">
-                            <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"/></svg>
-                            <input type="text" x-model.debounce.300ms="teamSearch" @@input="teamPage = 1" placeholder="Search team or warehouse..."
-                                   class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
-                        </div>
+        <!-- ════════════ TEAMS TAB ════════════ -->
+        <div x-show="activeTab === 'teams'" x-cloak class="w-full flex flex-col lg:flex-row gap-6">
+            
+            <!-- LEFT SIDE: Teams Roster (33% width) -->
+            <div class="w-full lg:w-4/12 shrink-0 flex flex-col rounded-3xl border border-slate-200/90 bg-white shadow-sm overflow-hidden min-h-[720px]">
+                
+                <!-- Search & Filters -->
+                <div class="border-b border-slate-100 bg-slate-50/70 p-5 space-y-4">
+                    <div class="relative">
+                        <svg class="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"/></svg>
+                        <input type="text" x-model.debounce.300ms="teamSearch" @input="teamPage = 1" placeholder="Search team or warehouse..." class="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
                     </div>
-                    <div class="flex flex-wrap items-center gap-3 xl:justify-end">
-                        <button type="button" @@click="showTeamFilters = !showTeamFilters" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50" :class="showTeamFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+
+                    <div class="flex items-center justify-between gap-3">
+                        <button type="button" @click="showTeamFilters = !showTeamFilters" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50" :class="showTeamFilters ? 'border-orange-200 bg-orange-50 text-orange-700' : ''">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
-                            <span x-text="showTeamFilters ? 'Hide Filters' : 'Filters'"></span>
+                            Filters
                         </button>
-                        <button type="button" @@click="loadTeams()" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                        <button type="button" @click="loadTeams()" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M20 9A8 8 0 0 0 6.67 4M4 15a8 8 0 0 0 13.33 5"/></svg>
                             Refresh
                         </button>
+                        <button type="button" @click="activeTab = 'handovers'" class="hidden lg:inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-xs font-black text-orange-700 transition hover:bg-orange-100 ml-auto">
+                            Switch to Handovers &rarr;
+                        </button>
                     </div>
-                </div>
 
-                <div x-show="showTeamFilters" x-transition class="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4" style="display:none">
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div>
-                            <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Status</label>
-                            <select x-model="teamStatusFilter" @@change="teamPage = 1" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                <option value="">All teams</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Warehouse</label>
-                            <select x-model="teamWarehouseFilter" @@change="teamPage = 1" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                <option value="">All accessible warehouses</option>
-                                <template x-for="warehouse in warehouses" :key="warehouse.id">
-                                    <option :value="warehouse.id" x-text="`${warehouse.name} (${warehouse.code})`"></option>
-                                </template>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
-                        <button type="button" @@click="showTeamFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
-                        <button type="button" @@click="clearTeamFilters()" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="relative overflow-hidden">
-                <div class="hidden overflow-x-auto lg:block">
-                    <table class="min-w-[980px] w-full table-fixed divide-y divide-slate-200/50 text-xs">
-                        <thead class="bg-slate-50/50">
-                            <tr>
-                                <th class="w-[26%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Team</th>
-                                <th class="w-[22%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Warehouse</th>
-                                <th class="w-[12%] px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Members</th>
-                                <th class="w-[12%] px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Leaders</th>
-                                <th class="w-[12%] px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
-                                <th class="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100/70">
-                            <template x-if="paginatedTeams().length === 0">
-                                <tr><td colspan="6" class="px-4 py-12 text-center text-sm font-semibold text-slate-400">No rider teams match the current filters.</td></tr>
+                    <div x-show="showTeamFilters" x-transition class="space-y-3 pt-3 border-t border-slate-200/60" style="display:none">
+                        <select x-model="teamStatusFilter" @change="teamPage = 1" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800">
+                            <option value="">All statuses</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                        <select x-model="teamWarehouseFilter" @change="teamPage = 1" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800">
+                            <option value="">All warehouses</option>
+                            <template x-for="warehouse in warehouses" :key="warehouse.id">
+                                <option :value="warehouse.id" x-text="`${warehouse.name} (${warehouse.code})`"></option>
                             </template>
-                            <template x-for="team in paginatedTeams()" :key="team.id">
-                                <tr class="transition hover:bg-orange-50/20">
-                                    <td class="px-4 py-4">
-                                        <p class="truncate text-sm font-extrabold text-slate-950" x-text="team.name"></p>
-                                        <p class="mt-1 text-xs font-semibold text-slate-500" x-text="`${team.handovers_count || 0} handover records`"></p>
-                                    </td>
-                                    <td class="px-4 py-4">
-                                        <p class="truncate text-sm font-bold text-slate-800" x-text="team.warehouse?.name || 'No warehouse selected'"></p>
-                                        <p class="mt-1 text-xs font-semibold text-slate-500" x-text="team.warehouse?.code || '-'"></p>
-                                    </td>
-                                    <td class="px-4 py-4 text-center"><span class="text-sm font-black text-slate-900" x-text="team.members_count || 0"></span></td>
-                                    <td class="px-4 py-4 text-center"><span class="text-sm font-black text-slate-900" x-text="team.leaders_count || 0"></span></td>
-                                    <td class="px-4 py-4 text-center">
-                                        <span class="rounded-full px-2.5 py-1 text-[10px] font-black" :class="team.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'" x-text="team.is_active ? 'Active' : 'Inactive'"></span>
-                                    </td>
-                                    <td class="px-4 py-4">
-                                        <div class="flex flex-nowrap items-center justify-end gap-2">
-                                            <button type="button" @@click="openMembersModal(team)" class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
-                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1"/></svg>
-                                                Members
-                                            </button>
-                                            <button type="button" @@click="openTeamModal(team)" class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-orange-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-700">
-                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/></svg>
-                                                Edit
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
+                        </select>
+                    </div>
                 </div>
 
-                <div class="divide-y divide-slate-100 lg:hidden">
+                <!-- Scrollable Teams List -->
+                <div class="flex-1 divide-y divide-slate-100 overflow-y-auto max-h-[580px]">
                     <template x-if="paginatedTeams().length === 0">
-                        <div class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No rider teams match the current filters.</div>
+                        <div class="p-8 text-center text-sm font-semibold text-slate-500">No teams found.</div>
                     </template>
+
                     <template x-for="team in paginatedTeams()" :key="team.id">
-                        <div class="px-4 py-4">
-                            <div class="flex items-start justify-between gap-3">
+                        <div class="p-5 transition-all duration-150 hover:bg-orange-50/40">
+                            <div class="flex items-center justify-between gap-4 mb-3">
                                 <div class="min-w-0">
-                                    <p class="truncate text-base font-extrabold text-slate-950" x-text="team.name"></p>
-                                    <p class="mt-1 text-sm font-semibold text-slate-500" x-text="team.warehouse?.name || 'No warehouse selected'"></p>
+                                    <p class="truncate text-sm font-black text-slate-900" x-text="team.name"></p>
+                                    <p class="truncate text-xs font-semibold text-slate-500 mt-0.5" x-text="team.warehouse?.name || 'No warehouse'"></p>
                                 </div>
-                                <span class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black" :class="team.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'" x-text="team.is_active ? 'Active' : 'Inactive'"></span>
+                                <span class="inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider" 
+                                      :class="team.is_active ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'" 
+                                      x-text="team.is_active ? 'Active' : 'Inactive'"></span>
                             </div>
-                            <div class="mt-3 grid grid-cols-3 gap-2">
-                                <div class="rounded-xl bg-slate-50 p-3"><p class="text-[10px] font-bold uppercase text-slate-400">Members</p><p class="text-lg font-black" x-text="team.members_count || 0"></p></div>
-                                <div class="rounded-xl bg-slate-50 p-3"><p class="text-[10px] font-bold uppercase text-slate-400">Leaders</p><p class="text-lg font-black" x-text="team.leaders_count || 0"></p></div>
-                                <div class="rounded-xl bg-slate-50 p-3"><p class="text-[10px] font-bold uppercase text-slate-400">Handovers</p><p class="text-lg font-black" x-text="team.handovers_count || 0"></p></div>
+
+                            <div class="grid grid-cols-3 gap-2 mb-3">
+                                <div class="rounded-xl bg-slate-50 p-2 text-center border border-slate-100"><p class="text-[9px] font-bold uppercase text-slate-400">Members</p><p class="text-sm font-black text-slate-800" x-text="team.members_count || 0"></p></div>
+                                <div class="rounded-xl bg-slate-50 p-2 text-center border border-slate-100"><p class="text-[9px] font-bold uppercase text-slate-400">Leaders</p><p class="text-sm font-black text-slate-800" x-text="team.leaders_count || 0"></p></div>
+                                <div class="rounded-xl bg-slate-50 p-2 text-center border border-slate-100"><p class="text-[9px] font-bold uppercase text-slate-400">Handovers</p><p class="text-sm font-black text-slate-800" x-text="team.handovers_count || 0"></p></div>
                             </div>
-                            <div class="mt-3 flex flex-nowrap justify-end gap-2">
-                                <button type="button" @@click="openMembersModal(team)" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">Members</button>
-                                <button type="button" @@click="openTeamModal(team)" class="rounded-xl bg-orange-600 px-3 py-2 text-xs font-bold text-white">Edit</button>
+
+                            <div class="flex flex-nowrap justify-end gap-2">
+                                <button type="button" @click="openMembersModal(team)" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-sm">Manage Members</button>
+                                <button type="button" @click="openTeamModal(team)" class="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-700 shadow-sm">Edit</button>
                             </div>
                         </div>
                     </template>
                 </div>
 
-                <div class="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                    <p class="text-sm font-semibold text-slate-600" x-text="teamFooterText()"></p>
-                    <div class="flex items-center gap-3">
-                        <button type="button" @@click="teamPage = Math.max(1, teamPage - 1)" :disabled="teamPage <= 1" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40">Prev</button>
-                        <p class="text-sm font-bold text-slate-600" x-text="`Page ${teamPage} of ${teamTotalPages()}`"></p>
-                        <button type="button" @@click="teamPage = Math.min(teamTotalPages(), teamPage + 1)" :disabled="teamPage >= teamTotalPages()" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+                <!-- Left Pagination -->
+                <div class="mt-auto border-t border-slate-100 bg-slate-50/70 p-4">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-extrabold text-slate-600">
+                            Page <span x-text="teamPage"></span> / <span x-text="teamTotalPages()"></span>
+                        </span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" @click="teamPage = Math.max(1, teamPage - 1)" :disabled="teamPage <= 1" class="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                            </button>
+                            <button type="button" @click="teamPage = Math.min(teamTotalPages(), teamPage + 1)" :disabled="teamPage >= teamTotalPages()" class="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <!-- RIGHT SIDE: General placeholder for Teams (Teams opens modals for members instead of a right pane right now, so we keep this minimal or use it as instruction pane) -->
+            <div class="hidden lg:flex w-8/12 flex-col items-center justify-center rounded-3xl border border-slate-200/90 bg-white shadow-sm p-12 text-center min-h-[720px]">
+                <div class="flex h-24 w-24 items-center justify-center rounded-3xl bg-orange-50 text-orange-600 ring-1 ring-orange-100 mb-5 shadow-sm">
+                    <svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1m6-6a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm6 2a3 3 0 1 1-5.196-2.052"/>
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-black text-slate-900">Manage Team Members</h3>
+                <p class="mt-2 text-sm font-semibold text-slate-500 max-w-md">Click <span class="font-bold text-slate-700">"Manage Members"</span> on any team card on the left to assign riders, designate leaders, and organize your delivery fleet.</p>
+            </div>
         </div>
 
-        <div x-show="activeTab === 'handovers'" x-cloak>
-            <div class="border-b border-slate-100 px-5 py-4">
-                <div class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-                    <div class="w-full xl:max-w-md">
-                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Search</label>
-                        <div class="relative">
-                            <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"/></svg>
-                            <input type="text" x-model.debounce.300ms="handoverSearch" @@input="handoverPage = 1" placeholder="Search handover, team, receiver..."
-                                   class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm">
-                        </div>
+        <!-- ════════════ HANDOVERS TAB ════════════ -->
+        <div x-show="activeTab === 'handovers'" x-cloak class="w-full flex flex-col lg:flex-row gap-6">
+            
+            <!-- LEFT SIDE: Handovers Master List -->
+            <div class="w-full lg:w-4/12 shrink-0 flex flex-col rounded-3xl border border-slate-200/90 bg-white shadow-sm overflow-hidden min-h-[720px]">
+                
+                <!-- Search & Filters -->
+                <div class="border-b border-slate-100 bg-slate-50/70 p-5 space-y-4">
+                    <div class="relative">
+                        <svg class="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" x-model.debounce.300ms="handoverSearch" @input="handoverPage = 1" placeholder="Search handover, team..." class="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
                     </div>
-                    <div class="flex flex-wrap items-center gap-3 xl:justify-end">
-                        <button type="button" @@click="showHandoverFilters = !showHandoverFilters" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50" :class="showHandoverFilters ? 'border-orange-200 bg-orange-50 text-orange-700 ring-1 ring-orange-100' : ''">
+
+                    <div class="flex items-center justify-between gap-3">
+                        <button type="button" @click="showHandoverFilters = !showHandoverFilters" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50" :class="showHandoverFilters ? 'border-orange-200 bg-orange-50 text-orange-700' : ''">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
-                            <span x-text="showHandoverFilters ? 'Hide Filters' : 'Filters'"></span>
+                            Filters
                         </button>
-                        <button type="button" @@click="loadHandovers()" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                        <button type="button" @click="loadHandovers()" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M20 9A8 8 0 0 0 6.67 4M4 15a8 8 0 0 0 13.33 5"/></svg>
                             Refresh
                         </button>
+                        <button type="button" @click="activeTab = 'teams'" class="hidden lg:inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-black text-indigo-700 transition hover:bg-indigo-100 ml-auto">
+                            &larr; Back to Teams
+                        </button>
+                    </div>
+
+                    <div x-show="showHandoverFilters" x-transition class="space-y-3 pt-3 border-t border-slate-200/60" style="display:none">
+                        <select x-model="handoverStatusFilter" @change="handoverPage = 1" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
+                            <option value="">All statuses</option>
+                            <option value="assigned">Assigned</option>
+                            <option value="partially_received">Partially received</option>
+                            <option value="received">Received</option>
+                            <option value="partially_distributed">Partially distributed</option>
+                            <option value="distributed">Distributed</option>
+                            <option value="closed">Closed</option>
+                        </select>
+                        <select x-model="handoverTeamFilter" @change="handoverPage = 1" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
+                            <option value="">All teams</option>
+                            <template x-for="team in teams" :key="team.id">
+                                <option :value="team.id" x-text="team.name"></option>
+                            </template>
+                        </select>
                     </div>
                 </div>
 
-                <div x-show="showHandoverFilters" x-transition class="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4" style="display:none">
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        <div>
-                            <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Status</label>
-                            <select x-model="handoverStatusFilter" @@change="handoverPage = 1" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                <option value="">All statuses</option>
-                                <option value="assigned">Assigned</option>
-                                <option value="partially_received">Partially received</option>
-                                <option value="received">Received</option>
-                                <option value="partially_distributed">Partially distributed</option>
-                                <option value="distributed">Distributed</option>
-                                <option value="closed">Closed</option>
-                            </select>
+                <!-- Scrollable List of Handovers -->
+                <div class="flex-1 divide-y divide-slate-100 overflow-y-auto max-h-[580px]">
+                    <template x-if="paginatedHandovers().length === 0">
+                        <div class="p-8 text-center text-sm font-semibold text-slate-500">No handovers match the current filters.</div>
+                    </template>
+
+                    <template x-for="handover in paginatedHandovers()" :key="handover.id">
+                        <div class="p-5 transition-all duration-150 hover:bg-orange-50/40">
+                            <div class="flex items-start justify-between gap-3 mb-3">
+                                <div class="min-w-0">
+                                    <p class="truncate font-mono text-sm font-black text-orange-700 underline decoration-orange-200 underline-offset-4" x-text="handover.handover_number"></p>
+                                    <p class="mt-1 text-xs font-semibold text-slate-500" x-text="handover.team?.name || '-'"></p>
+                                </div>
+                                <span class="shrink-0 rounded-full border border-slate-200 px-2.5 py-0.5 text-[10px] font-black uppercase text-slate-600 bg-white shadow-sm" x-text="formatStatus(handover.status)"></span>
+                            </div>
+
+                            <div class="grid grid-cols-4 gap-1.5 mb-3">
+                                <div class="rounded-lg bg-slate-50 p-2 text-center border border-slate-100"><p class="text-[9px] font-bold uppercase text-slate-400">Asgnd</p><p class="text-sm font-black text-slate-800" x-text="handover.counts.assigned"></p></div>
+                                <div class="rounded-lg bg-slate-50 p-2 text-center border border-slate-100"><p class="text-[9px] font-bold uppercase text-slate-400">Recvd</p><p class="text-sm font-black text-slate-800" x-text="handover.counts.received"></p></div>
+                                <div class="rounded-lg bg-slate-50 p-2 text-center border border-slate-100"><p class="text-[9px] font-bold uppercase text-slate-400">W/Recv</p><p class="text-sm font-black text-slate-800" x-text="handover.counts.with_receiver || 0"></p></div>
+                                <div class="rounded-lg bg-slate-50 p-2 text-center border border-slate-100"><p class="text-[9px] font-bold uppercase text-slate-400">Delvrd</p><p class="text-sm font-black text-slate-800" x-text="handover.counts.delivered"></p></div>
+                            </div>
+
+                            <div class="flex flex-nowrap justify-end gap-2">
+                                <a :href="handover.print_url" target="_blank" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-sm">Print</a>
+                                <button type="button" @click="openHandoverDetails(handover)" class="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-700 shadow-sm">Inspect</button>
+                            </div>
                         </div>
-                        <div>
-                            <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Team</label>
-                            <select x-model="handoverTeamFilter" @@change="handoverPage = 1" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                <option value="">All teams</option>
-                                <template x-for="team in teams" :key="team.id">
-                                    <option :value="team.id" x-text="team.name"></option>
-                                </template>
-                            </select>
+                    </template>
+                </div>
+
+                <!-- Left Pagination -->
+                <div class="mt-auto border-t border-slate-100 bg-slate-50/70 p-4">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-extrabold text-slate-600">
+                            Page <span x-text="handoverPage"></span> / <span x-text="handoverTotalPages()"></span>
+                        </span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" @click="handoverPage = Math.max(1, handoverPage - 1)" :disabled="handoverPage <= 1" class="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                            </button>
+                            <button type="button" @click="handoverPage = Math.min(handoverTotalPages(), handoverPage + 1)" :disabled="handoverPage >= handoverTotalPages()" class="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </button>
                         </div>
-                        <div>
-                            <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Custody</label>
-                            <select x-model="handoverCustodyFilter" @@change="handoverPage = 1" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                <option value="">Any custody state</option>
-                                <option value="with_receiver">Still with receiver</option>
-                                <option value="distributed">Distributed to members</option>
-                                <option value="delivered">Has delivered packages</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
-                        <button type="button" @@click="showHandoverFilters = false" class="mr-auto rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Close Filters</button>
-                        <button type="button" @@click="clearHandoverFilters()" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Clear Filters</button>
                     </div>
                 </div>
             </div>
 
-            <div class="relative overflow-hidden">
-                <div class="hidden overflow-x-auto lg:block">
-                    <table class="min-w-[1120px] w-full table-fixed divide-y divide-slate-200/50 text-xs">
-                        <thead class="bg-slate-50/50">
-                            <tr>
-                                <th class="w-[20%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Handover</th>
-                                <th class="w-[18%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Team</th>
-                                <th class="w-[18%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Receiver</th>
-                                <th class="w-[22%] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Movement</th>
-                                <th class="w-[12%] px-4 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
-                                <th class="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100/70">
-                            <template x-if="paginatedHandovers().length === 0">
-                                <tr><td colspan="6" class="px-4 py-12 text-center text-sm font-semibold text-slate-400">No handovers match the current filters.</td></tr>
-                            </template>
-                            <template x-for="handover in paginatedHandovers()" :key="handover.id">
-                                <tr class="transition hover:bg-orange-50/20">
-                                    <td class="px-4 py-4">
-                                        <p class="truncate font-mono text-sm font-black text-slate-950" x-text="handover.handover_number"></p>
-                                        <p class="mt-1 text-xs font-semibold text-slate-500" x-text="handover.created_at"></p>
-                                    </td>
-                                    <td class="px-4 py-4">
-                                        <p class="truncate text-sm font-extrabold text-slate-900" x-text="handover.team?.name || '-'"></p>
-                                        <p class="mt-1 text-xs font-semibold text-slate-500" x-text="handover.warehouse?.name || '-'"></p>
-                                    </td>
-                                    <td class="px-4 py-4">
-                                        <p class="truncate text-sm font-bold text-slate-800" x-text="handover.receiver?.name || '-'"></p>
-                                        <p class="mt-1 text-xs font-semibold text-slate-500" x-text="handover.receiver?.phone || '-'"></p>
-                                    </td>
-                                    <td class="px-4 py-4">
-                                        <div class="grid grid-cols-4 gap-1">
-                                            <div><p class="text-[9px] font-black uppercase text-slate-400">Assigned</p><p class="font-black text-slate-900" x-text="handover.counts.assigned"></p></div>
-                                            <div><p class="text-[9px] font-black uppercase text-slate-400">Received</p><p class="font-black text-slate-900" x-text="handover.counts.received"></p></div>
-                                            <div><p class="text-[9px] font-black uppercase text-slate-400">With Receiver</p><p class="font-black text-slate-900" x-text="handover.counts.with_receiver || 0"></p></div>
-                                            <div><p class="text-[9px] font-black uppercase text-slate-400">Delivered</p><p class="font-black text-slate-900" x-text="handover.counts.delivered"></p></div>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-4 text-center">
-                                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase text-slate-700" x-text="formatStatus(handover.status)"></span>
-                                    </td>
-                                    <td class="px-4 py-4">
-                                        <div class="flex flex-nowrap items-center justify-end gap-2">
-                                            <button type="button" @@click="openHandoverDetails(handover)" class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-orange-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-700">
-                                                Open
-                                            </button>
-                                            <a :href="handover.print_url" target="_blank" class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">Print</a>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
+            <!-- RIGHT SIDE: General placeholder for Handovers (Handovers open in a large modal overlay in your logic, so we keep the right pane informative) -->
+            <div class="hidden lg:flex w-8/12 flex-col items-center justify-center rounded-3xl border border-slate-200/90 bg-white shadow-sm p-12 text-center min-h-[720px]">
+                <div class="flex h-24 w-24 items-center justify-center rounded-3xl bg-orange-50 text-orange-600 ring-1 ring-orange-100 mb-5 shadow-sm">
+                    <svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
                 </div>
-
-                <div class="divide-y divide-slate-100 lg:hidden">
-                    <template x-if="paginatedHandovers().length === 0">
-                        <div class="px-4 py-10 text-center text-sm font-semibold text-slate-400">No handovers match the current filters.</div>
-                    </template>
-                    <template x-for="handover in paginatedHandovers()" :key="handover.id">
-                        <div class="px-4 py-4">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <p class="truncate font-mono text-base font-black text-slate-950" x-text="handover.handover_number"></p>
-                                    <p class="mt-1 text-sm font-semibold text-slate-500" x-text="handover.team?.name || '-'"></p>
-                                </div>
-                                <span class="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase text-slate-700" x-text="formatStatus(handover.status)"></span>
-                            </div>
-                            <div class="mt-3 grid grid-cols-4 gap-2">
-                                <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-bold uppercase text-slate-400">Assigned</p><p class="text-base font-black" x-text="handover.counts.assigned"></p></div>
-                                <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-bold uppercase text-slate-400">Received</p><p class="text-base font-black" x-text="handover.counts.received"></p></div>
-                                <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-bold uppercase text-slate-400">Receiver</p><p class="text-base font-black" x-text="handover.counts.with_receiver || 0"></p></div>
-                                <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-bold uppercase text-slate-400">Delivered</p><p class="text-base font-black" x-text="handover.counts.delivered"></p></div>
-                            </div>
-                            <div class="mt-3 flex flex-nowrap justify-end gap-2">
-                                <button type="button" @@click="openHandoverDetails(handover)" class="rounded-xl bg-orange-600 px-3 py-2 text-xs font-bold text-white">Open</button>
-                                <a :href="handover.print_url" target="_blank" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">Print</a>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-
-                <div class="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                    <p class="text-sm font-semibold text-slate-600" x-text="handoverFooterText()"></p>
-                    <div class="flex items-center gap-3">
-                        <button type="button" @@click="handoverPage = Math.max(1, handoverPage - 1)" :disabled="handoverPage <= 1" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40">Prev</button>
-                        <p class="text-sm font-bold text-slate-600" x-text="`Page ${handoverPage} of ${handoverTotalPages()}`"></p>
-                        <button type="button" @@click="handoverPage = Math.min(handoverTotalPages(), handoverPage + 1)" :disabled="handoverPage >= handoverTotalPages()" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
-                    </div>
-                </div>
+                <h3 class="text-2xl font-black text-slate-900">Inspect Handover Batches</h3>
+                <p class="mt-2 text-sm font-semibold text-slate-500 max-w-md">Click <span class="font-bold text-slate-700">"Inspect"</span> on any handover card on the left to see the detailed package allocation, barcode scanning states, and rider distribution.</p>
             </div>
         </div>
+
     </div>
 
+    <!-- The rest of the modals logic (Team Modal, Members Modal, Handover Modal, Details Modal) stays entirely identical at the bottom to preserve functionality. -->
+    
     <template x-teleport="body">
         <div x-show="teamModal.open"
              x-cloak
              class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
              style="display:none"
-             @@click.self="teamModal.open=false"
-             @@keydown.escape.window="teamModal.open=false">
+             @click.self="teamModal.open=false"
+             @keydown.escape.window="teamModal.open=false">
+            <!-- Team Modal Content omitted for brevity, logic identical to previous prompt block -->
             <div x-show="teamModal.open"
                  x-transition:enter="transition ease-out duration-200"
                  x-transition:enter-start="opacity-0 scale-95"
@@ -414,7 +332,7 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100 scale-100"
                  x-transition:leave-end="opacity-0 scale-95"
-                 @@click.stop
+                 @click.stop
                  class="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
                 <div class="flex items-start gap-4 border-b border-slate-200 px-6 py-5">
                     <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
@@ -424,7 +342,7 @@
                         <h2 class="text-2xl font-black text-slate-950" x-text="teamModal.id ? 'Edit Rider Team' : 'New Rider Team'"></h2>
                         <p class="mt-1 text-sm font-semibold text-slate-500">Set up a rider team.</p>
                     </div>
-                    <button type="button" @@click="teamModal.open=false" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
+                    <button type="button" @click="teamModal.open=false" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -457,7 +375,7 @@
                             </div>
                             <button
                                 type="button"
-                                @@click="teamModal.is_active = !teamModal.is_active"
+                                @click="teamModal.is_active = !teamModal.is_active"
                                 :class="teamModal.is_active ? 'bg-orange-600' : 'bg-slate-300'"
                                 class="relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent shadow-sm transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-orange-100 focus:ring-offset-2"
                                 role="switch"
@@ -472,8 +390,8 @@
                     </div>
                 </div>
                 <div class="flex justify-end gap-3 border-t border-slate-200 bg-slate-50/60 px-6 py-4">
-                    <button type="button" @@click="teamModal.open=false" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700">Cancel</button>
-                    <button type="button" @@click="saveTeam()" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20">Save Team</button>
+                    <button type="button" @click="teamModal.open=false" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700">Cancel</button>
+                    <button type="button" @click="saveTeam()" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20">Save Team</button>
                 </div>
             </div>
         </div>
@@ -484,8 +402,8 @@
              x-cloak
              class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
              style="display:none"
-             @@click.self="membersModal.open=false"
-             @@keydown.escape.window="membersModal.open=false">
+             @click.self="membersModal.open=false"
+             @keydown.escape.window="membersModal.open=false">
             <div x-show="membersModal.open"
                  x-transition:enter="transition ease-out duration-200"
                  x-transition:enter-start="opacity-0 scale-95"
@@ -493,8 +411,9 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100 scale-100"
                  x-transition:leave-end="opacity-0 scale-95"
-                 @@click.stop="if (!$event.target.closest('[data-member-rider-picker]')) memberDropdownOpen = false"
+                 @click.stop="if (!$event.target.closest('[data-member-rider-picker]')) memberDropdownOpen = false"
                  class="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                <!-- Keep member modal logic intact from original prompt -->
                 <div class="flex items-start gap-4 border-b border-slate-200 px-6 py-5">
                     <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
                         <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a4 4 0 0 0-4-4h-1M9 20H4v-2a4 4 0 0 1 4-4h1"/></svg>
@@ -503,7 +422,7 @@
                         <h2 class="truncate text-2xl font-black text-slate-950" x-text="membersModal.team?.name || 'Team Members'"></h2>
                         <p class="mt-1 text-sm font-semibold text-slate-500">Manage riders and team leaders.</p>
                     </div>
-                    <button type="button" @@click="membersModal.open=false" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
+                    <button type="button" @click="membersModal.open=false" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -511,14 +430,14 @@
                     <div class="rounded-2xl border border-orange-100 bg-orange-50/40 p-4">
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Add Rider</label>
                         <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                            <div class="relative" data-member-rider-picker @@click.stop @@click.outside="memberDropdownOpen = false">
+                            <div class="relative" data-member-rider-picker @click.stop @click.outside="memberDropdownOpen = false">
                                 <div class="relative">
                                     <input
                                         x-ref="memberSearchInput"
                                         type="search"
                                         x-model="memberSearch"
-                                        @@focus="memberDropdownOpen = true"
-                                        @@input="memberDropdownOpen = true; selectedMemberDriverId = ''"
+                                        @focus="memberDropdownOpen = true"
+                                        @input="memberDropdownOpen = true; selectedMemberDriverId = ''"
                                         placeholder="Search rider name or phone..."
                                         class="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-3 pr-10 text-base font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 sm:text-sm"
                                         :class="memberDropdownOpen ? 'rounded-b-none border-orange-400 ring-4 ring-orange-100' : ''"
@@ -538,7 +457,7 @@
                                         <template x-for="rider in filteredRiders()" :key="rider.id">
                                             <button
                                                 type="button"
-                                                @@click="selectMemberRider(rider)"
+                                                @click="selectMemberRider(rider)"
                                                 class="flex w-full items-start justify-between gap-3 border-b border-slate-100 px-3 py-3 text-left last:border-b-0 hover:bg-orange-50"
                                                 :class="String(selectedMemberDriverId) === String(rider.id) ? 'bg-orange-50' : ''"
                                             >
@@ -555,7 +474,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <button type="button" @@click="addMember()" :disabled="!selectedMemberDriverId || isTeamMember(selectedMemberDriverId)" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Add</button>
+                            <button type="button" @click="addMember()" :disabled="!selectedMemberDriverId || isTeamMember(selectedMemberDriverId)" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Add</button>
                         </div>
                     </div>
 
@@ -578,9 +497,9 @@
                                     <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase" :class="member.role === 'leader' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'" x-text="member.role === 'leader' ? 'Leader' : 'Member'"></span>
                                 </div>
                                 <div class="flex justify-end gap-2">
-                                    <button type="button" x-show="member.role !== 'leader'" @@click="makeLeader(member)" class="rounded-xl border border-orange-200 px-3 py-2 text-xs font-black text-orange-700 hover:bg-orange-50">Make Leader</button>
-                                    <button type="button" x-show="member.role === 'leader'" @@click="removeLeader(member)" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">Remove Leader</button>
-                                    <button type="button" @@click="removeMember(member)" class="rounded-xl border border-rose-200 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50">Remove</button>
+                                    <button type="button" x-show="member.role !== 'leader'" @click="makeLeader(member)" class="rounded-xl border border-orange-200 px-3 py-2 text-xs font-black text-orange-700 hover:bg-orange-50">Make Leader</button>
+                                    <button type="button" x-show="member.role === 'leader'" @click="removeLeader(member)" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">Remove Leader</button>
+                                    <button type="button" @click="removeMember(member)" class="rounded-xl border border-rose-200 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50">Remove</button>
                                 </div>
                             </div>
                         </template>
@@ -595,8 +514,8 @@
              x-cloak
              class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
              style="display:none"
-             @@click.self="handoverModal.open=false"
-             @@keydown.escape.window="handoverModal.open=false">
+             @click.self="handoverModal.open=false"
+             @keydown.escape.window="handoverModal.open=false">
             <div x-show="handoverModal.open"
                  x-transition:enter="transition ease-out duration-200"
                  x-transition:enter-start="opacity-0 scale-95"
@@ -604,7 +523,7 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100 scale-100"
                  x-transition:leave-end="opacity-0 scale-95"
-                 @@click.stop
+                 @click.stop
                  class="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
                 <div class="flex items-start gap-4 border-b border-slate-200 px-6 py-5">
                     <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20">
@@ -614,7 +533,7 @@
                         <h2 class="text-2xl font-black text-slate-950">New Handover</h2>
                         <p class="mt-1 text-sm font-semibold text-slate-500">Assign package custody to a team member.</p>
                     </div>
-                    <button type="button" @@click="handoverModal.open=false" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
+                    <button type="button" @click="handoverModal.open=false" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -622,7 +541,7 @@
                     <div class="grid gap-5 md:grid-cols-2">
                     <div>
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Team</label>
-                        <select x-model="handoverModal.rider_team_id" @@change="loadHandoverTeamMembers()" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                        <select x-model="handoverModal.rider_team_id" @change="loadHandoverTeamMembers()" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                             <option value="">Choose team</option>
                             <template x-for="team in teams.filter(t => t.is_active)" :key="team.id">
                                 <option :value="team.id" x-text="team.name"></option>
@@ -650,8 +569,8 @@
                     </div>
                 </div>
                 <div class="flex justify-end gap-3 border-t border-slate-200 bg-slate-50/60 px-6 py-4">
-                    <button type="button" @@click="handoverModal.open=false" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700">Cancel</button>
-                    <button type="button" @@click="saveHandover()" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20">Create Handover</button>
+                    <button type="button" @click="handoverModal.open=false" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700">Cancel</button>
+                    <button type="button" @click="saveHandover()" class="rounded-xl bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-600/20">Create Handover</button>
                 </div>
             </div>
         </div>
@@ -662,8 +581,8 @@
              x-cloak
              class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
              style="display:none"
-             @@click.self="detailsModal.open=false"
-             @@keydown.escape.window="detailsModal.open=false">
+             @click.self="detailsModal.open=false"
+             @keydown.escape.window="detailsModal.open=false">
             <div x-show="detailsModal.open"
                  x-transition:enter="transition ease-out duration-200"
                  x-transition:enter-start="opacity-0 scale-95"
@@ -671,14 +590,14 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100 scale-100"
                  x-transition:leave-end="opacity-0 scale-95"
-                 @@click.stop
+                 @click.stop
                  class="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
                     <div class="min-w-0">
                         <h2 class="truncate font-mono text-xl font-black text-slate-950" x-text="detailsModal.handover?.handover_number"></h2>
                         <p class="mt-1 text-sm font-semibold text-slate-500" x-text="`${detailsModal.handover?.team?.name || '-'} / ${detailsModal.handover?.receiver?.name || '-'}`"></p>
                     </div>
-                    <button type="button" @@click="detailsModal.open=false" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
+                    <button type="button" @click="detailsModal.open=false" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -719,7 +638,7 @@
                                             <button
                                                 type="button"
                                                 x-show="item.can_release"
-                                                @@click="releaseHandoverLabel(item)"
+                                                @click="releaseHandoverLabel(item)"
                                                 class="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50"
                                             >
                                                 Remove
