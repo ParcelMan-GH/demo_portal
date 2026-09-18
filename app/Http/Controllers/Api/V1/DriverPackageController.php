@@ -74,11 +74,57 @@ class DriverPackageController extends Controller
                 ->first();
         }
 
+        if (! $driver && $phone !== '') {
+            $driver = $this->provisionDriverProfile($user, $phone);
+        }
+
         if (! $driver) {
             abort(403, 'No rider profile is linked to this account yet. Please contact your warehouse supervisor.');
         }
 
         return $this->resolvedActingDriver = $driver;
+    }
+
+    /**
+     * Create the rider profile for an app account that has none yet.
+     *
+     * Riders sign in with their staff account; the very first scan of a rider
+     * whose profile was never created used to stop with "no rider profile".
+     * Provisioning keeps the link (and therefore scanning) working.
+     */
+    private function provisionDriverProfile(?object $user, string $phone): ?Driver
+    {
+        $fallbackEmail = 'rider-'.(preg_replace('/\D+/', '', $phone) ?: 'unknown').'@parcelmanexpress.local';
+
+        foreach (array_values(array_unique(array_filter([$user?->email, $fallbackEmail]))) as $email) {
+            try {
+                $driver = Driver::create([
+                    'name' => (string) ($user?->name ?: 'Rider'),
+                    'email' => $email,
+                    'phone' => $phone,
+                    'password' => bcrypt(bin2hex(random_bytes(16))),
+                    'vehicle_type' => 'motorcycle',
+                    'status' => 'available',
+                    'is_active' => true,
+                    'task_capabilities' => ['pickup', 'delivery'],
+                ]);
+
+                logger()->info('Auto-provisioned rider profile for app account', [
+                    'user_id' => $user?->id,
+                    'driver_id' => $driver->id,
+                    'phone' => $phone,
+                ]);
+
+                return $driver;
+            } catch (\Throwable $e) {
+                logger()->warning('Could not auto-provision rider profile', [
+                    'email' => $email,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return null;
     }
 
     /**
