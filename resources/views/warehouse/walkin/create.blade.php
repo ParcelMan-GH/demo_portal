@@ -260,7 +260,7 @@
                 <h2 class="text-xl font-medium text-slate-800">Packages Details</h2>
             </div>
 
-            <div class="space-y-10">
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
                 <template x-for="(item, idx) in items" :key="item.key">
                     <div class="relative">
                         
@@ -313,47 +313,51 @@
                             </template>
                         </div>
 
-                        <!-- Form Grid 1 -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                            <div>
-                                <label class="block text-sm text-slate-600 mb-2">Package Type <span class="text-rose-500">*</span></label>
-                                <input type="text" x-model="item.description" placeholder="e.g. Shoes" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                        <!-- Fields: two per row -->
+                        <div class="space-y-5">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div>
+                                    <label class="block text-sm text-slate-600 mb-2">Receiver Name <span class="text-rose-500">*</span></label>
+                                    <input type="text" x-model="item.delivery.recipient_name" placeholder="Jane Doe" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-600 mb-2">Number <span class="text-rose-500">*</span></label>
+                                    <input type="tel" maxlength="10" x-model="item.delivery.recipient_phone" @input="normalizeDeliveryPhoneInput(item.delivery)" placeholder="050 893 6615" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-sm text-slate-600 mb-2">Quantity <span class="text-rose-500">*</span></label>
-                                <input type="number" x-model="item.quantity" placeholder="1" min="1" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
-                            </div>
-                            <div>
-                                <label class="block text-sm text-slate-600 mb-2">Delivery Fee (Optional)</label>
-                                <input type="number" x-model="item.delivery_fee" placeholder="0.00" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
-                            </div>
-                        </div>
 
-                        <!-- Form Grid 2 -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div>
-                                <label class="block text-sm text-slate-600 mb-2">Recipient Name <span class="text-rose-500">*</span></label>
-                                <input type="text" x-model="item.delivery.recipient_name" placeholder="Jane Doe" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div class="relative" @click.outside="item.delivery._showDropdown = false">
+                                    <label class="block text-sm text-slate-600 mb-2">Location <span class="text-rose-500">*</span></label>
+                                    <input type="text" x-model="item.delivery.locationQuery" @input="searchLocation(item.delivery)" @focus="item.delivery.locationResults?.length && (item.delivery._showDropdown = true)" placeholder="Search location" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                    <!-- Location Dropdown -->
+                                    <div x-show="item.delivery._showDropdown" class="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                        <template x-for="loc in item.delivery.locationResults" :key="loc.id">
+                                            <button type="button" @click="selectLocation(item.delivery, loc)" class="block w-full text-left px-4 py-2.5 hover:bg-orange-50 text-sm text-slate-700 border-b border-slate-50 last:border-0" x-text="loc.display"></button>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-600 mb-2">Description <span class="text-rose-500">*</span></label>
+                                    <input type="text" x-model="item.description" placeholder="e.g. Shoes" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-sm text-slate-600 mb-2">Recipient Phone <span class="text-rose-500">*</span></label>
-                                <input type="tel" maxlength="10" x-model="item.delivery.recipient_phone" @input="normalizeDeliveryPhoneInput(item.delivery)" placeholder="050 893 6615" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
-                            </div>
-                            <div class="relative" @click.outside="item.delivery._showDropdown = false">
-                                <label class="block text-sm text-slate-600 mb-2">Delivery Location <span class="text-rose-500">*</span></label>
-                                <input type="text" x-model="item.delivery.locationQuery" @input="searchLocation(item.delivery)" @focus="item.delivery.locationResults?.length && (item.delivery._showDropdown = true)" placeholder="Search location" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
-                                <!-- Location Dropdown -->
-                                <div x-show="item.delivery._showDropdown" class="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                                    <template x-for="loc in item.delivery.locationResults" :key="loc.id">
-                                        <button type="button" @click="selectLocation(item.delivery, loc)" class="block w-full text-left px-4 py-2.5 hover:bg-orange-50 text-sm text-slate-700 border-b border-slate-50 last:border-0" x-text="loc.display"></button>
-                                    </template>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div>
+                                    <label class="block text-sm text-slate-600 mb-2">Quantity <span class="text-rose-500">*</span></label>
+                                    <input type="number" x-model="item.quantity" placeholder="1" min="1" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-600 mb-2">Price</label>
+                                    <input type="number" x-model="item.delivery_fee" placeholder="0.00" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Remove button -->
-                        <div class="absolute -right-4 top-[180px] h-full" x-show="items.length > 1">
-                            <button type="button" @click="removeItem(idx)" title="Remove Package" class="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                        <div class="absolute right-3 top-3 z-20" x-show="items.length > 1">
+                            <button type="button" @click="removeItem(idx)" title="Remove Package" class="p-1.5 bg-white/90 backdrop-blur rounded-full text-slate-400 hover:text-red-500 shadow-sm border border-slate-200 transition-colors">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>

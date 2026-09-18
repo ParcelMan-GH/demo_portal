@@ -82,10 +82,43 @@
             <img :src="current.preview" class="w-full h-52 object-cover bg-slate-100" alt="package">
 
             <div class="p-4 space-y-3">
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Package Type *</label>
-                    <input type="text" x-model="current.description" placeholder="e.g. Shoe, Box, Envelope"
-                           class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Receiver Name</label>
+                        <input type="text" x-model="current.recipient_name" placeholder="Full name"
+                               class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Number</label>
+                        <input type="tel" x-model="current.recipient_phone" placeholder="0551234567"
+                               class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="relative">
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Location</label>
+                        <input type="text" x-model="current.town" @input="searchLocations()" placeholder="e.g. Taifa"
+                               class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
+                        <p class="text-[11px] text-slate-400 mt-1" x-show="current.region_name">
+                            <span x-text="current.town"></span>, <span x-text="current.district_name"></span>, <span x-text="current.region_name"></span>
+                        </p>
+
+                        <div x-show="current.locationResults.length" x-cloak
+                             class="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                            <template x-for="(loc, i) in current.locationResults" :key="i">
+                                <button type="button" @click="pickLocation(loc)"
+                                        class="w-full text-left px-3 py-2.5 text-sm hover:bg-orange-50 border-b border-slate-100 last:border-0">
+                                    <span x-text="loc.display"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Description *</label>
+                        <input type="text" x-model="current.description" placeholder="e.g. Shoe, Box"
+                               class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -95,57 +128,10 @@
                                class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Delivery Fee</label>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Price</label>
                         <input type="number" min="0" step="0.01" x-model="current.delivery_fee" placeholder="0.00"
                                class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
                     </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Delivery Type</label>
-                    <select x-model="current.delivery_method"
-                            class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm bg-white focus:border-orange-500 focus:ring-orange-500">
-                        <option value="direct">Door delivery</option>
-                        <option value="bus_handoff">Bus station handoff</option>
-                    </select>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Receiver Name</label>
-                        <input type="text" x-model="current.recipient_name" placeholder="Full name"
-                               class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Receiver Phone</label>
-                        <input type="tel" x-model="current.recipient_phone" placeholder="0551234567"
-                               class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
-                    </div>
-                </div>
-
-                <div class="relative">
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Delivery Area / Town</label>
-                    <input type="text" x-model="current.town" @input="searchLocations()" placeholder="Start typing e.g. Taifa"
-                           class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
-                    <p class="text-[11px] text-slate-400 mt-1" x-show="current.region_name">
-                        <span x-text="current.town"></span>, <span x-text="current.district_name"></span>, <span x-text="current.region_name"></span>
-                    </p>
-
-                    <div x-show="current.locationResults.length" x-cloak
-                         class="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
-                        <template x-for="(loc, i) in current.locationResults" :key="i">
-                            <button type="button" @click="pickLocation(loc)"
-                                    class="w-full text-left px-3 py-2.5 text-sm hover:bg-orange-50 border-b border-slate-100 last:border-0">
-                                <span x-text="loc.display"></span>
-                            </button>
-                        </template>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Landmark / Note</label>
-                    <input type="text" x-model="current.landmark" placeholder="e.g. near the blue kiosk"
-                           class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
                 </div>
             </div>
         </div>
@@ -359,7 +345,7 @@
                     this.index = missing;
                     Swal.fire({
                         title: 'Package type is required',
-                        text: `Please fill the "Package Type" for package ${missing + 1}.`,
+                        text: `Please fill the "Description" for package ${missing + 1}.`,
                         icon: 'warning',
                         confirmButtonColor: '#E2762B',
                     });
@@ -373,14 +359,12 @@
                     description: img.description,
                     quantity: img.quantity || 1,
                     delivery_fee: img.delivery_fee === '' ? null : img.delivery_fee,
-                    delivery_method: img.delivery_method || 'direct',
+                    delivery_method: 'direct',
                     recipient_name: img.recipient_name,
                     recipient_phone: img.recipient_phone,
                     town: img.town,
                     region_id: img.region_id || null,
                     district_id: img.district_id || null,
-                    landmark: img.landmark,
-                    instructions: img.instructions,
                 }));
 
                 try {
