@@ -25,14 +25,14 @@
             <label class="w-full bg-orange-600 active:bg-orange-700 text-white rounded-2xl py-4 px-6 flex items-center justify-center gap-3 text-lg font-bold shadow-xl shadow-orange-600/30 transition-transform active:scale-95 cursor-pointer">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 Take Photo
-                <!-- capture="environment" forces the rear camera -->
-                <input type="file" accept="image/*" capture="environment" class="hidden" @change="uploadPhoto">
+                <!-- capture="environment" forces the rear camera; multiple lets several photos be picked at once -->
+                <input type="file" accept="image/*" capture="environment" multiple class="hidden" @change="uploadPhoto">
             </label>
 
             <label class="w-full bg-slate-900 active:bg-slate-800 text-white rounded-2xl py-4 px-6 flex items-center justify-center gap-3 text-lg font-bold shadow-xl shadow-slate-900/30 transition-transform active:scale-95 cursor-pointer">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                 Choose from Gallery
-                <input type="file" accept="image/*" class="hidden" @change="uploadPhoto">
+                <input type="file" accept="image/*" multiple class="hidden" @change="uploadPhoto">
             </label>
         </div>
 
@@ -48,11 +48,11 @@
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                 Sent to Desktop!
             </div>
-            <p class="text-emerald-100 text-xs font-medium">You can close this tab, or take another photo.</p>
+            <p class="text-emerald-100 text-xs font-medium">You can close this tab, or send more photos.</p>
         </div>
 
         <button x-show="status === 'success'" x-cloak @click="status = 'idle'" class="mt-6 text-slate-500 font-bold text-sm underline underline-offset-4">
-            Take Another Photo
+            Add More Photos
         </button>
     </div>
 
@@ -61,35 +61,57 @@
             return {
                 status: 'idle', // idle, uploading, success
                 sessionId: '{{ $sessionId }}',
+                progress: { done: 0, total: 0, failed: 0 },
                 
                 async uploadPhoto(event) {
-                    const file = event.target.files[0];
-                    if (!file) return;
+                    const files = Array.from(event.target.files || []);
+                    if (!files.length) return;
 
                     this.status = 'uploading';
-                    
-                    const formData = new FormData();
-                    formData.append('photo', file);
+                    this.progress = { done: 0, total: files.length, failed: 0 };
 
-                    try {
-                        const response = await fetch(`/mobile-camera/${this.sessionId}/upload`, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                            },
-                            body: formData
-                        });
+                    for (const file of files) {
+                        const formData = new FormData();
+                        formData.append('photo', file);
 
-                        if (response.ok) {
-                            this.status = 'success';
-                        } else {
-                            Swal.fire({ title: 'Upload failed', text: 'Please try again.', icon: 'error', confirmButtonColor: '#E2762B' });
-                            this.status = 'idle';
+                        try {
+                            const response = await fetch(`/mobile-camera/${this.sessionId}/upload`, {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                                },
+                                body: formData
+                            });
+
+                            if (!response.ok) {
+                                this.progress.failed++;
+                            }
+                        } catch (error) {
+                            this.progress.failed++;
                         }
-                    } catch (error) {
-                        Swal.fire({ title: 'Network error', text: 'Please try again.', icon: 'error', confirmButtonColor: '#E2762B' });
-                        this.status = 'idle';
+
+                        this.progress.done++;
                     }
+
+                    // Keep the same photo selectable again next time.
+                    event.target.value = '';
+
+                    if (this.progress.failed === this.progress.total) {
+                        Swal.fire({ title: 'Upload failed', text: 'Please try again.', icon: 'error', confirmButtonColor: '#E2762B' });
+                        this.status = 'idle';
+                        return;
+                    }
+
+                    if (this.progress.failed > 0) {
+                        Swal.fire({
+                            title: 'Some photos were not sent',
+                            text: (this.progress.total - this.progress.failed) + ' of ' + this.progress.total + ' photos arrived. Please send the rest again.',
+                            icon: 'warning',
+                            confirmButtonColor: '#E2762B'
+                        });
+                    }
+
+                    this.status = 'success';
                 }
             }
         }

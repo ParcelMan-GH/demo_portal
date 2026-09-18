@@ -17,9 +17,9 @@ class PackageLabelHtmlRenderer
     private function css(): string
     {
         return <<<'CSS'
-@page { size: 105mm 148mm; margin: 0; }
+@page { size: 100mm 150mm; margin: 0; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { width: 105mm; min-width: 105mm; background: #fff; }
+html, body { width: 100mm; min-width: 100mm; background: #fff; }
 body {
     font-family: 'Segoe UI', Arial, sans-serif;
     color: #0f172a;
@@ -27,8 +27,8 @@ body {
     print-color-adjust: exact;
 }
 .label {
-    width: 105mm;
-    min-height: 148mm;
+    width: 100mm;
+    min-height: 150mm;
     margin: 0;
     padding: 4mm;
     background: #fff;
@@ -290,7 +290,7 @@ script { display: none !important; }
     .label { border: 1px solid #e2e8f0; }
 }
 @media print {
-    html, body { width: 105mm; }
+    html, body { width: 100mm; }
     .label {
         border: 0;
         margin: 0;

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Driver;
 use App\Models\DeliveryDelayReason;
 use App\Models\DeliveryRun;
 use App\Models\DeliveryRunItem;
@@ -16,6 +17,107 @@ use Illuminate\Http\Request;
 
 class DriverDeliveryController extends Controller
 {
+
+    /** Driver resolved for the authenticated account (cached per request). */
+    private ?Driver $resolvedActingDriver = null;
+
+    /**
+     * Resolve the Driver profile behind the authenticated account.
+     *
+     * The rider/transporter app authenticates the staff User that holds the
+     * rider or transporter role, while deliveries, custody and transfers are all
+     * recorded against a Driver record.
+     */
+    private function actingDriver(Request $request): Driver
+    {
+        if ($this->resolvedActingDriver) {
+            return $this->resolvedActingDriver;
+        }
+
+        $user = $request->user();
+
+        if ($user instanceof Driver) {
+            return $this->resolvedActingDriver = $user;
+        }
+
+        $phone = trim((string) ($user?->phone ?? ''));
+        $email = trim((string) ($user?->email ?? ''));
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+        // Ghana numbers are stored inconsistently (+233..., 233..., 0...).
+        $tail = strlen($digits) >= 9 ? substr($digits, -9) : '';
+        $normalisePhone = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '')";
+
+        $driver = null;
+
+        if ($phone !== '' || $email !== '') {
+            $driver = Driver::query()
+                ->where(function ($query) use ($phone, $email, $digits, $tail, $normalisePhone) {
+                    if ($phone !== '') {
+                        $query->where('phone', $phone);
+                    }
+                    if ($digits !== '') {
+                        $query->orWhereRaw("{$normalisePhone} = ?", [$digits]);
+                    }
+                    if ($tail !== '') {
+                        $query->orWhereRaw("RIGHT({$normalisePhone}, 9) = ?", [$tail]);
+                    }
+                    if ($email !== '') {
+                        $query->orWhere('email', $email);
+                    }
+                })
+                ->orderByDesc('is_active')
+                ->first();
+        }
+
+        if (! $driver && $phone !== '') {
+            $driver = $this->provisionDriverProfile($user, $phone);
+        }
+
+        if (! $driver) {
+            abort(403, 'No rider profile is linked to this account yet. Please contact your warehouse supervisor.');
+        }
+
+        return $this->resolvedActingDriver = $driver;
+    }
+
+    /**
+     * Create the rider profile for an app account that has none yet.
+     */
+    private function provisionDriverProfile(?object $user, string $phone): ?Driver
+    {
+        $fallbackEmail = 'rider-'.(preg_replace('/\D+/', '', $phone) ?: 'unknown').'@parcelmanexpress.local';
+
+        foreach (array_values(array_unique(array_filter([$user?->email, $fallbackEmail]))) as $email) {
+            try {
+                $driver = Driver::create([
+                    'name' => (string) ($user?->name ?: 'Rider'),
+                    'email' => $email,
+                    'phone' => $phone,
+                    'password' => bcrypt(bin2hex(random_bytes(16))),
+                    'vehicle_type' => 'motorcycle',
+                    'status' => 'available',
+                    'is_active' => true,
+                    'task_capabilities' => ['pickup', 'delivery'],
+                ]);
+
+                logger()->info('Auto-provisioned rider profile for app account', [
+                    'user_id' => $user?->id,
+                    'driver_id' => $driver->id,
+                    'phone' => $phone,
+                ]);
+
+                return $driver;
+            } catch (\Throwable $e) {
+                logger()->warning('Could not auto-provision rider profile', [
+                    'email' => $email,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return null;
+    }
+
     public function __construct(
         private DriverDeliveryService $driverDeliveryService,
         private WarehouseDeliveryService $warehouseDeliveryService,
@@ -25,14 +127,14 @@ class DriverDeliveryController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $result = $this->driverDeliveryService->list($request->user(), $request);
+        $result = $this->driverDeliveryService->list($this->actingDriver($request), $request);
 
         return response()->json($result);
     }
 
     public function show(Request $request, DeliveryRun $run): JsonResponse
     {
-        $result = $this->driverDeliveryService->show($request->user(), $run);
+        $result = $this->driverDeliveryService->show($this->actingDriver($request), $run);
         $status = $result['status'] ?? 200;
         unset($result['status']);
 
@@ -41,7 +143,7 @@ class DriverDeliveryController extends Controller
 
     public function arriveStop(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         $result = $this->warehouseDeliveryService->driverArriveStop($run, $stop, $driver);
 
         return $this->deliveryActionResponse($driver, $run, $result, 400);
@@ -49,7 +151,7 @@ class DriverDeliveryController extends Controller
 
     public function confirmStop(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         $skipVerification = filter_var($request->input('skip_verification', false), FILTER_VALIDATE_BOOLEAN);
 
         $validated = $request->validate([
@@ -86,7 +188,7 @@ class DriverDeliveryController extends Controller
 
     public function confirmStopPackages(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         $skipVerification = filter_var($request->input('skip_verification', false), FILTER_VALIDATE_BOOLEAN);
 
         $validated = $request->validate([
@@ -126,7 +228,7 @@ class DriverDeliveryController extends Controller
 
     public function failStop(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -145,7 +247,7 @@ class DriverDeliveryController extends Controller
 
     public function updateItemEta(Request $request, DeliveryRunItem $deliveryRunItem): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         if (!$this->deliveryDelayService->canDriverUpdate($deliveryRunItem, $driver)) {
             return response()->json([
@@ -197,7 +299,7 @@ class DriverDeliveryController extends Controller
 
     public function confirmHandoff(Request $request, DeliveryRun $run, DeliveryRunStop $stop): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $validated = $request->validate([
             'courier_name' => ['nullable', 'string', 'max:255'],
