@@ -46,6 +46,8 @@
         $canItems = $authUser?->hasPermission('warehouse.items.scan') || $authUser?->hasPermission('shipments.view');
         $canSorting = $authUser?->hasPermission('warehouse.sorting.manage') || $authUser?->hasPermission('shipments.view');
         $canManifest = $authUser?->hasPermission('warehouse.manifest.manage') || $authUser?->hasPermission('shipments.view');
+        // Riders & transporters perform offload scanning, so they need the incoming list too.
+        $canScanIncoming = $canManifest || $canItems;
         $canDeliveryAssign = $authUser?->hasPermission('warehouse.delivery.assign') || $authUser?->hasPermission('shipments.view');
         $canContacts = $authUser?->hasPermission('warehouse.contacts.manage') || $authUser?->hasPermission('shipments.view');
         $canRecipientPayments = $authUser?->hasPermission('warehouse.recipient_payments.view') || $authUser?->hasPermission('recipient_payments.view');
@@ -167,7 +169,7 @@
                     </div>
                 @endif
 
-                @if($canManifest || $canDeliveryAssign || $canRiderTeams || $canSorting)
+                @if($canManifest || $canScanIncoming || $canDeliveryAssign || $canRiderTeams || $canSorting)
                     <div class="mb-6">
                         <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-2" x-show="!sidebarCollapsed">Transport & Deliveries</div>
                         <div class="mx-auto w-6 h-px bg-slate-200 mb-4" x-show="sidebarCollapsed" x-cloak></div>
@@ -179,6 +181,9 @@
                                     <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Outgoing Batches</span>
                                 </div>
                             </a>
+                        @endif
+
+                        @if($canScanIncoming)
                             <a href="{{ route('warehouse.manifests.incoming.index') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('warehouse.manifests.incoming.*') || request()->routeIs('admin.transport-manifests.incoming.*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                                 <div class="flex items-center gap-3">
                                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8"/></svg>

@@ -833,7 +833,7 @@ class TransportManifestController extends Controller
 
     public function incomingIndex(): View
     {
-        $this->authorizePermission('warehouse.receiving.manage');
+        $this->authorizeScanning();
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
 
         return view('warehouse.manifests.incoming.index', [
@@ -858,7 +858,7 @@ class TransportManifestController extends Controller
 
     public function incomingData(Request $request): JsonResponse
     {
-        $this->authorizePermission('warehouse.receiving.manage');
+        $this->authorizeScanning();
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
         $query = $this->transportService->incomingQuery($warehouse);
         $summary = $this->incomingSummary(clone $query);
@@ -938,7 +938,7 @@ class TransportManifestController extends Controller
 
     public function incomingShow(TransportManifest $manifest): View
     {
-        $this->authorizePermission('warehouse.receiving.manage');
+        $this->authorizeScanning();
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
         if ((int) $manifest->destination_warehouse_id !== (int) $warehouse->id) {
             abort(404);
@@ -976,7 +976,7 @@ class TransportManifestController extends Controller
 
     public function scanIncomingPackage(Request $request): JsonResponse
     {
-        $this->authorizePermission('warehouse.receiving.manage');
+        $this->authorizeScanning();
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
 
         $validated = $request->validate([
@@ -1106,7 +1106,7 @@ class TransportManifestController extends Controller
 
     public function scanIncomingItem(Request $request, TransportManifest $manifest, ShipmentItem $shipmentItem): JsonResponse
     {
-        $this->authorizePermission('warehouse.receiving.manage');
+        $this->authorizeScanning();
         $warehouse = $this->portalService->resolveWarehouse(Auth::guard('admin')->user());
         if ((int) $manifest->destination_warehouse_id !== (int) $warehouse->id) {
             abort(404);
@@ -1267,6 +1267,27 @@ class TransportManifestController extends Controller
         if (!$user || !$user->hasPermission($permission)) {
             abort(403, 'Unauthorized action.');
         }
+    }
+
+    /**
+     * Destination / offload scanning is performed by warehouse receiving staff
+     * AND by riders and transporters, whose roles grant the dedicated
+     * warehouse.items.scan permission instead of warehouse.receiving.manage.
+     * Accept either permission so scanning is never blocked for them.
+     */
+    private function authorizeScanning(): void
+    {
+        $user = Auth::guard('admin')->user();
+
+        if (! $user) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        if ($user->hasPermission('warehouse.receiving.manage') || $user->hasPermission('warehouse.items.scan')) {
+            return;
+        }
+
+        abort(403, 'Unauthorized action.');
     }
 
     private function applyOutboundStatusFilter(Builder $query, string $status): void
