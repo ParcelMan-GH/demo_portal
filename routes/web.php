@@ -68,6 +68,9 @@ Route::post('/agents/allocation/assign', [AgentAllocationController::class, 'ass
 Route::get('/mobile-camera/{sessionId}', [MobileCameraController::class, 'show'])->name('mobile-camera.show');
 Route::post('/mobile-camera/{sessionId}/upload', [MobileCameraController::class, 'upload'])->name('mobile-camera.upload');
 Route::get('/mobile-camera/{sessionId}/photos', [MobileCameraController::class, 'photos'])->name('mobile-camera.photos');
+Route::get('/mobile-camera/{sessionId}/locations', [MobileCameraController::class, 'locations'])->name('mobile-camera.locations');
+Route::get('/mobile-camera/{sessionId}/packages', [MobileCameraController::class, 'packages'])->name('mobile-camera.packages');
+Route::post('/mobile-camera/{sessionId}/packages', [MobileCameraController::class, 'storePackages'])->name('mobile-camera.packages.store');
 
 Route::get('/', function () {
     return view('web.landing');

@@ -382,8 +382,8 @@
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                 </div>
                 
-                <h3 class="text-xl font-bold text-slate-900 mb-2">Connect Camera</h3>
-                <p class="text-sm text-slate-500 mb-6 leading-relaxed">Point your phone's camera at this QR code to capture photos for <strong class="text-slate-700">Package <span x-text="activePackageIndex + 1"></span></strong>.</p>
+                <h3 class="text-xl font-bold text-slate-900 mb-2">Capture on your phone</h3>
+                <p class="text-sm text-slate-500 mb-6 leading-relaxed">Scan this QR code, take one photo per package, fill each package's details on the phone, then press <strong class="text-slate-700">Send</strong>. The finished packages appear here automatically.</p>
                 
                 <div class="inline-block p-4 bg-white border-2 border-slate-100 rounded-2xl shadow-sm mb-6 relative">
                     <img x-show="qrPreview" :src="qrPreview" class="w-[200px] h-[200px] object-cover rounded-xl" alt="Uploaded photo">
@@ -394,7 +394,7 @@
                 </div>
                 
                 <p x-show="qrReceivedCount > 0" class="text-sm font-semibold text-emerald-600 mb-4">
-                    <span x-text="qrReceivedCount"></span> photo<span x-show="qrReceivedCount !== 1">s</span> received — take as many as you need; this closes on its own when you finish.
+                    <span x-text="qrReceivedCount"></span> package<span x-show="qrReceivedCount !== 1">s</span> received from the phone — added to this order.
                 </p>
 
                 <div x-show="!qrPreview" class="flex items-center justify-center gap-2.5 text-sm text-emerald-600 font-medium bg-emerald-50 py-2.5 px-4 rounded-xl inline-flex w-full">
@@ -402,10 +402,10 @@
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                     </span>
-                    Listening for mobile uploads...
+                    Waiting for packages from the phone...
                 </div>
                 <div x-show="qrPreview" class="flex items-center justify-center gap-2.5 text-sm text-emerald-600 font-medium bg-emerald-50 py-2.5 px-4 rounded-xl inline-flex w-full">
-                    Photo received — you can close this window.
+                    Packages received — you can close this window.
                 </div>
             </div>
         </div>
@@ -443,43 +443,61 @@ function walkinShipment() {
         qrAutoCloseTimer: null,
         qrReceivedCount: 0,
         activePackageIndex: 0,
+        receivedPhonePaths: [],
 
         init() {
             this.config = JSON.parse(this.$el.dataset.walkinConfig);
             this.transferWarehouses = Array.isArray(this.config.transferWarehouses) ? this.config.transferWarehouses : [];
             this.items = [this.makeItem()];
-
-            // Set up Laravel Echo WebSocket Listener
-            if (typeof window.Echo !== 'undefined') {
-                window.Echo.channel(`walkin-uploads.${this.config.uploadSessionId}`)
-                    .listen('.PhotoUploaded', (e) => {
-                        this.handleReceivedPhoto(e.temp_path);
-                    });
-            }
         },
 
-        handleReceivedPhoto(tempPath) {
-            if (!tempPath) return;
-            const targetItem = this.items[this.activePackageIndex];
-            if (!targetItem) return;
+        /**
+         * The phone sends finished packages (photo + details). Each one becomes a
+         * ready package here, so nothing has to be retyped on the desktop.
+         */
+        handleReceivedPackages(packages) {
+            (Array.isArray(packages) ? packages : []).forEach((pkg) => {
+                if (!pkg || !pkg.path) return;
+                if (this.receivedPhonePaths.includes(pkg.path)) return; // already collected
 
-            // 1. Save mobile temp path for submission
-            targetItem.mobilePhotos = targetItem.mobilePhotos || [];
-            if (targetItem.mobilePhotos.includes(tempPath)) return; // dedupe
-            targetItem.mobilePhotos.push(tempPath);
-
-            // 2. Create preview object for UI thumbnails
-            targetItem.photos = targetItem.photos || [];
-            targetItem.photos.push({
-                file: null,
-                preview: `/storage/${tempPath}`,
-                from_mobile: true,
-                temp_path: tempPath
+                this.receivedPhonePaths.push(pkg.path);
+                this.addPackageFromPhone(pkg);
             });
+        },
 
-            // 3. Show the newest photo in place of the QR and KEEP listening, so
-            //    every photo taken on the phone is collected (not just the first).
-            this.qrPreview = `/storage/${tempPath}`;
+        addPackageFromPhone(pkg) {
+            const item = this.makeItem();
+
+            item.description = pkg.description || '';
+            item.quantity = Number(pkg.quantity) > 0 ? Number(pkg.quantity) : 1;
+            item.delivery_fee = (pkg.delivery_fee === null || pkg.delivery_fee === undefined) ? '' : pkg.delivery_fee;
+            item.delivery_method = pkg.delivery_method || 'direct';
+            item.delivery.recipient_name = pkg.recipient_name || '';
+            item.delivery.recipient_phone = pkg.recipient_phone || '';
+            item.delivery.town = pkg.town || '';
+            item.delivery.locationQuery = pkg.town || '';
+            item.delivery.region_id = pkg.region_id || '';
+            item.delivery.district_id = pkg.district_id || '';
+            item.delivery.landmark = pkg.landmark || '';
+            item.delivery.instructions = pkg.instructions || '';
+
+            item.mobilePhotos = [pkg.path];
+            item.photos = [{
+                file: null,
+                preview: `/storage/${pkg.path}`,
+                from_mobile: true,
+                temp_path: pkg.path,
+            }];
+
+            // Replace the untouched starter package instead of leaving a blank one.
+            const firstItem = this.items[0];
+            if (this.items.length === 1 && firstItem && !firstItem.description && !(firstItem.photos || []).length) {
+                this.items[0] = item;
+            } else {
+                this.items.push(item);
+            }
+
+            this.qrPreview = `/storage/${pkg.path}`;
             this.qrReceivedCount = (this.qrReceivedCount || 0) + 1;
             this.scheduleQrAutoClose();
         },
@@ -498,7 +516,7 @@ function walkinShipment() {
         startQrPolling() {
             this.stopQrPolling();
             this.qrReceivedCount = 0;
-            this.qrPollTimer = setInterval(() => this.checkForMobilePhotos(), 2500);
+            this.qrPollTimer = setInterval(() => this.checkForMobilePackages(), 3000);
         },
 
         stopQrPolling() {
@@ -513,16 +531,14 @@ function walkinShipment() {
             }
         },
 
-        async checkForMobilePhotos() {
+        async checkForMobilePackages() {
             try {
-                const res = await fetch(`/mobile-camera/${this.config.uploadSessionId}/photos`, {
+                const res = await fetch(`/mobile-camera/${this.config.uploadSessionId}/packages`, {
                     headers: { Accept: 'application/json' },
                 });
                 if (!res.ok) return;
                 const data = await res.json();
-                (Array.isArray(data.photos) ? data.photos : []).forEach((path) => {
-                    this.handleReceivedPhoto(path);
-                });
+                this.handleReceivedPackages(data.packages);
             } catch (e) {
                 // transient network error — keep polling
             }
