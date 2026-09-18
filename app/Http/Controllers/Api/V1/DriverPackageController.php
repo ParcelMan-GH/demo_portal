@@ -45,21 +45,32 @@ class DriverPackageController extends Controller
         }
 
         $phone = trim((string) ($user?->phone ?? ''));
+        $email = trim((string) ($user?->email ?? ''));
         $digits = preg_replace('/\D+/', '', $phone) ?? '';
+        // Ghana numbers are stored inconsistently (+233…, 233…, 0…), so the last
+        // nine digits are used as a fallback signature for comparison.
+        $tail = strlen($digits) >= 9 ? substr($digits, -9) : '';
+        $normalisePhone = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '')";
 
         $driver = null;
 
-        if ($phone !== '' || $digits !== '') {
+        if ($phone !== '' || $email !== '') {
             $driver = Driver::query()
-                ->where('is_active', true)
-                ->where(function ($query) use ($phone, $digits) {
+                ->where(function ($query) use ($phone, $email, $digits, $tail, $normalisePhone) {
                     if ($phone !== '') {
                         $query->where('phone', $phone);
                     }
                     if ($digits !== '') {
-                        $query->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$digits]);
+                        $query->orWhereRaw("{$normalisePhone} = ?", [$digits]);
+                    }
+                    if ($tail !== '') {
+                        $query->orWhereRaw("RIGHT({$normalisePhone}, 9) = ?", [$tail]);
+                    }
+                    if ($email !== '') {
+                        $query->orWhere('email', $email);
                     }
                 })
+                ->orderByDesc('is_active')
                 ->first();
         }
 
