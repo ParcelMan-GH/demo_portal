@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\OutgoingBatch;
 use App\Models\ShipmentItem;
+use App\Models\TransportManifest;
+use App\Models\TransportManifestItem;
 use App\Models\Warehouse;
 use App\Services\BackOfficeAccess;
 use Illuminate\Http\JsonResponse;
@@ -182,30 +184,130 @@ class AdminTransportManifestController extends Controller
             'driver_id' => ['nullable', 'integer'],
         ]);
 
-        if (in_array($manifest->status, ['dispatched', 'received'], true)) {
-            return response()->json([
-                'success' => true,
-                'status' => 'success',
-                'message' => "Batch {$manifest->batch_number} was already dispatched.",
-            ]);
-        }
+        $alreadyDispatched = in_array($manifest->status, ['dispatched', 'received'], true);
 
         if (! empty($validated['driver_id'])) {
             $manifest->transport_driver_id = $validated['driver_id'];
         }
 
-        $manifest->status = 'dispatched';
+        if (! $alreadyDispatched) {
+            $manifest->status = 'dispatched';
+        }
+
         $manifest->save();
 
-        $manifest->shipmentItems()->update([
-            'status' => ItemStatus::IN_TRANSIT->value,
-        ]);
+        if (! $alreadyDispatched) {
+            $manifest->shipmentItems()->update([
+                'status' => ItemStatus::IN_TRANSIT->value,
+            ]);
+        }
+
+        // The mobile app dispatches and loads through transport manifests, so make
+        // sure this batch has one the transporter can scan.
+        $transportManifest = $this->bridgeBatchToTransportManifest($manifest);
+
+        $message = $alreadyDispatched
+            ? "Batch {$manifest->batch_number} was already dispatched."
+            : "Batch {$manifest->batch_number} closed and dispatched to transport.";
+
+        $message .= $transportManifest
+            ? " Transport manifest {$transportManifest->manifest_number} is ready to scan in the app."
+            : ' No destination hub warehouse matched this region, so the app cannot show it yet.';
 
         return response()->json([
             'success' => true,
             'status' => 'success',
-            'message' => "Batch {$manifest->batch_number} closed and dispatched to transport.",
+            'message' => $message,
         ]);
+    }
+
+    /**
+     * Create (once) the transport manifest the mobile app uses for this batch.
+     */
+    protected function bridgeBatchToTransportManifest(OutgoingBatch $batch): ?TransportManifest
+    {
+        $existing = TransportManifest::query()
+            ->where('manifest_number', $batch->batch_number)
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $user = Auth::guard('admin')->user();
+        $origin = $this->resolveOriginWarehouse($user);
+        $destination = $this->resolveDestinationWarehouse($batch);
+
+        if (! $origin || ! $destination) {
+            return null;
+        }
+
+        $driverId = $batch->transport_driver_id ?: null;
+        $now = now();
+
+        $manifest = TransportManifest::query()->create([
+            'manifest_number' => $batch->batch_number,
+            'origin_warehouse_id' => $origin->id,
+            'destination_warehouse_id' => $destination->id,
+            'assigned_driver_id' => $driverId,
+            'assigned_at' => $driverId ? $now : null,
+            'status' => $driverId ? TransportManifest::STATUS_IN_TRANSIT : TransportManifest::STATUS_DRAFT,
+            'dispatched_at' => $driverId ? $now : null,
+            'created_by_user_id' => $user?->id,
+            'notes' => 'Created automatically from outgoing batch '.$batch->batch_number.'.',
+        ]);
+
+        $items = ShipmentItem::query()
+            ->where('outgoing_batch_id', $batch->id)
+            ->get();
+
+        foreach ($items as $item) {
+            $quantity = max(1, (int) $item->quantity);
+
+            TransportManifestItem::query()->create([
+                'transport_manifest_id' => $manifest->id,
+                'shipment_item_id' => $item->id,
+                'expected_quantity' => $quantity,
+                'loaded_quantity' => $quantity,
+                'line_status' => TransportManifestItem::LINE_LOADED,
+                'loaded_at' => $now,
+            ]);
+        }
+
+        logger()->info('Bridged outgoing batch to transport manifest', [
+            'batch' => $batch->batch_number,
+            'manifest_id' => $manifest->id,
+            'items' => $items->count(),
+        ]);
+
+        return $manifest->fresh();
+    }
+
+    protected function resolveOriginWarehouse(?object $user): ?Warehouse
+    {
+        if ($user?->warehouse_id) {
+            $warehouse = Warehouse::query()->find($user->warehouse_id);
+
+            if ($warehouse) {
+                return $warehouse;
+            }
+        }
+
+        return $this->access->warehousesFor($user, 'warehouse')->first();
+    }
+
+    protected function resolveDestinationWarehouse(OutgoingBatch $batch): ?Warehouse
+    {
+        $base = Warehouse::query()
+            ->where('is_active', true)
+            ->where('region_id', $batch->delivery_region_id);
+
+        return (clone $base)->whereIn('type', ['destination', 'both'])
+                ->where('district_id', $batch->delivery_district_id)
+                ->orderBy('id')
+                ->first()
+            ?? (clone $base)->whereIn('type', ['destination', 'both'])->orderBy('id')->first()
+            ?? (clone $base)->orderBy('id')->first();
     }
 
     // ==========================================

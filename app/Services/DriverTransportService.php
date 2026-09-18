@@ -118,7 +118,19 @@ class DriverTransportService
     public function show(Driver $driver, TransportManifest $manifest): array
     {
         if ((int) $manifest->assigned_driver_id !== (int) $driver->id) {
-            return ['success' => false, 'message' => 'Transport not found.', 'status' => 404];
+            // Pool manifests (no transporter yet) are taken over by the first
+            // driver who opens them, so batches dispatched unassigned still work.
+            if (empty($manifest->assigned_driver_id)) {
+                $manifest->forceFill([
+                    'assigned_driver_id' => $driver->id,
+                    'assigned_at' => $manifest->assigned_at ?: now(),
+                    'status' => $manifest->status === TransportManifest::STATUS_DRAFT
+                        ? TransportManifest::STATUS_ASSIGNED
+                        : $manifest->status,
+                ])->save();
+            } else {
+                return ['success' => false, 'message' => 'Transport not found.', 'status' => 404];
+            }
         }
 
         $manifest->load([
