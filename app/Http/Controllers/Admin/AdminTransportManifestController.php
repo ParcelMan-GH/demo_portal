@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\ItemStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\OutgoingBatch;
@@ -164,6 +165,46 @@ class AdminTransportManifestController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Batch {$batch->batch_number} closed and dispatched to transport.",
+        ]);
+    }
+
+    /**
+     * Close and dispatch an outgoing batch to transport.
+     *
+     * The Outgoing Batches screen posts here when the operator confirms
+     * "Close & Dispatch". The batch is closed (status dispatched), an optional
+     * transporter is stored, and every package on the batch moves to
+     * "In Transit" so receiving hubs see it as travelling.
+     */
+    public function dispatch(Request $request, OutgoingBatch $manifest): JsonResponse
+    {
+        $validated = $request->validate([
+            'driver_id' => ['nullable', 'integer'],
+        ]);
+
+        if (in_array($manifest->status, ['dispatched', 'received'], true)) {
+            return response()->json([
+                'success' => true,
+                'status' => 'success',
+                'message' => "Batch {$manifest->batch_number} was already dispatched.",
+            ]);
+        }
+
+        if (! empty($validated['driver_id'])) {
+            $manifest->transport_driver_id = $validated['driver_id'];
+        }
+
+        $manifest->status = 'dispatched';
+        $manifest->save();
+
+        $manifest->shipmentItems()->update([
+            'status' => ItemStatus::IN_TRANSIT->value,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'status' => 'success',
+            'message' => "Batch {$manifest->batch_number} closed and dispatched to transport.",
         ]);
     }
 
