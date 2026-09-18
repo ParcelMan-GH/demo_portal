@@ -14,6 +14,7 @@ use App\Services\BackOfficeAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -204,7 +205,16 @@ class AdminTransportManifestController extends Controller
 
         // The mobile app dispatches and loads through transport manifests, so make
         // sure this batch has one the transporter can scan.
-        $transportManifest = $this->bridgeBatchToTransportManifest($manifest);
+        try {
+            $transportManifest = $this->bridgeBatchToTransportManifest($manifest);
+        } catch (\Throwable $e) {
+            logger()->error('Could not bridge outgoing batch to a transport manifest', [
+                'batch' => $manifest->batch_number,
+                'error' => $e->getMessage(),
+            ]);
+
+            $transportManifest = null;
+        }
 
         $message = $alreadyDispatched
             ? "Batch {$manifest->batch_number} was already dispatched."
@@ -245,7 +255,9 @@ class AdminTransportManifestController extends Controller
         $driverId = $batch->transport_driver_id ?: null;
         $now = now();
 
-        $manifest = TransportManifest::query()->create([
+        $columns = Schema::getColumnListing('transport_manifests');
+
+        $attributes = array_filter([
             'manifest_number' => $batch->batch_number,
             'origin_warehouse_id' => $origin->id,
             'destination_warehouse_id' => $destination->id,
@@ -255,7 +267,11 @@ class AdminTransportManifestController extends Controller
             'dispatched_at' => $driverId ? $now : null,
             'created_by_user_id' => $user?->id,
             'notes' => 'Created automatically from outgoing batch '.$batch->batch_number.'.',
-        ]);
+        ], fn ($value) => $value !== null);
+
+        $attributes = array_intersect_key($attributes, array_flip($columns));
+
+        $manifest = TransportManifest::query()->create($attributes);
 
         $items = ShipmentItem::query()
             ->where('outgoing_batch_id', $batch->id)
@@ -302,12 +318,20 @@ class AdminTransportManifestController extends Controller
             ->where('is_active', true)
             ->where('region_id', $batch->delivery_region_id);
 
-        return (clone $base)->whereIn('type', ['destination', 'both'])
-                ->where('district_id', $batch->delivery_district_id)
-                ->orderBy('id')
-                ->first()
-            ?? (clone $base)->whereIn('type', ['destination', 'both'])->orderBy('id')->first()
-            ?? (clone $base)->orderBy('id')->first();
+        // Older databases do not have every warehouse column, so filter only when present.
+        if (Schema::hasColumn('warehouses', 'type')) {
+            $base->whereIn('type', ['destination', 'both']);
+        }
+
+        if (Schema::hasColumn('warehouses', 'district_id') && $batch->delivery_district_id) {
+            $sameDistrict = (clone $base)->where('district_id', $batch->delivery_district_id)->orderBy('id')->first();
+
+            if ($sameDistrict) {
+                return $sameDistrict;
+            }
+        }
+
+        return (clone $base)->orderBy('id')->first();
     }
 
     // ==========================================
