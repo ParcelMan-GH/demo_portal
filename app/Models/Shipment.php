@@ -127,22 +127,31 @@ class Shipment extends Model
         $length = (int) PlatformSetting::getValue('shipment.number_length', 5);
         $year = date('Y');
 
-        // Get the last shipment number for this year
-        $lastShipment = static::withTrashed()
+        // Highest *numeric* suffix used this year. Legacy/manual numbers such as
+        // "PCM-2026-D104" have no numeric suffix and used to be cast to 0, which
+        // made the next number "PCM-2026-00001" and collide with an existing one.
+        $numbers = static::withTrashed()
             ->where('shipment_number', 'like', "{$prefix}-{$year}-%")
-            ->orderBy('id', 'desc')
-            ->first();
+            ->pluck('shipment_number');
 
-        if ($lastShipment) {
-            // Extract the number part and increment
-            $parts = explode('-', $lastShipment->shipment_number);
-            $lastNumber = (int) end($parts);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
+        $nextNumber = 1;
+
+        foreach ($numbers as $number) {
+            $suffix = substr((string) $number, strrpos((string) $number, '-') + 1);
+
+            if (ctype_digit($suffix)) {
+                $nextNumber = max($nextNumber, ((int) $suffix) + 1);
+            }
         }
 
-        return sprintf("%s-%s-%0{$length}d", $prefix, $year, $nextNumber);
+        // Never hand out a number that is already taken.
+        do {
+            $candidate = sprintf("%s-%s-%0{$length}d", $prefix, $year, $nextNumber);
+            $taken = static::withTrashed()->where('shipment_number', $candidate)->exists();
+            $nextNumber++;
+        } while ($taken);
+
+        return $candidate;
     }
 
     /**
