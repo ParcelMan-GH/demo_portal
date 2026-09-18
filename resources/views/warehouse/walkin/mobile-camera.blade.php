@@ -63,6 +63,32 @@
                 sessionId: '{{ $sessionId }}',
                 progress: { done: 0, total: 0, failed: 0 },
                 
+                async compressImage(file, maxSize = 1600, quality = 0.8) {
+                    try {
+                        if (!file || !file.type || !file.type.startsWith('image/')) return file;
+
+                        const bitmap = await createImageBitmap(file);
+                        const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+                        const width = Math.max(1, Math.round(bitmap.width * scale));
+                        const height = Math.max(1, Math.round(bitmap.height * scale));
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        canvas.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+                        if (bitmap.close) bitmap.close();
+
+                        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+                        if (!blob || blob.size >= file.size) return file;
+
+                        const name = (file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg';
+
+                        return new File([blob], name, { type: 'image/jpeg', lastModified: Date.now() });
+                    } catch (error) {
+                        return file;
+                    }
+                },
+
                 async uploadPhoto(event) {
                     const files = Array.from(event.target.files || []);
                     if (!files.length) return;
@@ -71,8 +97,12 @@
                     this.progress = { done: 0, total: files.length, failed: 0 };
 
                     for (const file of files) {
+                        // Phone photos are several MB and upload slowly (or get
+                        // rejected by the server). Shrink them first.
+                        const upload = await this.compressImage(file);
+
                         const formData = new FormData();
-                        formData.append('photo', file);
+                        formData.append('photo', upload);
 
                         try {
                             const response = await fetch(`/mobile-camera/${this.sessionId}/upload`, {

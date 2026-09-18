@@ -393,6 +393,10 @@
                     <div x-show="qrPreview" class="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-full">Received ✓</div>
                 </div>
                 
+                <p x-show="qrReceivedCount > 0" class="text-sm font-semibold text-emerald-600 mb-4">
+                    <span x-text="qrReceivedCount"></span> photo<span x-show="qrReceivedCount !== 1">s</span> received — take as many as you need; this closes on its own when you finish.
+                </p>
+
                 <div x-show="!qrPreview" class="flex items-center justify-center gap-2.5 text-sm text-emerald-600 font-medium bg-emerald-50 py-2.5 px-4 rounded-xl inline-flex w-full">
                     <span class="relative flex h-2.5 w-2.5">
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -436,6 +440,8 @@ function walkinShipment() {
         qrModalOpen: false,
         qrPreview: null,
         qrPollTimer: null,
+        qrAutoCloseTimer: null,
+        qrReceivedCount: 0,
         activePackageIndex: 0,
 
         init() {
@@ -471,14 +477,27 @@ function walkinShipment() {
                 temp_path: tempPath
             });
 
-            // 3. Show the received photo in place of the QR, then close
+            // 3. Show the newest photo in place of the QR and KEEP listening, so
+            //    every photo taken on the phone is collected (not just the first).
             this.qrPreview = `/storage/${tempPath}`;
-            this.stopQrPolling();
-            setTimeout(() => { this.qrModalOpen = false; }, 1200);
+            this.qrReceivedCount = (this.qrReceivedCount || 0) + 1;
+            this.scheduleQrAutoClose();
+        },
+
+        scheduleQrAutoClose() {
+            if (this.qrAutoCloseTimer) clearTimeout(this.qrAutoCloseTimer);
+
+            // Close once the phone stops sending photos (20s of silence).
+            this.qrAutoCloseTimer = setTimeout(() => {
+                this.qrAutoCloseTimer = null;
+                this.stopQrPolling();
+                this.qrModalOpen = false;
+            }, 20000);
         },
 
         startQrPolling() {
             this.stopQrPolling();
+            this.qrReceivedCount = 0;
             this.qrPollTimer = setInterval(() => this.checkForMobilePhotos(), 2500);
         },
 
@@ -486,6 +505,11 @@ function walkinShipment() {
             if (this.qrPollTimer) {
                 clearInterval(this.qrPollTimer);
                 this.qrPollTimer = null;
+            }
+
+            if (this.qrAutoCloseTimer) {
+                clearTimeout(this.qrAutoCloseTimer);
+                this.qrAutoCloseTimer = null;
             }
         },
 
