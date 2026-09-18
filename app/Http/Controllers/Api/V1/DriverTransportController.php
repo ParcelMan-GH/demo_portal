@@ -4,6 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\TransportLoadingException;
+use App\Models\OutgoingBatch;
+use App\Models\ShipmentItem;
+use App\Models\TransportManifestItem;
+use App\Models\Warehouse;
+use App\Models\Driver;
 use App\Models\TransportManifest;
 use App\Services\DriverTransportService;
 use App\Services\Warehouse\WarehouseTransportService;
@@ -14,6 +19,179 @@ use Illuminate\Support\Facades\Log;
 
 class DriverTransportController extends Controller
 {
+
+    /** Driver resolved for the authenticated account (cached per request). */
+    private ?Driver $resolvedActingDriver = null;
+
+    /**
+     * The app signs in the staff User that holds the rider/transporter role, while
+     * dispatches, custody and deliveries are recorded against a Driver record.
+     */
+    private function actingDriver(Request $request): Driver
+    {
+        if ($this->resolvedActingDriver) {
+            return $this->resolvedActingDriver;
+        }
+
+        $user = $request->user();
+
+        if ($user instanceof Driver) {
+            return $this->resolvedActingDriver = $user;
+        }
+
+        $phone = trim((string) ($user?->phone ?? ''));
+        $email = trim((string) ($user?->email ?? ''));
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+        $tail = strlen($digits) >= 9 ? substr($digits, -9) : '';
+        $normalisePhone = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '')";
+
+        $driver = null;
+
+        if ($phone !== '' || $email !== '') {
+            $driver = Driver::query()
+                ->where(function ($query) use ($phone, $email, $digits, $tail, $normalisePhone) {
+                    if ($phone !== '') {
+                        $query->where('phone', $phone);
+                    }
+                    if ($digits !== '') {
+                        $query->orWhereRaw("{$normalisePhone} = ?", [$digits]);
+                    }
+                    if ($tail !== '') {
+                        $query->orWhereRaw("RIGHT({$normalisePhone}, 9) = ?", [$tail]);
+                    }
+                    if ($email !== '') {
+                        $query->orWhere('email', $email);
+                    }
+                })
+                ->orderByDesc('is_active')
+                ->first();
+        }
+
+        if (! $driver && $phone !== '') {
+            $driver = $this->provisionDriverProfile($user, $phone);
+        }
+
+        if (! $driver) {
+            abort(403, 'No rider profile is linked to this account yet. Please contact your warehouse supervisor.');
+        }
+
+        return $this->resolvedActingDriver = $driver;
+    }
+
+    private function provisionDriverProfile(?object $user, string $phone): ?Driver
+    {
+        $fallbackEmail = 'rider-'.(preg_replace('/\D+/', '', $phone) ?: 'unknown').'@parcelmanexpress.local';
+
+        foreach (array_values(array_unique(array_filter([$user?->email, $fallbackEmail]))) as $email) {
+            try {
+                return Driver::create([
+                    'name' => (string) ($user?->name ?: 'Rider'),
+                    'email' => $email,
+                    'phone' => $phone,
+                    'password' => bcrypt(bin2hex(random_bytes(16))),
+                    'vehicle_type' => 'motorcycle',
+                    'status' => 'available',
+                    'is_active' => true,
+                    'task_capabilities' => ['pickup', 'delivery'],
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('Could not auto-provision rider profile', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Build the transport manifest a scanned outgoing-batch code refers to.
+     */
+    private function bridgeOutgoingBatch(string $code, Driver $driver): ?TransportManifest
+    {
+        try {
+            $existing = TransportManifest::query()->where('manifest_number', $code)->first();
+
+            if ($existing) {
+                return $existing;
+            }
+
+            $batch = OutgoingBatch::query()->where('batch_number', $code)->first();
+
+            if (! $batch) {
+                return null;
+            }
+
+            $items = ShipmentItem::query()
+                ->where('outgoing_batch_id', $batch->id)
+                ->with('warehouseReceiptItems.receipt')
+                ->get();
+
+            $originId = $items
+                ->map(fn ($item) => $item->warehouseReceiptItems->first()?->receipt?->warehouse_id)
+                ->filter()
+                ->first()
+                ?? ($driver->warehouse_id ?? null);
+
+            $destinationQuery = Warehouse::query()->where('is_active', true);
+
+            if (Schema::hasColumn('warehouses', 'region_id') && $batch->delivery_region_id) {
+                $destinationQuery->where('region_id', $batch->delivery_region_id);
+            }
+
+            $destinationId = (clone $destinationQuery)->orderBy('id')->value('id') ?? $originId;
+
+            if (! $originId || ! $destinationId) {
+                Log::warning('Bridge skipped: no warehouse could be resolved', ['batch' => $code]);
+
+                return null;
+            }
+
+            $now = now();
+
+            $attributes = array_intersect_key(array_filter([
+                'manifest_number' => $batch->batch_number,
+                'origin_warehouse_id' => $originId,
+                'destination_warehouse_id' => $destinationId,
+                'assigned_driver_id' => $driver->id,
+                'assigned_at' => $now,
+                'status' => 'in_transit',
+                'dispatched_at' => $now,
+                'notes' => 'Created from outgoing batch '.$batch->batch_number.' during a transporter scan.',
+            ], fn ($value) => $value !== null), array_flip(Schema::getColumnListing('transport_manifests')));
+
+            $manifest = TransportManifest::query()->create($attributes);
+
+            $itemColumns = array_flip(Schema::getColumnListing('transport_manifest_items'));
+
+            foreach ($items as $item) {
+                $quantity = max(1, (int) $item->quantity);
+
+                $itemAttributes = array_intersect_key(array_filter([
+                    'transport_manifest_id' => $manifest->id,
+                    'shipment_item_id' => $item->id,
+                    'expected_quantity' => $quantity,
+                    'loaded_quantity' => $quantity,
+                    'line_status' => 'loaded',
+                    'loaded_at' => $now,
+                ], fn ($value) => $value !== null), $itemColumns);
+
+                TransportManifestItem::query()->create($itemAttributes);
+            }
+
+            Log::info('Bridged outgoing batch during a transporter scan', [
+                'batch' => $batch->batch_number,
+                'manifest_id' => $manifest->id,
+                'driver_id' => $driver->id,
+                'items' => $items->count(),
+            ]);
+
+            return $manifest->fresh();
+        } catch (\Throwable $e) {
+            Log::error('Bridge failed during transporter scan: '.$e->getMessage(), ['code' => $code]);
+
+            return null;
+        }
+    }
+
     public function __construct(
         private DriverTransportService $driverTransportService,
         private WarehouseTransportService $transportService
@@ -23,7 +201,7 @@ class DriverTransportController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $driver = $request->user();
+            $driver = $this->actingDriver($request);
             $search = trim($request->query('search', ''));
 
             // Dynamically detect column name (driver_id vs transporter_id)
@@ -70,6 +248,16 @@ class DriverTransportController extends Controller
             }
 
             $manifests = $query->latest()->get();
+
+            // A transporter scanning a batch the portal dispatched before the bridge
+            // existed: build the manifest now and hand it to this transporter.
+            if ($search !== '' && $manifests->isEmpty()) {
+                $bridged = $this->bridgeOutgoingBatch($search, $driver);
+
+                if ($bridged) {
+                    $manifests = collect([$bridged->load(['originWarehouse', 'destinationWarehouse'])]);
+                }
+            }
 
             // Calculate transporter metrics
             $drivesMade = TransportManifest::where($driverCol, $driver->id)
