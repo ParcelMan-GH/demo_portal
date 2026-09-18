@@ -441,6 +441,7 @@ function walkinShipment() {
         qrPreview: null,
         qrPollTimer: null,
         qrAutoCloseTimer: null,
+        qrPollStartedAt: null,
         qrReceivedCount: 0,
         activePackageIndex: 0,
         receivedPhonePaths: [],
@@ -449,6 +450,11 @@ function walkinShipment() {
             this.config = JSON.parse(this.$el.dataset.walkinConfig);
             this.transferWarehouses = Array.isArray(this.config.transferWarehouses) ? this.config.transferWarehouses : [];
             this.items = [this.makeItem()];
+
+            // Listen for phone packages for as long as this page is open, not only
+            // while the QR window is up — the operator may close it while filling
+            // the details on the phone.
+            this.startQrPolling();
         },
 
         /**
@@ -456,13 +462,31 @@ function walkinShipment() {
          * ready package here, so nothing has to be retyped on the desktop.
          */
         handleReceivedPackages(packages) {
+            let added = 0;
+
             (Array.isArray(packages) ? packages : []).forEach((pkg) => {
                 if (!pkg || !pkg.path) return;
                 if (this.receivedPhonePaths.includes(pkg.path)) return; // already collected
 
                 this.receivedPhonePaths.push(pkg.path);
                 this.addPackageFromPhone(pkg);
+                added++;
             });
+
+            // Let the operator know even when the QR window is already closed.
+            if (added > 0 && !this.qrModalOpen && window.Swal) {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: added + ' package' + (added === 1 ? '' : 's') + ' received from the phone',
+                    showConfirmButton: false,
+                    timer: 4500,
+                    timerProgressBar: true,
+                });
+            }
+
+            return added;
         },
 
         addPackageFromPhone(pkg) {
@@ -516,7 +540,9 @@ function walkinShipment() {
         startQrPolling() {
             this.stopQrPolling();
             this.qrReceivedCount = 0;
+            this.qrPollStartedAt = Date.now();
             this.qrPollTimer = setInterval(() => this.checkForMobilePackages(), 3000);
+            this.checkForMobilePackages();
         },
 
         stopQrPolling() {
@@ -532,6 +558,12 @@ function walkinShipment() {
         },
 
         async checkForMobilePackages() {
+            // Stop after an hour so a page left open does not poll forever.
+            if (this.qrPollStartedAt && (Date.now() - this.qrPollStartedAt) > 3600000) {
+                this.stopQrPolling();
+                return;
+            }
+
             try {
                 const res = await fetch(`/mobile-camera/${this.config.uploadSessionId}/packages`, {
                     headers: { Accept: 'application/json' },
