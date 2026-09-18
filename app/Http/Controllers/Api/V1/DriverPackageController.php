@@ -20,13 +20,63 @@ use Illuminate\Http\Request;
 
 class DriverPackageController extends Controller
 {
+
+    /** Driver resolved for the authenticated account (cached per request). */
+    private ?Driver $resolvedActingDriver = null;
+
+    /**
+     * Resolve the Driver profile behind the authenticated account.
+     *
+     * The rider/transporter app signs in with the back-office User that holds
+     * the rider or transporter role, but package custody, rider team membership
+     * and transfers are all recorded against a Driver record. Map the account to
+     * its Driver so scanning records the right owner instead of failing.
+     */
+    private function actingDriver(Request $request): Driver
+    {
+        if ($this->resolvedActingDriver) {
+            return $this->resolvedActingDriver;
+        }
+
+        $user = $request->user();
+
+        if ($user instanceof Driver) {
+            return $this->resolvedActingDriver = $user;
+        }
+
+        $phone = trim((string) ($user?->phone ?? ''));
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+
+        $driver = null;
+
+        if ($phone !== '' || $digits !== '') {
+            $driver = Driver::query()
+                ->where('is_active', true)
+                ->where(function ($query) use ($phone, $digits) {
+                    if ($phone !== '') {
+                        $query->where('phone', $phone);
+                    }
+                    if ($digits !== '') {
+                        $query->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$digits]);
+                    }
+                })
+                ->first();
+        }
+
+        if (! $driver) {
+            abort(403, 'No rider profile is linked to this account yet. Please contact your warehouse supervisor.');
+        }
+
+        return $this->resolvedActingDriver = $driver;
+    }
+
     /**
      * Scan and claim a package label.
      * POST /api/v1/driver/scan-claim
      */
     public function scanClaim(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $validated = $request->validate([
             'barcode' => ['required', 'string', 'max:100'],
@@ -75,7 +125,7 @@ class DriverPackageController extends Controller
      */
     public function myPackages(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $validated = $request->validate([
             'from_date' => ['nullable', 'date'],
@@ -271,7 +321,7 @@ class DriverPackageController extends Controller
         string $trackingCode,
         DriverPackageOperationsService $operations
     ): JsonResponse {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $validated = $request->validate([
             'delivery_town' => ['required', 'string', 'max:255'],
@@ -296,7 +346,7 @@ class DriverPackageController extends Controller
         string $trackingCode,
         DriverPackageOperationsService $operations
     ): JsonResponse {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $validated = $request->validate([
             'receiver_phone' => ['required', 'string', 'max:30'],
@@ -315,7 +365,7 @@ class DriverPackageController extends Controller
 
     public function incomingTransfers(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $transfers = RiderPackageTransfer::query()
             ->with([
@@ -341,7 +391,7 @@ class DriverPackageController extends Controller
 
     public function outgoingTransfers(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $transfers = RiderPackageTransfer::query()
             ->with([
@@ -370,7 +420,7 @@ class DriverPackageController extends Controller
         RiderPackageTransfer $transfer,
         DriverPackageOperationsService $operations
     ): JsonResponse {
-        $accepted = $operations->acceptTransfer($request->user(), $transfer);
+        $accepted = $operations->acceptTransfer($this->actingDriver($request), $transfer);
 
         return response()->json([
             'success' => true,
@@ -386,7 +436,7 @@ class DriverPackageController extends Controller
         RiderPackageTransfer $transfer,
         DriverPackageOperationsService $operations
     ): JsonResponse {
-        $rejected = $operations->rejectTransfer($request->user(), $transfer);
+        $rejected = $operations->rejectTransfer($this->actingDriver($request), $transfer);
 
         return response()->json([
             'success' => true,
@@ -402,7 +452,7 @@ class DriverPackageController extends Controller
         RiderPackageTransfer $transfer,
         DriverPackageOperationsService $operations
     ): JsonResponse {
-        $cancelled = $operations->cancelTransfer($request->user(), $transfer);
+        $cancelled = $operations->cancelTransfer($this->actingDriver($request), $transfer);
 
         return response()->json([
             'success' => true,
@@ -418,7 +468,7 @@ class DriverPackageController extends Controller
         RiderPackageTransfer $transfer,
         DriverPackageOperationsService $operations
     ): JsonResponse {
-        $recalled = $operations->recallTransfer($request->user(), $transfer);
+        $recalled = $operations->recallTransfer($this->actingDriver($request), $transfer);
 
         return response()->json([
             'success' => true,
@@ -435,7 +485,7 @@ class DriverPackageController extends Controller
      */
     public function releasePackage(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $validated = $request->validate([
             'barcode' => ['required', 'string', 'max:100'],
@@ -680,7 +730,7 @@ class DriverPackageController extends Controller
      */
     public function startDeliveries(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $validated = $request->validate([
             'warehouse_id' => ['nullable', 'exists:warehouses,id'],

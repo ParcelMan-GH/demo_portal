@@ -15,13 +15,63 @@ use Illuminate\Http\Request;
 
 class DriverRiderTeamHandoverController extends Controller
 {
+
+    /** Driver resolved for the authenticated account (cached per request). */
+    private ?Driver $resolvedActingDriver = null;
+
+    /**
+     * Resolve the Driver profile behind the authenticated account.
+     *
+     * The rider/transporter app signs in with the back-office User that holds
+     * the rider or transporter role, but package custody, rider team membership
+     * and transfers are all recorded against a Driver record. Map the account to
+     * its Driver so scanning records the right owner instead of failing.
+     */
+    private function actingDriver(Request $request): Driver
+    {
+        if ($this->resolvedActingDriver) {
+            return $this->resolvedActingDriver;
+        }
+
+        $user = $request->user();
+
+        if ($user instanceof Driver) {
+            return $this->resolvedActingDriver = $user;
+        }
+
+        $phone = trim((string) ($user?->phone ?? ''));
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+
+        $driver = null;
+
+        if ($phone !== '' || $digits !== '') {
+            $driver = Driver::query()
+                ->where('is_active', true)
+                ->where(function ($query) use ($phone, $digits) {
+                    if ($phone !== '') {
+                        $query->where('phone', $phone);
+                    }
+                    if ($digits !== '') {
+                        $query->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$digits]);
+                    }
+                })
+                ->first();
+        }
+
+        if (! $driver) {
+            abort(403, 'No rider profile is linked to this account yet. Please contact your warehouse supervisor.');
+        }
+
+        return $this->resolvedActingDriver = $driver;
+    }
+
     public function __construct(private readonly RiderTeamHandoverService $service)
     {
     }
 
     public function index(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $teamIds = $driver->riderTeamMemberships()
             ->where('is_active', true)
@@ -45,7 +95,7 @@ class DriverRiderTeamHandoverController extends Controller
 
     public function show(Request $request, RiderTeamHandover $handover): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         $handover->load(['team', 'receiver:id,name,phone', 'warehouse:id,name,code']);
         abort_unless($this->service->driverBelongsToTeam($driver, $handover->team), 403);
 
@@ -86,7 +136,7 @@ class DriverRiderTeamHandoverController extends Controller
 
     public function scanReceive(Request $request, RiderTeamHandover $handover): JsonResponse
     {
-        $receiver = $request->user();
+        $receiver = $this->actingDriver($request);
         $validated = $request->validate(['barcode' => ['required', 'string', 'max:100']]);
 
         $item = $this->service->receiveByReceiver($handover->loadMissing('team'), $receiver, $validated['barcode']);
@@ -100,7 +150,7 @@ class DriverRiderTeamHandoverController extends Controller
 
     public function scanReceiveForTeam(Request $request, RiderTeam $team): JsonResponse
     {
-        $receiver = $request->user();
+        $receiver = $this->actingDriver($request);
         $validated = $request->validate([
             'barcode' => ['required', 'string', 'max:100'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
@@ -128,7 +178,7 @@ class DriverRiderTeamHandoverController extends Controller
 
     public function allocate(Request $request, RiderTeamHandover $handover): JsonResponse
     {
-        $receiver = $request->user();
+        $receiver = $this->actingDriver($request);
         $validated = $request->validate([
             'driver_id' => ['required', 'integer', 'exists:drivers,id'],
             'barcodes' => ['required', 'array', 'min:1'],
@@ -147,7 +197,7 @@ class DriverRiderTeamHandoverController extends Controller
 
     public function scanClaim(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         $validated = $request->validate([
             'barcode' => ['required', 'string', 'max:100'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],

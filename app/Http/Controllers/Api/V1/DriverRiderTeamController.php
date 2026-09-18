@@ -12,13 +12,63 @@ use Illuminate\Http\Request;
 
 class DriverRiderTeamController extends Controller
 {
+
+    /** Driver resolved for the authenticated account (cached per request). */
+    private ?Driver $resolvedActingDriver = null;
+
+    /**
+     * Resolve the Driver profile behind the authenticated account.
+     *
+     * The rider/transporter app signs in with the back-office User that holds
+     * the rider or transporter role, but package custody, rider team membership
+     * and transfers are all recorded against a Driver record. Map the account to
+     * its Driver so scanning records the right owner instead of failing.
+     */
+    private function actingDriver(Request $request): Driver
+    {
+        if ($this->resolvedActingDriver) {
+            return $this->resolvedActingDriver;
+        }
+
+        $user = $request->user();
+
+        if ($user instanceof Driver) {
+            return $this->resolvedActingDriver = $user;
+        }
+
+        $phone = trim((string) ($user?->phone ?? ''));
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+
+        $driver = null;
+
+        if ($phone !== '' || $digits !== '') {
+            $driver = Driver::query()
+                ->where('is_active', true)
+                ->where(function ($query) use ($phone, $digits) {
+                    if ($phone !== '') {
+                        $query->where('phone', $phone);
+                    }
+                    if ($digits !== '') {
+                        $query->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$digits]);
+                    }
+                })
+                ->first();
+        }
+
+        if (! $driver) {
+            abort(403, 'No rider profile is linked to this account yet. Please contact your warehouse supervisor.');
+        }
+
+        return $this->resolvedActingDriver = $driver;
+    }
+
     public function __construct(private readonly RiderTeamHandoverService $service)
     {
     }
 
     public function index(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $memberships = RiderTeamMembership::query()
             ->with(['team.warehouse:id,name,code'])
@@ -41,7 +91,7 @@ class DriverRiderTeamController extends Controller
 
     public function show(Request $request, RiderTeam $team): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         abort_unless($this->service->driverBelongsToTeam($driver, $team), 403);
 
         $team->load(['warehouse:id,name,code']);
@@ -72,7 +122,7 @@ class DriverRiderTeamController extends Controller
 
     public function lookupMember(Request $request, RiderTeam $team): JsonResponse
     {
-        $leader = $request->user();
+        $leader = $this->actingDriver($request);
         abort_unless($this->service->driverCanManageTeam($leader, $team), 403);
 
         $validated = $request->validate([
@@ -98,7 +148,7 @@ class DriverRiderTeamController extends Controller
 
     public function addMember(Request $request, RiderTeam $team): JsonResponse
     {
-        $leader = $request->user();
+        $leader = $this->actingDriver($request);
         abort_unless($this->service->driverCanManageTeam($leader, $team), 403);
 
         $validated = $request->validate([
@@ -137,7 +187,7 @@ class DriverRiderTeamController extends Controller
 
     public function removeMember(Request $request, RiderTeam $team, Driver $driver): JsonResponse
     {
-        $leader = $request->user();
+        $leader = $this->actingDriver($request);
         abort_unless($this->service->driverCanManageTeam($leader, $team), 403);
 
         if ((int) $leader->id === (int) $driver->id) {
