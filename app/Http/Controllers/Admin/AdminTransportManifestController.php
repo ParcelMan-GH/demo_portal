@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\BatchDestinationType;
 use App\Enums\ItemStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
@@ -11,17 +12,20 @@ use App\Models\TransportManifest;
 use App\Models\TransportManifestItem;
 use App\Models\Warehouse;
 use App\Services\BackOfficeAccess;
+use App\Services\OutgoingBatchPackageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AdminTransportManifestController extends Controller
 {
     public function __construct(
         private readonly BackOfficeAccess $access,
+        private readonly OutgoingBatchPackageService $packageService,
     ) {}
 
     // ==========================================
@@ -60,12 +64,14 @@ class AdminTransportManifestController extends Controller
         $validated = $request->validate([
             'delivery_region_id'   => ['required', 'integer'],
             'delivery_district_id' => ['required', 'integer'],
+            'destination_type'     => ['nullable', 'string', 'in:' . implode(',', array_column(BatchDestinationType::toArray(), 'value'))],
         ]);
 
         $batch = OutgoingBatch::create([
             'batch_number'         => 'BATCH-' . strtoupper(Str::random(6)),
             'delivery_region_id'   => $validated['delivery_region_id'],
             'delivery_district_id' => $validated['delivery_district_id'],
+            'destination_type'     => $validated['destination_type'] ?? null,
             'status'               => 'open',
         ]);
 
@@ -73,6 +79,77 @@ class AdminTransportManifestController extends Controller
             'success' => true,
             'message' => "Batch {$batch->batch_number} created successfully!",
             'data'    => $batch,
+        ]);
+    }
+
+    /**
+     * Detail view for a single batch: its metadata plus every package in it.
+     *
+     * The route for this has existed for a while but the method was never
+     * written, so clicking a batch in the list returned a 500. It now backs the
+     * "click a batch to open it" flow.
+     */
+    public function show(OutgoingBatch $manifest): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'batch'    => $this->packageService->summary($manifest),
+                'packages' => $this->packageService->assignedItems($manifest),
+            ],
+        ]);
+    }
+
+    /**
+     * Packages that can be added to this batch, with per-package eligibility so
+     * the picker can disable what the batch will not accept.
+     */
+    public function availablePackages(Request $request, OutgoingBatch $batch): JsonResponse
+    {
+        $search = (string) $request->get('search', '');
+        $limit  = (int) $request->get('limit', 100);
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'batch'      => $this->packageService->summary($batch),
+                'candidates' => $this->packageService->candidates($batch, $search, $limit),
+            ],
+        ]);
+    }
+
+    /**
+     * Add packages to a batch.
+     *
+     * The commerce rule is enforced here as well as in the picker — the client
+     * check is a convenience, this one is the guarantee.
+     */
+    public function addPackages(Request $request, OutgoingBatch $batch): JsonResponse
+    {
+        // The messages are supplied so an empty selection reads the same whether
+        // it is caught here or by the service below, instead of surfacing
+        // Laravel's raw "The package ids field is required."
+        $validated = $request->validate([
+            'package_ids'   => ['required', 'array', 'min:1'],
+            'package_ids.*' => ['integer'],
+        ], [
+            'package_ids.required' => OutgoingBatchPackageService::ERROR_NONE_SELECTED,
+            'package_ids.min'      => OutgoingBatchPackageService::ERROR_NONE_SELECTED,
+        ]);
+
+        $result = $this->packageService->addItems($batch, $validated['package_ids']);
+
+        $batch->refresh();
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['added'] === 1
+                ? '1 package added to the batch.'
+                : "{$result['added']} packages added to the batch.",
+            'data'    => [
+                'batch'    => $this->packageService->summary($batch),
+                'packages' => $result['items'],
+            ],
         ]);
     }
 
@@ -116,6 +193,9 @@ class AdminTransportManifestController extends Controller
                 'batch_number'          => $batch->batch_number,
                 'status'                => $batch->status,
                 'status_label'          => ucfirst(str_replace('_', ' ', $batch->status)),
+                'destination_type'      => $batch->destination_type,
+                'destination_type_label' => $batch->destinationTypeLabel(),
+                'accepts_only_commerce' => $batch->acceptsOnlyCommerce(),
                 'destination_warehouse' => "Region #{$batch->delivery_region_id} / District #{$batch->delivery_district_id}",
                 'driver_name'           => null,
                 'driver_phone'          => null,

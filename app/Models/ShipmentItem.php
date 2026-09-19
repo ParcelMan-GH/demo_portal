@@ -36,6 +36,7 @@ class ShipmentItem extends Model
         'delivery_instructions',
         'fulfillment_type',
         'delivery_preference',
+        'is_commerce',
         'delivery_method',
         'status',
         'tracking_code',
@@ -56,6 +57,7 @@ class ShipmentItem extends Model
      */
     protected $casts = [
         'quantity' => 'integer',
+        'is_commerce' => 'boolean',
         'delivery_fee' => 'decimal:2',
         'delivery_latitude' => 'decimal:8',
         'delivery_longitude' => 'decimal:8',
