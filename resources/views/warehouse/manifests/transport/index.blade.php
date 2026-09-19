@@ -7,6 +7,11 @@
     $config = [
         'data_endpoint' => route('admin.transport-manifests.data'),
         'create_endpoint' => route('admin.transport-manifests.store'),
+        // __ID__ is swapped for the batch id at call time.
+        'detail_endpoint' => route('admin.transport-manifests.show', ['manifest' => '__ID__']),
+        'packages_endpoint' => route('admin.transport-manifests.packages', ['batch' => '__ID__']),
+        'add_packages_endpoint' => route('admin.transport-manifests.packages.store', ['batch' => '__ID__']),
+        'destination_types' => \App\Enums\BatchDestinationType::toArray(),
         'transfer_batches' => collect($transferBatches ?? [])->values(),
         'transport_drivers' => collect($transportDrivers ?? $drivers ?? [])->map(fn ($driver) => [
             'id' => data_get($driver, 'id'),
@@ -167,7 +172,9 @@
                         </template>
 
                         <template x-for="row in rows" :key="row.id">
-                            <tr class="hover:bg-slate-50/70 transition-colors">
+                            <tr class="cursor-pointer hover:bg-orange-50/60 transition-colors"
+                                @click="openDetail(row.id)"
+                                title="Open this batch">
                                 <td class="px-4 py-3 font-extrabold text-slate-900" x-text="row.manifest_number || row.batch_number"></td>
                                 <td class="px-4 py-3 font-bold text-slate-700" x-text="row.destination_warehouse"></td>
                                 <td class="px-4 py-3 text-center">
@@ -192,7 +199,7 @@
                                 <td class="px-4 py-3 font-semibold text-slate-600" x-text="row.created_at"></td>
                                 <td class="px-4 py-3 text-right">
                                     <template x-if="row.status === 'pending' || row.status === 'open'">
-                                        <button type="button" @click="closeAndDispatch(row.id)" class="inline-flex items-center gap-1 rounded-xl bg-slate-900 hover:bg-slate-800 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors">
+                                        <button type="button" @click.stop="closeAndDispatch(row.id)" class="inline-flex items-center gap-1 rounded-xl bg-slate-900 hover:bg-slate-800 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors">
                                             <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                             Close & Dispatch
                                         </button>
@@ -296,6 +303,154 @@
         </div>
     </div>
 
+    {{-- Batch Detail Drawer --}}
+    <div x-show="showDetail" x-cloak class="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="closeDetail()"></div>
+        <div class="absolute inset-y-0 right-0 flex max-w-full">
+            <div class="flex w-screen max-w-2xl flex-col bg-white shadow-2xl">
+                <div class="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Outgoing Batch</p>
+                        <h3 class="text-lg font-extrabold text-slate-900" x-text="detail?.batch_number || '—'"></h3>
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
+                            <span class="inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider"
+                                  :class="detail?.accepts_only_commerce ? 'bg-orange-50 text-orange-800 border-orange-200' : 'bg-slate-100 text-slate-700 border-slate-200'"
+                                  x-text="detail?.destination_type_label || 'Standard'"></span>
+                            <span class="inline-flex rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-700"
+                                  x-text="detail?.status_label || '—'"></span>
+                        </div>
+                    </div>
+                    <button type="button" @click="closeDetail()" class="text-2xl font-bold leading-none text-slate-400 hover:text-slate-600">&times;</button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 border-b border-slate-100 px-5 py-4 text-xs">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Destination</p>
+                        <p class="mt-1 font-bold text-slate-800" x-text="detail?.destination_warehouse || '—'"></p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Created</p>
+                        <p class="mt-1 font-bold text-slate-800" x-text="detail?.created_at || '—'"></p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Packages</p>
+                        <p class="mt-1 text-lg font-black text-slate-900" x-text="detail?.items_count ?? 0"></p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Batch ID</p>
+                        <p class="mt-1 font-bold text-slate-800" x-text="detail?.id"></p>
+                    </div>
+                </div>
+
+                <div x-show="detail?.accepts_only_commerce" class="mx-5 mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-xs font-bold text-orange-800">
+                    This is a Commerce batch. Only packages marked as Commerce can be added.
+                </div>
+
+                <div class="flex-1 overflow-y-auto px-5 py-4">
+                    <div class="mb-3 flex items-center justify-between">
+                        <h4 class="text-xs font-black uppercase tracking-wider text-slate-500">Packages in this batch</h4>
+                        <button type="button" @click="openAddPackages()"
+                                class="inline-flex items-center gap-1.5 rounded-xl bg-[#E2762B] px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#d1651d]">
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                            Add Packages
+                        </button>
+                    </div>
+
+                    <p x-show="detailLoading" class="py-8 text-center text-xs font-bold text-slate-400">Loading…</p>
+
+                    <template x-if="!detailLoading && (detailPackages || []).length === 0">
+                        <p class="rounded-xl border border-dashed border-slate-200 py-10 text-center text-xs font-bold text-slate-400">
+                            No packages in this batch yet.
+                        </p>
+                    </template>
+
+                    <div class="space-y-2">
+                        <template x-for="pkg in detailPackages" :key="pkg.id">
+                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="truncate text-xs font-extrabold text-slate-900" x-text="pkg.description || 'Package'"></p>
+                                        <p class="truncate text-[11px] font-semibold text-slate-500">
+                                            <span x-text="pkg.tracking_code || '—'"></span>
+                                            · <span x-text="pkg.recipient_name || 'No recipient'"></span>
+                                            <span x-show="pkg.delivery_town"> · <span x-text="pkg.delivery_town"></span></span>
+                                        </p>
+                                    </div>
+                                    <span x-show="pkg.is_commerce" class="shrink-0 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-orange-800">Commerce</span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Add Packages Modal --}}
+    <div x-show="showAddPackages" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+        <div class="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-3xl border border-slate-100 bg-white shadow-2xl" @click.away="showAddPackages = false">
+            <div class="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+                <div>
+                    <h3 class="text-lg font-extrabold text-slate-900">Add Packages</h3>
+                    <p class="text-xs font-medium text-slate-400">
+                        Adding to <span class="font-bold text-slate-600" x-text="detail?.batch_number"></span>
+                    </p>
+                </div>
+                <button type="button" @click="showAddPackages = false" class="text-xl font-bold text-slate-400 hover:text-slate-600">&times;</button>
+            </div>
+
+            <div x-show="detail?.accepts_only_commerce" class="mx-5 mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-xs font-bold text-orange-800">
+                Commerce batch — non-Commerce packages are not selectable.
+            </div>
+
+            <div class="px-5 pt-4">
+                <input type="text" x-model="candidateSearch" @input.debounce.400ms="loadCandidates()"
+                       placeholder="Search by tracking code, description, recipient…"
+                       class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-5 py-4">
+                <p x-show="candidatesLoading" class="py-8 text-center text-xs font-bold text-slate-400">Loading…</p>
+
+                <template x-if="!candidatesLoading && candidates.length === 0">
+                    <p class="rounded-xl border border-dashed border-slate-200 py-10 text-center text-xs font-bold text-slate-400">
+                        No packages available to add.
+                    </p>
+                </template>
+
+                <div class="space-y-2">
+                    <template x-for="pkg in candidates" :key="pkg.id">
+                        <div class="flex items-start gap-3 rounded-xl border px-3 py-2.5 transition"
+                             :class="pkg.selectable ? (isSelected(pkg.id) ? 'border-orange-300 bg-orange-50/60' : 'border-slate-200 bg-white hover:bg-slate-50') : 'border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed'"
+                             @click="togglePackage(pkg)">
+                            <input type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" :checked="isSelected(pkg.id)" :disabled="!pkg.selectable" @click.stop="togglePackage(pkg)">
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-xs font-extrabold text-slate-900" x-text="pkg.description || 'Package'"></p>
+                                <p class="truncate text-[11px] font-semibold text-slate-500">
+                                    <span x-text="pkg.tracking_code || '—'"></span>
+                                    · <span x-text="pkg.recipient_name || 'No recipient'"></span>
+                                </p>
+                                <p x-show="!pkg.selectable" class="mt-1 text-[11px] font-bold text-red-600" x-text="pkg.blocked_reason"></p>
+                            </div>
+                            <span x-show="pkg.is_commerce" class="shrink-0 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-orange-800">Commerce</span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 border-t border-slate-100 px-5 py-4">
+                <p class="text-xs font-bold text-slate-500"><span x-text="selectedPackageIds.length"></span> selected</p>
+                <div class="flex gap-2">
+                    <button type="button" @click="showAddPackages = false" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="button" @click="submitAddPackages()" :disabled="addingPackages || selectedPackageIds.length === 0"
+                            class="rounded-xl bg-[#E2762B] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#d1651d] disabled:opacity-50">
+                        <span x-text="addingPackages ? 'Adding…' : 'Add to Batch'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -306,6 +461,18 @@
             showCreateModal: false,
             creating: false,
             loading: false,
+            // Batch detail drawer
+            showDetail: false,
+            detailLoading: false,
+            detail: null,
+            detailPackages: [],
+            // Add-packages modal
+            showAddPackages: false,
+            candidatesLoading: false,
+            candidates: [],
+            candidateSearch: '',
+            selectedPackageIds: [],
+            addingPackages: false,
             selectedDateLabel: 'Today',
             dateFilter: 'today',
             newBatch: {
@@ -463,6 +630,113 @@
                     }
                 })
                 .catch(() => alert('Error processing batch dispatch.'));
+            },
+            openDetail(batchId) {
+                this.showDetail = true;
+                this.detailLoading = true;
+                this.detail = null;
+                this.detailPackages = [];
+
+                fetch(this.config.detail_endpoint.replace('__ID__', batchId), {
+                    headers: { 'Accept': 'application/json' }
+                })
+                    .then(res => res.json())
+                    .then(res => {
+                        if (!res.success) throw new Error(res.message || 'Unable to load this batch.');
+                        this.detail = res.data.batch;
+                        this.detailPackages = res.data.packages || [];
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        window.showToast?.(err.message || 'Unable to load this batch.', 'error');
+                        this.showDetail = false;
+                    })
+                    .finally(() => { this.detailLoading = false; });
+            },
+            closeDetail() {
+                this.showDetail = false;
+                this.showAddPackages = false;
+                this.candidates = [];
+                this.candidateSearch = '';
+                this.selectedPackageIds = [];
+            },
+            openAddPackages() {
+                this.showAddPackages = true;
+                this.selectedPackageIds = [];
+                this.candidateSearch = '';
+                this.loadCandidates();
+            },
+            loadCandidates() {
+                if (!this.detail) return;
+                this.candidatesLoading = true;
+
+                const params = new URLSearchParams({ search: this.candidateSearch || '' });
+                fetch(`${this.config.packages_endpoint.replace('__ID__', this.detail.id)}?${params.toString()}`, {
+                    headers: { 'Accept': 'application/json' }
+                })
+                    .then(res => res.json())
+                    .then(res => {
+                        if (!res.success) throw new Error(res.message || 'Unable to load packages.');
+                        this.candidates = res.data.candidates || [];
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        window.showToast?.(err.message || 'Unable to load packages.', 'error');
+                        this.candidates = [];
+                    })
+                    .finally(() => { this.candidatesLoading = false; });
+            },
+            isSelected(id) {
+                return this.selectedPackageIds.includes(id);
+            },
+            togglePackage(pkg) {
+                if (!pkg.selectable) {
+                    // Clicking or scanning a package the batch will not accept has
+                    // to say so immediately, not silently do nothing.
+                    window.showToast?.(pkg.blocked_reason || 'This package cannot be added to this batch.', 'error');
+                    return;
+                }
+
+                this.selectedPackageIds = this.isSelected(pkg.id)
+                    ? this.selectedPackageIds.filter(id => id !== pkg.id)
+                    : [...this.selectedPackageIds, pkg.id];
+            },
+            submitAddPackages() {
+                if (!this.detail || this.selectedPackageIds.length === 0) return;
+                this.addingPackages = true;
+
+                fetch(this.config.add_packages_endpoint.replace('__ID__', this.detail.id), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ package_ids: this.selectedPackageIds })
+                })
+                    .then(async res => {
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                            // The field message carries the exact reason ("...only
+                            // accepts Commerce packages."), so surface that first.
+                            throw new Error(data?.errors?.package_ids?.[0] || data?.message || 'Could not add the selected packages.');
+                        }
+                        return data;
+                    })
+                    .then(data => {
+                        // Update the drawer in place; no page reload needed.
+                        this.detail = data.data.batch;
+                        this.detailPackages = data.data.packages || [];
+                        this.selectedPackageIds = [];
+                        this.showAddPackages = false;
+                        this.loadData();
+                        window.showToast?.(data.message || 'Packages added to the batch.', 'success');
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        window.showToast?.(err.message || 'Could not add the selected packages.', 'error');
+                    })
+                    .finally(() => { this.addingPackages = false; });
             }
         }));
     });

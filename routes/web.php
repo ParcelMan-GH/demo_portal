@@ -544,6 +544,8 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::get('transport-manifests/incoming/{manifest}', [AdminTransportManifestController::class, 'incomingShow'])->name('transport-manifests.incoming.show');
         Route::post('transport-manifests/incoming/{manifest}/items/{shipmentItem}/scan-receive', [AdminTransportManifestController::class, 'scanIncomingItem'])->name('transport-manifests.incoming.items.scan');
         Route::post('transport-manifests/incoming/{manifest}/finalize-receipt', [AdminTransportManifestController::class, 'finalizeIncoming'])->name('transport-manifests.incoming.finalize');
+        Route::get('transport-manifests/{batch}/packages', [AdminTransportManifestController::class, 'availablePackages'])->name('transport-manifests.packages');
+        Route::post('transport-manifests/{batch}/packages', [AdminTransportManifestController::class, 'addPackages'])->name('transport-manifests.packages.store');
         Route::get('transport-manifests/{manifest}', [AdminTransportManifestController::class, 'show'])->name('transport-manifests.show');
         Route::delete('transport-manifests/{manifest}', [AdminTransportManifestController::class, 'destroy'])->name('transport-manifests.destroy');
         Route::post('transport-manifests/{manifest}/assign-driver', [AdminTransportManifestController::class, 'assignDriver'])->name('transport-manifests.assign-driver');
