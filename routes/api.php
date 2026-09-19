@@ -76,6 +76,7 @@ Route::prefix('v1/agent')->middleware(['auth:sanctum'])->group(function () {
 Route::prefix('v1/vendor')->middleware(['auth:sanctum', 'vendor.active'])->group(function () {
     Route::get('profile', [VendorProfileController::class, 'show']);
     Route::put('profile', [VendorProfileController::class, 'update']);
+    Route::post('profile/photo', [VendorProfileController::class, 'updatePhoto']);
     Route::get('payout-account', [VendorProfileController::class, 'payoutAccount']);
     Route::put('payout-account', [VendorProfileController::class, 'updatePayoutAccount']);
     Route::post('fcm-token', [VendorProfileController::class, 'updateFcmToken']);
@@ -116,6 +117,7 @@ Route::prefix('v1/driver')->group(function () {
         Route::post('logout', [DriverAuthController::class, 'logout']);
         Route::get('profile', [DriverProfileController::class, 'show']);
         Route::put('profile', [DriverProfileController::class, 'update']);
+        Route::post('profile/photo', [DriverProfileController::class, 'updatePhoto']);
         Route::put('change-password', [DriverProfileController::class, 'changePassword']);
         Route::post('fcm-token', [DriverProfileController::class, 'updateFcmToken']);
         Route::get('bus-stations', [DriverBusStationController::class, 'index']);

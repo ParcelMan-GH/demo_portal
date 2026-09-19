@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Driver;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -13,10 +14,47 @@ class DriverProfileService
 
     protected DriverAuthService $driverAuthService;
 
-    public function __construct(DriverActivityLogService $activityLogService, DriverAuthService $driverAuthService)
-    {
+    protected ProfilePhotoService $photoService;
+
+    public function __construct(
+        DriverActivityLogService $activityLogService,
+        DriverAuthService $driverAuthService,
+        ProfilePhotoService $photoService,
+    ) {
         $this->activityLogService = $activityLogService;
         $this->driverAuthService = $driverAuthService;
+        $this->photoService = $photoService;
+    }
+
+    /**
+     * Replace the driver's profile photo.
+     *
+     * A dedicated endpoint rather than part of updateProfile: PHP only parses
+     * multipart bodies on POST, so a PUT carrying a file would arrive empty.
+     */
+    public function updatePhoto(Driver $driver, UploadedFile $file, Request $request): array
+    {
+        $driver->photo_path = $this->photoService->replace(
+            $file,
+            ProfilePhotoService::FOLDER_DRIVER,
+            $driver->photo_path,
+        );
+        $driver->save();
+
+        $this->activityLogService->log(
+            $driver->id,
+            'driver_profile_photo_updated',
+            'Profile photo updated',
+            $request
+        );
+
+        return [
+            'success' => true,
+            'message' => 'Profile photo updated successfully.',
+            'data' => [
+                'user' => $this->driverAuthService->formatDriver($driver),
+            ],
+        ];
     }
 
     /**

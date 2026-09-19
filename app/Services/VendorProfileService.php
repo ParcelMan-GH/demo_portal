@@ -6,14 +6,52 @@ use App\Helpers\PhoneHelper;
 use App\Models\PlatformSetting;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 
 class VendorProfileService
 {
     protected ActivityLogService $activityLogService;
 
-    public function __construct(ActivityLogService $activityLogService)
-    {
+    protected ProfilePhotoService $photoService;
+
+    public function __construct(
+        ActivityLogService $activityLogService,
+        ProfilePhotoService $photoService,
+    ) {
         $this->activityLogService = $activityLogService;
+        $this->photoService = $photoService;
+    }
+
+    /**
+     * Replace the vendor's profile photo.
+     *
+     * A dedicated endpoint rather than part of updateProfile: PHP only parses
+     * multipart bodies on POST, so a PUT carrying a file would arrive empty.
+     */
+    public function updatePhoto(Vendor $vendor, UploadedFile $file, Request $request): array
+    {
+        $vendor->photo_path = $this->photoService->replace(
+            $file,
+            ProfilePhotoService::FOLDER_VENDOR,
+            $vendor->photo_path,
+        );
+        $vendor->save();
+
+        $this->activityLogService->log(
+            $vendor->id,
+            'profile_photo_updated',
+            'Profile photo updated',
+            $request
+        );
+
+        return [
+            'success' => true,
+            'message' => 'Profile photo updated successfully.',
+            'data' => [
+                'user' => $this->formatVendor($vendor),
+                'app_config' => $this->formatAppConfig(),
+            ],
+        ];
     }
 
     /**
@@ -101,6 +139,9 @@ class VendorProfileService
             'business_name' => $vendor->business_name,
             'phone' => $vendor->phone,
             'email' => $vendor->email,
+            'photo_url' => $this->photoService->url($vendor->photo_path),
+            // The app falls back to initials when there is no photo.
+            'avatar' => strtoupper(substr((string) $vendor->name, 0, 1)),
             'payout_account' => $this->formatPayoutAccount($vendor),
             'created_at' => $vendor->created_at?->toISOString(),
         ];
