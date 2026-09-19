@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Profile photo storage, shared by the driver, vendor and user profile
@@ -36,6 +38,25 @@ class ProfilePhotoService
     public function __construct(
         private readonly StorageService $storage,
     ) {}
+
+    /**
+     * Fail clearly when the photo column has not been migrated yet.
+     *
+     * Deploying the code before running the migration is a real workflow here,
+     * and without this the write below surfaces as a raw
+     * "SQLSTATE[42S22] Unknown column 'photo_path'" 500 that reads like a bug
+     * in the feature rather than a missing deploy step.
+     *
+     * @throws ValidationException
+     */
+    public function assertSupported(string $table, string $column = 'photo_path'): void
+    {
+        if (! Schema::hasColumn($table, $column)) {
+            throw ValidationException::withMessages([
+                'photo' => "Profile photos are not available on this server yet — run `php artisan migrate` (missing {$table}.{$column}).",
+            ]);
+        }
+    }
 
     /**
      * Store a new photo for a profile, removing the one it replaces.

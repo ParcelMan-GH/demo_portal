@@ -30,6 +30,8 @@ class VendorProfileService
      */
     public function updatePhoto(Vendor $vendor, UploadedFile $file, Request $request): array
     {
+        $this->photoService->assertSupported($vendor->getTable());
+
         $vendor->photo_path = $this->photoService->replace(
             $file,
             ProfilePhotoService::FOLDER_VENDOR,

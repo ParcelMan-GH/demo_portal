@@ -34,6 +34,8 @@ class DriverProfileService
      */
     public function updatePhoto(Driver $driver, UploadedFile $file, Request $request): array
     {
+        $this->photoService->assertSupported($driver->getTable());
+
         $driver->photo_path = $this->photoService->replace(
             $file,
             ProfilePhotoService::FOLDER_DRIVER,
