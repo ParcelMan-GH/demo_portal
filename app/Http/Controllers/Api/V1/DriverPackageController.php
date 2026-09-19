@@ -793,6 +793,11 @@ class DriverPackageController extends Controller
             'warehouse_id' => ['nullable', 'exists:warehouses,id'],
             'barcodes' => ['nullable', 'array'],
             'barcodes.*' => ['string', 'max:100'],
+            // Rider's current position, used to order the stops nearest-first.
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            // Barcode of the package the rider wants to finish the run with.
+            'last_stop_barcode' => ['nullable', 'string', 'max:100'],
         ]);
 
         // Resolve warehouse — try from the driver's last pickup assignment, or from request
@@ -817,6 +822,27 @@ class DriverPackageController extends Controller
         }
 
         $warehouse = Warehouse::findOrFail($warehouseId);
+
+        // The rider's chosen final stop, resolved to the shipment item behind the
+        // barcode they picked.
+        $lastStopItemId = null;
+        if (!empty($validated['last_stop_barcode'])) {
+            $lastStopItemId = WarehouseReceiptItemLabel::query()
+                ->where('barcode_value', $validated['last_stop_barcode'])
+                ->with('receiptItem:id,shipment_item_id')
+                ->first()
+                ?->receiptItem?->shipment_item_id;
+        }
+
+        // Where the route starts. The app sends the rider's GPS position; when it
+        // cannot (permission denied, or no fix yet) the warehouse stands in, since
+        // that is where the run physically begins.
+        $originLatitude = isset($validated['latitude'])
+            ? (float) $validated['latitude']
+            : ($warehouse->latitude !== null ? (float) $warehouse->latitude : null);
+        $originLongitude = isset($validated['longitude'])
+            ? (float) $validated['longitude']
+            : ($warehouse->longitude !== null ? (float) $warehouse->longitude : null);
 
         $selectedItemIds = collect($validated['barcodes'] ?? [])
             ->filter()
@@ -843,7 +869,10 @@ class DriverPackageController extends Controller
             $driver,
             $warehouse,
             null,
-            $validated['barcodes'] ?? null
+            $validated['barcodes'] ?? null,
+            $originLatitude,
+            $originLongitude,
+            $lastStopItemId
         );
 
         $statusCode = $result['success'] ? 200 : 422;

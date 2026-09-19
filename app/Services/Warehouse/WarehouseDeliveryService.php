@@ -265,13 +265,24 @@ class WarehouseDeliveryService
 
     /**
      * Create a delivery run from a driver's claimed package labels.
-     * Groups packages into stops by recipient phone → town.
+     *
+     * Direct-delivery stops are ordered nearest-first from the rider's current
+     * position and end at the stop they nominated. Returns them in that order.
+     *
+     * @param  float|null  $originLatitude   Rider's latitude; the warehouse is
+     *                                       used when the app could not supply a fix.
+     * @param  float|null  $originLongitude  Rider's longitude.
+     * @param  int|null    $lastStopShipmentItemId  Item the rider asked to finish
+     *                                       with. Always placed last.
      */
     public function createRunFromClaims(
         Driver $driver,
         Warehouse $warehouse,
         ?User $admin = null,
-        ?array $barcodes = null
+        ?array $barcodes = null,
+        ?float $originLatitude = null,
+        ?float $originLongitude = null,
+        ?int $lastStopShipmentItemId = null
     ): array {
         $barcodes = $barcodes === null
             ? null
@@ -419,7 +430,7 @@ class WarehouseDeliveryService
             ];
         }
 
-        return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems, $claimedLabelIds, $allocatedQuantitiesByItemId) {
+        return DB::transaction(function () use ($driver, $warehouse, $admin, $shipmentItems, $claimedLabelIds, $allocatedQuantitiesByItemId, $originLatitude, $originLongitude, $lastStopShipmentItemId) {
             $driver = Driver::query()->lockForUpdate()->findOrFail($driver->id);
             $assignedAt = now();
             $run = DeliveryRun::query()->create([
@@ -472,14 +483,23 @@ class WarehouseDeliveryService
                 $stopsCount++;
             }
 
-            // Create direct delivery stops — one per package
-            $sortedDirect = $directItems->sortBy(function ($item) {
-                $destination = $this->resolveDeliveryDestination($item);
-                $phone = preg_replace('/\D/', '', (string) ($destination['recipient_phone'] ?? ''));
-                $town = mb_strtolower(trim((string) ($destination['town'] ?? '')));
+            // Create direct delivery stops — one per package.
+            //
+            // Ordered nearest-first from the rider's position, ending at the stop
+            // they nominated. This previously sorted by recipient phone number,
+            // which produced an arbitrary walk across town.
+            $destinationsById = [];
+            foreach ($directItems as $item) {
+                $destinationsById[$item->id] = $this->resolveDeliveryDestination($item);
+            }
 
-                return $phone.'|'.$town;
-            })->values();
+            $sortedDirect = $this->orderStopsNearestFirst(
+                $directItems->values(),
+                $destinationsById,
+                $originLatitude,
+                $originLongitude,
+                $lastStopShipmentItemId
+            );
 
             foreach ($sortedDirect as $shipmentItem) {
                 $destination = $this->resolveDeliveryDestination($shipmentItem);
@@ -1776,6 +1796,141 @@ class WarehouseDeliveryService
                 'message' => 'Delivery stop marked as failed.',
             ];
         });
+    }
+
+    /**
+     * Order direct-delivery stops nearest-first from the rider's position using a
+     * greedy nearest-neighbour walk, with an optional forced final stop.
+     *
+     * This is not the optimal route — that is the travelling-salesman problem —
+     * but it is a large improvement on ordering by recipient phone number, and it
+     * is O(n^2) over a handful of stops.
+     *
+     * Stops without coordinates are appended after the routed ones, keeping their
+     * previous relative order. With no usable origin the old phone|town ordering
+     * is preserved so nothing regresses.
+     *
+     * @param  \Illuminate\Support\Collection<int, ShipmentItem>  $items
+     * @param  array<int, array<string, mixed>>  $destinationsById
+     * @return \Illuminate\Support\Collection<int, ShipmentItem>
+     */
+    private function orderStopsNearestFirst(
+        $items,
+        array $destinationsById,
+        ?float $originLatitude,
+        ?float $originLongitude,
+        ?int $lastStopShipmentItemId
+    ) {
+        $legacy = function ($collection) use ($destinationsById) {
+            return $collection->sortBy(function ($item) use ($destinationsById) {
+                $destination = $destinationsById[$item->id] ?? [];
+                $phone = preg_replace('/\D/', '', (string) ($destination['recipient_phone'] ?? ''));
+                $town = mb_strtolower(trim((string) ($destination['town'] ?? '')));
+
+                return $phone.'|'.$town;
+            })->values();
+        };
+
+        if ($items->isEmpty()) {
+            return $items;
+        }
+
+        if ($originLatitude === null || $originLongitude === null) {
+            return $legacy($items);
+        }
+
+        $pinned = null;
+        $routable = [];
+
+        foreach ($items as $item) {
+            if ($lastStopShipmentItemId !== null && (int) $item->id === $lastStopShipmentItemId) {
+                $pinned = $item;
+                continue;
+            }
+
+            $destination = $destinationsById[$item->id] ?? [];
+            $latitude = $destination['latitude'] ?? null;
+            $longitude = $destination['longitude'] ?? null;
+
+            if ($latitude === null || $longitude === null) {
+                continue;
+            }
+
+            $routable[] = [
+                'item' => $item,
+                'lat' => (float) $latitude,
+                'lng' => (float) $longitude,
+            ];
+        }
+
+        $ordered = collect();
+        $currentLat = $originLatitude;
+        $currentLng = $originLongitude;
+        $remaining = $routable;
+
+        while ($remaining !== []) {
+            $bestIndex = 0;
+            $bestDistance = null;
+
+            foreach ($remaining as $index => $candidate) {
+                $distance = $this->haversineKm(
+                    $currentLat,
+                    $currentLng,
+                    $candidate['lat'],
+                    $candidate['lng']
+                );
+
+                if ($bestDistance === null || $distance < $bestDistance) {
+                    $bestDistance = $distance;
+                    $bestIndex = $index;
+                }
+            }
+
+            $chosen = $remaining[$bestIndex];
+            $ordered->push($chosen['item']);
+            $currentLat = $chosen['lat'];
+            $currentLng = $chosen['lng'];
+
+            unset($remaining[$bestIndex]);
+            $remaining = array_values($remaining);
+        }
+
+        // Stops we could not locate are still delivered, just after the routed
+        // ones, so the rider sees them rather than losing them silently.
+        $routedItemIds = $ordered->map(fn ($item) => (int) $item->id)->all();
+        $unroutable = $items->reject(function ($item) use ($routedItemIds, $pinned) {
+            if ($pinned !== null && (int) $item->id === (int) $pinned->id) {
+                return true;
+            }
+
+            return in_array((int) $item->id, $routedItemIds, true);
+        });
+
+        if ($unroutable->isNotEmpty()) {
+            $ordered = $ordered->concat($legacy($unroutable));
+        }
+
+        if ($pinned !== null) {
+            $ordered->push($pinned);
+        }
+
+        return $ordered->values();
+    }
+
+    /**
+     * Great-circle distance between two points, in kilometres.
+     */
+    private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthRadiusKm = 6371.0;
+
+        $latDelta = deg2rad($lat2 - $lat1);
+        $lngDelta = deg2rad($lng2 - $lng1);
+
+        $a = sin($latDelta / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($lngDelta / 2) ** 2;
+
+        return 2 * $earthRadiusKm * asin(min(1.0, sqrt($a)));
     }
 
     private function resolveDeliveryDestination(ShipmentItem $shipmentItem): array
