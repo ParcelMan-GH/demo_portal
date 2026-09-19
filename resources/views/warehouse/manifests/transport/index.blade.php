@@ -275,6 +275,21 @@
                     </select>
                 </div>
 
+                {{-- Destination Type --}}
+                {{-- Without this there is no way to create a Commerce batch, and the
+                     commerce rule could never be exercised. --}}
+                <div>
+                    <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Batch Destination Type</label>
+                    <select x-model="newBatch.destination_type" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-orange-500">
+                        <option value="">Standard — accepts any package</option>
+                        <template x-for="type in destinationTypes" :key="type.value">
+                            <option :value="type.value"
+                                    x-text="type.value === 'commerce' ? 'Commerce — only Commerce packages' : type.label"></option>
+                        </template>
+                    </select>
+                    <p class="text-[11px] text-slate-400 mt-1">A Commerce batch will only accept packages marked as Commerce.</p>
+                </div>
+
                 {{-- Assign Driver (Optional) --}}
                 <div>
                     <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Assigned Transporter / Driver (Optional)</label>
@@ -493,6 +508,7 @@
             availableDistricts: [],
             destinationWarehouses: [],
             transportDrivers: [],
+            destinationTypes: [],
             activeCards: [
                 { region_id: 1, region_name: 'Kumasi', count: 0 },
                 { region_id: 2, region_name: 'Koforidua', count: 0 },
@@ -509,6 +525,7 @@
                 this.availableDistricts = this.config.available_districts || [];
                 this.destinationWarehouses = this.config.destination_warehouses || [];
                 this.transportDrivers = this.config.transport_drivers || [];
+                this.destinationTypes = this.config.destination_types || [];
                 this.loadData();
             },
             get filteredDistricts() {
@@ -531,6 +548,7 @@
                     destination_warehouse_id: '',
                     delivery_region_id: 1,
                     delivery_district_id: 1,
+                    destination_type: '',
                     transporter_id: '',
                     notes: ''
                 };
