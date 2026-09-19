@@ -275,6 +275,21 @@
                     </select>
                 </div>
 
+                {{-- Destination Type --}}
+                {{-- Without this there is no way to create a Commerce batch, and the
+                     commerce rule could never be exercised. --}}
+                <div>
+                    <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Batch Destination Type</label>
+                    <select x-model="newBatch.destination_type" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-orange-500">
+                        <option value="">Standard — accepts any package</option>
+                        <template x-for="type in destinationTypes" :key="type.value">
+                            <option :value="type.value"
+                                    x-text="type.value === 'commerce' ? 'Commerce — only Commerce packages' : type.label"></option>
+                        </template>
+                    </select>
+                    <p class="text-[11px] text-slate-400 mt-1">A Commerce batch will only accept packages marked as Commerce.</p>
+                </div>
+
                 {{-- Assign Driver (Optional) --}}
                 <div>
                     <label class="block text-xs font-extrabold uppercase text-slate-600 mb-1">Assigned Transporter / Driver (Optional)</label>
@@ -346,10 +361,16 @@
                     This is a Commerce batch. Only packages marked as Commerce can be added.
                 </div>
 
+                <div x-show="detail && !detail.is_open" class="mx-5 mt-4 rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 text-xs font-bold text-slate-700">
+                    This batch is already <span x-text="(detail?.status_label || '').toLowerCase()"></span>, so no further packages can be added.
+                </div>
+
                 <div class="flex-1 overflow-y-auto px-5 py-4">
                     <div class="mb-3 flex items-center justify-between">
                         <h4 class="text-xs font-black uppercase tracking-wider text-slate-500">Packages in this batch</h4>
-                        <button type="button" @click="openAddPackages()"
+                        {{-- Offering a picker that can only refuse everything is worse
+                             than not offering it, so a closed batch has no button. --}}
+                        <button type="button" x-show="detail?.is_open" @click="openAddPackages()"
                                 class="inline-flex items-center gap-1.5 rounded-xl bg-[#E2762B] px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#d1651d]">
                             <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                             Add Packages
@@ -487,6 +508,7 @@
             availableDistricts: [],
             destinationWarehouses: [],
             transportDrivers: [],
+            destinationTypes: [],
             activeCards: [
                 { region_id: 1, region_name: 'Kumasi', count: 0 },
                 { region_id: 2, region_name: 'Koforidua', count: 0 },
@@ -503,6 +525,7 @@
                 this.availableDistricts = this.config.available_districts || [];
                 this.destinationWarehouses = this.config.destination_warehouses || [];
                 this.transportDrivers = this.config.transport_drivers || [];
+                this.destinationTypes = this.config.destination_types || [];
                 this.loadData();
             },
             get filteredDistricts() {
@@ -525,6 +548,7 @@
                     destination_warehouse_id: '',
                     delivery_region_id: 1,
                     delivery_district_id: 1,
+                    destination_type: '',
                     transporter_id: '',
                     notes: ''
                 };
@@ -661,6 +685,10 @@
                 this.selectedPackageIds = [];
             },
             openAddPackages() {
+                // Guard as well as hide the button: a closed batch can add nothing,
+                // so opening an empty picker only wastes the operator's time.
+                if (this.detail && !this.detail.is_open) return;
+
                 this.showAddPackages = true;
                 this.selectedPackageIds = [];
                 this.candidateSearch = '';

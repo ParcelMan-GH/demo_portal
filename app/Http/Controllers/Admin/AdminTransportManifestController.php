@@ -67,13 +67,21 @@ class AdminTransportManifestController extends Controller
             'destination_type'     => ['nullable', 'string', 'in:' . implode(',', array_column(BatchDestinationType::toArray(), 'value'))],
         ]);
 
-        $batch = OutgoingBatch::create([
+        $attributes = [
             'batch_number'         => 'BATCH-' . strtoupper(Str::random(6)),
             'delivery_region_id'   => $validated['delivery_region_id'],
             'delivery_district_id' => $validated['delivery_district_id'],
-            'destination_type'     => $validated['destination_type'] ?? null,
             'status'               => 'open',
-        ]);
+        ];
+
+        // A deployment that has not yet run the destination_type migration must
+        // still be able to create a batch. Writing the column unconditionally
+        // turned batch creation into a 500 until the migration was applied.
+        if (Schema::hasColumn('outgoing_batches', 'destination_type')) {
+            $attributes['destination_type'] = $validated['destination_type'] ?? null;
+        }
+
+        $batch = OutgoingBatch::create($attributes);
 
         return response()->json([
             'success' => true,
