@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\DriverProfileController;
 use App\Http\Controllers\Api\V1\DriverRiderTeamController;
 use App\Http\Controllers\Api\V1\DriverRiderTeamHandoverController;
 use App\Http\Controllers\Api\V1\DriverTransportController;
+use App\Http\Controllers\Api\V1\LabelOcrController;
 use App\Http\Controllers\Api\V1\TransporterLocationController;
 use App\Http\Controllers\Api\V1\VendorEarningsController;
 use App\Http\Controllers\Api\V1\VendorLocationController;
@@ -107,6 +108,14 @@ Route::prefix('v1/vendor')->middleware(['auth:sanctum', 'vendor.active'])->group
     Route::get('earnings/summary', [VendorEarningsController::class, 'summary']);
     Route::get('earnings', [VendorEarningsController::class, 'earnings']);
     Route::get('payouts', [VendorEarningsController::class, 'payouts']);
+});
+
+// API v1 - Shared authenticated utilities
+Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+    // Fallback used by the apps when on-device recognition cannot read a
+    // handwritten label. Throttled because every call is billed by the OCR
+    // provider, and a runaway client should not be able to spend freely.
+    Route::post('ocr/label', [LabelOcrController::class, 'extract']);
 });
 
 // API v1 - Driver Operations (Transporter & Rider)

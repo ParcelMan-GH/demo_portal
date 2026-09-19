@@ -53,4 +53,26 @@ return [
         ),
     ],
 
+    'google_vision' => [
+        // Server-side label reading. The on-device ML Kit recogniser is a
+        // printed-text model and returns fragments from handwritten labels, so
+        // the app falls back to this when it cannot find a phone number.
+        //
+        // The key is also storable in the `platform_settings` table (as
+        // `google_vision_api_key`), which is what the admin settings screen
+        // writes; GoogleVisionLabelExtractor prefers that and falls back here.
+        // An API key is used rather than a service account so nothing beyond a
+        // single value has to be placed on the server.
+        'key' => env('GOOGLE_VISION_API_KEY'),
+
+        'endpoint' => 'https://vision.googleapis.com/v1/images:annotate',
+
+        // Vision accepts inline base64 up to 20MB, but the app already
+        // compresses to under 2MB and anything much larger is a mistake worth
+        // refusing before paying to upload it.
+        'max_bytes' => (int) env('GOOGLE_VISION_MAX_BYTES', 6 * 1024 * 1024),
+
+        'timeout' => (int) env('GOOGLE_VISION_TIMEOUT', 25),
+    ],
+
 ];

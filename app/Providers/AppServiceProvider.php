@@ -19,7 +19,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Server-side label reading. Bound to one implementation so a different
+        // provider (Textract, a vision model) is a single class plus a line here.
+        $this->app->bind(
+            \App\Contracts\LabelTextExtractor::class,
+            \App\Services\Ocr\GoogleVisionLabelExtractor::class,
+        );
     }
 
     /**
