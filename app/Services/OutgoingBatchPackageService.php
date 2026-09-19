@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 class OutgoingBatchPackageService
 {
     public const ERROR_NOT_COMMERCE = 'Cannot add package: This batch only accepts Commerce packages.';
-    public const ERROR_BATCH_NOT_OPEN = 'Cannot add package: This batch is no longer open.';
+    public const ERROR_BATCH_NOT_OPEN = 'Cannot add package: This batch has already left and no longer accepts packages.';
     public const ERROR_ALREADY_ASSIGNED = 'Cannot add package: This package is already assigned to another batch.';
     public const ERROR_NOT_FOUND = 'Cannot add package: Package not found.';
     public const ERROR_NONE_SELECTED = 'Select at least one package to add.';
@@ -76,7 +76,7 @@ class OutgoingBatchPackageService
     public function rejectionReason(OutgoingBatch $batch, ShipmentItem $item): ?string
     {
         if (! $batch->isOpen()) {
-            return self::ERROR_BATCH_NOT_OPEN;
+            return $this->closedMessage($batch);
         }
 
         if ($item->outgoing_batch_id !== null && (int) $item->outgoing_batch_id !== (int) $batch->id) {
@@ -93,6 +93,25 @@ class OutgoingBatchPackageService
     public function canAccept(OutgoingBatch $batch, ShipmentItem $item): bool
     {
         return $this->rejectionReason($batch, $item) === null;
+    }
+
+    /**
+     * Name the state the batch is actually in, rather than a bare "not open".
+     * "no longer open" left the operator with no way to tell a dispatched batch
+     * from an unexpected status value.
+     */
+    public function closedMessage(OutgoingBatch $batch): string
+    {
+        $status = strtolower(trim((string) $batch->status));
+
+        if ($status === '') {
+            return self::ERROR_BATCH_NOT_OPEN;
+        }
+
+        return sprintf(
+            'Cannot add package: This batch is already %s and no longer accepts packages.',
+            strtolower($batch->statusLabel())
+        );
     }
 
     /**
@@ -172,7 +191,8 @@ class OutgoingBatchPackageService
             'destination_type_label' => $batch->destinationTypeLabel(),
             'accepts_only_commerce' => $batch->acceptsOnlyCommerce(),
             'status' => $batch->status,
-            'status_label' => ucfirst(str_replace('_', ' ', (string) $batch->status)),
+            'status_label' => $batch->statusLabel(),
+            'is_open' => $batch->isOpen(),
             'destination_warehouse' => "Region #{$batch->delivery_region_id} / District #{$batch->delivery_district_id}",
             'items_count' => $batch->shipmentItems()->count(),
             'created_at' => optional($batch->created_at)->format('Y-m-d H:i:s'),

@@ -15,6 +15,17 @@ class OutgoingBatch extends Model
     public const STATUS_OPEN = 'open';
 
     /**
+     * Statuses that mean the batch has already left and can take no more work.
+     *
+     * Deliberately a deny-list. The first version of this checked for `'open'`,
+     * which meant any status the code did not anticipate — an older row, a
+     * status written by another module — silently blocked every package with
+     * "no longer open". A batch is now assumed workable unless it is known to
+     * have gone.
+     */
+    public const CLOSED_STATUSES = ['dispatched', 'received', 'in_transit'];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
@@ -62,10 +73,15 @@ class OutgoingBatch extends Model
     }
 
     /**
-     * A dispatched batch can no longer accept packages.
+     * Whether the batch can still accept packages.
      */
     public function isOpen(): bool
     {
-        return $this->status === self::STATUS_OPEN;
+        return ! in_array(strtolower(trim((string) $this->status)), self::CLOSED_STATUSES, true);
+    }
+
+    public function statusLabel(): string
+    {
+        return ucfirst(str_replace('_', ' ', (string) ($this->status ?: self::STATUS_OPEN)));
     }
 }

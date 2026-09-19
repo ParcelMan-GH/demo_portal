@@ -346,10 +346,16 @@
                     This is a Commerce batch. Only packages marked as Commerce can be added.
                 </div>
 
+                <div x-show="detail && !detail.is_open" class="mx-5 mt-4 rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 text-xs font-bold text-slate-700">
+                    This batch is already <span x-text="(detail?.status_label || '').toLowerCase()"></span>, so no further packages can be added.
+                </div>
+
                 <div class="flex-1 overflow-y-auto px-5 py-4">
                     <div class="mb-3 flex items-center justify-between">
                         <h4 class="text-xs font-black uppercase tracking-wider text-slate-500">Packages in this batch</h4>
-                        <button type="button" @click="openAddPackages()"
+                        {{-- Offering a picker that can only refuse everything is worse
+                             than not offering it, so a closed batch has no button. --}}
+                        <button type="button" x-show="detail?.is_open" @click="openAddPackages()"
                                 class="inline-flex items-center gap-1.5 rounded-xl bg-[#E2762B] px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#d1651d]">
                             <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                             Add Packages
@@ -661,6 +667,10 @@
                 this.selectedPackageIds = [];
             },
             openAddPackages() {
+                // Guard as well as hide the button: a closed batch can add nothing,
+                // so opening an empty picker only wastes the operator's time.
+                if (this.detail && !this.detail.is_open) return;
+
                 this.showAddPackages = true;
                 this.selectedPackageIds = [];
                 this.candidateSearch = '';
