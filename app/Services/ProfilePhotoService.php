@@ -1,0 +1,103 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
+
+/**
+ * Profile photo storage, shared by the driver, vendor and user profile
+ * services so the size limit, accepted types and cleanup behaviour cannot
+ * drift between them.
+ */
+class ProfilePhotoService
+{
+    public const FOLDER_DRIVER = 'driver-photos';
+    public const FOLDER_VENDOR = 'vendor-photos';
+    public const FOLDER_USER = 'user-photos';
+
+    /**
+     * Photos are capped at 5MB. The app resizes before upload, but the server
+     * has to enforce its own limit rather than trust the client.
+     */
+    public const MAX_KILOBYTES = 5120;
+
+    /**
+     * Validation rules for an incoming photo.
+     *
+     * @return array<string, array<int, string>>
+     */
+    public static function rules(string $field = 'photo'): array
+    {
+        return [
+            $field => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:' . self::MAX_KILOBYTES],
+        ];
+    }
+
+    public function __construct(
+        private readonly StorageService $storage,
+    ) {}
+
+    /**
+     * Fail clearly when the photo column has not been migrated yet.
+     *
+     * Deploying the code before running the migration is a real workflow here,
+     * and without this the write below surfaces as a raw
+     * "SQLSTATE[42S22] Unknown column 'photo_path'" 500 that reads like a bug
+     * in the feature rather than a missing deploy step.
+     *
+     * @throws ValidationException
+     */
+    public function assertSupported(string $table, string $column = 'photo_path'): void
+    {
+        if (! Schema::hasColumn($table, $column)) {
+            throw ValidationException::withMessages([
+                'photo' => "Profile photos are not available on this server yet — run `php artisan migrate` (missing {$table}.{$column}).",
+            ]);
+        }
+    }
+
+    /**
+     * Store a new photo for a profile, removing the one it replaces.
+     *
+     * @return string the stored path
+     */
+    public function replace(UploadedFile $file, string $folder, ?string $previousPath = null): string
+    {
+        $stored = $this->storage->upload($file, $folder);
+        $newPath = $stored['path'];
+
+        // Only remove the old file once the new one is safely written — losing
+        // the previous photo because an upload failed halfway would be worse
+        // than keeping an orphan.
+        if ($previousPath && $previousPath !== $newPath) {
+            try {
+                $this->storage->delete($previousPath);
+            } catch (\Throwable $e) {
+                // A stale file is not worth failing the request over.
+                report($e);
+            }
+        }
+
+        return $newPath;
+    }
+
+    /**
+     * Public URL for a stored path, or null when there is no photo.
+     */
+    public function url(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        try {
+            return $this->storage->getUrl($path);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
+    }
+}

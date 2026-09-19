@@ -16,6 +16,7 @@ class Vendor extends Authenticatable
         'business_name',
         'phone',
         'email',
+        'photo_path',
         'is_active',
         'fcm_token',
         'commission_rate_override',

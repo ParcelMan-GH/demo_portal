@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Driver\ChangePasswordRequest;
 use App\Http\Requests\Api\Driver\UpdateProfileRequest;
 use App\Services\DriverProfileService;
+use App\Services\ProfilePhotoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -42,6 +43,26 @@ class DriverProfileController extends Controller
         $result = $this->profileService->updateProfile(
             $driver,
             $request->validated(),
+            $request
+        );
+
+        return response()->json($result);
+    }
+
+    /**
+     * Update the driver's profile photo.
+     * POST /api/v1/driver/profile/photo
+     *
+     * POST rather than PUT: PHP only populates uploaded files on POST, so a
+     * multipart PUT body arrives empty.
+     */
+    public function updatePhoto(Request $request): JsonResponse
+    {
+        $request->validate(ProfilePhotoService::rules());
+
+        $result = $this->profileService->updatePhoto(
+            $request->user(),
+            $request->file('photo'),
             $request
         );
 

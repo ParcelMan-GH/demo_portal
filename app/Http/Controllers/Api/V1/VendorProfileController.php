@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Vendor\UpdateProfileRequest;
 use App\Helpers\PhoneHelper;
+use App\Services\ProfilePhotoService;
 use App\Services\VendorProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,6 +44,26 @@ class VendorProfileController extends Controller
         $result = $this->profileService->updateProfile(
             $vendor,
             $request->validated(),
+            $request
+        );
+
+        return response()->json($result);
+    }
+
+    /**
+     * Update the vendor's profile photo.
+     * POST /api/v1/vendor/profile/photo
+     *
+     * POST rather than PUT: PHP only populates uploaded files on POST, so a
+     * multipart PUT body arrives empty.
+     */
+    public function updatePhoto(Request $request): JsonResponse
+    {
+        $request->validate(ProfilePhotoService::rules());
+
+        $result = $this->profileService->updatePhoto(
+            $request->user(),
+            $request->file('photo'),
             $request
         );
 
