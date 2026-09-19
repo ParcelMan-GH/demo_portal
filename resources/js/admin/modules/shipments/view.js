@@ -3933,6 +3933,71 @@ function shipmentShow() {
             this.receiving.saving = false;
         },
 
+        // Tab navigation (tab bar lives in admin/shipments/show.blade.php).
+        // The Packages panel is only rendered when the order can be managed.
+        tabFromUrl() {
+            const allowed = ["overview", "packages", "receiving", "tracking"];
+            const tab =
+                new URLSearchParams(window.location.search).get("tab") ||
+                "receiving";
+
+            return allowed.includes(tab) ? tab : "receiving";
+        },
+
+        setActiveTab(tab, options = {}) {
+            const allowed = ["overview", "packages", "receiving", "tracking"];
+            let nextTab = allowed.includes(tab) ? tab : "receiving";
+
+            // The Packages panel only exists for manageable orders.
+            if (nextTab === "packages" && !this.config.canManage) {
+                nextTab = "receiving";
+            }
+
+            this.activeTab = nextTab;
+
+            if (nextTab === "receiving" && !this.receivingLoaded) {
+                this.loadReceiving();
+            }
+
+            if (
+                nextTab === "tracking" &&
+                !this.tracking.data.length &&
+                !this.tracking.loading
+            ) {
+                this.loadTracking();
+            }
+
+            const url = new URL(window.location.href);
+            if (nextTab === "receiving") {
+                url.searchParams.delete("tab");
+            } else {
+                url.searchParams.set("tab", nextTab);
+            }
+
+            const method = options.replace ? "replaceState" : "pushState";
+            window.history[method]({}, "", url);
+        },
+
+        // Pickup status badge colours — same mapping the orders table uses.
+        pickupBadgeClass(status) {
+            switch ((status || "").toLowerCase()) {
+                case "assigned":
+                    return "border-blue-200 bg-blue-50 text-blue-700";
+                case "en_route":
+                    return "border-indigo-200 bg-indigo-50 text-indigo-700";
+                case "arrived":
+                    return "border-amber-200 bg-amber-50 text-amber-700";
+                case "picking_up":
+                    return "border-violet-200 bg-violet-50 text-violet-700";
+                case "completed":
+                    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+                case "cancelled":
+                    return "border-rose-200 bg-rose-50 text-rose-700";
+                default:
+                    return "border-orange-200 bg-orange-50 text-orange-700";
+            }
+        },
+
         init() {
             this.config = window.shipmentShowConfig;
             this.shipment = this.config.shipment;
@@ -3967,6 +4032,13 @@ function shipmentShow() {
                     this.loadReceiving();
                 }
             }
+
+            window.addEventListener("popstate", () => {
+                const tab = this.tabFromUrl();
+                if (tab !== this.activeTab) {
+                    this.setActiveTab(tab, { replace: true });
+                }
+            });
 
             if (this.activeTab === "receiving" && !this.receivingLoaded) {
                 this.loadReceiving();
