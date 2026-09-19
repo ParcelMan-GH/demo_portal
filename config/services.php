@@ -36,8 +36,21 @@ return [
     ],
 
     'arkesel' => [
-    'api_key' => env('ARKESEL_API_KEY'),
-    'sender_id' => env('ARKESEL_SENDER_ID', 'Parcelman'),
-],
+        // Both values are also storable in the `platform_settings` table, which
+        // is what the admin settings screen writes. SmsService prefers the
+        // platform setting when present and falls back to these.
+        'api_key' => env('ARKESEL_API_KEY'),
+        'sender_id' => env('ARKESEL_SENDER_ID', 'Parcelman'),
+
+        // When true, a failed SMS send still leaves a valid OTP in place and
+        // writes the code to the application log, so sign-in works without a
+        // working SMS account. Enabled by default outside production; force it
+        // off with SMS_OTP_LOG_FALLBACK=false. Never enable in production —
+        // it writes login codes to the log.
+        'log_fallback' => env(
+            'SMS_OTP_LOG_FALLBACK',
+            env('APP_ENV', 'production') !== 'production'
+        ),
+    ],
 
 ];
