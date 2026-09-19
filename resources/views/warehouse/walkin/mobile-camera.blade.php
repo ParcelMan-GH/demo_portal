@@ -84,14 +84,17 @@
             <div class="p-4 space-y-3">
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Receiver Name</label>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Receiver Name <span class="text-rose-500">*</span></label>
                         <input type="text" x-model="current.recipient_name" placeholder="Full name"
                                class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
+                        <p x-show="fieldErrorVisible(current, 'recipient_name', current.recipient_name)" x-cloak class="mt-1 text-[11px] font-medium text-rose-600" x-text="imageFieldError(current, 'recipient_name')"></p>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Number</label>
-                        <input type="tel" x-model="current.recipient_phone" placeholder="0551234567"
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Number <span class="text-rose-500">*</span></label>
+                        <input type="tel" inputmode="numeric" maxlength="10" x-model="current.recipient_phone"
+                               @input="normalizePhoneInput()" placeholder="0551234567"
                                class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
+                        <p x-show="fieldErrorVisible(current, 'recipient_phone', current.recipient_phone)" x-cloak class="mt-1 text-[11px] font-medium text-rose-600" x-text="imageFieldError(current, 'recipient_phone')"></p>
                     </div>
                 </div>
 
@@ -103,6 +106,7 @@
                         <p class="text-[11px] text-slate-400 mt-1" x-show="current.region_name">
                             <span x-text="current.town"></span>, <span x-text="current.district_name"></span>, <span x-text="current.region_name"></span>
                         </p>
+                        <p x-show="fieldErrorVisible(current, 'town', current.town)" x-cloak class="mt-1 text-[11px] font-medium text-rose-600" x-text="imageFieldError(current, 'town')"></p>
 
                         <div x-show="current.locationResults.length" x-cloak
                              class="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
@@ -118,19 +122,22 @@
                         <label class="block text-xs font-bold text-slate-600 mb-1">Description *</label>
                         <input type="text" x-model="current.description" placeholder="e.g. Shoe, Box"
                                class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
+                        <p x-show="fieldErrorVisible(current, 'description', current.description)" x-cloak class="mt-1 text-[11px] font-medium text-rose-600" x-text="imageFieldError(current, 'description')"></p>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-bold text-slate-600 mb-1">Quantity *</label>
-                        <input type="number" min="1" x-model.number="current.quantity"
+                        <input type="number" min="1" step="1" x-model.number="current.quantity"
                                class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
+                        <p x-show="fieldErrorVisible(current, 'quantity', current.quantity)" x-cloak class="mt-1 text-[11px] font-medium text-rose-600" x-text="imageFieldError(current, 'quantity')"></p>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-600 mb-1">Price</label>
                         <input type="number" min="0" step="0.01" x-model="current.delivery_fee" placeholder="0.00"
                                class="w-full rounded-xl border-slate-300 border px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-orange-500">
+                        <p x-show="fieldErrorVisible(current, 'delivery_fee', current.delivery_fee)" x-cloak class="mt-1 text-[11px] font-medium text-rose-600" x-text="imageFieldError(current, 'delivery_fee')"></p>
                     </div>
                 </div>
             </div>
@@ -177,9 +184,102 @@
             sentCount: 0,
             sessionId: '{{ $sessionId }}',
             locationTimer: null,
+            submitAttempted: false,
 
             get current() {
                 return this.images[this.index] || {};
+            },
+
+            /* ---- VALIDATION / PHONE FORMATTING ---- */
+            normalizePhoneValue(value) {
+                return String(value || '').replace(/\D/g, '').slice(0, 10);
+            },
+
+            // Never allow more than 10 digits in a phone field.
+            normalizePhoneInput() {
+                const img = this.current;
+                if (!img) return;
+
+                img.recipient_phone = this.normalizePhoneValue(img.recipient_phone);
+            },
+
+            nameError(value, label) {
+                const text = String(value || '').trim();
+
+                if (!text) return `${label} is required.`;
+                if (text.length < 2) return `${label} must be at least 2 characters.`;
+                if (!/^[A-Za-z][A-Za-z .'-]*$/.test(text)) {
+                    return `${label}: letters, spaces, apostrophes, dots and hyphens only.`;
+                }
+
+                return '';
+            },
+
+            phoneError(value, label) {
+                const digits = String(value || '').replace(/\D/g, '');
+
+                if (!digits) return `${label} is required.`;
+                if (digits.length !== 10) return `${label} must be exactly 10 digits.`;
+
+                return '';
+            },
+
+            quantityError(value) {
+                const text = String(value ?? '').trim();
+
+                if (text === '') return 'Quantity is required.';
+                if (!/^\d+$/.test(text)) return 'Quantity must be a whole number.';
+
+                const quantity = Number(text);
+                if (quantity < 1) return 'Quantity must be at least 1.';
+                if (quantity > 9999) return 'Quantity cannot be more than 9999.';
+
+                return '';
+            },
+
+            priceError(value) {
+                const text = String(value ?? '').trim();
+
+                if (text === '') return '';
+                if (!/^\d+(\.\d{1,2})?$/.test(text)) return 'Price must be a number with at most 2 decimals.';
+                if (Number(text) > 1000000) return 'Price looks too large.';
+
+                return '';
+            },
+
+            imageFieldError(img, field) {
+                if (!img) return '';
+
+                switch (field) {
+                    case 'recipient_name':
+                        return this.nameError(img.recipient_name, 'Receiver name');
+                    case 'recipient_phone':
+                        return this.phoneError(img.recipient_phone, 'Number');
+                    case 'town':
+                        return String(img.town || '').trim() ? '' : 'Location is required.';
+                    case 'description':
+                        return String(img.description || '').trim() ? '' : 'Description is required.';
+                    case 'quantity':
+                        return this.quantityError(img.quantity);
+                    case 'delivery_fee':
+                        return this.priceError(img.delivery_fee);
+                    default:
+                        return '';
+                }
+            },
+
+            fieldErrorVisible(img, field, rawValue) {
+                const message = this.imageFieldError(img, field);
+                if (!message) return false;
+
+                return this.submitAttempted || String(rawValue ?? '').trim() !== '';
+            },
+
+            // Returns the message for the first invalid field, or '' when the package is fine.
+            firstImageError(img) {
+                const fields = ['description', 'quantity', 'recipient_name', 'recipient_phone', 'town', 'delivery_fee'];
+
+                return fields.map((field) => this.imageFieldError(img, field)).find(Boolean) || '';
             },
 
             emptyImage(path) {
@@ -339,13 +439,15 @@
             },
 
             async submitAll() {
-                const missing = this.images.findIndex((img) => !(img.description || '').trim());
+                this.submitAttempted = true;
 
-                if (missing !== -1) {
-                    this.index = missing;
+                const invalid = this.images.findIndex((img) => this.firstImageError(img) !== '');
+
+                if (invalid !== -1) {
+                    this.index = invalid;
                     Swal.fire({
-                        title: 'Package type is required',
-                        text: `Please fill the "Description" for package ${missing + 1}.`,
+                        title: `Package ${invalid + 1} needs attention`,
+                        text: this.firstImageError(this.images[invalid]),
                         icon: 'warning',
                         confirmButtonColor: '#E2762B',
                     });
@@ -360,8 +462,8 @@
                     quantity: img.quantity || 1,
                     delivery_fee: img.delivery_fee === '' ? null : img.delivery_fee,
                     delivery_method: 'direct',
-                    recipient_name: img.recipient_name,
-                    recipient_phone: img.recipient_phone,
+                    recipient_name: (img.recipient_name || '').trim(),
+                    recipient_phone: this.normalizePhoneValue(img.recipient_phone),
                     town: img.town,
                     region_id: img.region_id || null,
                     district_id: img.district_id || null,

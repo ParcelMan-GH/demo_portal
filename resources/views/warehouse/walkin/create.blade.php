@@ -238,6 +238,7 @@
                 <div>
                     <label class="block text-sm text-slate-600 mb-2">Full Name <span class="text-rose-500">*</span></label>
                     <input type="text" x-model="newVendor.name" placeholder="John Doe" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                    <p x-show="fieldErrorVisible(null, 'vendor_name', newVendor.name)" x-cloak data-field-error class="mt-1.5 text-xs font-medium text-rose-600" x-text="fieldError(null, 'vendor_name')"></p>
                 </div>
                 <div>
                     <label class="block text-sm text-slate-600 mb-2">Business Name (Optional)</label>
@@ -245,7 +246,8 @@
                 </div>
                 <div>
                     <label class="block text-sm text-slate-600 mb-2">Phone <span class="text-rose-500">*</span></label>
-                    <input type="tel" maxlength="10" x-model="vendorPhone" @input="normalizeVendorPhoneInput()" placeholder="050 893 6615" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                    <input type="tel" inputmode="numeric" maxlength="10" x-model="vendorPhone" @input="normalizeVendorPhoneInput()" placeholder="050 893 6615" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                    <p x-show="fieldErrorVisible(null, 'vendor_phone', vendorPhone)" x-cloak data-field-error class="mt-1.5 text-xs font-medium text-rose-600" x-text="fieldError(null, 'vendor_phone')"></p>
                 </div>
                 <div>
                     <label class="block text-sm text-slate-600 mb-2">Email (Optional)</label>
@@ -260,9 +262,20 @@
                 <h2 class="text-xl font-medium text-slate-800">Packages Details</h2>
             </div>
 
-            <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
                 <template x-for="(item, idx) in items" :key="item.key">
-                    <div class="relative">
+                    <div class="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
+                        <!-- Package Card Header -->
+                        <div class="flex items-center justify-between gap-3 mb-5 pb-3 border-b border-slate-100">
+                            <div class="flex items-center gap-2.5">
+                                <span class="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 text-[11px] font-black text-[#ea580c]" x-text="idx + 1"></span>
+                                <p class="text-sm font-semibold text-slate-700">Package <span x-text="idx + 1"></span></p>
+                            </div>
+                            <button type="button" @click="removeItem(idx)" x-show="items.length > 1" title="Remove Package" class="p-1.5 rounded-full text-slate-400 hover:text-red-500 hover:bg-rose-50 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
                         
                         <!-- Upload Box / Image Thumbnails Display -->
                         <div class="w-full min-h-[176px] border border-slate-200 border-dashed rounded-xl bg-[#FAFAFA] p-4 mb-6 transition-colors flex flex-col items-center justify-center relative">
@@ -319,10 +332,12 @@
                                 <div>
                                     <label class="block text-sm text-slate-600 mb-2">Receiver Name <span class="text-rose-500">*</span></label>
                                     <input type="text" x-model="item.delivery.recipient_name" placeholder="Jane Doe" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                    <p x-show="fieldErrorVisible(item, 'recipient_name', item.delivery.recipient_name)" x-cloak data-field-error class="mt-1.5 text-xs font-medium text-rose-600" x-text="fieldError(item, 'recipient_name')"></p>
                                 </div>
                                 <div>
                                     <label class="block text-sm text-slate-600 mb-2">Number <span class="text-rose-500">*</span></label>
-                                    <input type="tel" maxlength="10" x-model="item.delivery.recipient_phone" @input="normalizeDeliveryPhoneInput(item.delivery)" placeholder="050 893 6615" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                    <input type="tel" inputmode="numeric" maxlength="10" x-model="item.delivery.recipient_phone" @input="normalizeDeliveryPhoneInput(item.delivery)" placeholder="050 893 6615" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                    <p x-show="fieldErrorVisible(item, 'recipient_phone', item.delivery.recipient_phone)" x-cloak data-field-error class="mt-1.5 text-xs font-medium text-rose-600" x-text="fieldError(item, 'recipient_phone')"></p>
                                 </div>
                             </div>
 
@@ -333,34 +348,32 @@
                                     <!-- Location Dropdown -->
                                     <div x-show="item.delivery._showDropdown" class="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                                         <template x-for="loc in item.delivery.locationResults" :key="loc.id">
-                                            <button type="button" @click="selectLocation(item.delivery, loc)" class="block w-full text-left px-4 py-2.5 hover:bg-orange-50 text-sm text-slate-700 border-b border-slate-50 last:border-0" x-text="loc.display"></button>
+                                             <button type="button" @click="selectLocation(item.delivery, loc)" class="block w-full text-left px-4 py-2.5 hover:bg-orange-50 text-sm text-slate-700 border-b border-slate-50 last:border-0" x-text="loc.display"></button>
                                         </template>
                                     </div>
+                                    <p x-show="fieldErrorVisible(item, 'locationQuery', item.delivery.locationQuery)" x-cloak data-field-error class="mt-1.5 text-xs font-medium text-rose-600" x-text="fieldError(item, 'locationQuery')"></p>
                                 </div>
                                 <div>
                                     <label class="block text-sm text-slate-600 mb-2">Description <span class="text-rose-500">*</span></label>
                                     <input type="text" x-model="item.description" placeholder="e.g. Shoes" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                    <p x-show="fieldErrorVisible(item, 'description', item.description)" x-cloak data-field-error class="mt-1.5 text-xs font-medium text-rose-600" x-text="fieldError(item, 'description')"></p>
                                 </div>
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <div>
                                     <label class="block text-sm text-slate-600 mb-2">Quantity <span class="text-rose-500">*</span></label>
-                                    <input type="number" x-model="item.quantity" placeholder="1" min="1" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                    <input type="number" x-model="item.quantity" placeholder="1" min="1" step="1" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                    <p x-show="fieldErrorVisible(item, 'quantity', item.quantity)" x-cloak data-field-error class="mt-1.5 text-xs font-medium text-rose-600" x-text="fieldError(item, 'quantity')"></p>
                                 </div>
                                 <div>
                                     <label class="block text-sm text-slate-600 mb-2">Price</label>
-                                    <input type="number" x-model="item.delivery_fee" placeholder="0.00" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                    <input type="number" x-model="item.delivery_fee" placeholder="0.00" min="0" step="0.01" class="w-full bg-[#FAFAFA] border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all placeholder-slate-300">
+                                    <p x-show="fieldErrorVisible(item, 'delivery_fee', item.delivery_fee)" x-cloak data-field-error class="mt-1.5 text-xs font-medium text-rose-600" x-text="fieldError(item, 'delivery_fee')"></p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Remove button -->
-                        <div class="absolute right-3 top-3 z-20" x-show="items.length > 1">
-                            <button type="button" @click="removeItem(idx)" title="Remove Package" class="p-1.5 bg-white/90 backdrop-blur rounded-full text-slate-400 hover:text-red-500 shadow-sm border border-slate-200 transition-colors">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                            </button>
-                        </div>
                     </div>
                 </template>
             </div>
@@ -438,6 +451,7 @@ function walkinShipment() {
         itemSeed: 0,
         submitting: false,
         submitError: '',
+        submitAttempted: false,
         recentOrders: @json($recentWalkins ?? []),
 
         /* ---- WEBSOCKET HANDOFF ---- */
@@ -501,7 +515,8 @@ function walkinShipment() {
             item.delivery_fee = (pkg.delivery_fee === null || pkg.delivery_fee === undefined) ? '' : pkg.delivery_fee;
             item.delivery_method = pkg.delivery_method || 'direct';
             item.delivery.recipient_name = pkg.recipient_name || '';
-            item.delivery.recipient_phone = pkg.recipient_phone || '';
+            // Cap at 10 digits even when the number came in from the phone.
+            item.delivery.recipient_phone = this.normalizePhoneValue(pkg.recipient_phone);
             item.delivery.town = pkg.town || '';
             item.delivery.locationQuery = pkg.town || '';
             item.delivery.region_id = pkg.region_id || '';
@@ -593,7 +608,97 @@ function walkinShipment() {
             this.newVendor = { name: '', business_name: '', phone: '', email: '' };
             this.vendorError = '';
             this.submitError = '';
+            this.submitAttempted = false;
             this.items = [this.makeItem()];
+        },
+
+        /* ---- FIELD VALIDATION ---- */
+        // Names: letters plus the usual separators. Numbers: digits only.
+        nameError(value, label) {
+            const text = String(value || '').trim();
+
+            if (!text) return `${label} is required.`;
+            if (text.length < 2) return `${label} must be at least 2 characters.`;
+            if (!/^[A-Za-z][A-Za-z .'-]*$/.test(text)) {
+                return `${label} can only contain letters, spaces, apostrophes, dots and hyphens.`;
+            }
+
+            return '';
+        },
+
+        phoneError(value, label) {
+            const digits = String(value || '').replace(/\D/g, '');
+
+            if (!digits) return `${label} is required.`;
+            if (digits.length !== 10) return `${label} must be exactly 10 digits (no more, no less).`;
+
+            return '';
+        },
+
+        quantityError(value) {
+            const text = String(value ?? '').trim();
+
+            if (text === '') return 'Quantity is required.';
+            if (!/^\d+$/.test(text)) return 'Quantity must be a whole number.';
+
+            const quantity = Number(text);
+            if (quantity < 1) return 'Quantity must be at least 1.';
+            if (quantity > 9999) return 'Quantity cannot be more than 9999.';
+
+            return '';
+        },
+
+        // Price is optional, but when given it must be a sane amount.
+        priceError(value) {
+            const text = String(value ?? '').trim();
+
+            if (text === '') return '';
+            if (!/^\d+(\.\d{1,2})?$/.test(text)) return 'Price must be a number with at most 2 decimal places.';
+            if (Number(text) > 1000000) return 'Price looks too large.';
+
+            return '';
+        },
+
+        fieldError(item, field) {
+            if (field === 'vendor_name') return this.nameError(this.newVendor.name, 'Vendor full name');
+            if (field === 'vendor_phone') return this.phoneError(this.vendorPhone, 'Vendor phone');
+            if (!item) return '';
+
+            const delivery = item.delivery || {};
+
+            switch (field) {
+                case 'recipient_name':
+                    return this.nameError(delivery.recipient_name, 'Receiver name');
+                case 'recipient_phone':
+                    return this.phoneError(delivery.recipient_phone, 'Number');
+                case 'locationQuery':
+                    return String(delivery.locationQuery || '').trim() ? '' : 'Location is required.';
+                case 'description':
+                    return String(item.description || '').trim() ? '' : 'Description is required.';
+                case 'quantity':
+                    return this.quantityError(item.quantity);
+                case 'delivery_fee':
+                    return this.priceError(item.delivery_fee);
+                default:
+                    return '';
+            }
+        },
+
+        // Errors stay hidden until the field has something in it or Save was pressed.
+        fieldErrorVisible(item, field, rawValue) {
+            const message = this.fieldError(item, field);
+            if (!message) return false;
+
+            return this.submitAttempted || String(rawValue ?? '').trim() !== '';
+        },
+
+        scrollToFirstError() {
+            this.$nextTick?.(() => {
+                const visible = Array.from(this.$el.querySelectorAll('[data-field-error]'))
+                    .find((el) => el.offsetParent !== null);
+
+                visible?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
         },
 
         openQrModal(index) {
@@ -691,24 +796,25 @@ function walkinShipment() {
         async handleSaveOrder() {
             this.submitError = '';
             this.vendorError = '';
+            this.submitAttempted = true;
 
-            if(!this.newVendor.name) { 
-                this.vendorError = "Vendor Full Name is required."; 
-                return; 
-            }
-            if(!this.vendorPhone || this.vendorPhone.length < 10) { 
-                this.vendorError = "Vendor Phone must be exactly 10 digits."; 
-                return; 
+            const vendorMessage = this.fieldError(null, 'vendor_name') || this.fieldError(null, 'vendor_phone');
+            if (vendorMessage) {
+                this.vendorError = vendorMessage;
+                this.scrollToFirstError();
+                return;
             }
 
-            for(let i=0; i<this.items.length; i++) {
-                let item = this.items[i];
-                if(!item.description || !item.quantity || !item.delivery.recipient_name || !item.delivery.recipient_phone || !item.delivery.locationQuery) {
-                    this.submitError = `Please complete all required fields (Type, Qty, Recipient Name, Phone, and Location) for Package ${i+1}.`;
-                    return;
-                }
-                if(item.delivery.recipient_phone.length < 10) {
-                    this.submitError = `Package ${i+1} Recipient Phone must be exactly 10 digits.`;
+            const packageFields = ['recipient_name', 'recipient_phone', 'locationQuery', 'description', 'quantity', 'delivery_fee'];
+
+            for (let i = 0; i < this.items.length; i++) {
+                const message = packageFields
+                    .map((field) => this.fieldError(this.items[i], field))
+                    .find(Boolean);
+
+                if (message) {
+                    this.submitError = `Package ${i + 1}: ${message}`;
+                    this.scrollToFirstError();
                     return;
                 }
             }
