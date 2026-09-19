@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\OtpCode;
+use Illuminate\Support\Facades\Log;
 
 class OtpService
 {
@@ -53,6 +54,20 @@ class OtpService
             $sent = $this->smsService->send($phone, $message);
         }
 
+        // When no SMS provider is reachable, previously the OTP row was deleted
+        // and the whole flow hard-failed, which made sign-in impossible without a
+        // working SMS account. Outside production the code is logged instead so
+        // the flow can still be completed. Toggle with SMS_OTP_LOG_FALLBACK.
+        if (! $sent && $this->smsLogFallbackEnabled()) {
+            Log::warning('OTP SMS could not be sent — code written to log instead.', [
+                'phone' => $phone,
+                'purpose' => $purpose,
+                'code' => $code,
+            ]);
+
+            $sent = true;
+        }
+
         if (! $sent) {
             $otp->delete();
 
@@ -60,6 +75,15 @@ class OtpService
         }
 
         return $code;
+    }
+
+    /**
+     * Whether a failed SMS should still leave a usable OTP in place.
+     * Enabled by default outside production only — see config/services.php.
+     */
+    protected function smsLogFallbackEnabled(): bool
+    {
+        return (bool) config('services.arkesel.log_fallback', false);
     }
 
     /**

@@ -104,15 +104,30 @@ class SmsService
     }
 
     /**
-     * Get the Arkesel API key from platform settings.
+     * Get the Arkesel API key.
+     *
+     * Prefers the admin-managed platform setting, then falls back to
+     * config/services.php. That config entry has always existed and reads
+     * ARKESEL_API_KEY from the environment, but nothing ever consumed it, so
+     * setting the env var alone silently had no effect and every send failed
+     * with "Arkesel API key or Sender ID not configured".
      */
     protected function getApiKey(): ?string
     {
-        return PlatformSetting::getValue('arkesel_api_key');
+        $key = PlatformSetting::getValue('arkesel_api_key');
+
+        if (filled($key)) {
+            return (string) $key;
+        }
+
+        $configKey = config('services.arkesel.api_key');
+
+        return filled($configKey) ? (string) $configKey : null;
     }
 
     /**
-     * Get the sender ID from platform settings.
+     * Get the sender ID. Platform setting first, then config/services.php,
+     * then the historical SHAXI default.
      */
     protected function getSenderId(): ?string
     {
@@ -122,7 +137,15 @@ class SmsService
             return (string) $senderId;
         }
 
-        return PlatformSetting::getValue('arkesel_sender_id', 'SHAXI');
+        $legacySenderId = PlatformSetting::getValue('arkesel_sender_id');
+
+        if (filled($legacySenderId)) {
+            return (string) $legacySenderId;
+        }
+
+        $configSenderId = config('services.arkesel.sender_id');
+
+        return filled($configSenderId) ? (string) $configSenderId : null;
     }
 
     /**
