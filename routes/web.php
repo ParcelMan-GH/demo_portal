@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\BackOfficeContextController;
 use App\Http\Controllers\Admin\CollectionCenterController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DriverController;
+use App\Http\Controllers\Admin\FleetVehicleController;
 use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Admin\PickupAssignmentController;
 use App\Http\Controllers\Admin\RecipientPaymentController;
@@ -609,6 +610,10 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         // Settings Management
         Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::post('settings/save', [SettingsController::class, 'save'])->name('settings.save');
+
+        // Vehicle Fleet: dedicated home for pickup vehicle availability, which is
+        // what the vendor app reads to decide which options can be selected.
+        Route::get('fleet/vehicles', [FleetVehicleController::class, 'index'])->name('fleet.vehicles.index');
         Route::post('settings/upload', [SettingsController::class, 'uploadFile'])->name('settings.upload');
         Route::post('settings/pickup-vehicles', [SettingsController::class, 'storePickupVehicle'])->name('settings.pickup-vehicles.store');
         Route::put('settings/pickup-vehicles/{pickupVehicleType}', [SettingsController::class, 'updatePickupVehicle'])->name('settings.pickup-vehicles.update');
