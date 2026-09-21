@@ -40,7 +40,9 @@ class ShipmentItem extends Model
         'delivery_method',
         'status',
         'tracking_code',
-        'outgoing_batch_id', // <--- Added this line
+        'outgoing_batch_id',
+        'agent_id',
+        'claimed_at',
     ];
 
     public const DELIVERY_METHOD_DIRECT = 'direct';
@@ -63,6 +65,7 @@ class ShipmentItem extends Model
         'delivery_longitude' => 'decimal:8',
         'fulfillment_type' => FulfillmentType::class,
         'status' => \App\Casts\TolerantBackedEnumCast::class.':'.ItemStatus::class.','.ItemStatus::PENDING->value,
+        'claimed_at' => 'datetime',
     ];
 
     /**

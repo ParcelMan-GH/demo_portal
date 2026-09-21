@@ -3,14 +3,19 @@
 namespace App\Http\Controllers\Agent;
 
 use App\Http\Controllers\Controller;
-use App\Models\RecipientPaymentTask;
-use App\Models\OutgoingBatch;
 use App\Models\AgentDailyQuota;
+use App\Models\OutgoingBatchAssignmentEvent;
+use App\Models\RecipientPaymentTask;
+use App\Services\OutgoingBatchAutoAssignmentService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class AgentDashboardController extends Controller
 {
+    public function __construct(
+        private readonly OutgoingBatchAutoAssignmentService $autoBatching
+    ) {
+    }
+
     public function index()
     {
         // 1. Fetch pending tasks assigned to the Admin (Hardcoded User ID 1)
@@ -34,30 +39,29 @@ class AgentDashboardController extends Controller
 
         $parcel = $task->shipmentItem;
 
-        // --- NEW SAFETY CHECK ---
-        // If the parcel is missing its destination, reject it gracefully instead of crashing!
-        if (empty($parcel->delivery_region_id) || empty($parcel->delivery_district_id)) {
-            return back()->with('error', 'Cannot auto-batch! This parcel is missing its Region or District routing information.');
+        if (! $parcel) {
+            return back()->with('error', 'This task has no parcel attached, so it cannot be batched.');
         }
 
         // 1. THE AUTO-BATCHING MAGIC
-        $batch = OutgoingBatch::firstOrCreate(
-            [
-                'delivery_region_id'   => $parcel->delivery_region_id,
-                'delivery_district_id' => $parcel->delivery_district_id,
-                'status'               => 'open',
-            ],
-            [
-                'batch_number'         => 'BATCH-' . strtoupper(Str::random(6)),
-            ]
+        // Shared with the agent app's "confirmed payment" call outcome so both
+        // entry points behave identically.
+        $assignment = $this->autoBatching->assignForDestination(
+            $parcel,
+            OutgoingBatchAssignmentEvent::SOURCE_AGENT_DASHBOARD,
+            auth('admin')->id() ?? auth()->id()
         );
 
-        // 2. Update the Parcel & Task statuses
-        $parcel->update([
-            'outgoing_batch_id' => $batch->id,
-            'status'            => 'ready_for_hub_transfer'
-        ]);
+        // A parcel with no destination, or one that has already finished its
+        // journey, is a genuine problem the agent has to fix by hand.
+        if (in_array($assignment['result'], [
+            OutgoingBatchAutoAssignmentService::RESULT_MISSING_DESTINATION,
+            OutgoingBatchAutoAssignmentService::RESULT_NOT_ELIGIBLE,
+        ], true)) {
+            return back()->with('error', 'Cannot auto-batch! '.$assignment['message']);
+        }
 
+        // 2. Update the Task status
         $task->update(['status' => 'payment_approved']);
 
         // 3. Update the Agent's Commission Ledger (Hardcoded User ID 1)
@@ -70,6 +74,6 @@ class AgentDashboardController extends Controller
             $quota->increment('collected_amount', $task->amount ?? 0);
         }
 
-        return back()->with('success', 'Payment approved! Parcel safely added to ' . $batch->batch_number);
+        return back()->with('success', 'Payment approved! '.$assignment['message']);
     }
 }
