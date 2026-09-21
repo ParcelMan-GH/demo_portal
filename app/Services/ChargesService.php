@@ -8,6 +8,8 @@ use App\Models\Shipment;
 use App\Models\ShipmentCharge;
 use App\Models\ShipmentItem;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -279,6 +281,104 @@ class ChargesService
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * Every live delivery-fee line recorded against a package.
+     *
+     * @return Collection<int, ShipmentCharge>
+     */
+    public function deliveryFeeChargesForItem(ShipmentItem $item): Collection
+    {
+        return ShipmentCharge::query()
+            ->where('shipment_id', $item->shipment_id)
+            ->where('shipment_item_id', $item->id)
+            ->where('charge_type', ShipmentCharge::TYPE_DELIVERY_FEE)
+            ->where('payer_type', ShipmentCharge::PAYER_RECIPIENT)
+            ->whereNotIn('status', [ShipmentCharge::STATUS_CANCELLED])
+            ->get();
+    }
+
+    /**
+     * Record (or refresh) the delivery fee the recipient owes for a package,
+     * cancelling anything outstanding when there is no longer a fee.
+     *
+     * A delivery fee used to be written down two unrelated ways: the walk-in
+     * intake stored it on `shipment_items.delivery_fee`, while the receiving
+     * workspace wrote a charge line here. Every screen - this portal, the API
+     * and the mobile app - reads the fee from the ledger, so a fee captured at
+     * walk-in intake showed up nowhere. Recording it here, once, is what makes
+     * "add it anywhere, see it everywhere" true.
+     *
+     * `shipment_items.delivery_fee` stays the amount agreed at intake; this
+     * keeps the ledger in step with it.
+     *
+     * @param  array{mode?: string, notes?: ?string, payment_method?: ?string, payment_reference?: ?string}  $options
+     *         mode is 'collect' (owed at delivery, the default), 'paid' or
+     *         'none' (no fee).
+     */
+    public function syncDeliveryFeeForItem(
+        ShipmentItem $item,
+        float $amount,
+        array $options = [],
+        User|Driver|null $actor = null,
+    ): ?ShipmentCharge {
+        $mode = $options['mode'] ?? 'collect';
+        $amount = round($amount, 2);
+        $actor ??= Auth::guard('admin')->user();
+
+        $outstanding = $this->deliveryFeeChargesForItem($item)
+            ->whereIn('status', [ShipmentCharge::STATUS_DRAFT, ShipmentCharge::STATUS_PENDING]);
+
+        if ($mode === 'none' || $amount <= 0) {
+            $outstanding->each(fn (ShipmentCharge $charge) => $charge->update([
+                'status' => ShipmentCharge::STATUS_CANCELLED,
+            ]));
+
+            return null;
+        }
+
+        $charge = $outstanding->first()
+            ?: $this->deliveryFeeChargesForItem($item)
+                ->where('status', ShipmentCharge::STATUS_PAID)
+                ->sortByDesc(fn (ShipmentCharge $candidate) => $candidate->paid_at?->getTimestamp() ?? 0)
+                ->first();
+
+        // A settled fee is never quietly reopened by an edit made elsewhere.
+        if ($charge && $charge->status === ShipmentCharge::STATUS_PAID && $mode !== 'paid') {
+            return $charge;
+        }
+
+        if ($charge) {
+            // Direct write on purpose: this is a ledger sync, not an
+            // interactive edit, and it must be able to stamp a fee as paid.
+            $charge->update([
+                'amount' => $amount,
+                'currency' => $charge->currency ?: self::DEFAULT_CURRENCY,
+                'notes' => $options['notes'] ?? $charge->notes,
+                'paid_at' => $mode === 'paid' ? ($charge->paid_at ?? now()) : null,
+                'payment_method' => $mode === 'paid'
+                    ? ($options['payment_method'] ?? $charge->payment_method ?? 'cash')
+                    : null,
+                'payment_reference' => $mode === 'paid'
+                    ? ($options['payment_reference'] ?? $charge->payment_reference)
+                    : null,
+            ]);
+
+            return $charge->refresh();
+        }
+
+        return $this->addCharge($item->shipment, [
+            'shipment_item_id' => $item->id,
+            'charge_type' => ShipmentCharge::TYPE_DELIVERY_FEE,
+            'payer_type' => ShipmentCharge::PAYER_RECIPIENT,
+            'due_stage' => ShipmentCharge::STAGE_AT_DELIVERY,
+            'amount' => $amount,
+            'status' => $mode === 'paid' ? ShipmentCharge::STATUS_PAID : ShipmentCharge::STATUS_PENDING,
+            'notes' => $options['notes'] ?? null,
+            'payment_method' => $options['payment_method'] ?? null,
+            'payment_reference' => $options['payment_reference'] ?? null,
+        ], $actor);
     }
 
     /**

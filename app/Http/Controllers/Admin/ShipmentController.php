@@ -28,6 +28,7 @@ use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
 use App\Services\BackOfficeAccess;
+use App\Services\ChargesService;
 use App\Services\PushNotificationService;
 use App\Services\StorageService;
 use App\Services\WalkinShipmentService;
@@ -44,6 +45,10 @@ use Throwable;
 
 class ShipmentController extends Controller
 {
+    public function __construct(
+        private readonly ChargesService $charges,
+    ) {}
+
     public function index()
     {
         $this->authorizePermission('shipments.view');
@@ -3604,81 +3609,29 @@ class ShipmentController extends Controller
             return;
         }
 
-        $mode = $validated['delivery_fee_mode'] ?: 'none';
+        $requested = $validated['delivery_fee_mode'] ?: 'none';
+
         $amount = array_key_exists('delivery_fee_amount', $validated) && $validated['delivery_fee_amount'] !== null
-            ? round((float) $validated['delivery_fee_amount'], 2)
+            ? (float) $validated['delivery_fee_amount']
             : 0.0;
 
-        $outstanding = $this->deliveryFeeChargesForItem($shipment, $item)
-            ->whereIn('status', [ShipmentCharge::STATUS_DRAFT, ShipmentCharge::STATUS_PENDING]);
-
-        if ($mode === 'none' || $amount <= 0) {
-            $outstanding->each(fn (ShipmentCharge $charge) => $charge->update([
-                'status' => ShipmentCharge::STATUS_CANCELLED,
-            ]));
-
-            return;
-        }
-
-        $payload = [
-            'shipment_id' => $shipment->id,
-            'shipment_item_id' => $item->id,
-            'charge_type' => ShipmentCharge::TYPE_DELIVERY_FEE,
-            'payer_type' => ShipmentCharge::PAYER_RECIPIENT,
-            'direction' => ShipmentCharge::DIRECTION_REVENUE,
-            'due_stage' => ShipmentCharge::STAGE_AT_DELIVERY,
-            'amount' => $amount,
-            'currency' => 'GHS',
+        // Recording the fee is the charges ledger's job, so the walk-in intake
+        // and this workspace cannot drift apart again.
+        $this->charges->syncDeliveryFeeForItem($item, $amount, [
+            'mode' => match ($requested) {
+                'paid' => 'paid',
+                'none' => 'none',
+                default => 'collect',
+            },
             'notes' => $validated['delivery_fee_notes'] ?? null,
-            'recorded_by_admin_id' => Auth::guard('admin')->id(),
-        ];
-
-        if ($mode === 'paid') {
-            $payload['status'] = ShipmentCharge::STATUS_PAID;
-            $payload['payment_method'] = $validated['delivery_fee_payment_method'] ?? 'cash';
-            $payload['payment_reference'] = $validated['delivery_fee_payment_reference'] ?? null;
-        } else {
-            $payload['status'] = ShipmentCharge::STATUS_PENDING;
-            $payload['paid_at'] = null;
-            $payload['payment_method'] = null;
-            $payload['payment_reference'] = null;
-        }
-
-        $charge = $outstanding->first()
-            ?: $this->deliveryFeeChargesForItem($shipment, $item)
-                ->where('status', ShipmentCharge::STATUS_PAID)
-                ->sortByDesc(fn (ShipmentCharge $candidate) => $candidate->paid_at?->getTimestamp() ?? 0)
-                ->first();
-
-        if ($charge && $charge->status === ShipmentCharge::STATUS_PAID && $mode !== 'paid') {
-            return;
-        }
-
-        if ($charge) {
-            if ($mode === 'paid' && ! $charge->paid_at) {
-                $payload['paid_at'] = now();
-            }
-            $charge->update($payload);
-
-            return;
-        }
-
-        if ($mode === 'paid') {
-            $payload['paid_at'] = now();
-        }
-
-        ShipmentCharge::query()->create($payload);
+            'payment_method' => $validated['delivery_fee_payment_method'] ?? null,
+            'payment_reference' => $validated['delivery_fee_payment_reference'] ?? null,
+        ]);
     }
 
     protected function deliveryFeeChargesForItem(Shipment $shipment, ShipmentItem $item)
     {
-        return ShipmentCharge::query()
-            ->where('shipment_id', $shipment->id)
-            ->where('shipment_item_id', $item->id)
-            ->where('charge_type', ShipmentCharge::TYPE_DELIVERY_FEE)
-            ->where('payer_type', ShipmentCharge::PAYER_RECIPIENT)
-            ->whereNotIn('status', [ShipmentCharge::STATUS_CANCELLED])
-            ->get();
+        return $this->charges->deliveryFeeChargesForItem($item);
     }
 
     protected function serializeReceivingPickupFee(Shipment $shipment): array
@@ -3854,6 +3807,28 @@ class ShipmentController extends Controller
         $charges = $this->deliveryFeeChargesForItem($shipment, $item);
 
         if ($charges->isEmpty()) {
+            // A fee agreed at intake lives on the package itself (walk-in
+            // parcels are captured this way). Report it instead of "No delivery
+            // fee" so the order view agrees with what was actually recorded,
+            // including for parcels taken in before the fee was also written to
+            // the charge ledger.
+            $packageFee = round((float) $item->delivery_fee, 2);
+
+            if ($packageFee > 0) {
+                return [
+                    'mode' => 'collect',
+                    'status' => 'collect',
+                    'amount' => $packageFee,
+                    'currency' => 'GHS',
+                    'paid_amount' => 0.0,
+                    'outstanding_amount' => $packageFee,
+                    'notes' => null,
+                    'payment_method' => 'cash',
+                    'payment_reference' => null,
+                    'paid_at' => null,
+                ];
+            }
+
             return [
                 'mode' => 'none',
                 'status' => 'none',
