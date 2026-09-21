@@ -252,3 +252,37 @@ it('records the agent on the parcel when it is claimed', function () {
     expect($parcel->claimed_at)->not->toBeNull();
     expect($parcel->status)->toBe(ItemStatus::PICKED_UP);
 });
+
+it('reads an amount typed with a local separator', function () {
+    $region = acbRegion('UE');
+    $district = acbDistrict($region, 'BOL');
+    $parcel = acbParcel($region, $district);
+
+    Sanctum::actingAs(acbAgent());
+
+    $this->postJson('/api/v1/agent/calls/log', [
+        'parcel_id' => $parcel->id,
+        'outcome' => 'confirmed',
+        'amount_paid' => '150,50',
+    ])->assertOk();
+
+    expect((float) AgentCallLog::firstOrFail()->amount_paid)->toBe(150.5);
+    expect($parcel->fresh()->outgoing_batch_id)->not->toBeNull();
+});
+
+it('still records and batches the confirmation when the amount is unusable', function () {
+    $region = acbRegion('UW');
+    $district = acbDistrict($region, 'WA');
+    $parcel = acbParcel($region, $district);
+
+    Sanctum::actingAs(acbAgent());
+
+    $this->postJson('/api/v1/agent/calls/log', [
+        'parcel_id' => $parcel->id,
+        'outcome' => 'confirmed',
+        'amount_paid' => 'abc',
+    ])->assertOk();
+
+    expect(AgentCallLog::firstOrFail()->amount_paid)->toBeNull();
+    expect($parcel->fresh()->outgoing_batch_id)->not->toBeNull();
+});

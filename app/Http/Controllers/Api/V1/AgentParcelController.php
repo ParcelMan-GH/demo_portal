@@ -112,9 +112,12 @@ class AgentParcelController extends Controller
             'parcel_id' => ['required'],
             'outcome' => ['required', 'string', 'max:40'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'amount_paid' => ['nullable', 'numeric', 'min:0'],
+            // Kept loose on purpose: the agent types this on a decimal keypad,
+            // and a mistyped amount must never cost us the call outcome (and
+            // with it the batch assignment). Normalised below.
+            'amount_paid' => ['nullable', 'string', 'max:40'],
             'rescheduled_date' => ['nullable', 'date'],
-            'payment_proof' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:10240'],
+            'payment_proof' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,heic,heif,pdf', 'max:10240'],
         ]);
 
         $outcome = AgentCallLog::normalizeOutcome($request->input('outcome'));
@@ -161,7 +164,7 @@ class AgentParcelController extends Controller
             'agent_id' => $agent->id,
             'outcome' => $outcome,
             'notes' => $request->input('notes'),
-            'amount_paid' => $request->input('amount_paid'),
+            'amount_paid' => $this->parseAmount($request->input('amount_paid')),
             'payment_proof_path' => $proofPath,
             'rescheduled_for' => $request->input('rescheduled_date'),
         ]);
@@ -222,6 +225,35 @@ class AgentParcelController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Read the amount the agent typed as best we can.
+     *
+     * A decimal keypad can hand us "150.", a locale separator such as "150,50",
+     * or a stutter like "1.5.0". The amount is bookkeeping; the outcome and the
+     * batch assignment are the point, so an unreadable value is stored as null
+     * rather than rejecting the whole call.
+     */
+    protected function parseAmount($value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $clean = preg_replace('/[^0-9.,]/', '', (string) $value) ?? '';
+        $clean = str_replace(',', '.', $clean);
+
+        if (substr_count($clean, '.') > 1) {
+            $parts = explode('.', $clean);
+            $clean = array_shift($parts).'.'.implode('', $parts);
+        }
+
+        if ($clean === '' || $clean === '.' || ! is_numeric($clean)) {
+            return null;
+        }
+
+        return round((float) $clean, 2);
     }
 
     /**
