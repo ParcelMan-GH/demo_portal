@@ -40,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.audit' => \App\Http\Middleware\LogAdminAuditActivity::class,
             'backoffice.user' => \App\Http\Middleware\EnsureBackOfficeUser::class,
             'vendor.active' => \App\Http\Middleware\EnsureVendorActive::class,
+            'hub.agent' => \App\Http\Middleware\EnsureHubAgent::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

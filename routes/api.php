@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AgentParcelController;
 use App\Http\Controllers\Api\V1\Auth\AgentAuthController;
 use App\Http\Controllers\Api\V1\Auth\DriverAuthController;
+use App\Http\Controllers\Api\V1\Auth\HubAuthController;
 use App\Http\Controllers\Api\V1\Auth\VendorAuthController;
 use App\Http\Controllers\Api\V1\DriverAssignmentController;
 use App\Http\Controllers\Api\V1\DriverBusHandoffController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Api\V1\DriverProfileController;
 use App\Http\Controllers\Api\V1\DriverRiderTeamController;
 use App\Http\Controllers\Api\V1\DriverRiderTeamHandoverController;
 use App\Http\Controllers\Api\V1\DriverTransportController;
+use App\Http\Controllers\Api\V1\HubController;
 use App\Http\Controllers\Api\V1\LabelOcrController;
 use App\Http\Controllers\Api\V1\TransporterLocationController;
 use App\Http\Controllers\Api\V1\VendorEarningsController;
@@ -48,6 +50,37 @@ Route::prefix('v1/auth/agent')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', [AgentAuthController::class, 'logout']);
+    });
+});
+
+// API v1 - Hub App (authentication + operations)
+// A hub is a warehouse; every call below is scoped to the hub of the signed in
+// agent via the hub.agent middleware.
+Route::prefix('v1/hub')->group(function () {
+    Route::post('login', [HubAuthController::class, 'login']);
+
+    Route::middleware(['auth:sanctum', 'hub.agent'])->group(function () {
+        Route::post('logout', [HubAuthController::class, 'logout']);
+        Route::get('me', [HubController::class, 'me']);
+
+        // Batch intake & scanning.
+        Route::post('batches/intake', [HubController::class, 'intake']);
+        Route::get('batches', [HubController::class, 'batches']);
+        // Review a batch before checking it in.
+        Route::get('batches/{batchNumber}', [HubController::class, 'showBatch']);
+
+        // What is currently held at the hub.
+        Route::get('inventory', [HubController::class, 'inventory']);
+
+        // Hand parcels to an intercity bus.
+        Route::post('batches/handoff', [HubController::class, 'handoff']);
+
+        // Release to a rider or the recipient.
+        Route::post('packages/release', [HubController::class, 'release']);
+        Route::post('packages/shelf', [HubController::class, 'shelve']);
+
+        // Recent hub activity, for the notifications screen.
+        Route::get('activity', [HubController::class, 'activity']);
     });
 });
 
