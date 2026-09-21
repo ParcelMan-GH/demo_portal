@@ -14,6 +14,12 @@ class OutgoingBatch extends Model
 
     public const STATUS_OPEN = 'open';
 
+    /** Handed to a driver or bus and on its way. */
+    public const STATUS_DISPATCHED = 'dispatched';
+
+    /** Confirmed in at the destination end. */
+    public const STATUS_RECEIVED = 'received';
+
     /**
      * Statuses that mean the batch has already left and can take no more work.
      *

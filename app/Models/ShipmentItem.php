@@ -41,6 +41,15 @@ class ShipmentItem extends Model
         'status',
         'tracking_code',
         'outgoing_batch_id', // <--- Added this line
+
+        // Hub leg: which hub holds the parcel, when it got there, when it left
+        // on a bus, and when it was handed over.
+        'hub_id',
+        'arrived_at_hub_at',
+        'dispatched_to_bus_at',
+        'released_at',
+        'shelf_location',
+        'pickup_code',
     ];
 
     public const DELIVERY_METHOD_DIRECT = 'direct';
@@ -63,6 +72,9 @@ class ShipmentItem extends Model
         'delivery_longitude' => 'decimal:8',
         'fulfillment_type' => FulfillmentType::class,
         'status' => \App\Casts\TolerantBackedEnumCast::class.':'.ItemStatus::class.','.ItemStatus::PENDING->value,
+        'arrived_at_hub_at' => 'datetime',
+        'dispatched_to_bus_at' => 'datetime',
+        'released_at' => 'datetime',
     ];
 
     /**
