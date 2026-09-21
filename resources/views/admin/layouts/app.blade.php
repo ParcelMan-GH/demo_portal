@@ -72,7 +72,7 @@
         $isWhActive = request()->routeIs('admin.warehouses.*') || request()->routeIs('admin.locations.*') || request()->routeIs('warehouse.packages.*') || request()->routeIs('warehouse.receipts.pending.*') || request()->routeIs('warehouse.pickups.received.*');
         $isWorkersActive = request()->routeIs('warehouse.users.*') || request()->routeIs('admin.admins.*') || request()->routeIs('admin.roles.*');
         $isHqActive = request()->routeIs('admin.orders.*') || request()->routeIs('admin.vendors.*');
-        $isSettingsActive = request()->routeIs('admin.settings.*');
+        $isSettingsActive = request()->routeIs('admin.settings.*') || request()->routeIs('admin.fleet.*');
 
         $initialDropdown = $isWhActive ? 'warehouses' : ($isWorkersActive ? 'workers' : ($isHqActive ? 'hq' : ($isSettingsActive ? 'settings' : '')));
     @endphp
@@ -272,6 +272,7 @@
                                 </button>
                                 <div x-show="activeDropdown === 'settings' && !sidebarCollapsed" x-transition.opacity class="pl-[52px] pr-4 pb-4 pt-2 space-y-4" x-cloak>
                                     <a href="{{ route('admin.settings.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('admin.settings.index') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">General Settings</a>
+                                    <a href="{{ route('admin.fleet.vehicles.index') }}" class="block text-[13px] font-semibold transition-colors {{ request()->routeIs('admin.fleet.*') ? 'text-orange-600' : 'text-slate-500 hover:text-orange-600' }}">Vehicle Fleet</a>
                                 </div>
                             </div>
                         @endhasPermission
