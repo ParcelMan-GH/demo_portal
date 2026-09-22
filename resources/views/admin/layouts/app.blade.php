@@ -194,10 +194,17 @@
                         @if($canDeliveryAssign)
                             <a href="{{ route('warehouse.deliveries.runs.index') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('warehouse.deliveries.runs.*') || request()->routeIs('admin.delivery-runs.*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                                 <div class="flex items-center gap-3">
-                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                                    <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Delivery Runs</span>
-                                </div>
-                            </a>
+                                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                     <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Delivery Runs</span>
+                                 </div>
+                             </a>
+                             {{-- Parcels a hub handed to an external intercity bus driver, with the handover photo. --}}
+                             <a href="{{ route('admin.hub-handoffs.index') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('admin.hub-handoffs.*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                                 <div class="flex items-center gap-3">
+                                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7h12m0 0-4-4m4 4-4 4m0 6H4m0 0 4 4m-4-4 4-4"/></svg>
+                                     <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Bus Handovers</span>
+                                 </div>
+                             </a>
                             <a href="{{ route('warehouse.deliveries.pending-confirmations') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('warehouse.deliveries.pending-confirmations*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                                 <div class="flex items-center gap-3">
                                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>

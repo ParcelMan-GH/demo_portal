@@ -34,6 +34,14 @@ class HubController extends Controller
     private const AT_HUB_STATUSES = [ItemStatus::ARRIVED_AT_HUB, ItemStatus::AT_WAREHOUSE];
 
     /**
+     * Role slugs, as the database knows them, for the two sides of the hub app.
+     * See `EnsureHubAgent::ROLES`.
+     */
+    private const ROLE_HUB_AGENT = 'external_hub_agent';
+
+    private const ROLE_BUS_HANDOFF = 'external_bus_handoff_agent';
+
+    /**
      * Destination names, remembered for the life of the request so listing a
      * page of parcels does not re-query the same handful of places.
      *
@@ -52,6 +60,24 @@ class HubController extends Controller
         $user = $request->user();
         $hub = $user->warehouse;
 
+        $slugs = $user->roles
+            ->pluck('slug')
+            ->map(fn ($slug) => strtolower((string) $slug));
+
+        // The hub app has two sides — running the hub, and putting parcels on the
+        // bus — and knows them in its own vocabulary. Login returns the side the
+        // user signed in as; this lets a refresh work out which sides it may show
+        // without the client having to remember.
+        $appRoles = [];
+
+        if ($slugs->contains(self::ROLE_HUB_AGENT)) {
+            $appRoles[] = 'hub_agent';
+        }
+
+        if ($slugs->contains(self::ROLE_BUS_HANDOFF)) {
+            $appRoles[] = 'bus_handoff';
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -59,6 +85,9 @@ class HubController extends Controller
                     'id' => (string) $user->id,
                     'name' => $user->name,
                     'phone' => $user->phone,
+                    // The side to open first, when the account holds both.
+                    'role' => $appRoles[0] ?? null,
+                    'roles' => $appRoles,
                 ],
                 'hub' => $this->serializeHub($hub),
             ],
