@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AdminContactQueueController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminDeliveryRunController;
+use App\Http\Controllers\Admin\AdminHubBusHandoffController;
 use App\Http\Controllers\Admin\AdminInAppNotificationController;
 use App\Http\Controllers\Admin\AdminLocationController;
 use App\Http\Controllers\Admin\AdminMarketingController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\Admin\VendorPayoutController;
 use App\Http\Controllers\Admin\WarehouseCapabilityController;
 use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\BusHandoffPublicController;
+use App\Http\Controllers\HubHandoffPublicController;
 use App\Http\Controllers\Warehouse\CollectionController as WarehouseCollectionController;
 use App\Http\Controllers\Warehouse\ContactQueueController as WarehouseContactQueueController;
 use App\Http\Controllers\Warehouse\DashboardController as WarehouseDashboardController;
@@ -83,6 +85,10 @@ Route::get('terms-of-service', fn () => view('web.legal.terms'))->name('web.term
 Route::get('h/{token}', [BusHandoffPublicController::class, 'show'])->name('bus-handoff.public.show');
 Route::post('h/{token}/confirm', [BusHandoffPublicController::class, 'confirm'])->name('bus-handoff.public.confirm');
 Route::post('h/{token}/issue', [BusHandoffPublicController::class, 'issue'])->name('bus-handoff.public.issue');
+
+// The photo link we text a customer when a hub hands their parcel to a bus.
+// Read-only: it shows the handover, it does not ask the customer to do anything.
+Route::get('handover/{token}', [HubHandoffPublicController::class, 'show'])->name('hub-handoff.public.show');
 
 if (app()->environment(['local', 'testing'])) {
     Route::get('dev/bus-handoff-confirmation-preview', function () {
@@ -519,6 +525,10 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::post('recipient-payments/{task}/fee', [RecipientPaymentController::class, 'setFee'])->name('recipient-payments.fee');
         Route::post('recipient-payments/{task}/mark-paid', [RecipientPaymentController::class, 'markPaid'])->name('recipient-payments.mark-paid');
         Route::post('recipient-payments/{task}/override', [RecipientPaymentController::class, 'override'])->name('recipient-payments.override');
+
+        // Bus Handovers (parcels a hub handed to an external bus driver)
+        Route::get('hub-handovers', [AdminHubBusHandoffController::class, 'index'])->name('hub-handoffs.index');
+        Route::get('hub-handovers/{handoff}', [AdminHubBusHandoffController::class, 'show'])->name('hub-handoffs.show');
 
         // Delivery Runs (admin read visibility)
         Route::get('delivery-runs', [AdminDeliveryRunController::class, 'index'])->name('delivery-runs.index');

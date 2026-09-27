@@ -12,6 +12,11 @@ enum ItemStatus: string
     case READY_FOR_HUB_TRANSFER = 'ready_for_hub_transfer'; 
     
     case SORTED = 'sorted';
+
+    // --- Hub leg: checked in at a hub, then loaded onto an intercity bus ---
+    case ARRIVED_AT_HUB = 'arrived_at_hub';
+    case DISPATCHED_TO_BUS = 'dispatched_to_bus';
+
     case IN_TRANSIT = 'in_transit';
     case AT_DESTINATION = 'at_destination';
     case OUT_FOR_DELIVERY = 'out_for_delivery';
@@ -33,6 +38,11 @@ enum ItemStatus: string
             self::READY_FOR_HUB_TRANSFER => 'Ready for Hub Transfer',
             
             self::SORTED => 'Sorted',
+
+            // --- Hub leg ---
+            self::ARRIVED_AT_HUB => 'Arrived at Hub',
+            self::DISPATCHED_TO_BUS => 'Dispatched to Bus',
+
             self::IN_TRANSIT => 'In Transit',
             self::AT_DESTINATION => 'At Destination',
             self::OUT_FOR_DELIVERY => 'Out for Delivery',
