@@ -116,10 +116,13 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
+          # The heredoc below is quoted so that $DB/$DU/$DP/$HOME stay literal and
+          # are expanded on the server, not here. That means DEPLOY_PATH cannot be
+          # referenced inside it -- it is expanded locally in the ssh command and
+          # the remote shell is already cd'd into the app root.
           ssh -p "$DEPLOY_PORT" -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
-            "$DEPLOY_USER@$DEPLOY_HOST" 'bash -s' <<'REMOTE' || echo "::warning::database backup step failed (continuing)"
+            "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && bash -s" <<'REMOTE' || echo "::warning::database backup step failed (continuing)"
           set -u
-          cd "$DEPLOY_PATH"
           DB=$(grep -E '^DB_DATABASE=' .env | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')
           DU=$(grep -E '^DB_USERNAME=' .env | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')
           DP=$(grep -E '^DB_PASSWORD=' .env | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')
