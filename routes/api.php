@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\DriverProfileController;
 use App\Http\Controllers\Api\V1\DriverRiderTeamController;
 use App\Http\Controllers\Api\V1\DriverRiderTeamHandoverController;
 use App\Http\Controllers\Api\V1\DriverTransportController;
+use App\Http\Controllers\Api\V1\HubBusHandoffController;
 use App\Http\Controllers\Api\V1\HubController;
 use App\Http\Controllers\Api\V1\LabelOcrController;
 use App\Http\Controllers\Api\V1\TransporterLocationController;
@@ -72,8 +73,16 @@ Route::prefix('v1/hub')->group(function () {
         // What is currently held at the hub.
         Route::get('inventory', [HubController::class, 'inventory']);
 
-        // Hand parcels to an intercity bus.
+        // Hand parcels to an intercity bus, in bulk, from the hub side.
         Route::post('batches/handoff', [HubController::class, 'handoff']);
+
+        // The bus handoff agent's per-parcel flow: scan, photograph, hand over.
+        // `handoffs/lookup` is declared before `handoffs/{handoff}` so the
+        // literal path is not swallowed by the model-binding parameter.
+        Route::get('handoffs/lookup', [HubBusHandoffController::class, 'lookup']);
+        Route::get('handoffs', [HubBusHandoffController::class, 'index']);
+        Route::post('handoffs', [HubBusHandoffController::class, 'store']);
+        Route::get('handoffs/{handoff}', [HubBusHandoffController::class, 'show']);
 
         // Release to a rider or the recipient.
         Route::post('packages/release', [HubController::class, 'release']);
