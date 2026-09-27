@@ -29,8 +29,12 @@ return new class extends Migration
             $table->foreign('outgoing_batch_id')->references('id')->on('outgoing_batches')->cascadeOnDelete();
             $table->foreign('actor_user_id')->references('id')->on('users')->nullOnDelete();
 
-            $table->index(['outgoing_batch_id', 'event_type']);
-            $table->index(['shipment_item_id', 'created_at']);
+            // MySQL caps identifier names at 64 characters. Laravel's generated
+            // names ("outgoing_batch_assignment_events_outgoing_batch_id_event_type_index",
+            // 67 chars) overflow that limit and abort the migration, so both
+            // indexes are named explicitly to stay well under it.
+            $table->index(['outgoing_batch_id', 'event_type'], 'obae_batch_event_idx');
+            $table->index(['shipment_item_id', 'created_at'], 'obae_item_created_idx');
         });
     }
 
