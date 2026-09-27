@@ -40,7 +40,9 @@ class ShipmentItem extends Model
         'delivery_method',
         'status',
         'tracking_code',
-        'outgoing_batch_id', // <--- Added this line
+        'outgoing_batch_id',
+        'agent_id',
+        'claimed_at',
 
         // Hub leg: which hub holds the parcel, when it got there, when it left
         // on a bus, and when it was handed over.
@@ -72,6 +74,7 @@ class ShipmentItem extends Model
         'delivery_longitude' => 'decimal:8',
         'fulfillment_type' => FulfillmentType::class,
         'status' => \App\Casts\TolerantBackedEnumCast::class.':'.ItemStatus::class.','.ItemStatus::PENDING->value,
+        'claimed_at' => 'datetime',
         'arrived_at_hub_at' => 'datetime',
         'dispatched_to_bus_at' => 'datetime',
         'released_at' => 'datetime',

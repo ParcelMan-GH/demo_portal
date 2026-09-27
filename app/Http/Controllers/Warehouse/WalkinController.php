@@ -11,6 +11,7 @@ use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceiptItemPhoto;
+use App\Services\ChargesService;
 use App\Services\WalkinShipmentService;
 use App\Services\StorageService;
 use App\Services\Warehouse\WarehousePortalService;
@@ -29,6 +30,7 @@ class WalkinController extends Controller
     public function __construct(
         private WarehousePortalService $portalService,
         private StorageService $storageService,
+        private ChargesService $charges,
     ) {}
 
     public function create(): View
@@ -406,13 +408,18 @@ class WalkinController extends Controller
             }
 
             if (isset($existingItems[$index])) {
-                $existingItems[$index]->update($attrs);
+                $item = $existingItems[$index];
+                $item->update($attrs);
             } else {
                 $attrs['shipment_id'] = $shipment->id;
                 $attrs['status'] = ItemStatus::AT_WAREHOUSE;
                 $attrs['tracking_code'] = ShipmentItem::generateTrackingCode();
-                ShipmentItem::create($attrs);
+                $item = ShipmentItem::create($attrs);
             }
+
+            // Keep the charges ledger in step with the fee just entered (or
+            // cleared), so the order view and the app show the same number.
+            $this->charges->syncDeliveryFeeForItem($item, (float) $item->delivery_fee);
         }
 
         // Persist newly uploaded photos from the edit form onto the receipt items

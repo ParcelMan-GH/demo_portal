@@ -177,6 +177,14 @@ class WalkinShipmentService
 
                 $shipmentItem = ShipmentItem::create($itemAttrs);
 
+                // Mirror the agreed fee into the charges ledger. Every screen -
+                // the receiving workspace, the API and the mobile app - reads the
+                // fee from there, so without this the walk-in fee was invisible
+                // in the order view.
+                if ((float) $shipmentItem->delivery_fee > 0) {
+                    $this->chargesService->syncDeliveryFeeForItem($shipmentItem, (float) $shipmentItem->delivery_fee);
+                }
+
                 // Warehouse receipt item
                 $receiptItem = WarehouseReceiptItem::create([
                     'warehouse_receipt_id' => $receipt->id,
