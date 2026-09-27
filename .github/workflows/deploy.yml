@@ -1,0 +1,168 @@
+name: Deploy production (new.parcelmanexpress.com)
+
+# Deploys on every merge to main. The site has no git working copy on the
+# server, so files are synced with rsync over SSH instead of git pull.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   DEPLOY_HOST      host to ssh to              e.g. 65.21.88.189
+#   DEPLOY_PORT      ssh port                    e.g. 22
+#   DEPLOY_USER      ssh user                    e.g. parcelmanexpress.com_21wmfrifzd1
+#   DEPLOY_SSH_KEY   private half of the deploy key (whole PEM/OpenSSH block)
+#   DEPLOY_PATH      absolute app root on the server
+#                    e.g. /var/www/vhosts/parcelmanexpress.com/new.parcelmanexpress.com
+#   DEPLOY_PHP       absolute php binary
+#                    e.g. /opt/plesk/php/8.4/bin/php
+#
+# Secrets must exist before the first run or the workflow fails fast.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_migrations:
+        description: Run database migrations after syncing files
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-new-parcelmanexpress
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Sync, migrate, clear caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # public/build is gitignored, so the compiled assets must be produced
+      # here and shipped with the sync (node/npm are not installed on the server).
+      - name: Build front-end assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      # NOTE: deliberately no --delete. A wrong exclude here would wipe live
+      # files, so stale files are left in place rather than risk deletion.
+      # .env, storage/ and Plesk's own .php-ini/.php-version/.npmrc are excluded
+      # so the deploy can never clobber server-managed configuration.
+      - name: Sync application files
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          rsync -az --human-readable \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='storage/' \
+            --exclude='public/storage' \
+            --exclude='node_modules/' \
+            --exclude='vendor/' \
+            --exclude='tests/' \
+            --exclude='phpunit.xml' \
+            --exclude='.php-ini' \
+            --exclude='.php-version' \
+            --exclude='.npmrc' \
+            --exclude='database/*.sqlite' \
+            --exclude='*.zip' \
+            -e "ssh -p $DEPLOY_PORT -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes" \
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+
+      - name: Install production dependencies
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PHP: ${{ secrets.DEPLOY_PHP }}
+        run: |
+          ssh -p "$DEPLOY_PORT" -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd '$DEPLOY_PATH' && PATH=\$(dirname '$DEPLOY_PHP'):\$PATH composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader"
+
+      # Safety net: dump the database before touching schema. Never fails the
+      # deploy, and only the 5 most recent dumps are kept.
+      - name: Back up database
+        if: ${{ github.event_name == 'push' || inputs.run_migrations }}
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -p "$DEPLOY_PORT" -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" 'bash -s' <<'REMOTE' || echo "::warning::database backup step failed (continuing)"
+          set -u
+          cd "$DEPLOY_PATH"
+          DB=$(grep -E '^DB_DATABASE=' .env | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')
+          DU=$(grep -E '^DB_USERNAME=' .env | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')
+          DP=$(grep -E '^DB_PASSWORD=' .env | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')
+          mkdir -p "$HOME/db-backups"
+          STAMP=$(date -u +%Y%m%d-%H%M%S)
+          mysqldump --single-transaction --quick -h127.0.0.1 -u"$DU" -p"$DP" "$DB" \
+            > "$HOME/db-backups/$DB-$STAMP.sql"
+          gzip -f "$HOME/db-backups/$DB-$STAMP.sql"
+          cd "$HOME/db-backups"
+          # keep only the 5 most recent dumps
+          KEEP=5
+          COUNT=$(ls -1 "$DB"-*.sql.gz 2>/dev/null | wc -l)
+          if [ "$COUNT" -gt "$KEEP" ]; then
+            ls -1t "$DB"-*.sql.gz | tail -n +$((KEEP + 1)) | while read -r OLD; do
+              [ -n "$OLD" ] && rm -f -- "./$OLD"
+            done
+          fi
+          ls -lh | tail -3
+          REMOTE
+
+      - name: Run migrations and clear caches
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PHP: ${{ secrets.DEPLOY_PHP }}
+        run: |
+          MIGRATE=""
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.run_migrations }}" = "true" ]; then
+            MIGRATE="'$DEPLOY_PHP' artisan migrate --force"
+          fi
+          ssh -p "$DEPLOY_PORT" -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "set -e; cd '$DEPLOY_PATH'; $MIGRATE; '$DEPLOY_PHP' artisan optimize:clear"
+
+      - name: Smoke test
+        run: |
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 https://new.parcelmanexpress.com/admin/login || true)
+            echo "attempt $i: /admin/login -> $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::error::/admin/login did not return 200 after deploy"
+          exit 1
