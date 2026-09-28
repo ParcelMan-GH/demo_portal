@@ -161,7 +161,18 @@ class DriverTransportController extends Controller
             $isHistory = $request->query('filter') === 'history';
 
             $query = TransportManifest::query()
-                ->with(['originWarehouse', 'destinationWarehouse'])
+                /*
+                 * The coordinate columns matter as much as the names here: the
+                 * app draws the route and computes the distance from them, and
+                 * without them it substituted hardcoded Accra and Kumasi
+                 * constants — so every batch was reported as a 250 km intercity
+                 * run, including the ones whose origin and destination are the
+                 * same warehouse.
+                 */
+                ->with([
+                    'originWarehouse:id,name,code,address,latitude,longitude',
+                    'destinationWarehouse:id,name,code,address,latitude,longitude',
+                ])
                 /*
                  * Counted, not loaded. The payload reads `items_count`, and this
                  * query never produced it — so `package_count` fell through to
@@ -251,7 +262,12 @@ class DriverTransportController extends Controller
 
                 if ($bridged) {
                     $manifests = collect([
-                        $bridged->load(['originWarehouse', 'destinationWarehouse'])->loadCount(['items', 'containers']),
+                        $bridged
+                            ->load([
+                                'originWarehouse:id,name,code,address,latitude,longitude',
+                                'destinationWarehouse:id,name,code,address,latitude,longitude',
+                            ])
+                            ->loadCount(['items', 'containers']),
                     ]);
                 }
             }
@@ -277,8 +293,38 @@ class DriverTransportController extends Controller
                 return [
                     'id' => (string) $m->id,
                     'manifest_code' => $code,
-                    'origin' => $m->originWarehouse?->name ?? 'Origin Hub',
+                    'origin' => $m->originWarehouse?->name ?? 'Origin not recorded',
                     'destination' => $destinationName,
+                    /*
+                     * Coordinates, so the client never has to invent them.
+                     *
+                     * Sent both as warehouse objects (with the address, for a
+                     * future detail view) and flattened as *_lat / *_lng, which
+                     * is what the existing screens already look for. They are
+                     * null when a warehouse has no coordinate on file — the
+                     * client must handle that by showing no route rather than a
+                     * guess.
+                     */
+                    'origin_warehouse' => $m->originWarehouse ? [
+                        'id' => $m->originWarehouse->id,
+                        'name' => $m->originWarehouse->name,
+                        'code' => $m->originWarehouse->code,
+                        'address' => $m->originWarehouse->address,
+                        'latitude' => $m->originWarehouse->latitude !== null ? (float) $m->originWarehouse->latitude : null,
+                        'longitude' => $m->originWarehouse->longitude !== null ? (float) $m->originWarehouse->longitude : null,
+                    ] : null,
+                    'origin_lat' => $m->originWarehouse?->latitude !== null ? (float) $m->originWarehouse->latitude : null,
+                    'origin_lng' => $m->originWarehouse?->longitude !== null ? (float) $m->originWarehouse->longitude : null,
+                    'destination_warehouse' => $m->destinationWarehouse ? [
+                        'id' => $m->destinationWarehouse->id,
+                        'name' => $m->destinationWarehouse->name,
+                        'code' => $m->destinationWarehouse->code,
+                        'address' => $m->destinationWarehouse->address,
+                        'latitude' => $m->destinationWarehouse->latitude !== null ? (float) $m->destinationWarehouse->latitude : null,
+                        'longitude' => $m->destinationWarehouse->longitude !== null ? (float) $m->destinationWarehouse->longitude : null,
+                    ] : null,
+                    'destination_lat' => $m->destinationWarehouse?->latitude !== null ? (float) $m->destinationWarehouse->latitude : null,
+                    'destination_lng' => $m->destinationWarehouse?->longitude !== null ? (float) $m->destinationWarehouse->longitude : null,
                     'package_count' => (int) ($m->items_count ?? ($m->relationLoaded('items') ? $m->items->count() : 0)),
                     // The raw counts, so the client is not parsing a number out
                     // of a display field to decide whether anything is loaded.

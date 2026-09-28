@@ -216,6 +216,11 @@ Route::prefix('v1/driver')->group(function () {
          */
         Route::post('vehicle/update', [DriverProfileController::class, 'update']);
 
+        // The same handler as PUT profile. A client that posts rather than puts
+        // is reaching for the same thing, and a 405 is a worse answer than the
+        // save it asked for.
+        Route::post('profile', [DriverProfileController::class, 'update']);
+
         Route::get('earnings', [DriverEarningsController::class, 'index']);
         Route::post('payouts/request', [DriverEarningsController::class, 'requestPayout']);
         Route::put('notifications/preferences', [DriverNotificationController::class, 'updatePreferences']);

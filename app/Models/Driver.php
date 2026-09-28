@@ -38,6 +38,7 @@ class Driver extends Authenticatable
         'make_model',
         'max_capacity',
         'base_location',
+        'emergency_contact',
         'notification_settings',
         'status',
         'is_active',

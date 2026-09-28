@@ -160,6 +160,7 @@ class DriverAuthService
             'license_number' => $driver->license_number,
             'max_capacity' => $driver->max_capacity,
             'base_location' => $driver->base_location,
+            'emergency_contact' => $driver->emergency_contact,
             'status' => $driver->status,
             'is_active' => $driver->is_active,
             'task_capabilities' => $driver->getCapabilities(),

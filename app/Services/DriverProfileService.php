@@ -104,7 +104,7 @@ class DriverProfileService
          * The list stays filtered against the schema, so a name that is wrong for
          * a future table cannot become a 500.
          */
-        $writable = ['name', 'phone', 'email', 'vehicle_type', 'vehicle_number', 'make_model', 'license_number', 'max_capacity', 'base_location'];
+        $writable = ['name', 'phone', 'email', 'vehicle_type', 'vehicle_number', 'make_model', 'license_number', 'max_capacity', 'base_location', 'emergency_contact'];
         $allowedFields = array_values(array_filter(
             $writable,
             fn (string $field) => Schema::hasColumn($driver->getTable(), $field)

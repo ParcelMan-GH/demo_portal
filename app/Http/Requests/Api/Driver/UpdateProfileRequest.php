@@ -30,6 +30,8 @@ class UpdateProfileRequest extends FormRequest
             // A label, not a number: "3,500 kg" would fail a numeric rule.
             'max_capacity' => ['sometimes', 'nullable', 'string', 'max:50'],
             'base_location' => ['sometimes', 'nullable', 'string', 'max:255'],
+            // Free text on purpose: the form takes a name, a number, or both.
+            'emergency_contact' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }
 
