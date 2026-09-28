@@ -790,6 +790,10 @@ Route::prefix(config('backoffice.prefix', 'admin').'/operations')
         Route::post('manifests/transport', [WarehouseTransportManifestController::class, 'create'])->name('manifests.transport.store');
         Route::post('manifests/transport/{manifest}/assign-driver', [WarehouseTransportManifestController::class, 'assignDriver'])->name('manifests.transport.assign-driver');
         Route::post('manifests/transport/{manifest}/dispatch', [WarehouseTransportManifestController::class, 'dispatch'])->name('manifests.transport.dispatch');
+
+        // POST, not GET: printing also creates the parcel label rows the driver
+        // scans to load, so it is not a read-only action.
+        Route::post('manifests/transport/{manifest}/print-labels', [WarehouseTransportManifestController::class, 'printLabels'])->name('manifests.transport.print-labels');
         Route::post('manifests/transport/{manifest}/undo-dispatch', [WarehouseTransportManifestController::class, 'undoDispatch'])->name('manifests.transport.undo-dispatch');
         Route::post('manifests/transport/{manifest}/print-waybill', [WarehouseTransportManifestController::class, 'printWaybill'])->name('manifests.transport.print-waybill');
         Route::post('manifests/transport/{manifest}/unassign-driver', [WarehouseTransportManifestController::class, 'unassignDriver'])->name('manifests.transport.unassign-driver');

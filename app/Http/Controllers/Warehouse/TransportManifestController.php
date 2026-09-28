@@ -22,6 +22,7 @@ use App\Services\Warehouse\WarehouseTransportService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Services\Warehouse\TransportLabelService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -33,6 +34,45 @@ class TransportManifestController extends Controller
         private WarehouseTransportReceivingService $receivingService,
         private BarcodeService $barcodeService
     ) {
+    }
+
+    /**
+     * The destination each summary card stands for.
+     *
+     * The cards are labelled by city, but a batch is routed by region — so each
+     * card tracks the region that city is the hub of. Kumasi is the capital of
+     * Ashanti, Koforidua of Eastern, Takoradi of Western and Tamale of Northern.
+     *
+     * The ids are resolved by name rather than written down, because the ids the
+     * view used to hardcode pointed at the wrong regions entirely: it labelled
+     * region 1 "Ashanti (Kumasi)" when region 1 is Greater Accra. The cards
+     * therefore counted the wrong places and read zero.
+     */
+    private const SUMMARY_CARD_REGIONS = [
+        'Kumasi'    => 'Ashanti',
+        'Koforidua' => 'Eastern',
+        'Takoradi'  => 'Western',
+        'Tamale'    => 'Northern',
+    ];
+
+    /**
+     * @return array<int, array{region_id: int, region_name: string}>
+     */
+    private function summaryCardDefaults(): array
+    {
+        $idByName = \App\Models\Region::query()->pluck('id', 'name')->all();
+
+        $cards = [];
+
+        foreach (self::SUMMARY_CARD_REGIONS as $city => $regionName) {
+            $regionId = $idByName[$regionName] ?? null;
+
+            if ($regionId !== null) {
+                $cards[] = ['region_id' => (int) $regionId, 'region_name' => $city];
+            }
+        }
+
+        return $cards;
     }
 
     public function outboundIndex(): View
@@ -70,6 +110,19 @@ class TransportManifestController extends Controller
                     'name' => $item->name,
                     'code' => $item->code,
                 ]),
+            /*
+             * Straight from the tables.
+             *
+             * This screen used to carry its own hardcoded region and district
+             * lists in the Blade config, and they disagreed with the database:
+             * the config called region 1 "Ashanti (Kumasi)" while region 1 is
+             * Greater Accra. The summary cards tracked those ids, so they counted
+             * batches from the wrong regions and read zero however much was in
+             * transit.
+             */
+            'regions' => \App\Models\Region::query()->orderBy('name')->get(['id', 'name']),
+            'districts' => \App\Models\District::query()->orderBy('name')->get(['id', 'name', 'region_id']),
+            'summaryCards' => $this->summaryCardDefaults(),
         ]);
     }
 
@@ -320,6 +373,51 @@ class TransportManifestController extends Controller
                 'view_url' => route('warehouse.manifests.transport.show', $manifest),
             ];
         }, ['summary' => $summary]);
+    }
+
+    /**
+     * Printable batch + parcel labels for a manifest.
+     *
+     * Same sheet and same side effect as the admin Outgoing Batches action: it
+     * creates the `warehouse_receipt_item_labels` rows the driver's scanner
+     * matches on, which is what "Manifest is not ready to depart" is waiting for.
+     */
+    public function printLabels(TransportManifest $manifest, TransportLabelService $labels): JsonResponse
+    {
+        $this->authorizePermission('warehouse.manifest.manage');
+
+        $manifest->load(['destinationWarehouse:id,name', 'sortBatch:id,batch_number', 'items.shipmentItem']);
+
+        $items = $manifest->items->map->shipmentItem->filter()->values();
+
+        $prepared = $labels->prepare($items);
+        $total = count($prepared['parcels']);
+
+        // The batch number is what the driver's scanner knows; the manifest
+        // number is the fallback for a draft that has no batch yet.
+        $code = $manifest->sortBatch?->batch_number ?? $manifest->manifest_number;
+
+        $html = $labels->renderSheet([
+            'batch' => $manifest,
+            'code' => $code,
+            'destination' => $manifest->destinationWarehouse?->name ?? 'Not set',
+            'origin' => $prepared['origin'],
+            'parcels' => $prepared['parcels'],
+            'batchBarcode' => $labels->batchBarcode($code),
+            'labelledCount' => $prepared['labelled'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $labels->message($prepared['labels_created'], $prepared['labelled'], $total),
+            'data' => [
+                'batch_number' => $code,
+                'packages_total' => $total,
+                'packages_labelled' => $prepared['labelled'],
+                'labels_created' => $prepared['labels_created'],
+                'label_html' => $html,
+            ],
+        ]);
     }
 
     public function create(Request $request): JsonResponse

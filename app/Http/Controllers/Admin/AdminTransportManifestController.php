@@ -15,7 +15,7 @@ use App\Models\TransportManifest;
 use App\Models\TransportManifestItem;
 use App\Models\Warehouse;
 use App\Services\BackOfficeAccess;
-use App\Services\Warehouse\BarcodeService;
+use App\Services\Warehouse\TransportLabelService;
 use App\Services\OutgoingBatchPackageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -411,120 +411,43 @@ class AdminTransportManifestController extends Controller
      * Idempotent: an item that already has a label is left alone, so printing
      * twice does not duplicate barcodes or bump counts.
      */
-    public function printBatchLabels(OutgoingBatch $batch, BarcodeService $barcodeService): JsonResponse
+    /**
+     * Printable master-batch label plus one label per parcel.
+     *
+     * The label work — creating the rows the driver scans, and describing each
+     * parcel — lives in TransportLabelService because the warehouse Outgoing
+     * Batches screen prints the same sheet from a TransportManifest. This method
+     * only supplies what is specific to an outgoing batch.
+     */
+    public function printBatchLabels(OutgoingBatch $batch, TransportLabelService $labels): JsonResponse
     {
-        $batch->load([
-            'destinationWarehouse:id,name',
-            'shipmentItems' => fn ($query) => $query->with([
-                'warehouseReceiptItems.labels',
-                'warehouseReceiptItems.receipt.warehouse:id,name',
-            ]),
-        ]);
+        $batch->load(['destinationWarehouse:id,name', 'shipmentItems']);
 
-        $labelsCreated = 0;
-        $parcels = [];
-        $missingReceipt = 0;
-        $originName = null;
+        $prepared = $labels->prepare($batch->shipmentItems);
+        $total = count($prepared['parcels']);
 
-        foreach ($batch->shipmentItems as $item) {
-            // The parcel's receipt says which warehouse it is leaving from.
-            $receiptItem = $item->warehouseReceiptItems->first();
-            $originName ??= $receiptItem?->receipt?->warehouse?->name;
-
-            if (! $receiptItem) {
-                // No receipt means no barcode and nothing for the scanner to
-                // match. Counted and surfaced rather than quietly skipped.
-                $missingReceipt++;
-                $parcels[] = [
-                    'tracking_code' => $item->tracking_code,
-                    'barcode' => null,
-                    'barcode_svg' => null,
-                    'labelled' => false,
-                    'note' => 'No warehouse receipt — label at the warehouse first',
-                ];
-                continue;
-            }
-
-            if ($receiptItem->labels->isEmpty()) {
-                // The receiving flow numbers labels `{receipt barcode}-001`. The
-                // barcode on the receipt item is the parent; the tracking code is
-                // the fallback for an item that was receipted before barcoding.
-                $parent = $receiptItem->barcode_value ?: $item->tracking_code;
-
-                if (filled($parent)) {
-                    $receiptItem->labels()->create([
-                        'barcode_value' => $parent . '-001',
-                        'label_index' => 1,
-                        'labels_total' => 1,
-                        'label_type' => 'sealed',
-                        'printed_at' => now(),
-                        'print_count' => 1,
-                    ]);
-
-                    $labelsCreated++;
-                    $receiptItem->load('labels');
-                }
-            }
-
-            $label = $receiptItem->labels->first();
-
-            $parcels[] = [
-                'tracking_code' => $item->tracking_code,
-                'barcode' => $label?->barcode_value,
-                'barcode_svg' => $label ? $barcodeService->renderCode128Svg($label->barcode_value, 60, 2, 8, true) : null,
-                'labelled' => $label !== null,
-                'note' => $label ? null : 'Could not derive a barcode for this parcel',
-            ];
-        }
-
-        $labelledCount = count(array_filter($parcels, fn ($parcel) => $parcel['labelled']));
-
-        // The `view()` helper, not View::make — `View` here is the imported
-        // Illuminate\View\View class (used as the return type on index()), not
-        // the facade, so View::make() is an undefined method.
-        $html = view('shared.outgoing-batch-labels', [
+        $html = $labels->renderSheet([
             'batch' => $batch,
+            'code' => $batch->batch_number,
             'destination' => $this->destinationLabel($batch),
-            'origin' => $originName,
-            'parcels' => $parcels,
-            'batchBarcode' => $barcodeService->renderCode128Svg($batch->batch_number, 80, 2, 12, true),
-            'labelledCount' => $labelledCount,
-        ])->render();
+            'origin' => $prepared['origin'],
+            'parcels' => $prepared['parcels'],
+            'batchBarcode' => $labels->batchBarcode($batch->batch_number),
+            'labelledCount' => $prepared['labelled'],
+        ]);
 
         return response()->json([
             'success' => true,
-            'message' => $this->labelMessage($labelsCreated, $labelledCount, count($parcels)),
+            'message' => $labels->message($prepared['labels_created'], $prepared['labelled'], $total),
             'data' => [
                 'batch_number' => $batch->batch_number,
-                'packages_total' => count($parcels),
-                'packages_labelled' => $labelledCount,
-                'labels_created' => $labelsCreated,
-                'parcels_without_receipt' => $missingReceipt,
+                'packages_total' => $total,
+                'packages_labelled' => $prepared['labelled'],
+                'labels_created' => $prepared['labels_created'],
+                'parcels_without_receipt' => $total - $prepared['labelled'],
                 'label_html' => $html,
             ],
         ]);
-    }
-
-    /** Says what actually happened, including when part of it could not be done. */
-    private function labelMessage(int $created, int $labelled, int $total): string
-    {
-        if ($total === 0) {
-            return 'This batch has no parcels yet, so there is nothing to label.';
-        }
-
-        $parts = [];
-
-        if ($created > 0) {
-            $parts[] = "{$created} parcel label" . ($created === 1 ? '' : 's') . ' created';
-        }
-
-        $parts[] = "{$labelled} of {$total} parcels labelled";
-
-        if ($labelled < $total) {
-            $parts[] = 'the rest need receipting at the warehouse before a driver can load them';
-        }
-
-        return ucfirst(implode(', ', $parts)) . '.';
     }
 
     public function dispatchBatch(Request $request, OutgoingBatch $batch): JsonResponse

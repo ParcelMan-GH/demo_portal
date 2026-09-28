@@ -10,7 +10,7 @@
      * Everything is black on white and drawn with rules rather than fills, so it
      * survives a thermal printer and a photocopier.
      */
-    $createdAt = optional($batch->created_at)->format('d M Y, H:i');
+    $createdAt = optional($batch->created_at ?? null)->format('d M Y, H:i');
     $packagesTotal = count($parcels);
     $shortfall = $packagesTotal - $labelledCount;
 @endphp
@@ -19,7 +19,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Batch Labels - {{ $batch->batch_number }}</title>
+    <title>Batch Labels - {{ $code }}</title>
     <style>
         @page { size: 100mm 150mm; margin: 0; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -98,7 +98,7 @@
             <span class="kind">BATCH LABEL</span>
         </div>
 
-        <div class="code">{{ $batch->batch_number }}</div>
+        <div class="code">{{ $code }}</div>
 
         <div class="barcode">{!! $batchBarcode !!}</div>
 
@@ -120,7 +120,7 @@
             </div>
             <div>
                 <div class="fact-label">Status</div>
-                <div class="fact-value">{{ ucfirst(str_replace('_', ' ', $batch->status)) }}</div>
+                <div class="fact-value">{{ ucfirst(str_replace('_', ' ', $batch->status ?? '')) }}</div>
             </div>
             <div>
                 <div class="fact-label">Created</div>
@@ -168,7 +168,7 @@
                 </div>
                 <div>
                     <div class="fact-label">Batch</div>
-                    <div class="fact-value">{{ $batch->batch_number }}</div>
+                    <div class="fact-value">{{ $code }}</div>
                 </div>
                 <div>
                     <div class="fact-label">Destination</div>
