@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\LabelCustodyEvent;
 use App\Models\WarehouseReceiptItemLabel;
@@ -63,11 +64,11 @@ class PackageTrackingController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('barcode_value', 'like', "%{$search}%")
                   ->orWhereHas('receiptItem.shipmentItem', fn ($sq) => $sq
-                      ->where('tracking_code', 'like', "%{$search}%")
+                      ->where('tracking_code', 'like', CodeResolver::likeTerm($search))
                       ->orWhere('description', 'like', "%{$search}%")
                   )
                   ->orWhereHas('receiptItem.shipmentItem.shipment', fn ($sq) => $sq
-                      ->where('shipment_number', 'like', "%{$search}%")
+                      ->where('shipment_number', 'like', CodeResolver::likeTerm($search))
                   );
             });
         }

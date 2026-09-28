@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\BatchDestinationType;
 use App\Enums\ItemStatus;
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\OutgoingBatch;
@@ -68,7 +69,8 @@ class AdminTransportManifestController extends Controller
         ]);
 
         $attributes = [
-            'batch_number'         => 'BATCH-' . strtoupper(Str::random(6)),
+            // Was generated inline with no collision check.
+            'batch_number'         => OutgoingBatch::generateBatchNumber(),
             'delivery_region_id'   => $validated['delivery_region_id'],
             'delivery_district_id' => $validated['delivery_district_id'],
             'status'               => 'open',
@@ -167,7 +169,7 @@ class AdminTransportManifestController extends Controller
 
         if ($search = trim((string) $request->get('search'))) {
             $query->where(function ($q) use ($search) {
-                $q->where('batch_number', 'like', "%{$search}%")
+                $q->where('batch_number', 'like', CodeResolver::likeTerm($search))
                   ->orWhere('delivery_region_id', 'like', "%{$search}%")
                   ->orWhere('delivery_district_id', 'like', "%{$search}%");
             });
@@ -450,7 +452,7 @@ class AdminTransportManifestController extends Controller
 
         if ($search = trim((string) $request->get('search'))) {
             $query->where(function ($q) use ($search) {
-                $q->where('batch_number', 'like', "%{$search}%")
+                $q->where('batch_number', 'like', CodeResolver::likeTerm($search))
                   ->orWhere('delivery_region_id', 'like', "%{$search}%")
                   ->orWhere('delivery_district_id', 'like', "%{$search}%");
             });
@@ -524,7 +526,7 @@ class AdminTransportManifestController extends Controller
             'code' => ['required', 'string'],
         ]);
 
-        $item = ShipmentItem::where('tracking_code', $validated['code'])->first();
+        $item = CodeResolver::resolveShipmentItem($validated['code']);
 
         if (!$item) {
             return response()->json([

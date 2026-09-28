@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Exports\DriversExport;
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\Location;
 use App\Models\PaymentWallet;
@@ -653,7 +654,7 @@ class RecipientPaymentController extends Controller
             ->first();
         $shipmentItemId = $label?->receiptItem?->shipment_item_id;
         if (!$shipmentItemId) {
-            $shipmentItemId = ShipmentItem::query()->where('tracking_code', $code)->value('id');
+            $shipmentItemId = CodeResolver::resolveShipmentItem($code)?->id;
         }
         if (!$shipmentItemId) {
             return response()->json(['success' => false, 'message' => 'No package found for this label or tracking code.'], 404);
@@ -1327,10 +1328,10 @@ class RecipientPaymentController extends Controller
                     ->orWhere('delivery_town', 'like', "%{$search}%")
                     ->orWhere('payment_reference', 'like', "%{$search}%")
                     ->orWhereHas('shipmentItem', fn (Builder $itemQuery) => $itemQuery
-                        ->where('tracking_code', 'like', "%{$search}%")
+                        ->where('tracking_code', 'like', CodeResolver::likeTerm($search))
                         ->orWhere('description', 'like', "%{$search}%"))
                     ->orWhereHas('shipmentItem.shipment', fn (Builder $shipmentQuery) => $shipmentQuery
-                        ->where('shipment_number', 'like', "%{$search}%"));
+                        ->where('shipment_number', 'like', CodeResolver::likeTerm($search)));
             });
         }
 
@@ -1453,12 +1454,12 @@ class RecipientPaymentController extends Controller
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('phone_number', 'like', "%{$search}%"))
                     ->orWhereHas('assignedTo', fn (Builder $userQuery) => $userQuery->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('sortBatch', fn (Builder $batchQuery) => $batchQuery->where('batch_number', 'like', "%{$search}%"))
+                    ->orWhereHas('sortBatch', fn (Builder $batchQuery) => $batchQuery->where('batch_number', 'like', CodeResolver::likeTerm($search)))
                     ->orWhereHas('shipmentItem', fn (Builder $itemQuery) => $itemQuery
-                        ->where('tracking_code', 'like', "%{$search}%")
+                        ->where('tracking_code', 'like', CodeResolver::likeTerm($search))
                         ->orWhere('description', 'like', "%{$search}%"))
                     ->orWhereHas('shipmentItem.shipment', fn (Builder $shipmentQuery) => $shipmentQuery
-                        ->where('shipment_number', 'like', "%{$search}%"));
+                        ->where('shipment_number', 'like', CodeResolver::likeTerm($search)));
             });
         }
 

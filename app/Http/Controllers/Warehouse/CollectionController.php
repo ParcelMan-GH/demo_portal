@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Warehouse;
 
 use App\Enums\FulfillmentType;
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\Shipment;
 use App\Models\ShipmentCollection;
@@ -65,7 +66,7 @@ class CollectionController extends Controller
 
         if ($search = $request->get('search')) {
             $query->whereHas('shipment', function ($q) use ($search) {
-                $q->where('shipment_number', 'like', "%{$search}%")
+                $q->where('shipment_number', 'like', CodeResolver::likeTerm($search))
                   ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                   ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                   ->orWhereHas('vendor', fn ($vq) => $vq->where('name', 'like', "%{$search}%"));

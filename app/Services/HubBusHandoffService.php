@@ -33,6 +33,14 @@ class HubBusHandoffService
     public const LINK_TTL_DAYS = 30;
 
     /**
+     * Where handover photographs are kept: `storage/app/public/handovers/`.
+     *
+     * Every proof photo — single parcel or whole load — lands here, so the
+     * served URL is always `/storage/handovers/<file>`.
+     */
+    public const PHOTO_DIRECTORY = 'handovers';
+
+    /**
      * How long the photo itself is signed for when the page renders. Long enough
      * to read the page, short enough that a leaked URL is not a permanent leak.
      */
@@ -124,10 +132,11 @@ class HubBusHandoffService
                 return $error;
             }
 
-            $upload = $this->storageService->upload(
-                $photo,
-                "hubs/{$hub->id}/bus-handoffs/{$item->id}"
-            );
+            // One flat folder for handover evidence, at the path the ops team
+            // looks in: storage/app/public/handovers/<file>, served from
+            // https://new.parcelmanexpress.com/storage/handovers/<file>. The
+            // parcel and hub a photo belongs to are on the handoff record.
+            $upload = $this->storageService->upload($photo, self::PHOTO_DIRECTORY);
 
             $now = now();
 
@@ -229,10 +238,9 @@ class HubBusHandoffService
         $created = DB::transaction(function () use ($hub, $agent, $items, $attributes, $photo, $destination, $groupLabel, &$notify, &$skipped) {
             // One upload for the load. Grouped under the batch when there is one
             // so the admin's file listing lines up with the dispatch.
-            $upload = $this->storageService->upload(
-                $photo,
-                'hubs/'.$hub->id.'/bus-handoffs/'.($groupLabel ? Str::slug($groupLabel) : 'batch')
-            );
+            // Same folder as a single handover: one photo per load, shared by
+            // every parcel's record.
+            $upload = $this->storageService->upload($photo, self::PHOTO_DIRECTORY);
 
             $now = now();
             $handoffs = [];

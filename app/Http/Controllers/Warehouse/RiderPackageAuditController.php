@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Warehouse;
 
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\RiderPackageLocationChange;
 use App\Models\RiderPackageTransfer;
@@ -44,7 +45,7 @@ class RiderPackageAuditController extends Controller
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('shipmentItem', fn ($item) => $item
-                        ->where('tracking_code', 'like', "%{$search}%")
+                        ->where('tracking_code', 'like', CodeResolver::likeTerm($search))
                         ->orWhere('description', 'like', "%{$search}%")
                         ->orWhere('delivery_town', 'like', "%{$search}%"))
                         ->orWhereHas('driver', fn ($driver) => $driver
@@ -108,7 +109,7 @@ class RiderPackageAuditController extends Controller
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('shipmentItem', fn ($item) => $item
-                        ->where('tracking_code', 'like', "%{$search}%")
+                        ->where('tracking_code', 'like', CodeResolver::likeTerm($search))
                         ->orWhere('description', 'like', "%{$search}%"))
                         ->orWhereHas('fromDriver', fn ($driver) => $driver
                             ->where('name', 'like', "%{$search}%")

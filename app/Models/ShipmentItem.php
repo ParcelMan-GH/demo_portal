@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\FulfillmentType;
 use App\Enums\ItemStatus;
+use App\Helpers\CodeResolver;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -121,14 +122,21 @@ class ShipmentItem extends Model
     }
 
     /**
-     * Generate a unique tracking code.
+     * Generate a unique parcel tracking code, e.g. `PM-KQ7XW2MNP`.
+     *
+     * The body stays random rather than sequential: these codes are printed on
+     * labels and read aloud down a phone line, and a sequential code would leak
+     * how much volume the business does. Only the prefix is standardised.
      */
     public static function generateTrackingCode(): string
     {
-        $prefix = PlatformSetting::getValue('shipment.tracking_prefix', 'TRK');
+        $prefix = rtrim(
+            (string) PlatformSetting::getValue('shipment.tracking_prefix', CodeResolver::PREFIX),
+            '-'
+        );
 
         do {
-            $code = $prefix . strtoupper(Str::random(8));
+            $code = $prefix.'-'.strtoupper(Str::random(8));
         } while (static::where('tracking_code', $code)->exists());
 
         return $code;

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\RecipientPaymentTask;
@@ -794,6 +795,10 @@ class AdminSearchController extends Controller
 
     private function like(string $q): string
     {
+        // Strip any prefix scheme before escaping, so searching "PCM-2026-00038"
+        // still finds the row now stored as "PM-2026-00038".
+        $q = CodeResolver::searchTerm($q);
+
         return '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q).'%';
     }
 

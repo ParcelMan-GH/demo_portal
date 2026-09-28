@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\CodeResolver;
 use App\Models\OutgoingBatch;
 use App\Models\ShipmentItem;
 use Illuminate\Database\Eloquent\Builder;
@@ -44,13 +45,16 @@ class OutgoingBatchPackageService
     {
         $query = $this->candidateQuery($batch)->with('shipment:id,shipment_number,vendor_id');
 
-        $term = trim((string) $search);
-        if ($term !== '') {
-            $query->where(function (Builder $inner) use ($term) {
-                $inner->where('tracking_code', 'like', "%{$term}%")
-                    ->orWhere('description', 'like', "%{$term}%")
-                    ->orWhere('delivery_recipient_name', 'like', "%{$term}%")
-                    ->orWhere('delivery_recipient_phone', 'like', "%{$term}%");
+        if (trim((string) $search) !== '') {
+            // The code column gets a prefix-agnostic term; the free-text columns
+            // are matched on what the user actually typed.
+            $term = CodeResolver::likeTerm((string) $search);
+            $text = '%'.trim((string) $search).'%';
+            $query->where(function (Builder $inner) use ($term, $text) {
+                $inner->where('tracking_code', 'like', $term)
+                    ->orWhere('description', 'like', $text)
+                    ->orWhere('delivery_recipient_name', 'like', $text)
+                    ->orWhere('delivery_recipient_phone', 'like', $text);
             });
         }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\PickupAssignmentStatus;
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\PickupAssignment;
@@ -45,7 +46,7 @@ class PickupAssignmentController extends Controller
         // Search
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
-                $q->whereHas('shipment', fn ($sq) => $sq->where('shipment_number', 'like', "%{$search}%"))
+                $q->whereHas('shipment', fn ($sq) => $sq->where('shipment_number', 'like', CodeResolver::likeTerm($search)))
                     ->orWhereHas('shipment.vendor', fn ($sq) => $sq->where('business_name', 'like', "%{$search}%"))
                     ->orWhereHas('driver', fn ($sq) => $sq->where('name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%"))
                     ->orWhereHas('targetWarehouse', fn ($sq) => $sq->where('name', 'like', "%{$search}%"));

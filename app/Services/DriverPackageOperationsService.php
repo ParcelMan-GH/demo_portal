@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\CodeResolver;
 use App\Helpers\PhoneHelper;
 use App\Models\DeliveryRun;
 use App\Models\DeliveryRunItem;
@@ -308,10 +309,11 @@ class DriverPackageOperationsService
     {
         $trackingCode = trim($trackingCode);
 
-        $item = ShipmentItem::query()
-            ->with(['shipment', 'deliveryRegion', 'deliveryDistrict'])
-            ->where('tracking_code', $trackingCode)
-            ->first();
+        $item = CodeResolver::resolveShipmentItem($trackingCode);
+
+        if ($item) {
+            $item->load(['shipment', 'deliveryRegion', 'deliveryDistrict']);
+        }
 
         if (! $item) {
             $label = WarehouseReceiptItemLabel::query()

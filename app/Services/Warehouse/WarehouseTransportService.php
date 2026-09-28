@@ -4,6 +4,7 @@ namespace App\Services\Warehouse;
 
 use App\Enums\ItemStatus;
 use App\Enums\ShipmentStatus;
+use App\Helpers\CodeResolver;
 use App\Models\Driver;
 use App\Models\PlatformSetting;
 use App\Models\Shipment;
@@ -825,7 +826,7 @@ class WarehouseTransportService
             $baseCodeLine = TransportManifestItem::query()
                 ->where('transport_manifest_id', $manifest->id)
                 ->whereHas('shipmentItem', function (Builder $query) use ($trackingCode) {
-                    $query->where('tracking_code', $trackingCode);
+                    $query->whereIn('tracking_code', CodeResolver::candidates($trackingCode));
                 })
                 ->lockForUpdate()
                 ->first();

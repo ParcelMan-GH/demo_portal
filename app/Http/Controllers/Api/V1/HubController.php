@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\ItemStatus;
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\District;
 use App\Models\OutgoingBatch;
@@ -166,7 +167,7 @@ class HubController extends Controller
 
         if (! empty($validated['batch_number'])) {
             $batch = OutgoingBatch::query()
-                ->where('batch_number', $validated['batch_number'])
+                ->whereIn('batch_number', CodeResolver::candidates($validated['batch_number']))
                 ->first();
 
             if (! $batch) {
@@ -395,7 +396,9 @@ class HubController extends Controller
         $query->whereIn('status', $statuses);
 
         if (! empty($validated['search'])) {
-            $term = '%'.$validated['search'].'%';
+            // Built through the resolver so a code typed as PCM- also matches
+            // a row stored as PM-, and vice versa.
+            $term = CodeResolver::likeTerm($validated['search']);
 
             $query->where(function ($inner) use ($term) {
                 $inner->where('tracking_code', 'like', $term)
@@ -474,7 +477,7 @@ class HubController extends Controller
         $hub = $request->user()->warehouse;
 
         $batch = OutgoingBatch::query()
-            ->where('batch_number', $batchNumber)
+            ->whereIn('batch_number', CodeResolver::candidates((string) $batchNumber))
             ->first();
 
         if (! $batch) {
@@ -529,9 +532,7 @@ class HubController extends Controller
         $batch = null;
 
         if (! empty($validated['batch_number'])) {
-            $batch = OutgoingBatch::query()
-                ->where('batch_number', $validated['batch_number'])
-                ->first();
+            $batch = CodeResolver::resolveOutgoingBatch($validated['batch_number']);
 
             if (! $batch) {
                 return $this->failed("No batch found for {$validated['batch_number']}.", 404);
@@ -834,21 +835,17 @@ class HubController extends Controller
         return $status ? [$status->value] : null;
     }
 
+    /**
+     * The parcel a scanned code refers to.
+     *
+     * Delegates to the resolver so the numeric-as-primary-key fallback sits
+     * *after* the code match, which is the other way round from the original
+     * inline version: a barcode reading "123" is far more likely to be a
+     * tracking code than a request for row 123.
+     */
     private function findItemByCode($code): ?ShipmentItem
     {
-        if ($code === null || $code === '') {
-            return null;
-        }
-
-        if (is_numeric($code)) {
-            $byId = ShipmentItem::query()->whereKey((int) $code)->first();
-
-            if ($byId) {
-                return $byId;
-            }
-        }
-
-        return ShipmentItem::query()->where('tracking_code', (string) $code)->first();
+        return CodeResolver::resolveShipmentItem(is_scalar($code) ? (string) $code : null);
     }
 
     private function generatePickupCode(): string

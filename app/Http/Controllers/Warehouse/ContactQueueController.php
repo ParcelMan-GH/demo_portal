@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Warehouse;
 
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\PackageContactAttempt;
 use App\Models\PackageContactTask;
@@ -99,8 +100,8 @@ class ContactQueueController extends Controller
                 $q->where('recipient_name', 'like', "%{$search}%")
                   ->orWhere('recipient_phone', 'like', "%{$search}%")
                   ->orWhere('delivery_town', 'like', "%{$search}%")
-                  ->orWhereHas('shipmentItem', fn ($sq) => $sq->where('tracking_code', 'like', "%{$search}%"))
-                  ->orWhereHas('shipment', fn ($sq) => $sq->where('shipment_number', 'like', "%{$search}%"));
+                  ->orWhereHas('shipmentItem', fn ($sq) => $sq->where('tracking_code', 'like', CodeResolver::likeTerm($search)))
+                  ->orWhereHas('shipment', fn ($sq) => $sq->where('shipment_number', 'like', CodeResolver::likeTerm($search)));
             });
         }
 

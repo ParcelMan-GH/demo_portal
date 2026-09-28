@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\HubBusHandoff;
 use App\Services\BackOfficeAccess;
@@ -73,7 +74,7 @@ class AdminHubBusHandoffController extends Controller
                     ->orWhere('vehicle_plate', 'like', "%{$search}%")
                     ->orWhere('bus_company', 'like', "%{$search}%")
                     ->orWhereHas('shipmentItem', fn ($itemQuery) => $itemQuery
-                        ->where('tracking_code', 'like', "%{$search}%")
+                        ->where('tracking_code', 'like', CodeResolver::likeTerm($search))
                         ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                         ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                     );

@@ -89,8 +89,9 @@ class EmailTemplateService
             'login_url' => url('/vendor/login'),
             'reset_url' => url('/reset-password/sample-token'),
             'expires_in' => '60 minutes',
-            'shipment_number' => 'PCM-2026-00025',
-            'tracking_code' => 'TRK1SRFFMPF',
+            // Sample values shown in the template preview, in the current scheme.
+            'shipment_number' => 'PM-2026-00038',
+            'tracking_code' => 'PM-KQ7XW2MNP',
             'warehouse_name' => 'Accra Main Hub',
             'warehouse_address' => 'Accra Main Hub',
             'driver_name' => 'John Rider',

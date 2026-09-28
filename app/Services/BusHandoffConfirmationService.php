@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ItemStatus;
 use App\Enums\ShipmentStatus;
+use App\Helpers\CodeResolver;
 use App\Helpers\PhoneHelper;
 use App\Models\BusHandoffConfirmation;
 use App\Models\DeliveryFailureReason;
@@ -120,7 +121,7 @@ class BusHandoffConfirmationService
                     ->where('target_name', 'like', "%{$search}%")
                     ->orWhere('target_phone', 'like', "%{$search}%")
                     ->orWhereHas('shipmentItem', fn (Builder $itemQuery) => $itemQuery
-                        ->where('tracking_code', 'like', "%{$search}%")
+                        ->where('tracking_code', 'like', CodeResolver::likeTerm($search))
                         ->orWhere('description', 'like', "%{$search}%")
                     )
                     ->orWhereHas('stop', fn (Builder $stopQuery) => $stopQuery

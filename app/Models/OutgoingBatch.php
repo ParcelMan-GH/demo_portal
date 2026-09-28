@@ -3,7 +3,10 @@
 namespace App\Models;
 
 use App\Enums\BatchDestinationType;
+use App\Helpers\CodeResolver;
+use App\Models\PlatformSetting;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -41,6 +44,39 @@ class OutgoingBatch extends Model
      * have gone.
      */
     public const CLOSED_STATUSES = ['dispatched', 'received', 'in_transit'];
+
+    /**
+     * A batch number that is not already taken, e.g. `PM-BATCH-IQKWKJ`.
+     *
+     * The `BATCH` marker is kept after the new `PM-` prefix because a batch has
+     * to stay tellable apart from a parcel tracking code at a glance — both are
+     * scanned by the same hands, and `PM-BATCH-…` says which is which.
+     *
+     * Short random bodies keep the code readable off a label; the longer
+     * fallback is only reached if five six-character draws all collided. The
+     * uniqueness check matters: one of the two callers used to generate a batch
+     * number inline with no check at all.
+     */
+    public static function generateBatchNumber(): string
+    {
+        $prefix = rtrim(
+            (string) PlatformSetting::getValue('shipment.batch_prefix', CodeResolver::PREFIX),
+            '-'
+        );
+
+        foreach ([6, 12] as $length) {
+            for ($attempt = 0; $attempt < 5; $attempt++) {
+                $candidate = $prefix.'-'.CodeResolver::BATCH_MARKER.'-'.strtoupper(Str::random($length));
+
+                if (! static::query()->where('batch_number', $candidate)->exists()) {
+                    return $candidate;
+                }
+            }
+        }
+
+        // Practically unreachable; a timestamp still beats failing the dispatch.
+        return $prefix.'-'.CodeResolver::BATCH_MARKER.'-'.strtoupper((string) time());
+    }
 
     /**
      * The attributes that are mass assignable.

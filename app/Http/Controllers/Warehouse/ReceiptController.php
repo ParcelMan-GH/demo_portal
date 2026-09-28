@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Warehouse;
 
 use App\Enums\PickupAssignmentStatus;
 use App\Enums\ShipmentDestinationMode;
+use App\Helpers\CodeResolver;
 use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Admin\ShipmentController as AdminShipmentController;
 use App\Models\Driver;
@@ -218,7 +219,7 @@ class ReceiptController extends AdminShipmentController
 
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function (Builder $q) use ($search) {
-                $q->whereHas('shipment', fn (Builder $sq) => $sq->where('shipment_number', 'like', "%{$search}%"))
+                $q->whereHas('shipment', fn (Builder $sq) => $sq->where('shipment_number', 'like', CodeResolver::likeTerm($search)))
                     ->orWhereHas('driver', fn (Builder $dq) => $dq->where('name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%"));
             });
         }
@@ -825,7 +826,7 @@ class ReceiptController extends AdminShipmentController
 
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function (Builder $q) use ($search) {
-                $q->whereHas('shipment', fn (Builder $sq) => $sq->where('shipment_number', 'like', "%{$search}%"))
+                $q->whereHas('shipment', fn (Builder $sq) => $sq->where('shipment_number', 'like', CodeResolver::likeTerm($search)))
                     ->orWhereHas('driver', fn (Builder $dq) => $dq->where('name', 'like', "%{$search}%"));
             });
         }
@@ -1149,7 +1150,7 @@ class ReceiptController extends AdminShipmentController
 
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function (Builder $q) use ($search) {
-                $q->whereHas('shipmentItem.shipment', fn (Builder $sq) => $sq->where('shipment_number', 'like', "%{$search}%"))
+                $q->whereHas('shipmentItem.shipment', fn (Builder $sq) => $sq->where('shipment_number', 'like', CodeResolver::likeTerm($search)))
                     ->orWhereHas('shipmentItem', fn (Builder $iq) => $iq->where('description', 'like', "%{$search}%"))
                     ->orWhereHas('receipt.pickupAssignment.driver', fn (Builder $dq) => $dq->where('name', 'like', "%{$search}%"));
             });

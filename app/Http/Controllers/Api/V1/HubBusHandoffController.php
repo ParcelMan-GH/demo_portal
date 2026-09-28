@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\District;
 use App\Models\HubBusHandoff;
@@ -160,7 +161,7 @@ class HubBusHandoffController extends Controller
                     ->orWhere('vehicle_plate', 'like', "%{$search}%")
                     ->orWhere('bus_company', 'like', "%{$search}%")
                     ->orWhereHas('shipmentItem', fn ($itemQuery) => $itemQuery
-                        ->where('tracking_code', 'like', "%{$search}%")
+                        ->where('tracking_code', 'like', CodeResolver::likeTerm($search))
                         ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                         ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                     );
@@ -247,21 +248,12 @@ class HubBusHandoffController extends Controller
             && ! $slugs->contains('external_hub_agent');
     }
 
+    /**
+     * The parcel a scanned code refers to, under any prefix scheme.
+     */
     private function findItemByCode($code): ?ShipmentItem
     {
-        if ($code === null || $code === '') {
-            return null;
-        }
-
-        if (is_numeric($code)) {
-            $byId = ShipmentItem::query()->whereKey((int) $code)->first();
-
-            if ($byId) {
-                return $byId;
-            }
-        }
-
-        return ShipmentItem::query()->where('tracking_code', (string) $code)->first();
+        return CodeResolver::resolveShipmentItem(is_scalar($code) ? (string) $code : null);
     }
 
     /**

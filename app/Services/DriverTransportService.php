@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\CodeResolver;
 use App\Models\Driver;
 use App\Models\TransportManifest;
 use App\Services\Warehouse\WarehouseTransportService;
@@ -61,7 +62,7 @@ class DriverTransportService
             $query->where(function ($q) use ($search) {
                 $q->where('manifest_number', 'like', "%{$search}%")
                     ->orWhere('status', 'like', "%{$search}%")
-                    ->orWhereHas('items.shipmentItem.shipment', fn ($sq) => $sq->where('shipment_number', 'like', "%{$search}%"));
+                    ->orWhereHas('items.shipmentItem.shipment', fn ($sq) => $sq->where('shipment_number', 'like', CodeResolver::likeTerm($search)));
             });
         }
 

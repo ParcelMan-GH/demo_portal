@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Exports\DriversExport;
+use App\Helpers\CodeResolver;
 use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
@@ -408,7 +409,7 @@ class DriverController extends Controller
                 $q->where('status', 'like', "%{$search}%")
                     ->orWhere('notes', 'like', "%{$search}%")
                     ->orWhereHas('shipment', function ($sq) use ($search) {
-                        $sq->where('shipment_number', 'like', "%{$search}%")
+                        $sq->where('shipment_number', 'like', CodeResolver::likeTerm($search))
                             ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                             ->orWhereHas('items', function ($itemQuery) use ($search) {
                                 $itemQuery->where('delivery_recipient_name', 'like', "%{$search}%");
@@ -831,7 +832,7 @@ class DriverController extends Controller
                             ->orWhere('delivery_town', 'like', "%{$search}%");
                     })
                     ->orWhereHas('label.receiptItem.shipmentItem.shipment', function ($shipmentQuery) use ($search) {
-                        $shipmentQuery->where('shipment_number', 'like', "%{$search}%")
+                        $shipmentQuery->where('shipment_number', 'like', CodeResolver::likeTerm($search))
                             ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                             ->orWhere('delivery_town', 'like', "%{$search}%");
                     });

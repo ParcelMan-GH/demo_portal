@@ -7,7 +7,6 @@ use App\Models\OutgoingBatch;
 use App\Models\OutgoingBatchAssignmentEvent;
 use App\Models\ShipmentItem;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Places a package into the outgoing batch for its destination.
@@ -112,7 +111,9 @@ class OutgoingBatchAutoAssignmentService
 
             if (! $batch) {
                 $batch = OutgoingBatch::create([
-                    'batch_number' => $this->generateBatchNumber(),
+                    // Numbering lives on the model now, so every caller issues
+                    // the same shape and checks for a collision.
+                    'batch_number' => OutgoingBatch::generateBatchNumber(),
                     'delivery_region_id' => $regionId,
                     'delivery_district_id' => $districtId,
                     'status' => OutgoingBatch::STATUS_OPEN,
@@ -157,21 +158,8 @@ class OutgoingBatchAutoAssignmentService
         });
     }
 
-    /**
-     * A batch number that is not already taken.
-     */
-    private function generateBatchNumber(): string
-    {
-        for ($attempt = 0; $attempt < 5; $attempt++) {
-            $candidate = 'BATCH-'.strtoupper(Str::random(6));
-
-            if (! OutgoingBatch::query()->where('batch_number', $candidate)->exists()) {
-                return $candidate;
-            }
-        }
-
-        return 'BATCH-'.strtoupper(Str::random(12));
-    }
+    // Batch numbering moved to OutgoingBatch::generateBatchNumber() so the two
+    // places that create batches cannot drift apart.
 
     /**
      * @return array{result: string, batch: ?OutgoingBatch, created: bool, message: string}

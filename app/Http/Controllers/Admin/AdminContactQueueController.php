@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\PackageContactAttempt;
 use App\Models\PackageContactTask;
@@ -72,7 +73,7 @@ class AdminContactQueueController extends Controller
                 $q->where('recipient_name', 'like', "%{$search}%")
                   ->orWhere('recipient_phone', 'like', "%{$search}%")
                   ->orWhere('delivery_town', 'like', "%{$search}%")
-                  ->orWhereHas('shipment', fn ($sq) => $sq->where('shipment_number', 'like', "%{$search}%"));
+                  ->orWhereHas('shipment', fn ($sq) => $sq->where('shipment_number', 'like', CodeResolver::likeTerm($search)));
             });
         }
 

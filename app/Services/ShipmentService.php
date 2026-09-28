@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentStatus;
+use App\Helpers\CodeResolver;
 use App\Models\OtpCode;
 use App\Models\PickupAssignment;
 use App\Models\PickupVehicleType;
@@ -76,7 +77,7 @@ class ShipmentService
         if (!empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
-                $q->where('shipment_number', 'like', "%{$search}%")
+                $q->where('shipment_number', 'like', CodeResolver::likeTerm($search))
                     ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                     ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                     ->orWhere('pickup_contact_name', 'like', "%{$search}%")

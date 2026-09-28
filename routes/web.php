@@ -105,7 +105,7 @@ if (app()->environment(['local', 'testing'])) {
             'token' => 'PREVIEWTOKEN',
             'handoff' => [
                 'package' => [
-                    'tracking_code' => 'TRKPREVIEW001',
+                    'tracking_code' => 'PM-PREVIEW001',
                     'description' => 'Foodstuff bag',
                 ],
                 'handoff' => [

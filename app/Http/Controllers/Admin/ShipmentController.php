@@ -9,6 +9,7 @@ use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentSource;
 use App\Enums\ShipmentStatus;
 use App\Exports\ShipmentsExport;
+use App\Helpers\CodeResolver;
 use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
@@ -668,7 +669,7 @@ class ShipmentController extends Controller
     {
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('shipment_number', 'like', "%{$search}%")
+                $q->where('shipment_number', 'like', CodeResolver::likeTerm($search))
                     ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                     ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                     ->orWhere('pickup_contact_name', 'like', "%{$search}%")

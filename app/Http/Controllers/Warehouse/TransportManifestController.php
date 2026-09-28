@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Warehouse;
 
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\ShipmentItem;
@@ -242,9 +243,9 @@ class TransportManifestController extends Controller
                 $builder->where('manifest_number', 'like', "%{$search}%")
                     ->orWhere('status', 'like', "%{$search}%")
                     ->orWhereHas('assignedDriver', fn (Builder $driverQuery) => $driverQuery->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('sortBatch', fn (Builder $batchQuery) => $batchQuery->where('batch_number', 'like', "%{$search}%"))
+                    ->orWhereHas('sortBatch', fn (Builder $batchQuery) => $batchQuery->where('batch_number', 'like', CodeResolver::likeTerm($search)))
                     ->orWhereHas('destinationWarehouse', fn (Builder $warehouseQuery) => $warehouseQuery->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('items.shipmentItem.shipment', fn (Builder $shipmentQuery) => $shipmentQuery->where('shipment_number', 'like', "%{$search}%"));
+                    ->orWhereHas('items.shipmentItem.shipment', fn (Builder $shipmentQuery) => $shipmentQuery->where('shipment_number', 'like', CodeResolver::likeTerm($search)));
             });
         }
 
@@ -727,7 +728,7 @@ class TransportManifestController extends Controller
                         ->orWhere('tracking_code', 'like', "%{$search}%")
                         ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                         ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
-                        ->orWhereHas('shipment', fn (Builder $shipmentQuery) => $shipmentQuery->where('shipment_number', 'like', "%{$search}%"));
+                        ->orWhereHas('shipment', fn (Builder $shipmentQuery) => $shipmentQuery->where('shipment_number', 'like', CodeResolver::likeTerm($search)));
                 })->orWhereHas('manifestItem.labelScans', fn (Builder $labelQuery) => $labelQuery->where('barcode_value', 'like', "%{$search}%"));
             });
         }
@@ -1020,7 +1021,7 @@ class TransportManifestController extends Controller
         $shipmentItemId = $label?->receiptItem?->shipment_item_id;
         if (!$shipmentItemId) {
             $shipmentItemId = ShipmentItem::query()
-                ->where('tracking_code', $barcode)
+                ->whereIn('tracking_code', CodeResolver::candidates($barcode))
                 ->value('id');
         }
 

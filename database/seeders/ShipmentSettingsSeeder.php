@@ -77,7 +77,7 @@ class ShipmentSettingsSeeder extends Seeder
 
         PlatformSetting::setValue(
             'shipment.number_prefix',
-            'PCM',
+            'PM',
             encrypt: false,
             description: 'Shipment number prefix'
         );
@@ -91,9 +91,16 @@ class ShipmentSettingsSeeder extends Seeder
 
         PlatformSetting::setValue(
             'shipment.tracking_prefix',
-            'TRK',
+            'PM',
             encrypt: false,
             description: 'Item tracking code prefix'
+        );
+
+        PlatformSetting::setValue(
+            'shipment.batch_prefix',
+            'PM',
+            encrypt: false,
+            description: 'Consignment batch number prefix'
         );
     }
 

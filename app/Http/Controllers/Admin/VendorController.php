@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\ShipmentStatus;
 use App\Exports\VendorsExport;
+use App\Helpers\CodeResolver;
 use App\Helpers\PhoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\OtpCode;
@@ -99,7 +100,7 @@ class VendorController extends Controller
                     ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                     ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                     ->orWhere('delivery_town', 'like', "%{$search}%")
-                    ->orWhereHas('shipment', fn ($shipmentQuery) => $shipmentQuery->where('shipment_number', 'like', "%{$search}%"));
+                    ->orWhereHas('shipment', fn ($shipmentQuery) => $shipmentQuery->where('shipment_number', 'like', CodeResolver::likeTerm($search)));
             });
         }
 
@@ -203,7 +204,7 @@ class VendorController extends Controller
         // Search
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('shipment_number', 'like', "%{$search}%")
+                $q->where('shipment_number', 'like', CodeResolver::likeTerm($search))
                     ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                     ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                     ->orWhereHas('items', function ($itemQuery) use ($search) {

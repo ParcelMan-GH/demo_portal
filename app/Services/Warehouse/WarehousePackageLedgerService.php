@@ -3,6 +3,7 @@
 namespace App\Services\Warehouse;
 
 use App\Enums\ItemStatus;
+use App\Helpers\CodeResolver;
 use App\Models\DeliveryRun;
 use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
@@ -132,7 +133,7 @@ class WarehousePackageLedgerService
                             ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                             ->orWhere('delivery_town', 'like', "%{$search}%")
                             ->orWhereHas('shipment', fn (Builder $sq) => $sq
-                                ->where('shipment_number', 'like', "%{$search}%")
+                                ->where('shipment_number', 'like', CodeResolver::likeTerm($search))
                                 ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                                 ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                                 ->orWhere('delivery_town', 'like', "%{$search}%")
@@ -141,7 +142,7 @@ class WarehousePackageLedgerService
                                     ->orWhere('business_name', 'like', "%{$search}%")
                                     ->orWhere('phone', 'like', "%{$search}%")));
                     })
-                    ->orWhereHas('sortBatchItems.sortBatch', fn (Builder $q) => $q->where('batch_number', 'like', "%{$search}%"));
+                    ->orWhereHas('sortBatchItems.sortBatch', fn (Builder $q) => $q->where('batch_number', 'like', CodeResolver::likeTerm($search)));
 
                 if ($this->hasTransportTables()) {
                     $builder->orWhereHas('shipmentItem.transportManifestItems.manifest', fn (Builder $q) => $q->where('manifest_number', 'like', "%{$search}%"));

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Warehouse;
 
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Exports\DriversExport;
 use App\Models\ShipmentItem;
@@ -170,11 +171,11 @@ class SortingController extends Controller
 
         if ($search = $request->get('search')) {
             $query->whereHas('shipmentItem', function ($q) use ($search) {
-                $q->where('tracking_code', 'like', "%{$search}%")
+                $q->where('tracking_code', 'like', CodeResolver::likeTerm($search))
                     ->orWhere('description', 'like', "%{$search}%")
                     ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                     ->orWhereHas('shipment', function ($sq) use ($search) {
-                        $sq->where('shipment_number', 'like', "%{$search}%");
+                        $sq->where('shipment_number', 'like', CodeResolver::likeTerm($search));
                     });
             });
         }
@@ -239,7 +240,7 @@ class SortingController extends Controller
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function (Builder $builder) use ($search) {
                 $builder->whereHas('shipmentItem.shipment', fn (Builder $q) => $q
-                    ->where('shipment_number', 'like', "%{$search}%")
+                    ->where('shipment_number', 'like', CodeResolver::likeTerm($search))
                     ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                     ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                     ->orWhere('delivery_town', 'like', "%{$search}%")
@@ -283,7 +284,7 @@ class SortingController extends Controller
 
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function (Builder $builder) use ($search) {
-                $builder->whereHas('shipmentItem.shipment', fn (Builder $shipmentQuery) => $shipmentQuery->where('shipment_number', 'like', "%{$search}%"))
+                $builder->whereHas('shipmentItem.shipment', fn (Builder $shipmentQuery) => $shipmentQuery->where('shipment_number', 'like', CodeResolver::likeTerm($search)))
                     ->orWhereHas('shipmentItem', fn (Builder $itemQuery) => $itemQuery
                         ->where('description', 'like', "%{$search}%")
                         ->orWhere('tracking_code', 'like', "%{$search}%")
@@ -324,7 +325,7 @@ class SortingController extends Controller
 
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function (Builder $builder) use ($search) {
-                $builder->where('batch_number', 'like', "%{$search}%")
+                $builder->where('batch_number', 'like', CodeResolver::likeTerm($search))
                     ->orWhereHas('destinationWarehouse', fn (Builder $warehouseQuery) => $warehouseQuery->where('name', 'like', "%{$search}%"));
             });
         }
@@ -561,7 +562,7 @@ class SortingController extends Controller
             ->where('origin_warehouse_id', $warehouse->id);
 
         if ($search = $request->get('search')) {
-            $query->where('batch_number', 'like', "%{$search}%");
+            $query->where('batch_number', 'like', CodeResolver::likeTerm($search));
         }
 
         if ($status = $request->get('status')) {

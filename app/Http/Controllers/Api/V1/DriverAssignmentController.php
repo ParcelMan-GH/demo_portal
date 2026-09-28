@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\PickupAssignmentStatus;
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\PickupAssignment;
 use App\Models\PickupPhoto;
@@ -109,7 +110,7 @@ class DriverAssignmentController extends Controller
                 $q->where('status', 'like', "%{$search}%")
                     ->orWhere('notes', 'like', "%{$search}%")
                     ->orWhereHas('shipment', function ($sq) use ($search) {
-                        $sq->where('shipment_number', 'like', "%{$search}%")
+                        $sq->where('shipment_number', 'like', CodeResolver::likeTerm($search))
                             ->orWhere('pickup_contact_name', 'like', "%{$search}%")
                             ->orWhere('pickup_contact_phone', 'like', "%{$search}%")
                             ->orWhereHas('items', function ($iq) use ($search) {

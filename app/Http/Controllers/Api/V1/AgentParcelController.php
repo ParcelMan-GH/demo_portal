@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\ItemStatus;
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\AgentCallLog;
 use App\Models\OutgoingBatchAssignmentEvent;
@@ -33,8 +34,9 @@ class AgentParcelController extends Controller
 
         $agent = $request->user();
 
-        // Query using tracking_code instead of barcode
-        $parcel = ShipmentItem::where('tracking_code', $code)->first();
+        // Resolves any prefix scheme, so a label printed before the move to
+        // PM- still scans.
+        $parcel = CodeResolver::resolveShipmentItem($code);
 
         if (!$parcel) {
             return response()->json([
@@ -262,19 +264,9 @@ class AgentParcelController extends Controller
      */
     protected function resolveParcel($reference): ?ShipmentItem
     {
-        if ($reference === null || $reference === '') {
-            return null;
-        }
-
-        if (is_numeric($reference)) {
-            $byId = ShipmentItem::query()->whereKey((int) $reference)->first();
-
-            if ($byId) {
-                return $byId;
-            }
-        }
-
-        return ShipmentItem::query()->where('tracking_code', (string) $reference)->first();
+        // Accepts a numeric id or a tracking code, under any prefix scheme, so a
+        // label printed before the move to PM- still claims.
+        return CodeResolver::resolveShipmentItem(is_scalar($reference) ? (string) $reference : null);
     }
 
     /**

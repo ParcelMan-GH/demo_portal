@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\TransportLoadingException;
 use App\Models\OutgoingBatch;
@@ -114,7 +115,7 @@ class DriverTransportController extends Controller
                 return $existing;
             }
 
-            $batch = OutgoingBatch::query()->where('batch_number', $code)->first();
+            $batch = CodeResolver::resolveOutgoingBatch($code);
 
             if (! $batch) {
                 return null;
@@ -243,7 +244,7 @@ class DriverTransportController extends Controller
                         $q->orWhereHas('containers', fn ($cq) => $cq->where('code', 'like', "%{$search}%"));
                     }
 
-                    $q->orWhereHas('items', fn ($iq) => $iq->where('tracking_code', 'like', "%{$search}%"));
+                    $q->orWhereHas('items', fn ($iq) => $iq->where('tracking_code', 'like', CodeResolver::likeTerm($search)));
                 });
             }
 

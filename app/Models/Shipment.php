@@ -6,6 +6,7 @@ use App\Enums\FulfillmentType;
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentSource;
 use App\Enums\ShipmentStatus;
+use App\Helpers\CodeResolver;
 use App\Helpers\PhoneHelper;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -119,19 +120,36 @@ class Shipment extends Model
     }
 
     /**
-     * Generate a unique shipment number.
+     * Generate a unique shipment number, e.g. `PM-2026-00040`.
+     *
+     * The prefix is issued as `PM-`. The sequence is deliberately continued
+     * across the prefixes this series has used rather than restarted: with 47
+     * rows numbered up to `PCM-2026-00039`, restarting would hand out
+     * `PM-2026-00001` and leave two live parcels sharing the number 00001. The
+     * next number after `PCM-2026-00039` is `PM-2026-00040`.
      */
     public static function generateShipmentNumber(): string
     {
-        $prefix = PlatformSetting::getValue('shipment.number_prefix', 'PCM');
+        $prefix = rtrim(
+            (string) PlatformSetting::getValue('shipment.number_prefix', CodeResolver::PREFIX),
+            '-'
+        );
         $length = (int) PlatformSetting::getValue('shipment.number_length', 5);
         $year = date('Y');
+
+        // Every spelling this series may have been written under, so the numeric
+        // suffix found is the highest in the series and not just this prefix's.
+        $prefixes = array_values(array_unique(array_merge([$prefix], CodeResolver::LEGACY_PREFIXES)));
 
         // Highest *numeric* suffix used this year. Legacy/manual numbers such as
         // "PCM-2026-D104" have no numeric suffix and used to be cast to 0, which
         // made the next number "PCM-2026-00001" and collide with an existing one.
         $numbers = static::withTrashed()
-            ->where('shipment_number', 'like', "{$prefix}-{$year}-%")
+            ->where(function ($query) use ($prefixes, $year) {
+                foreach ($prefixes as $candidate) {
+                    $query->orWhere('shipment_number', 'like', "{$candidate}-{$year}-%");
+                }
+            })
             ->pluck('shipment_number');
 
         $nextNumber = 1;
@@ -144,10 +162,15 @@ class Shipment extends Model
             }
         }
 
-        // Never hand out a number that is already taken.
+        // Never hand out a number that is already taken, under any spelling.
         do {
             $candidate = sprintf("%s-%s-%0{$length}d", $prefix, $year, $nextNumber);
-            $taken = static::withTrashed()->where('shipment_number', $candidate)->exists();
+            $taken = static::withTrashed()
+                ->whereIn('shipment_number', [
+                    $candidate,
+                    ...array_map(fn ($legacy) => "{$legacy}-{$year}-".sprintf("%0{$length}d", $nextNumber), CodeResolver::LEGACY_PREFIXES),
+                ])
+                ->exists();
             $nextNumber++;
         } while ($taken);
 

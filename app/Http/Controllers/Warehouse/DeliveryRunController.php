@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Warehouse;
 
+use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryDelayReason;
 use App\Models\DeliveryRun;
@@ -207,7 +208,7 @@ class DeliveryRunController extends Controller
 
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function (Builder $builder) use ($search) {
-                $builder->whereHas('shipmentItem.shipment', fn (Builder $q) => $q->where('shipment_number', 'like', "%{$search}%"))
+                $builder->whereHas('shipmentItem.shipment', fn (Builder $q) => $q->where('shipment_number', 'like', CodeResolver::likeTerm($search)))
                     ->orWhereHas('shipmentItem', fn (Builder $q) => $q
                         ->where('description', 'like', "%{$search}%")
                         ->orWhere('tracking_code', 'like', "%{$search}%")
@@ -273,7 +274,7 @@ class DeliveryRunController extends Controller
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function (Builder $builder) use ($search) {
                 $builder->whereHas('shipmentItem.shipment', fn (Builder $q) => $q
-                    ->where('shipment_number', 'like', "%{$search}%")
+                    ->where('shipment_number', 'like', CodeResolver::likeTerm($search))
                     ->orWhere('delivery_recipient_name', 'like', "%{$search}%")
                     ->orWhere('delivery_recipient_phone', 'like', "%{$search}%")
                     ->orWhere('delivery_town', 'like', "%{$search}%")
@@ -760,7 +761,7 @@ class DeliveryRunController extends Controller
                     ->orWhere('handoff_vehicle_number', 'like', "%{$search}%")
                     ->orWhere('bus_station_name', 'like', "%{$search}%")
                     ->orWhereHas('items.shipmentItem', fn ($itemQuery) => $itemQuery
-                        ->where('tracking_code', 'like', "%{$search}%")
+                        ->where('tracking_code', 'like', CodeResolver::likeTerm($search))
                         ->orWhere('description', 'like', "%{$search}%"));
             });
         }
