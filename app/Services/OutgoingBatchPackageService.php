@@ -197,7 +197,10 @@ class OutgoingBatchPackageService
             'status' => $batch->status,
             'status_label' => $batch->statusLabel(),
             'is_open' => $batch->isOpen(),
-            'destination_warehouse' => "Region #{$batch->delivery_region_id} / District #{$batch->delivery_district_id}",
+            // Was "Region #5 / District #6" — two foreign keys shown to a human. The
+            // names are resolved here so the same batch reads the same way in
+            // every screen that lists it.
+            'destination_warehouse' => $this->destinationLabel($batch),
             'items_count' => $batch->shipmentItems()->count(),
             'created_at' => optional($batch->created_at)->format('Y-m-d H:i:s'),
         ];
@@ -206,6 +209,36 @@ class OutgoingBatchPackageService
     /**
      * @return array<string, mixed>
      */
+    /** id => name lookups, resolved once per request. */
+    private ?array $regionNames = null;
+    private ?array $districtNames = null;
+    private ?array $warehouseNames = null;
+
+    /** Where a batch is going, in words rather than foreign keys. */
+    protected function destinationLabel(OutgoingBatch $batch): string
+    {
+        $this->regionNames ??= \App\Models\Region::query()->pluck('name', 'id')->all();
+        $this->districtNames ??= \App\Models\District::query()->pluck('name', 'id')->all();
+        $this->warehouseNames ??= \App\Models\Warehouse::query()->pluck('name', 'id')->all();
+
+        if ($batch->destination_warehouse_id) {
+            $warehouse = $this->warehouseNames[$batch->destination_warehouse_id] ?? null;
+            if ($warehouse) {
+                return $warehouse;
+            }
+        }
+
+        $region = $batch->delivery_region_id ? ($this->regionNames[$batch->delivery_region_id] ?? null) : null;
+        $district = $batch->delivery_district_id ? ($this->districtNames[$batch->delivery_district_id] ?? null) : null;
+
+        return match (true) {
+            $region !== null && $district !== null => "{$region} / {$district}",
+            $region !== null => $region,
+            $district !== null => $district,
+            default => 'Not set',
+        };
+    }
+
     protected function present(ShipmentItem $item): array
     {
         return [

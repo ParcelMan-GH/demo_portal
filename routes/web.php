@@ -552,6 +552,10 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::get('transport-manifests/incoming', [AdminTransportManifestController::class, 'incomingIndex'])->name('transport-manifests.incoming.index');
         Route::get('transport-manifests/incoming-data', [AdminTransportManifestController::class, 'incomingData'])->name('transport-manifests.incoming.data');
         Route::post('transport-manifests/{batch}/receive', [AdminTransportManifestController::class, 'receiveBatch'])->name('transport-manifests.receive');
+
+        // POST, not GET: printing also creates the parcel label rows the driver
+        // scans to load, so it is not a read-only action.
+        Route::post('transport-manifests/{batch}/print-labels', [AdminTransportManifestController::class, 'printBatchLabels'])->name('transport-manifests.print-labels');
         Route::get('transport-manifests/incoming/{manifest}', [AdminTransportManifestController::class, 'incomingShow'])->name('transport-manifests.incoming.show');
         Route::post('transport-manifests/incoming/{manifest}/items/{shipmentItem}/scan-receive', [AdminTransportManifestController::class, 'scanIncomingItem'])->name('transport-manifests.incoming.items.scan');
         Route::post('transport-manifests/incoming/{manifest}/finalize-receipt', [AdminTransportManifestController::class, 'finalizeIncoming'])->name('transport-manifests.incoming.finalize');

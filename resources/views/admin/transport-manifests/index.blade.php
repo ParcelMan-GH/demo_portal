@@ -19,6 +19,9 @@
         'regions' => collect($regions ?? [])->values(),
         'districts' => collect($districts ?? [])->values(),
         'create_endpoint' => route('admin.transport-manifests.store'),
+        // A template, because the batch id is only known per row. Keeps the URL
+        // in one place instead of reassembling it in the browser.
+        'print_labels_endpoint' => route('admin.transport-manifests.print-labels', ['batch' => '__BATCH__']),
     ];
 @endphp
 
@@ -214,15 +217,27 @@
                                 </td>
                                 <td class="px-4 py-3 font-semibold text-slate-600" x-text="row.created_at"></td>
                                 <td class="px-4 py-3 text-right">
-                                    <template x-if="row.status === 'open'">
-                                        <button type="button" @click="closeAndDispatch(row.id)" class="inline-flex items-center gap-1 rounded-xl bg-slate-900 hover:bg-slate-800 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors">
-                                            <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                            Close & Dispatch
+                                    <div class="inline-flex items-center justify-end gap-2">
+                                        {{-- Available in every state: printing the labels is also what
+                                             creates the parcel labels the driver scans to load. --}}
+                                        <button type="button"
+                                                @click="printBatchLabels(row.id)"
+                                                :disabled="printingId === row.id"
+                                                class="inline-flex items-center gap-1 rounded-xl border border-orange-200 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 text-xs font-bold text-orange-800 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659"/></svg>
+                                            <span x-text="printingId === row.id ? 'Preparing…' : 'Print Label'"></span>
                                         </button>
-                                    </template>
-                                    <template x-if="row.status !== 'open'">
-                                        <span class="text-xs font-extrabold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl inline-block">Dispatched</span>
-                                    </template>
+
+                                        <template x-if="row.status === 'open'">
+                                            <button type="button" @click="closeAndDispatch(row.id)" class="inline-flex items-center gap-1 rounded-xl bg-slate-900 hover:bg-slate-800 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors">
+                                                <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                Close & Dispatch
+                                            </button>
+                                        </template>
+                                        <template x-if="row.status !== 'open'">
+                                            <span class="text-xs font-extrabold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl inline-block">Dispatched</span>
+                                        </template>
+                                    </div>
                                 </td>
                             </tr>
                         </template>
@@ -256,6 +271,8 @@
             selectedDateLabel: 'Today',
             dateFilter: 'today',
             rows: [],
+            /** Batch id whose labels are being generated, so its button can disable. */
+            printingId: null,
             summaryCards: [
                 { label: 'Items Heading to Kumasi', value: '0' },
                 { label: 'Items Heading to Koforidua', value: '0' },
@@ -352,6 +369,68 @@
                     this.createErrors = { generic: error.message || 'Unable to create the batch.' };
                 } finally {
                     this.creating = false;
+                }
+            },
+            /**
+             * Generate and open the printable batch + parcel labels.
+             *
+             * The POST does two things: it renders the sheet, and it creates the
+             * `warehouse_receipt_item_labels` rows the driver's scanner matches
+             * on. Departure is refused until those exist, so printing from here
+             * is what unblocks the driver.
+             */
+            async printBatchLabels(batchId) {
+                if (this.printingId) return;
+                this.printingId = batchId;
+
+                try {
+                    const response = await fetch(
+                        (this.config.print_labels_endpoint || '').replace('__BATCH__', batchId),
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                            },
+                        },
+                    );
+
+                    const result = await response.json().catch(() => ({}));
+
+                    if (!response.ok || !result.success) {
+                        window.showToast?.(result.message || 'Could not generate the labels.', 'error');
+                        return;
+                    }
+
+                    const html = result.data?.label_html;
+
+                    if (!html) {
+                        window.showToast?.('The label sheet came back empty.', 'error');
+                        return;
+                    }
+
+                    const win = window.open('', '_blank');
+
+                    if (!win) {
+                        // Without this the button looks broken and the reason is invisible.
+                        window.showToast?.('Pop-up blocked. Allow pop-ups for this site to print labels.', 'warning');
+                        return;
+                    }
+
+                    win.document.write(html);
+                    win.document.close();
+                    window.setTimeout(() => { win.focus(); win.print(); }, 250);
+
+                    window.showToast?.(result.message || 'Labels ready.', 'success');
+
+                    // The parcel label count can change, so refresh the row.
+                    await this.loadData();
+                } catch (error) {
+                    window.showToast?.(error.message || 'Could not generate the labels.', 'error');
+                    console.error('[Print Batch Labels]', error);
+                } finally {
+                    this.printingId = null;
                 }
             },
             closeAndDispatch(batchId) {

@@ -15,6 +15,7 @@ use App\Models\TransportManifest;
 use App\Models\TransportManifestItem;
 use App\Models\Warehouse;
 use App\Services\BackOfficeAccess;
+use App\Services\Warehouse\BarcodeService;
 use App\Services\OutgoingBatchPackageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -34,6 +35,120 @@ class AdminTransportManifestController extends Controller
     // ==========================================
     // OUTGOING BATCHES / TRANSFERS
     // ==========================================
+
+    /**
+     * Regions the four summary cards stand for.
+     *
+     * The cards are named after cities, but a batch only records the region and
+     * district it is routed to — so each card is matched to the region holding
+     * that city. Kumasi is the capital of Ashanti, Koforidua of Eastern,
+     * Takoradi of Western and Tamale of Northern, which is what these map to.
+     */
+    private const SUMMARY_CARD_REGIONS = [
+        'Kumasi'    => 'Ashanti',
+        'Koforidua' => 'Eastern',
+        'Takoradi'  => 'Western',
+        'Tamale'    => 'Northern',
+    ];
+
+    /**
+     * Statuses that still count as "on the way".
+     *
+     * `arrived` and `received` are excluded on purpose: once a batch has landed
+     * it is no longer heading anywhere, and counting it would make the cards
+     * grow forever.
+     */
+    private const ACTIVE_BATCH_STATUSES = ['open', 'created', 'dispatched', 'in_transit', 'loading'];
+
+    /** id => name lookups, filled once per request rather than per row. */
+    private ?array $regionNames = null;
+    private ?array $districtNames = null;
+    private ?array $warehouseNames = null;
+
+    private function regionNames(): array
+    {
+        return $this->regionNames ??= Region::query()->pluck('name', 'id')->all();
+    }
+
+    private function districtNames(): array
+    {
+        return $this->districtNames ??= District::query()->pluck('name', 'id')->all();
+    }
+
+    private function warehouseNames(): array
+    {
+        return $this->warehouseNames ??= Warehouse::query()->pluck('name', 'id')->all();
+    }
+
+    /**
+     * Where a batch is going, in words.
+     *
+     * The table used to print "Region #5 / District #6" — two foreign keys. The
+     * destination hub wins when the batch has one; otherwise the region and
+     * district it is routed through are named. Only when none of those resolve
+     * does this say so outright, rather than showing raw ids.
+     */
+    private function destinationLabel(OutgoingBatch $batch): string
+    {
+        if ($batch->destination_warehouse_id) {
+            $warehouse = $this->warehouseNames()[$batch->destination_warehouse_id] ?? null;
+            if ($warehouse) {
+                return $warehouse;
+            }
+        }
+
+        $region = $batch->delivery_region_id ? ($this->regionNames()[$batch->delivery_region_id] ?? null) : null;
+        $district = $batch->delivery_district_id ? ($this->districtNames()[$batch->delivery_district_id] ?? null) : null;
+
+        return match (true) {
+            $region !== null && $district !== null => "{$region} / {$district}",
+            $region !== null => $region,
+            $district !== null => $district,
+            default => 'Not set',
+        };
+    }
+
+    /**
+     * The five cards above the table.
+     *
+     * These were a hardcoded array with `value: "0"` in the Blade component, so
+     * they read zero whatever the data said. The view already consumed
+     * `summaryCards` from this endpoint — it was simply never sent.
+     *
+     * @return array<int, array{label: string, value: string}>
+     */
+    private function summaryCards(): array
+    {
+        $regionIdByName = array_flip($this->regionNames());
+
+        $cards = [];
+
+        foreach (self::SUMMARY_CARD_REGIONS as $city => $regionName) {
+            $regionId = $regionIdByName[$regionName] ?? null;
+
+            $count = $regionId === null ? 0 : (int) ShipmentItem::query()
+                ->whereHas('outgoingBatch', function ($query) use ($regionId) {
+                    $query->where('delivery_region_id', $regionId)
+                        ->whereIn('status', self::ACTIVE_BATCH_STATUSES);
+                })
+                ->count();
+
+            $cards[] = ['label' => "Items Heading to {$city}", 'value' => (string) $count];
+        }
+
+        // The only money column on a parcel is its delivery fee, so that is what
+        // "expected value" sums — there is no declared-goods-value column.
+        $valueToday = (float) ShipmentItem::query()
+            ->whereHas('outgoingBatch', function ($query) {
+                $query->whereDate('created_at', today())
+                    ->whereIn('status', self::ACTIVE_BATCH_STATUSES);
+            })
+            ->sum('delivery_fee');
+
+        $cards[] = ['label' => 'Expected Value Today', 'value' => 'GH₵ ' . number_format($valueToday, 2)];
+
+        return $cards;
+    }
 
     public function index(): View
     {
@@ -245,7 +360,7 @@ class AdminTransportManifestController extends Controller
                 'destination_type'      => $batch->destination_type,
                 'destination_type_label' => $batch->destinationTypeLabel(),
                 'accepts_only_commerce' => $batch->acceptsOnlyCommerce(),
-                'destination_warehouse' => "Region #{$batch->delivery_region_id} / District #{$batch->delivery_district_id}",
+                'destination_warehouse' => $this->destinationLabel($batch),
                 'driver_name'           => null,
                 'driver_phone'          => null,
                 'items_count'           => $itemsCount,
@@ -266,8 +381,11 @@ class AdminTransportManifestController extends Controller
         }
 
         return response()->json([
-            'data'       => $data,
-            'cardCounts' => $cardCounts,
+            'data'         => $data,
+            'cardCounts'   => $cardCounts,
+            // The view has always looked for this and never received it, which is
+            // why the cards sat at zero.
+            'summaryCards' => $this->summaryCards(),
             'meta'       => [
                 'total'        => $total,
                 'per_page'     => $perPage,
@@ -277,6 +395,136 @@ class AdminTransportManifestController extends Controller
                 'to'           => min($offset + $perPage, $total),
             ],
         ]);
+    }
+
+    /**
+     * Printable master-batch label plus one label per parcel — and the label
+     * rows the driver's app needs.
+     *
+     * Two jobs in one action, deliberately. Departing a manifest is refused with
+     * "Manifest is not ready to depart" until every parcel carries a
+     * `warehouse_receipt_item_labels` row, because that is what the driver scans
+     * to load. Printing the batch label at the hub is the moment the warehouse
+     * commits to those parcels, so it is the right moment to create them —
+     * otherwise staff print a label and the driver is still blocked.
+     *
+     * Idempotent: an item that already has a label is left alone, so printing
+     * twice does not duplicate barcodes or bump counts.
+     */
+    public function printBatchLabels(OutgoingBatch $batch, BarcodeService $barcodeService): JsonResponse
+    {
+        $batch->load([
+            'destinationWarehouse:id,name',
+            'shipmentItems' => fn ($query) => $query->with([
+                'warehouseReceiptItems.labels',
+                'warehouseReceiptItems.receipt.warehouse:id,name',
+            ]),
+        ]);
+
+        $labelsCreated = 0;
+        $parcels = [];
+        $missingReceipt = 0;
+        $originName = null;
+
+        foreach ($batch->shipmentItems as $item) {
+            // The parcel's receipt says which warehouse it is leaving from.
+            $receiptItem = $item->warehouseReceiptItems->first();
+            $originName ??= $receiptItem?->receipt?->warehouse?->name;
+
+            if (! $receiptItem) {
+                // No receipt means no barcode and nothing for the scanner to
+                // match. Counted and surfaced rather than quietly skipped.
+                $missingReceipt++;
+                $parcels[] = [
+                    'tracking_code' => $item->tracking_code,
+                    'barcode' => null,
+                    'barcode_svg' => null,
+                    'labelled' => false,
+                    'note' => 'No warehouse receipt — label at the warehouse first',
+                ];
+                continue;
+            }
+
+            if ($receiptItem->labels->isEmpty()) {
+                // The receiving flow numbers labels `{receipt barcode}-001`. The
+                // barcode on the receipt item is the parent; the tracking code is
+                // the fallback for an item that was receipted before barcoding.
+                $parent = $receiptItem->barcode_value ?: $item->tracking_code;
+
+                if (filled($parent)) {
+                    $receiptItem->labels()->create([
+                        'barcode_value' => $parent . '-001',
+                        'label_index' => 1,
+                        'labels_total' => 1,
+                        'label_type' => 'sealed',
+                        'printed_at' => now(),
+                        'print_count' => 1,
+                    ]);
+
+                    $labelsCreated++;
+                    $receiptItem->load('labels');
+                }
+            }
+
+            $label = $receiptItem->labels->first();
+
+            $parcels[] = [
+                'tracking_code' => $item->tracking_code,
+                'barcode' => $label?->barcode_value,
+                'barcode_svg' => $label ? $barcodeService->renderCode128Svg($label->barcode_value, 60, 2, 8, true) : null,
+                'labelled' => $label !== null,
+                'note' => $label ? null : 'Could not derive a barcode for this parcel',
+            ];
+        }
+
+        $labelledCount = count(array_filter($parcels, fn ($parcel) => $parcel['labelled']));
+
+        // The `view()` helper, not View::make — `View` here is the imported
+        // Illuminate\View\View class (used as the return type on index()), not
+        // the facade, so View::make() is an undefined method.
+        $html = view('shared.outgoing-batch-labels', [
+            'batch' => $batch,
+            'destination' => $this->destinationLabel($batch),
+            'origin' => $originName,
+            'parcels' => $parcels,
+            'batchBarcode' => $barcodeService->renderCode128Svg($batch->batch_number, 80, 2, 12, true),
+            'labelledCount' => $labelledCount,
+        ])->render();
+
+        return response()->json([
+            'success' => true,
+            'message' => $this->labelMessage($labelsCreated, $labelledCount, count($parcels)),
+            'data' => [
+                'batch_number' => $batch->batch_number,
+                'packages_total' => count($parcels),
+                'packages_labelled' => $labelledCount,
+                'labels_created' => $labelsCreated,
+                'parcels_without_receipt' => $missingReceipt,
+                'label_html' => $html,
+            ],
+        ]);
+    }
+
+    /** Says what actually happened, including when part of it could not be done. */
+    private function labelMessage(int $created, int $labelled, int $total): string
+    {
+        if ($total === 0) {
+            return 'This batch has no parcels yet, so there is nothing to label.';
+        }
+
+        $parts = [];
+
+        if ($created > 0) {
+            $parts[] = "{$created} parcel label" . ($created === 1 ? '' : 's') . ' created';
+        }
+
+        $parts[] = "{$labelled} of {$total} parcels labelled";
+
+        if ($labelled < $total) {
+            $parts[] = 'the rest need receipting at the warehouse before a driver can load them';
+        }
+
+        return ucfirst(implode(', ', $parts)) . '.';
     }
 
     public function dispatchBatch(Request $request, OutgoingBatch $batch): JsonResponse
@@ -515,7 +763,7 @@ class AdminTransportManifestController extends Controller
                 'manifest_number' => $batch->batch_number,
                 'status'          => $batch->status,
                 'status_label'    => ucfirst(str_replace('_', ' ', $batch->status)),
-                'origin_context'  => "Region #{$batch->delivery_region_id} / District #{$batch->delivery_district_id}",
+                'origin_context'  => $this->destinationLabel($batch),
                 'items_count'     => $itemsCount,
                 'dispatched_at'   => $batch->updated_at->format('Y-m-d H:i:s'),
                 'can_receive'     => in_array($batch->status, ['dispatched', 'in_transit']),
