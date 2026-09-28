@@ -2309,18 +2309,12 @@ class WarehouseTransportService
         $year = now()->format('Y');
         $originCode = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($origin->code ?: $origin->id)));
         $destinationCode = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) (($destination?->code) ?: ($destination?->id) ?: 'DRAFT')));
-        $prefix = "TM-{$year}-{$originCode}-{$destinationCode}-";
+        $suffix = "TM-{$year}-{$originCode}-{$destinationCode}-";
 
-        $last = TransportManifest::query()
-            ->where('manifest_number', 'like', $prefix.'%')
-            ->latest('id')
-            ->first();
-
-        $next = 1;
-        if ($last) {
-            $parts = explode('-', $last->manifest_number);
-            $next = ((int) end($parts)) + 1;
-        }
+        // Issued as PM-TM-…; the internal TM- marker stays so a manifest is still
+        // tellable apart from a parcel or batch code. Numbering continues across
+        // the old spelling rather than restarting.
+        [$prefix, $next] = CodeResolver::nextInSeries($suffix, TransportManifest::class, 'manifest_number');
 
         return $prefix.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }

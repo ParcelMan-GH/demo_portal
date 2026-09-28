@@ -69,22 +69,38 @@ class HubBusHandoffService
      */
     public function eligibilityError(Warehouse $hub, ShipmentItem $item): ?array
     {
-        if ((int) $item->hub_id !== (int) $hub->id) {
-            return [
-                'message' => "Package {$item->tracking_code} is not held at {$hub->name}.",
-                'status' => 403,
-            ];
-        }
+        // The thing an agent can actually act on. A parcel that has not been
+        // given a tracking code yet is named by its id rather than shown blank.
+        $label = filled($item->tracking_code) ? $item->tracking_code : "Parcel #{$item->id}";
 
         $status = $item->status instanceof ItemStatus
             ? $item->status
             : ItemStatus::tryFrom((string) $item->status);
 
+        if ((int) $item->hub_id !== (int) $hub->id) {
+            // Never checked in anywhere. The useful instruction is "intake it",
+            // not a flat statement that it is missing from inventory — which is
+            // what used to leave the agent with no idea what to do next.
+            if (! $item->hub_id) {
+                return [
+                    'message' => "{$label} must be intake-scanned at {$hub->name} before it can be handed to a bus."
+                        .($status ? " It is currently {$status->label()}." : ''),
+                    'status' => 422,
+                ];
+            }
+
+            $heldAt = filled($item->hub?->name) ? $item->hub->name : 'another hub';
+
+            return [
+                'message' => "{$label} is held at {$heldAt}, not {$hub->name}. A parcel is handed to a bus at the hub holding it.",
+                'status' => 403,
+            ];
+        }
+
         if (! $status || ! in_array($status, self::AT_HUB_STATUSES, true)) {
             return [
-                'message' => "Package {$item->tracking_code} is not in this hub"
-                    .($status ? " (it is {$status->label()})" : '')
-                    .'.',
+                'message' => "{$label} must be intake-scanned at {$hub->name} before it can be handed to a bus."
+                    .($status ? " It is currently {$status->label()}." : ' Its status could not be read.'),
                 'status' => 422,
             ];
         }
@@ -96,7 +112,7 @@ class HubBusHandoffService
 
         if ($existing) {
             return [
-                'message' => "Package {$item->tracking_code} was already handed to a bus driver on "
+                'message' => "{$label} was already handed to a bus driver on "
                     .$existing->created_at?->format('j M Y, H:i').'.',
                 'status' => 422,
             ];

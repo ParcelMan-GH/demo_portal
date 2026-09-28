@@ -5,6 +5,7 @@ namespace App\Services\Warehouse;
 use App\Enums\ItemStatus;
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentStatus;
+use App\Helpers\CodeResolver;
 use App\Helpers\PhoneHelper;
 use App\Models\DeliveryRun;
 use App\Models\DeliveryRunItem;
@@ -1969,18 +1970,11 @@ class WarehouseDeliveryService
     {
         $year = now()->format('Y');
         $warehouseCode = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($warehouse->code ?: $warehouse->id)));
-        $prefix = "DR-{$year}-{$warehouseCode}-";
-
-        $last = DeliveryRun::query()
-            ->where('run_number', 'like', $prefix.'%')
-            ->latest('id')
-            ->first();
-
-        $next = 1;
-        if ($last) {
-            $parts = explode('-', $last->run_number);
-            $next = ((int) end($parts)) + 1;
-        }
+        [$prefix, $next] = CodeResolver::nextInSeries(
+            "DR-{$year}-{$warehouseCode}-",
+            DeliveryRun::class,
+            'run_number'
+        );
 
         return $prefix.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }

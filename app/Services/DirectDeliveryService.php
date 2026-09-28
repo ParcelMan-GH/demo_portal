@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ItemStatus;
 use App\Enums\ShipmentStatus;
+use App\Helpers\CodeResolver;
 use App\Models\DeliveryRun;
 use App\Models\DeliveryRunItem;
 use App\Models\DeliveryRunStop;
@@ -215,10 +216,11 @@ class DirectDeliveryService
     {
         $year = now()->format('Y');
         $code = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($warehouse->code ?: $warehouse->id)));
-        $prefix = "LB-{$year}-{$code}-DIRECT-";
-
-        $last = SortBatch::where('batch_number', 'like', $prefix.'%')->latest('id')->first();
-        $next = $last ? ((int) last(explode('-', $last->batch_number))) + 1 : 1;
+        [$prefix, $next] = CodeResolver::nextInSeries(
+            "LB-{$year}-{$code}-DIRECT-",
+            SortBatch::class,
+            'batch_number'
+        );
 
         return $prefix.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
@@ -227,10 +229,11 @@ class DirectDeliveryService
     {
         $year = now()->format('Y');
         $code = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($warehouse->code ?: $warehouse->id)));
-        $prefix = "DR-{$year}-{$code}-";
-
-        $last = DeliveryRun::where('run_number', 'like', $prefix.'%')->latest('id')->first();
-        $next = $last ? ((int) last(explode('-', $last->run_number))) + 1 : 1;
+        [$prefix, $next] = CodeResolver::nextInSeries(
+            "DR-{$year}-{$code}-",
+            DeliveryRun::class,
+            'run_number'
+        );
 
         return $prefix.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }

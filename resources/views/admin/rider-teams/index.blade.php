@@ -560,7 +560,7 @@
                     </div>
                     <div class="md:col-span-2">
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Package Labels</label>
-                        <textarea x-model="handoverModal.barcode_text" rows="7" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 font-mono text-sm font-bold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="TRKXXXX-001&#10;TRKXXXX-002"></textarea>
+                        <textarea x-model="handoverModal.barcode_text" rows="7" class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 font-mono text-sm font-bold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="PM-KQ7XW2MNP-001&#10;PM-KQ7XW2MNP-002"></textarea>
                     </div>
                     <div class="md:col-span-2">
                         <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Notes</label>

@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\ItemStatus;
 use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\District;
 use App\Models\HubBusHandoff;
 use App\Models\Region;
+use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\Warehouse;
 use App\Services\HubBusHandoffService;
@@ -43,27 +45,141 @@ class HubBusHandoffController extends Controller
             return $this->failed('No hub is assigned to this account.', 403);
         }
 
-        $item = $this->findItemByCode($validated['code']);
+        $match = $this->resolveScannableParcel($validated['code'], $hub);
 
-        if (! $item) {
-            return $this->failed("No package found for {$validated['code']}.", 404);
+        if (! $match['item']) {
+            return $this->failed($this->notFoundMessage($validated['code']), 404);
         }
+
+        $item = $match['item'];
 
         if ($error = $this->service->eligibilityError($hub, $item)) {
             return response()->json([
                 'success' => false,
                 'message' => $error['message'],
-                'data' => ['package' => $this->parcelPayload($item, $hub)],
+                'data' => $this->lookupData($item, $hub, $match),
             ], $error['status']);
         }
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'package' => $this->parcelPayload($item, $hub),
-                'handoff' => null,
-            ],
+            'data' => $this->lookupData($item, $hub, $match) + ['handoff' => null],
         ]);
+    }
+
+    /**
+     * The parcel a scanned code refers to, looking inside a shipment if needed.
+     *
+     * A parcel tracking code names a parcel directly. A shipment number names a
+     * *shipment*, which holds one to three parcels — so a hub agent scanning the
+     * consignment note is holding the right paperwork but the wrong kind of code.
+     * Following it through to its parcels is the difference between a dead-end
+     * "no package found" and actually handing the parcel over.
+     *
+     * @return array{item: ?ShipmentItem, matched_by: ?string, shipment: ?Shipment, siblings: \Illuminate\Support\Collection<int, ShipmentItem>}
+     */
+    private function resolveScannableParcel(string $code, Warehouse $hub): array
+    {
+        $item = $this->findItemByCode($code);
+
+        if ($item) {
+            return [
+                'item' => $item,
+                'matched_by' => 'tracking_code',
+                'shipment' => null,
+                'siblings' => collect(),
+            ];
+        }
+
+        $siblings = CodeResolver::resolveShipmentItemsByShipmentNumber($code);
+
+        if ($siblings->isEmpty()) {
+            return ['item' => null, 'matched_by' => null, 'shipment' => null, 'siblings' => collect()];
+        }
+
+        return [
+            'item' => $this->preferredParcel($hub, $siblings),
+            'matched_by' => 'shipment_number',
+            'shipment' => CodeResolver::resolveShipment($code),
+            'siblings' => $siblings,
+        ];
+    }
+
+    /**
+     * Which parcel of a shipment to hand over first.
+     *
+     * A shipment can hold several. Prefer one that can go on a bus right now;
+     * failing that, one that at least belongs to this hub; failing that, the
+     * first. And never silently — the response says how many there were.
+     *
+     * @param  \Illuminate\Support\Collection<int, ShipmentItem>  $items
+     */
+    private function preferredParcel(Warehouse $hub, $items): ?ShipmentItem
+    {
+        $ready = $items->first(
+            fn (ShipmentItem $candidate) => $this->service->eligibilityError($hub, $candidate) === null
+        );
+
+        if ($ready) {
+            return $ready;
+        }
+
+        return $items->first(fn (ShipmentItem $candidate) => (int) $candidate->hub_id === (int) $hub->id)
+            ?? $items->first();
+    }
+
+    /**
+     * @param  array{item: ?ShipmentItem, matched_by: ?string, shipment: ?Shipment, siblings: \Illuminate\Support\Collection<int, ShipmentItem>}  $match
+     * @return array<string, mixed>
+     */
+    private function lookupData(ShipmentItem $item, Warehouse $hub, array $match): array
+    {
+        $data = ['package' => $this->parcelPayload($item, $hub)];
+
+        if (($match['matched_by'] ?? null) !== 'shipment_number') {
+            return $data;
+        }
+
+        $siblings = $match['siblings'] ?? collect();
+
+        // So the screen can say "parcel 2 of 3" instead of pretending the
+        // shipment number was the parcel all along.
+        $data['matched_by'] = 'shipment_number';
+        $data['shipment_number'] = $match['shipment']?->shipment_number;
+        $data['shipment_parcel_count'] = $siblings->count();
+        $data['shipment_parcels'] = $siblings
+            ->map(function (ShipmentItem $sibling) use ($item) {
+                $status = $sibling->status instanceof ItemStatus
+                    ? $sibling->status
+                    : ItemStatus::tryFrom((string) $sibling->status);
+
+                return [
+                    'id' => (string) $sibling->id,
+                    'tracking_code' => $sibling->tracking_code,
+                    'status' => $status?->value,
+                    'status_label' => $status?->label(),
+                    'is_this_one' => (int) $sibling->id === (int) $item->id,
+                ];
+            })
+            ->values()
+            ->all();
+
+        return $data;
+    }
+
+    /**
+     * Why a scanned code matched nothing.
+     *
+     * A shipment number is a different kind of code from a parcel tracking code,
+     * so say which one was expected rather than leaving the agent to guess.
+     */
+    private function notFoundMessage(string $code): string
+    {
+        if (CodeResolver::family($code) === 'shipment') {
+            return "No shipment found for {$code}. Check the number, or scan the parcel's own barcode.";
+        }
+
+        return "No package found for {$code}.";
     }
 
     /**
@@ -99,7 +215,9 @@ class HubBusHandoffController extends Controller
         if (! empty($validated['package_id'])) {
             $item = ShipmentItem::query()->whereKey((int) $validated['package_id'])->first();
         } elseif (! empty($validated['code'])) {
-            $item = $this->findItemByCode($validated['code']);
+            // Same resolution the scan uses, so a shipment number submitted
+            // directly still lands on the right parcel.
+            $item = $this->resolveScannableParcel($validated['code'], $hub)['item'];
         }
 
         if (! $item) {

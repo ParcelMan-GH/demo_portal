@@ -3,6 +3,7 @@
 namespace App\Helpers;
 
 use App\Models\OutgoingBatch;
+use App\Models\Shipment;
 use App\Models\ShipmentItem;
 
 /**
@@ -145,9 +146,12 @@ class CodeResolver
                 break;
 
             default:
-                // Unrecognised shape: try it verbatim, then under the canonical
-                // prefix, so a hand-written code still has a chance.
+                // Unrecognised shape. Try it verbatim, then under the canonical
+                // prefix, then bare — which is what makes `PM-TM-…` and `TM-…`
+                // interchangeable for the codes carrying their own internal
+                // marker (transport manifests, sort batches, delivery runs).
                 $candidates[] = self::PREFIX.'-'.$body;
+                $candidates[] = $body;
                 break;
         }
 
@@ -277,5 +281,95 @@ class CodeResolver
     public static function issuePrefix(): string
     {
         return rtrim(self::PREFIX, '-');
+    }
+
+    /**
+     * The shipment a code names, if it names one.
+     *
+     * A shipment number (`PM-2026-00038`) and a parcel tracking code
+     * (`PM-KQ7XW2MNP`) are different things, and only the second one is a
+     * parcel. Scanning a shipment number at a parcel scanner used to dead-end in
+     * "no package found"; this is what lets the caller follow the shipment
+     * number through to the parcels inside it.
+     */
+    public static function resolveShipment(?string $code): ?Shipment
+    {
+        $code = self::normalize($code);
+
+        if ($code === '') {
+            return null;
+        }
+
+        return Shipment::query()
+            ->whereIn('shipment_number', self::candidates($code))
+            ->first();
+    }
+
+    /**
+     * Every parcel inside the shipment a code names.
+     *
+     * Returns an empty collection when the code is not a shipment number, or
+     * names a shipment that does not exist. A shipment holds one to three
+     * parcels, so callers must expect more than one back.
+     *
+     * @return \Illuminate\Support\Collection<int, ShipmentItem>
+     */
+    public static function resolveShipmentItemsByShipmentNumber(?string $code)
+    {
+        $shipment = self::resolveShipment($code);
+
+        if (! $shipment) {
+            return collect();
+        }
+
+        return ShipmentItem::query()
+            ->where('shipment_id', $shipment->id)
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * `LIKE` patterns that cover a numbered series under both its old and new
+     * prefix, so the next number continues the run instead of restarting.
+     *
+     * Pass the part after the prefix, e.g. `2026-` or `2026-WH001-WH002-`.
+     *
+     * @return array<int, string>
+     */
+    public static function seriesPatterns(string $suffix): array
+    {
+        return [self::PREFIX.'-'.$suffix, $suffix];
+    }
+
+    /**
+     * The prefix to issue for a numbered series, and the next number to use.
+     *
+     * Scans the series under both its new and its legacy spelling so numbering
+     * carries on rather than restarting under the fresh prefix — the same
+     * reasoning that keeps shipment numbers continuous, applied to the
+     * operational series (manifests, sort batches, delivery runs, handovers).
+     *
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $modelClass
+     * @return array{0: string, 1: int}  [prefix, next sequence]
+     */
+    public static function nextInSeries(string $suffix, string $modelClass, string $column): array
+    {
+        $prefix = self::PREFIX.'-'.$suffix;
+
+        $last = $modelClass::query()
+            ->where(function ($query) use ($prefix, $suffix, $column) {
+                $query->where($column, 'like', $prefix.'%')
+                    ->orWhere($column, 'like', $suffix.'%');
+            })
+            ->orderByDesc('id')
+            ->value($column);
+
+        $next = 1;
+
+        if (is_string($last) && preg_match('/(\d+)$/', $last, $matches) === 1) {
+            $next = ((int) $matches[1]) + 1;
+        }
+
+        return [$prefix, $next];
     }
 }

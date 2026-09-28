@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\CodeResolver;
 use App\Helpers\PhoneHelper;
 use App\Models\DeliveryRunItem;
 use App\Models\Driver;
@@ -741,16 +742,12 @@ class RiderTeamHandoverService
 
     private function generateHandoverNumber(?Warehouse $warehouse = null): string
     {
-        $prefix = 'RTH-' . now()->format('Y') . '-' . ($warehouse?->code ? str_replace('-', '', $warehouse->code) : 'GEN') . '-';
-        $last = RiderTeamHandover::query()
-            ->where('handover_number', 'like', $prefix . '%')
-            ->latest('id')
-            ->first();
-
-        $next = 1;
-        if ($last && preg_match('/(\d+)$/', $last->handover_number, $matches)) {
-            $next = ((int) $matches[1]) + 1;
-        }
+        // Issued as PM-RTH-…, continuing the numbering under the old spelling.
+        [$prefix, $next] = CodeResolver::nextInSeries(
+            'RTH-' . now()->format('Y') . '-' . ($warehouse?->code ? str_replace('-', '', $warehouse->code) : 'GEN') . '-',
+            RiderTeamHandover::class,
+            'handover_number'
+        );
 
         return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }

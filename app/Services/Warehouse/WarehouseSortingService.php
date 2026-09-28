@@ -4,6 +4,7 @@ namespace App\Services\Warehouse;
 
 use App\Enums\ItemStatus;
 use App\Enums\ShipmentStatus;
+use App\Helpers\CodeResolver;
 use App\Models\DeliveryRun;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
@@ -808,23 +809,16 @@ class WarehouseSortingService
         $originCode = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($originWarehouse->code ?: $originWarehouse->id)));
 
         if ($dispatchMode === SortBatch::DISPATCH_LOCAL_DELIVERY) {
-            $prefix = "LB-{$year}-{$originCode}-LOCAL-";
+            $suffix = "LB-{$year}-{$originCode}-LOCAL-";
         } else {
             $destinationCode = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($destinationWarehouse?->code ?: $destinationWarehouse?->id)));
-            $prefix = "SB-{$year}-{$originCode}-{$destinationCode}-";
+            $suffix = "SB-{$year}-{$originCode}-{$destinationCode}-";
         }
 
-        $lastBatch = SortBatch::query()
-            ->where('batch_number', 'like', $prefix . '%')
-            ->orderByDesc('id')
-            ->first();
-
-        $next = 1;
-        if ($lastBatch) {
-            $parts = explode('-', $lastBatch->batch_number);
-            $last = (int) end($parts);
-            $next = $last + 1;
-        }
+        // Issued as PM-SB-… / PM-LB-…. The routing codes stay inside the number:
+        // they are how a sorter knows where a batch is going, so they cannot be
+        // dropped in favour of the prefix.
+        [$prefix, $next] = CodeResolver::nextInSeries($suffix, SortBatch::class, 'batch_number');
 
         return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }

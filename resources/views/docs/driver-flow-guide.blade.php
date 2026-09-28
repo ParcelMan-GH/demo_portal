@@ -647,7 +647,7 @@
   <div class="endpoint-body">
     <p class="endpoint-desc">Scan one item's barcode as it is loaded onto the vehicle. Call once per item. The <code>tracking_code</code> is the barcode printed during warehouse receiving (Phase 2) — <strong>not</strong> the shipment number.</p>
     <pre><code>{
-  <span class="pre-key">"tracking_code"</span>: <span class="pre-string">"TRK5PNQ13E"</span>
+  <span class="pre-key">"tracking_code"</span>: <span class="pre-string">"PM-KQ7XW2MNP"</span>
 }</code></pre>
     <div class="callout callout-note">Auto-advances manifest from <code>assigned</code> → <code>loading</code> on the first scan.</div>
   </div>
@@ -763,9 +763,9 @@
           <span class="pre-key">"items"</span>: [
             {
               <span class="pre-key">"shipment_item_id"</span>:   <span class="pre-value">14</span>,
-              <span class="pre-key">"shipment_number"</span>:    <span class="pre-string">"PCM-2026-00014"</span>,
+              <span class="pre-key">"shipment_number"</span>:    <span class="pre-string">"PM-2026-00038"</span>,
               <span class="pre-key">"description"</span>:        <span class="pre-string">"LED TV 50-inch"</span>,
-              <span class="pre-key">"tracking_code"</span>:      <span class="pre-string">"TRK5PNQ13E"</span>,
+              <span class="pre-key">"tracking_code"</span>:      <span class="pre-string">"PM-KQ7XW2MNP"</span>,
               <span class="pre-key">"expected_quantity"</span>:  <span class="pre-value">1</span>,
               <span class="pre-key">"delivered_quantity"</span>: <span class="pre-value">0</span>,
               <span class="pre-key">"status"</span>:             <span class="pre-string">"pending"</span>
