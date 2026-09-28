@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\ResolvesActingDriver;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Driver\ChangePasswordRequest;
 use App\Http\Requests\Api\Driver\UpdateProfileRequest;
@@ -12,6 +13,8 @@ use Illuminate\Http\Request;
 
 class DriverProfileController extends Controller
 {
+    use ResolvesActingDriver;
+
     protected DriverProfileService $profileService;
 
     public function __construct(DriverProfileService $profileService)
@@ -25,7 +28,7 @@ class DriverProfileController extends Controller
      */
     public function show(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $result = $this->profileService->getProfile($driver);
 
@@ -38,7 +41,7 @@ class DriverProfileController extends Controller
      */
     public function update(UpdateProfileRequest $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $result = $this->profileService->updateProfile(
             $driver,
@@ -61,7 +64,7 @@ class DriverProfileController extends Controller
         $request->validate(ProfilePhotoService::rules());
 
         $result = $this->profileService->updatePhoto(
-            $request->user(),
+            $this->actingDriver($request),
             $request->file('photo'),
             $request
         );
@@ -75,7 +78,7 @@ class DriverProfileController extends Controller
      */
     public function changePassword(ChangePasswordRequest $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         $data = $request->validated();
 
         $result = $this->profileService->changePassword(
@@ -97,7 +100,7 @@ class DriverProfileController extends Controller
     public function updateFcmToken(Request $request): JsonResponse
     {
         $request->validate(['fcm_token' => ['required', 'string', 'max:512']]);
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         $driver->update(['fcm_token' => $request->fcm_token]);
 
         return response()->json(['success' => true, 'message' => 'FCM token updated.']);

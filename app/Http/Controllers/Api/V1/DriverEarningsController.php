@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\V1\Concerns\ResolvesActingDriver;
 use App\Models\Driver;
 use App\Services\DriverEarningsService;
 use Illuminate\Http\JsonResponse;
@@ -18,6 +19,8 @@ use Illuminate\Http\Request;
  */
 class DriverEarningsController extends Controller
 {
+    use ResolvesActingDriver;
+
     public function __construct(private DriverEarningsService $earnings) {}
 
     /**
@@ -25,7 +28,7 @@ class DriverEarningsController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $driver = $this->driver($request);
+        $driver = $this->actingDriver($request);
 
         return response()->json([
             'success' => true,
@@ -39,7 +42,7 @@ class DriverEarningsController extends Controller
      */
     public function requestPayout(Request $request): JsonResponse
     {
-        $driver = $this->driver($request);
+        $driver = $this->actingDriver($request);
 
         $request->validate([
             'amount' => ['required'],
@@ -78,24 +81,6 @@ class DriverEarningsController extends Controller
             'message' => $result['message'],
             'data' => $result['data'],
         ]);
-    }
-
-    /**
-     * The driver behind this request.
-     *
-     * The app authenticates as a Driver, so that is the normal case. Anything
-     * else is a staff account calling a driver route, which used to surface as a
-     * confusing "no rider profile" 500 from elsewhere in the controller.
-     */
-    private function driver(Request $request): Driver
-    {
-        $user = $request->user();
-
-        if (! $user instanceof Driver) {
-            abort(403, 'No rider profile is linked to this account yet. Please contact your warehouse supervisor.');
-        }
-
-        return $user;
     }
 
     /**

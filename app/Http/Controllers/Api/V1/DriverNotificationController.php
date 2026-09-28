@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\V1\Concerns\ResolvesActingDriver;
 use App\Models\Driver;
 use App\Models\NotificationLog;
 use Illuminate\Http\JsonResponse;
@@ -11,12 +12,14 @@ use Illuminate\Validation\Rule;
 
 class DriverNotificationController extends Controller
 {
+    use ResolvesActingDriver;
+
     /**
      * List notifications for the authenticated driver.
      */
     public function index(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $validated = $request->validate([
             'status'     => ['nullable', 'string', Rule::in(['sent', 'failed', 'logged'])],
@@ -129,7 +132,7 @@ class DriverNotificationController extends Controller
      */
     public function updatePreferences(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $rules = [];
         foreach (array_keys(Driver::DEFAULT_NOTIFICATION_PREFERENCES) as $key) {
@@ -156,7 +159,7 @@ class DriverNotificationController extends Controller
      */
     public function markAsRead(Request $request, NotificationLog $notification): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         if ($notification->notifiable_type !== 'App\Models\Driver' || $notification->notifiable_id !== $driver->id) {
             return response()->json([
@@ -192,7 +195,7 @@ class DriverNotificationController extends Controller
      */
     public function markAllAsRead(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $updated = NotificationLog::where('notifiable_type', 'App\Models\Driver')
             ->where('notifiable_id', $driver->id)

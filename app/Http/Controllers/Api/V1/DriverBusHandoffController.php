@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\ResolvesActingDriver;
 use App\Http\Controllers\Controller;
 use App\Models\BusHandoffConfirmation;
 use App\Models\DeliveryRunItem;
@@ -11,18 +12,20 @@ use Illuminate\Http\Request;
 
 class DriverBusHandoffController extends Controller
 {
+    use ResolvesActingDriver;
+
     public function __construct(private BusHandoffConfirmationService $service)
     {
     }
 
     public function index(Request $request): JsonResponse
     {
-        return response()->json($this->service->listForDriver($request->user(), $request));
+        return response()->json($this->service->listForDriver($this->actingDriver($request), $request));
     }
 
     public function show(Request $request, DeliveryRunItem $deliveryRunItem): JsonResponse
     {
-        $result = $this->service->showForDriver($request->user(), $deliveryRunItem);
+        $result = $this->service->showForDriver($this->actingDriver($request), $deliveryRunItem);
 
         return response()->json($result, $result['status'] ?? 200);
     }
@@ -45,7 +48,7 @@ class DriverBusHandoffController extends Controller
         ]);
 
         $result = $this->service->sendConfirmation(
-            $request->user(),
+            $this->actingDriver($request),
             $deliveryRunItem,
             $validated['target_type'],
         );
@@ -60,7 +63,7 @@ class DriverBusHandoffController extends Controller
         ]);
 
         $result = $this->service->confirmWithCode(
-            $request->user(),
+            $this->actingDriver($request),
             $deliveryRunItem,
             $validated['confirmation_code'],
         );
@@ -76,7 +79,7 @@ class DriverBusHandoffController extends Controller
         ]);
 
         $result = $this->service->reportIssue(
-            $request->user(),
+            $this->actingDriver($request),
             $deliveryRunItem,
             (int) $validated['reason_id'],
             $validated['notes'] ?? null,

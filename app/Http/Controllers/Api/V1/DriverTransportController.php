@@ -10,6 +10,7 @@ use App\Models\ShipmentItem;
 use App\Models\TransportManifestItem;
 use App\Models\Warehouse;
 use App\Models\Driver;
+use App\Http\Controllers\Api\V1\Concerns\ResolvesActingDriver;
 use App\Models\TransportManifest;
 use App\Services\DriverTransportService;
 use App\Services\Warehouse\WarehouseTransportService;
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\Log;
 
 class DriverTransportController extends Controller
 {
+    use ResolvesActingDriver;
+
 
     /** Driver resolved for the authenticated account (cached per request). */
     private ?Driver $resolvedActingDriver = null;
@@ -28,81 +31,6 @@ class DriverTransportController extends Controller
      * The app signs in the staff User that holds the rider/transporter role, while
      * dispatches, custody and deliveries are recorded against a Driver record.
      */
-    private function actingDriver(Request $request): Driver
-    {
-        if ($this->resolvedActingDriver) {
-            return $this->resolvedActingDriver;
-        }
-
-        $user = $request->user();
-
-        if ($user instanceof Driver) {
-            return $this->resolvedActingDriver = $user;
-        }
-
-        $phone = trim((string) ($user?->phone ?? ''));
-        $email = trim((string) ($user?->email ?? ''));
-        $digits = preg_replace('/\D+/', '', $phone) ?? '';
-        $tail = strlen($digits) >= 9 ? substr($digits, -9) : '';
-        $normalisePhone = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '')";
-
-        $driver = null;
-
-        if ($phone !== '' || $email !== '') {
-            $driver = Driver::query()
-                ->where(function ($query) use ($phone, $email, $digits, $tail, $normalisePhone) {
-                    if ($phone !== '') {
-                        $query->where('phone', $phone);
-                    }
-                    if ($digits !== '') {
-                        $query->orWhereRaw("{$normalisePhone} = ?", [$digits]);
-                    }
-                    if ($tail !== '') {
-                        $query->orWhereRaw("RIGHT({$normalisePhone}, 9) = ?", [$tail]);
-                    }
-                    if ($email !== '') {
-                        $query->orWhere('email', $email);
-                    }
-                })
-                ->orderByDesc('is_active')
-                ->first();
-        }
-
-        if (! $driver && $phone !== '') {
-            $driver = $this->provisionDriverProfile($user, $phone);
-        }
-
-        if (! $driver) {
-            abort(403, 'No rider profile is linked to this account yet. Please contact your warehouse supervisor.');
-        }
-
-        return $this->resolvedActingDriver = $driver;
-    }
-
-    private function provisionDriverProfile(?object $user, string $phone): ?Driver
-    {
-        $fallbackEmail = 'rider-'.(preg_replace('/\D+/', '', $phone) ?: 'unknown').'@parcelmanexpress.local';
-
-        foreach (array_values(array_unique(array_filter([$user?->email, $fallbackEmail]))) as $email) {
-            try {
-                return Driver::create([
-                    'name' => (string) ($user?->name ?: 'Rider'),
-                    'email' => $email,
-                    'phone' => $phone,
-                    'password' => bcrypt(bin2hex(random_bytes(16))),
-                    'vehicle_type' => 'motorcycle',
-                    'status' => 'available',
-                    'is_active' => true,
-                    'task_capabilities' => ['pickup', 'delivery'],
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning('Could not auto-provision rider profile', ['error' => $e->getMessage()]);
-            }
-        }
-
-        return null;
-    }
-
     /**
      * Build the transport manifest a scanned outgoing-batch code refers to.
      */
@@ -233,7 +161,16 @@ class DriverTransportController extends Controller
             $isHistory = $request->query('filter') === 'history';
 
             $query = TransportManifest::query()
-                ->with(['originWarehouse', 'destinationWarehouse']);
+                ->with(['originWarehouse', 'destinationWarehouse'])
+                /*
+                 * Counted, not loaded. The payload reads `items_count`, and this
+                 * query never produced it — so `package_count` fell through to
+                 * the `relationLoaded('items')` check, which was also false, and
+                 * every batch reported "0 packages" however many parcels it held.
+                 * withCount is also the cheaper of the two: it does not hydrate
+                 * the rows just to count them.
+                 */
+                ->withCount(['items', 'containers']);
 
             if ($isHistory) {
                 $query->where($driverCol, $driver->id)
@@ -313,7 +250,9 @@ class DriverTransportController extends Controller
                 $bridged = $this->bridgeOutgoingBatch($search, $driver);
 
                 if ($bridged) {
-                    $manifests = collect([$bridged->load(['originWarehouse', 'destinationWarehouse'])]);
+                    $manifests = collect([
+                        $bridged->load(['originWarehouse', 'destinationWarehouse'])->loadCount(['items', 'containers']),
+                    ]);
                 }
             }
 
@@ -340,7 +279,11 @@ class DriverTransportController extends Controller
                     'manifest_code' => $code,
                     'origin' => $m->originWarehouse?->name ?? 'Origin Hub',
                     'destination' => $destinationName,
-                    'package_count' => $m->items_count ?? ($m->relationLoaded('items') ? $m->items->count() : 0),
+                    'package_count' => (int) ($m->items_count ?? ($m->relationLoaded('items') ? $m->items->count() : 0)),
+                    // The raw counts, so the client is not parsing a number out
+                    // of a display field to decide whether anything is loaded.
+                    'items_count' => (int) ($m->items_count ?? 0),
+                    'containers_count' => (int) ($m->containers_count ?? 0),
                     'status' => str_replace('_', ' ', ucfirst($m->status ?? 'pending')),
                     'status_raw' => $m->status ?? 'pending',
                     // Was `$m->{$driverCol} ?? $driver->id`, which reported the
@@ -378,7 +321,7 @@ class DriverTransportController extends Controller
 
     public function show(Request $request, TransportManifest $manifest): JsonResponse
     {
-        $result = $this->driverTransportService->show($request->user(), $manifest);
+        $result = $this->driverTransportService->show($this->actingDriver($request), $manifest);
         $status = $result['status'] ?? 200;
         unset($result['status']);
 
@@ -387,7 +330,7 @@ class DriverTransportController extends Controller
 
     public function startLoading(Request $request, TransportManifest $manifest): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         $result = $this->transportService->driverStartLoading($manifest, $driver);
 
         return $this->transportActionResponse($driver, $manifest, $result, 400);
@@ -395,7 +338,7 @@ class DriverTransportController extends Controller
 
     public function scanLoad(Request $request, TransportManifest $manifest): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         $validated = $request->validate([
             'tracking_code' => ['nullable', 'string', 'max:100'],
             'container_code' => ['nullable', 'string', 'max:100'],
@@ -420,7 +363,7 @@ class DriverTransportController extends Controller
 
     public function scanIssue(Request $request, TransportManifest $manifest): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         $validated = $request->validate([
             'target_type' => ['required', 'string', 'in:container,item'],
             'container_id' => ['required_if:target_type,container', 'nullable', 'integer', 'exists:transport_containers,id'],
@@ -448,13 +391,13 @@ class DriverTransportController extends Controller
 
     public function depart(Request $request, TransportManifest $manifest): JsonResponse
     {
-        $driver = $request->user();
-        $driverCol = Schema::hasColumn('transport_manifests', 'driver_id') ? 'driver_id' : 'transporter_id';
+        $driver = $this->actingDriver($request);
 
-        if (!$manifest->{$driverCol}) {
-            $manifest->update([
-                $driverCol => $driver->id,
-            ]);
+        // Same phantom column that broke index(): neither `driver_id` nor
+        // `transporter_id` exists, so this always took the fallback and the
+        // update died with "Unknown column 'transporter_id'".
+        if (! $manifest->assigned_driver_id) {
+            $manifest->update(['assigned_driver_id' => $driver->id]);
         }
 
         $result = $this->transportService->driverDepart($manifest, $driver);
@@ -464,7 +407,7 @@ class DriverTransportController extends Controller
 
     public function arrive(Request $request, TransportManifest $manifest): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
         $result = $this->transportService->driverArrive($manifest, $driver);
 
         return $this->transportActionResponse($driver, $manifest, $result, 400);

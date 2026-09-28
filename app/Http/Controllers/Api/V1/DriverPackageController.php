@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryRun;
 use App\Models\DeliveryRunItem;
+use App\Http\Controllers\Api\V1\Concerns\ResolvesActingDriver;
 use App\Models\Driver;
 use App\Models\LabelCustodyEvent;
 use App\Models\RiderPackageTransfer;
@@ -20,6 +21,8 @@ use Illuminate\Http\Request;
 
 class DriverPackageController extends Controller
 {
+    use ResolvesActingDriver;
+
 
     /** Driver resolved for the authenticated account (cached per request). */
     private ?Driver $resolvedActingDriver = null;
@@ -32,59 +35,6 @@ class DriverPackageController extends Controller
      * and transfers are all recorded against a Driver record. Map the account to
      * its Driver so scanning records the right owner instead of failing.
      */
-    private function actingDriver(Request $request): Driver
-    {
-        if ($this->resolvedActingDriver) {
-            return $this->resolvedActingDriver;
-        }
-
-        $user = $request->user();
-
-        if ($user instanceof Driver) {
-            return $this->resolvedActingDriver = $user;
-        }
-
-        $phone = trim((string) ($user?->phone ?? ''));
-        $email = trim((string) ($user?->email ?? ''));
-        $digits = preg_replace('/\D+/', '', $phone) ?? '';
-        // Ghana numbers are stored inconsistently (+233…, 233…, 0…), so the last
-        // nine digits are used as a fallback signature for comparison.
-        $tail = strlen($digits) >= 9 ? substr($digits, -9) : '';
-        $normalisePhone = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '')";
-
-        $driver = null;
-
-        if ($phone !== '' || $email !== '') {
-            $driver = Driver::query()
-                ->where(function ($query) use ($phone, $email, $digits, $tail, $normalisePhone) {
-                    if ($phone !== '') {
-                        $query->where('phone', $phone);
-                    }
-                    if ($digits !== '') {
-                        $query->orWhereRaw("{$normalisePhone} = ?", [$digits]);
-                    }
-                    if ($tail !== '') {
-                        $query->orWhereRaw("RIGHT({$normalisePhone}, 9) = ?", [$tail]);
-                    }
-                    if ($email !== '') {
-                        $query->orWhere('email', $email);
-                    }
-                })
-                ->orderByDesc('is_active')
-                ->first();
-        }
-
-        if (! $driver && $phone !== '') {
-            $driver = $this->provisionDriverProfile($user, $phone);
-        }
-
-        if (! $driver) {
-            abort(403, 'No rider profile is linked to this account yet. Please contact your warehouse supervisor.');
-        }
-
-        return $this->resolvedActingDriver = $driver;
-    }
-
     /**
      * Create the rider profile for an app account that has none yet.
      *

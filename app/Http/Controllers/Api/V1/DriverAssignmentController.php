@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\ResolvesActingDriver;
 use App\Enums\PickupAssignmentStatus;
 use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
@@ -19,6 +20,8 @@ use Illuminate\Validation\Rule;
 
 class DriverAssignmentController extends Controller
 {
+    use ResolvesActingDriver;
+
     public function __construct(
         private PickupAssignmentService $pickupAssignmentService,
         private StorageService $storageService
@@ -29,7 +32,7 @@ class DriverAssignmentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $driver = $request->user();
+        $driver = $this->actingDriver($request);
 
         $allowedStatuses = array_map(
             fn(PickupAssignmentStatus $status) => $status->value,
@@ -171,7 +174,7 @@ class DriverAssignmentController extends Controller
      */
     public function show(Request $request, PickupAssignment $assignment): JsonResponse
     {
-        if ($assignment->driver_id !== $request->user()->id) {
+        if ($assignment->driver_id !== $this->actingDriver($request)->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Pickup not found.',
@@ -205,7 +208,7 @@ class DriverAssignmentController extends Controller
      */
     public function startEnRoute(Request $request, PickupAssignment $assignment): JsonResponse
     {
-        if ($assignment->driver_id !== $request->user()->id) {
+        if ($assignment->driver_id !== $this->actingDriver($request)->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Pickup not found.',
@@ -242,7 +245,7 @@ class DriverAssignmentController extends Controller
      */
     public function arrive(Request $request, PickupAssignment $assignment): JsonResponse
     {
-        if ($assignment->driver_id !== $request->user()->id) {
+        if ($assignment->driver_id !== $this->actingDriver($request)->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Pickup not found.',
@@ -288,7 +291,7 @@ class DriverAssignmentController extends Controller
      */
     public function confirmPickupItem(Request $request, PickupAssignment $assignment, ShipmentItem $item): JsonResponse
     {
-        if ($assignment->driver_id !== $request->user()->id) {
+        if ($assignment->driver_id !== $this->actingDriver($request)->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Pickup not found.',
@@ -341,7 +344,7 @@ class DriverAssignmentController extends Controller
      */
     public function confirmPickup(Request $request, PickupAssignment $assignment): JsonResponse
     {
-        if ($assignment->driver_id !== $request->user()->id) {
+        if ($assignment->driver_id !== $this->actingDriver($request)->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Pickup not found.',
