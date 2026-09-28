@@ -9,6 +9,8 @@ use App\Models\ShipmentItem;
 use App\Models\ShipmentItemTracking;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Models\WarehouseReceipt;
+use App\Models\WarehouseReceiptItem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -47,12 +49,28 @@ class HubBusHandoffService
     public const PHOTO_URL_TTL_MINUTES = 60;
 
     /**
-     * Statuses that mean the parcel is physically sitting in the hub and can
-     * therefore be put on a bus. Mirrors `HubController::AT_HUB_STATUSES`.
+     * Statuses a parcel can be handed to a bus from.
+     *
+     * Wider than `HubController::AT_HUB_STATUSES` on purpose. That constant
+     * answers "what is sitting in my hub's inventory" and stays narrow; this one
+     * answers "what am I allowed to put on a bus", which also covers a parcel
+     * taken in over the counter at the main office (`at_warehouse`) and one
+     * already sorted against its destination and waiting for a departure.
+     *
+     * `pending` is only ever allowed alongside positive proof that the parcel is
+     * physically at this hub — see `isAtHub()`. A parcel that was never checked
+     * in anywhere must not be dispatchable: that is how freight goes missing
+     * with no custody record to trace it by.
      *
      * @var array<int, ItemStatus>
      */
-    private const AT_HUB_STATUSES = [ItemStatus::ARRIVED_AT_HUB, ItemStatus::AT_WAREHOUSE];
+    private const BUS_HANDOFF_STATUSES = [
+        ItemStatus::AT_WAREHOUSE,
+        ItemStatus::ARRIVED_AT_HUB,
+        ItemStatus::SORTED,
+        ItemStatus::READY_FOR_HUB_TRANSFER,
+        ItemStatus::PENDING,
+    ];
 
     public function __construct(
         private SmsService $smsService,
@@ -77,30 +95,29 @@ class HubBusHandoffService
             ? $item->status
             : ItemStatus::tryFrom((string) $item->status);
 
-        if ((int) $item->hub_id !== (int) $hub->id) {
-            // Never checked in anywhere. The useful instruction is "intake it",
-            // not a flat statement that it is missing from inventory — which is
-            // what used to leave the agent with no idea what to do next.
-            if (! $item->hub_id) {
+        if (! $this->isAtHub($hub, $item)) {
+            // Somewhere else we can name: point at the right hub instead of
+            // pretending the parcel does not exist.
+            if ($heldAt = $this->heldAtHubName($hub, $item)) {
                 return [
-                    'message' => "{$label} must be intake-scanned at {$hub->name} before it can be handed to a bus."
-                        .($status ? " It is currently {$status->label()}." : ''),
-                    'status' => 422,
+                    'message' => "{$label} is held at {$heldAt}, not {$hub->name}. A parcel is handed to a bus at the hub holding it.",
+                    'status' => 403,
                 ];
             }
 
-            $heldAt = filled($item->hub?->name) ? $item->hub->name : 'another hub';
-
-            return [
-                'message' => "{$label} is held at {$heldAt}, not {$hub->name}. A parcel is handed to a bus at the hub holding it.",
-                'status' => 403,
-            ];
-        }
-
-        if (! $status || ! in_array($status, self::AT_HUB_STATUSES, true)) {
+            // No custody record anywhere. The useful instruction is "intake it",
+            // not a flat statement that it is missing from inventory — which is
+            // what used to leave the agent with no idea what to do next.
             return [
                 'message' => "{$label} must be intake-scanned at {$hub->name} before it can be handed to a bus."
                     .($status ? " It is currently {$status->label()}." : ' Its status could not be read.'),
+                'status' => 422,
+            ];
+        }
+
+        if (! $status || ! in_array($status, self::BUS_HANDOFF_STATUSES, true)) {
+            return [
+                'message' => $this->statusRefusal($label, $status, $hub),
                 'status' => 422,
             ];
         }
@@ -119,6 +136,93 @@ class HubBusHandoffService
         }
 
         return null;
+    }
+
+    /**
+     * Is this parcel physically at this hub?
+     *
+     * There are two ways for a parcel to be here, because parcels arrive two
+     * ways, and only one of them touches `shipment_items.hub_id`:
+     *
+     *  1. Hub intake — a transporter's batch is scanned in and `hub_id` is set
+     *     on every parcel in it.
+     *  2. Over the counter — a walk-in is booked at the main office. It gets a
+     *     finalized warehouse receipt naming the warehouse it was taken in at,
+     *     and `hub_id` is never touched. This is why walk-in parcels were being
+     *     turned away: the check only ever looked at `hub_id`.
+     *
+     * Reading the receipt is what makes "at the main office" provable rather
+     * than assumed, so a parcel sitting at another warehouse cannot be handed
+     * over from this one.
+     */
+    private function isAtHub(Warehouse $hub, ShipmentItem $item): bool
+    {
+        // `hub_id` wins when it is set. It is the more recent fact: a parcel
+        // taken in over the counter at Accra Main and *later* received at Kumasi
+        // keeps its Accra receipt, and must not still count as being at Accra.
+        if (filled($item->hub_id)) {
+            return (int) $item->hub_id === (int) $hub->id;
+        }
+
+        // Never checked into a hub, so the warehouse receipt is the only record
+        // of where the parcel physically is.
+        return $item->warehouseReceiptItems()
+            ->whereHas('receipt', function ($query) use ($hub) {
+                $query->where('warehouse_id', $hub->id)
+                    ->where('status', WarehouseReceipt::STATUS_FINALIZED);
+            })
+            ->exists();
+    }
+
+    /**
+     * The name of the other hub this parcel is being held at, if we can name one.
+     *
+     * Used to say "it is at Kumasi Center" instead of a bare refusal.
+     */
+    private function heldAtHubName(Warehouse $hub, ShipmentItem $item): ?string
+    {
+        if (filled($item->hub_id)) {
+            return (int) $item->hub_id === (int) $hub->id
+                ? null
+                : ($item->hub?->name ?: 'another hub');
+        }
+
+        $viaReceipt = $item->warehouseReceiptItems()
+            ->whereHas('receipt', function ($query) use ($hub) {
+                $query->where('warehouse_id', '!=', $hub->id)
+                    ->where('status', WarehouseReceipt::STATUS_FINALIZED);
+            })
+            ->with('receipt.warehouse')
+            ->get()
+            ->map(fn (WarehouseReceiptItem $receiptItem) => $receiptItem->receipt?->warehouse?->name)
+            ->filter()
+            ->first();
+
+        return $viaReceipt ?: null;
+    }
+
+    /**
+     * Why this status cannot go on a bus, in words the agent can act on.
+     */
+    private function statusRefusal(string $label, ?ItemStatus $status, Warehouse $hub): string
+    {
+        if (! $status) {
+            return "{$label} has a status this system does not recognise, so it cannot be handed to a bus. "
+                .'Ask an administrator to check the parcel record.';
+        }
+
+        return match ($status) {
+            ItemStatus::DISPATCHED_TO_BUS, ItemStatus::IN_TRANSIT => "{$label} is already on its way "
+                ."({$status->label()}). It cannot be handed to a second bus.",
+
+            ItemStatus::DELIVERED => "{$label} has already been delivered and cannot go on a bus.",
+
+            ItemStatus::OUT_FOR_DELIVERY, ItemStatus::AT_DESTINATION, ItemStatus::HANDED_TO_COURIER => "{$label} has "
+                ."already left for delivery ({$status->label()}) and cannot go on a bus.",
+
+            default => "{$label} is {$status->label()} and cannot be handed to a bus from {$hub->name}. "
+                .'A parcel goes on a bus from the warehouse counter, or once it has been received at the hub.',
+        };
     }
 
     /**
