@@ -42,7 +42,11 @@ class HubController extends Controller
      *
      * @var array<int, ItemStatus>
      */
-    private const AT_HUB_STATUSES = [ItemStatus::ARRIVED_AT_HUB, ItemStatus::AT_WAREHOUSE];
+    /**
+     * Which statuses count as "in the hub" now lives on the model, alongside the
+     * location rule, so inventory and bus handoff cannot drift apart again.
+     */
+    private const AT_HUB_STATUSES = ShipmentItem::AT_HUB_STATUSES;
 
     /**
      * Role slugs, as the database knows them, for the two sides of the hub app.
@@ -186,7 +190,7 @@ class HubController extends Controller
 
             if ($batch && (int) $item->outgoing_batch_id !== (int) $batch->id) {
                 return $this->failed(
-                    "Package {$item->tracking_code} does not belong to batch {$batch->batch_number}.",
+                    "{$this->parcelLabel($item)} does not belong to batch {$batch->batch_number}.",
                     422
                 );
             }
@@ -208,7 +212,7 @@ class HubController extends Controller
                 foreach ($items as $item) {
                     if ((int) $item->outgoing_batch_id !== (int) $batch->id) {
                         return $this->failed(
-                            "Package {$item->tracking_code} does not belong to batch {$batch->batch_number}.",
+                            "{$this->parcelLabel($item)} does not belong to batch {$batch->batch_number}.",
                             422
                         );
                     }
@@ -230,7 +234,7 @@ class HubController extends Controller
         foreach ($items as $item) {
             // Re-scanning a parcel is normal at a busy desk: report it, don't
             // move it or stamp it twice.
-            if ($item->hub_id === $hub->id && $item->arrived_at_hub_at) {
+            if ($item->isAtHub((int) $hub->id) && $item->arrived_at_hub_at) {
                 $alreadyAtHub[] = $this->serializePackage($item, $hub);
 
                 continue;
@@ -266,9 +270,12 @@ class HubController extends Controller
         if ($batch) {
             $outstanding = $batch->shipmentItems()
                 ->where(function ($query) use ($hub) {
+                    // Not yet fully in: either it has no arrival stamp, or it is
+                    // not at this hub by either route.
                     $query->whereNull('arrived_at_hub_at')
-                        ->orWhereNull('hub_id')
-                        ->orWhere('hub_id', '!=', $hub->id);
+                        ->orWhere(function ($elsewhere) use ($hub) {
+                            $elsewhere->notAtHub($hub->id);
+                        });
                 })
                 ->count();
 
@@ -316,10 +323,10 @@ class HubController extends Controller
             return $this->failed('No hub is assigned to this account. Ask an administrator to assign you to a hub.', 403);
         }
 
-        $item = ShipmentItem::query()->where('hub_id', $hub->id)->find($package)
+        $item = ShipmentItem::query()->atHub($hub->id)->find($package)
             ?? $this->findItemByCode($package);
 
-        if (! $item || (int) $item->hub_id !== (int) $hub->id) {
+        if (! $item || ! $item->isAtHub((int) $hub->id)) {
             return $this->failed("No package found for {$package} at this hub.", 404);
         }
 
@@ -385,7 +392,7 @@ class HubController extends Controller
         $hub = $request->user()->warehouse;
         $perPage = (int) ($validated['per_page'] ?? 30);
 
-        $query = ShipmentItem::query()->where('hub_id', $hub->id);
+        $query = ShipmentItem::query()->atHub($hub->id);
 
         $statuses = $this->statusesFromFilter($validated['status'] ?? null);
 
@@ -447,9 +454,9 @@ class HubController extends Controller
         $hub = $request->user()->warehouse;
 
         $batches = OutgoingBatch::query()
-            ->whereHas('shipmentItems', fn ($query) => $query->where('hub_id', $hub->id))
+            ->whereHas('shipmentItems', fn ($query) => $query->atHub($hub->id))
             ->whereNotIn('status', OutgoingBatch::CLOSED_STATUSES)
-            ->withCount(['shipmentItems' => fn ($query) => $query->where('hub_id', $hub->id)])
+            ->withCount(['shipmentItems' => fn ($query) => $query->atHub($hub->id)])
             ->orderBy('batch_number')
             ->get();
 
@@ -496,7 +503,7 @@ class HubController extends Controller
                     'destination' => $this->destinationLabel($batch->delivery_region_id, $batch->delivery_district_id),
                     'transport_driver_id' => $batch->transport_driver_id,
                     'total_parcels' => $items->count(),
-                    'already_at_this_hub' => $items->where('hub_id', $hub->id)->count(),
+                    'already_at_this_hub' => $items->filter(fn (ShipmentItem $item) => $item->isAtHub((int) $hub->id))->count(),
                 ],
                 'packages' => $this->serializePackages($items, $hub),
             ],
@@ -542,12 +549,12 @@ class HubController extends Controller
                 return $this->failed("Batch {$batch->batch_number} has already been received downstream.", 422);
             }
 
-            $items = $batch->shipmentItems()->where('hub_id', $hub->id)->get();
+            $items = $batch->shipmentItems()->atHub($hub->id)->get();
         } elseif (! empty($validated['package_ids'])) {
             $ids = array_values(array_unique($validated['package_ids']));
             $items = ShipmentItem::query()
                 ->whereIn('id', $ids)
-                ->where('hub_id', $hub->id)
+                ->atHub($hub->id)
                 ->get();
 
             if ($items->count() !== count($ids)) {
@@ -662,12 +669,12 @@ class HubController extends Controller
             return $this->failed("No package found for {$code}.", 404);
         }
 
-        if ($item->hub_id !== $hub->id) {
-            return $this->failed("Package {$item->tracking_code} is not held at {$hub->name}.", 403);
+        if (! $item->isAtHub((int) $hub->id)) {
+            return $this->failed("{$this->parcelLabel($item)} is not held at {$hub->name}.", 403);
         }
 
         if ($item->released_at) {
-            return $this->failed("Package {$item->tracking_code} was already released.", 422);
+            return $this->failed("{$this->parcelLabel($item)} was already released.", 422);
         }
 
         $toRecipient = $validated['release_to'] === 'recipient';
@@ -741,8 +748,8 @@ class HubController extends Controller
             return $this->failed('No package found for '.$validated['package_id'].'.', 404);
         }
 
-        if ($item->hub_id !== $hub->id) {
-            return $this->failed("Package {$item->tracking_code} is not held at {$hub->name}.", 403);
+        if (! $item->isAtHub((int) $hub->id)) {
+            return $this->failed("{$this->parcelLabel($item)} is not held at {$hub->name}.", 403);
         }
 
         $item->update(['shelf_location' => $validated['shelf_location']]);
@@ -786,7 +793,7 @@ class HubController extends Controller
      */
     private function recentActivities(Warehouse $hub, int $limit): array
     {
-        $itemIds = ShipmentItem::query()->where('hub_id', $hub->id)->pluck('id');
+        $itemIds = ShipmentItem::query()->atHub($hub->id)->pluck('id');
 
         if ($itemIds->isEmpty()) {
             return [];
@@ -917,11 +924,25 @@ class HubController extends Controller
     }
 
     /**
+     * How to name a parcel in a message the agent has to read.
+     *
+     * A parcel only gets a tracking code once it enters package movement, so a
+     * freshly booked one has none — and interpolating it produced messages like
+     * "Package  is not held at Accra Main." with a hole where the name belongs.
+     */
+    private function parcelLabel(ShipmentItem $item): string
+    {
+        return filled($item->tracking_code)
+            ? "Package {$item->tracking_code}"
+            : "Parcel #{$item->id}";
+    }
+
+    /**
      * @return array<string, int>
      */
     private function hubCounts(Warehouse $hub): array
     {
-        $base = ShipmentItem::query()->where('hub_id', $hub->id);
+        $base = ShipmentItem::query()->atHub($hub->id);
 
         return [
             'at_hub' => (clone $base)->whereIn('status', array_map(

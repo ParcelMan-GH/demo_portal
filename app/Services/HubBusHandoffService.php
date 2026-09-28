@@ -49,28 +49,13 @@ class HubBusHandoffService
     public const PHOTO_URL_TTL_MINUTES = 60;
 
     /**
-     * Statuses a parcel can be handed to a bus from.
-     *
-     * Wider than `HubController::AT_HUB_STATUSES` on purpose. That constant
-     * answers "what is sitting in my hub's inventory" and stays narrow; this one
-     * answers "what am I allowed to put on a bus", which also covers a parcel
-     * taken in over the counter at the main office (`at_warehouse`) and one
-     * already sorted against its destination and waiting for a departure.
-     *
-     * `pending` is only ever allowed alongside positive proof that the parcel is
-     * physically at this hub — see `isAtHub()`. A parcel that was never checked
-     * in anywhere must not be dispatchable: that is how freight goes missing
-     * with no custody record to trace it by.
-     *
-     * @var array<int, ItemStatus>
+     * Which statuses may go on a bus, and where a parcel has to be for it to
+     * count as being at this hub, both live on ShipmentItem. Inventory and
+     * handoff ask the same question, so they read the same answer — the two
+     * lists drifting apart is what let a parcel be handoff-able but invisible.
      */
-    private const BUS_HANDOFF_STATUSES = [
-        ItemStatus::AT_WAREHOUSE,
-        ItemStatus::ARRIVED_AT_HUB,
-        ItemStatus::SORTED,
-        ItemStatus::READY_FOR_HUB_TRANSFER,
-        ItemStatus::PENDING,
-    ];
+    private const BUS_HANDOFF_STATUSES = ShipmentItem::AT_HUB_STATUSES;
+
 
     public function __construct(
         private SmsService $smsService,
@@ -95,7 +80,7 @@ class HubBusHandoffService
             ? $item->status
             : ItemStatus::tryFrom((string) $item->status);
 
-        if (! $this->isAtHub($hub, $item)) {
+        if (! $item->isAtHub((int) $hub->id)) {
             // Somewhere else we can name: point at the right hub instead of
             // pretending the parcel does not exist.
             if ($heldAt = $this->heldAtHubName($hub, $item)) {
@@ -136,42 +121,6 @@ class HubBusHandoffService
         }
 
         return null;
-    }
-
-    /**
-     * Is this parcel physically at this hub?
-     *
-     * There are two ways for a parcel to be here, because parcels arrive two
-     * ways, and only one of them touches `shipment_items.hub_id`:
-     *
-     *  1. Hub intake — a transporter's batch is scanned in and `hub_id` is set
-     *     on every parcel in it.
-     *  2. Over the counter — a walk-in is booked at the main office. It gets a
-     *     finalized warehouse receipt naming the warehouse it was taken in at,
-     *     and `hub_id` is never touched. This is why walk-in parcels were being
-     *     turned away: the check only ever looked at `hub_id`.
-     *
-     * Reading the receipt is what makes "at the main office" provable rather
-     * than assumed, so a parcel sitting at another warehouse cannot be handed
-     * over from this one.
-     */
-    private function isAtHub(Warehouse $hub, ShipmentItem $item): bool
-    {
-        // `hub_id` wins when it is set. It is the more recent fact: a parcel
-        // taken in over the counter at Accra Main and *later* received at Kumasi
-        // keeps its Accra receipt, and must not still count as being at Accra.
-        if (filled($item->hub_id)) {
-            return (int) $item->hub_id === (int) $hub->id;
-        }
-
-        // Never checked into a hub, so the warehouse receipt is the only record
-        // of where the parcel physically is.
-        return $item->warehouseReceiptItems()
-            ->whereHas('receipt', function ($query) use ($hub) {
-                $query->where('warehouse_id', $hub->id)
-                    ->where('status', WarehouseReceipt::STATUS_FINALIZED);
-            })
-            ->exists();
     }
 
     /**

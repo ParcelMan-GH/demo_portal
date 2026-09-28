@@ -63,6 +63,102 @@ class ShipmentItem extends Model
     ];
 
     /**
+     * Statuses that mean a parcel is physically sitting at a hub.
+     *
+     * This is the single list behind both questions the hub app asks — "what is
+     * in my hub" (inventory, dashboard counts) and "what may I put on a bus"
+     * (bus handoff). They were separate lists once, which is how a parcel could
+     * be handoff-able but invisible in inventory.
+     *
+     * `pending` is in here, but it cannot pass the location test on its own — a
+     * parcel with no custody record is never "at" a hub, so it stays out of
+     * inventory and off the buses. See `scopeAtHub()`.
+     *
+     * @var array<int, ItemStatus>
+     */
+    public const AT_HUB_STATUSES = [
+        ItemStatus::AT_WAREHOUSE,
+        ItemStatus::ARRIVED_AT_HUB,
+        ItemStatus::SORTED,
+        ItemStatus::READY_FOR_HUB_TRANSFER,
+        ItemStatus::PENDING,
+    ];
+
+    /**
+     * Restrict a query to parcels physically sitting at the given hub.
+     *
+     * There are two ways a parcel gets to a hub, and only one of them writes a
+     * column on this table:
+     *
+     *  1. Hub intake — a transporter's batch is scanned in and `hub_id` is set.
+     *  2. Over the counter — a walk-in is booked at the office, which produces a
+     *     finalized warehouse receipt naming the warehouse and never touches
+     *     `hub_id` at all.
+     *
+     * Reading only `hub_id` means every walk-in parcel is invisible and
+     * undispatchable, which is exactly what was happening. Both are read here.
+     *
+     * `hub_id` wins wherever it is set, because it is the more recent fact: a
+     * parcel taken in at Accra Main and *later* received at Kumasi keeps its
+     * Accra receipt, and must not still count as being at Accra.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<ShipmentItem>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<ShipmentItem>
+     */
+    public function scopeAtHub($query, int $hubId)
+    {
+        return $query->where(function ($inner) use ($hubId) {
+            $inner->where($this->qualifyColumn('hub_id'), $hubId)
+                ->orWhere(function ($counter) use ($hubId) {
+                    $counter->whereNull($this->qualifyColumn('hub_id'))
+                        ->whereHas('warehouseReceiptItems.receipt', function ($receipt) use ($hubId) {
+                            $receipt->where('warehouse_receipts.warehouse_id', $hubId)
+                                ->where('warehouse_receipts.status', WarehouseReceipt::STATUS_FINALIZED);
+                        });
+                });
+        });
+    }
+
+    /**
+     * The complement of `scopeAtHub()`: parcels that are not at this hub.
+     *
+     * Written out rather than negated in SQL because `hub_id != ?` is NULL-unsafe
+     * — a walk-in parcel has no `hub_id`, and `NULL != 1` is not true, so a naive
+     * negation would silently drop the very rows this exists to catch.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<ShipmentItem>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<ShipmentItem>
+     */
+    public function scopeNotAtHub($query, int $hubId)
+    {
+        return $query->where(function ($inner) use ($hubId) {
+            $inner->where(function ($elsewhere) use ($hubId) {
+                $elsewhere->whereNotNull($this->qualifyColumn('hub_id'))
+                    ->where($this->qualifyColumn('hub_id'), '!=', $hubId);
+            })->orWhere(function ($unaccounted) use ($hubId) {
+                $unaccounted->whereNull($this->qualifyColumn('hub_id'))
+                    ->whereDoesntHave('warehouseReceiptItems.receipt', function ($receipt) use ($hubId) {
+                        $receipt->where('warehouse_receipts.warehouse_id', $hubId)
+                            ->where('warehouse_receipts.status', WarehouseReceipt::STATUS_FINALIZED);
+                    });
+            });
+        });
+    }
+
+    /**
+     * Is this parcel physically at the given hub?
+     *
+     * Delegates to the scope rather than repeating the rule, so a single parcel
+     * and a list of parcels can never disagree about where it is. That matters:
+     * inventory listing and bus handoff eligibility ask the same question, and
+     * they must not answer it differently.
+     */
+    public function isAtHub(int $hubId): bool
+    {
+        return static::query()->whereKey($this->getKey())->atHub($hubId)->exists();
+    }
+
+    /**
      * The attributes that should be cast.
      *
      * @var array<string, string>
