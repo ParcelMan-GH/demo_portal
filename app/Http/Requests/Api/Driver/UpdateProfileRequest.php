@@ -25,7 +25,10 @@ class UpdateProfileRequest extends FormRequest
             'email' => ['sometimes', 'nullable', 'email', 'max:255'],
             'vehicle_type' => ['sometimes', 'required', Rule::in(['motorcycle', 'car', 'van', 'truck'])],
             'vehicle_number' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'make_model' => ['sometimes', 'nullable', 'string', 'max:255'],
             'license_number' => ['sometimes', 'nullable', 'string', 'max:50'],
+            // A label, not a number: "3,500 kg" would fail a numeric rule.
+            'max_capacity' => ['sometimes', 'nullable', 'string', 'max:50'],
             'base_location' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }

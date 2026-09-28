@@ -91,13 +91,20 @@ class DriverProfileService
          * it and login accepts an email, but the field was never writable, so an
          * email edit looked saved and then reverted.
          *
-         * Note what is deliberately absent: make_model, license_plate and
-         * max_capacity are columns on `users`, NOT on `drivers`. The vehicle
-         * screen collects all three, and no driver column can hold them — that is
-         * a product gap, not a missing line here. Filtering against the schema
-         * keeps a wrong name from becoming a 500.
+         * make_model and max_capacity are here now that
+         * 2026_09_29_000001 adds them to `drivers` — the vehicle screen collects
+         * both and previously had nowhere to put them.
+         *
+         * There is no separate `license_plate` column, by design: `vehicle_number`
+         * already holds the vehicle's registration (the seeded values are
+         * Ghanaian plates, e.g. "GR-1234-20"). A second plate column would be a
+         * duplicate of the same fact. The screen's "License Plate Number" field
+         * writes to `vehicle_number`.
+         *
+         * The list stays filtered against the schema, so a name that is wrong for
+         * a future table cannot become a 500.
          */
-        $writable = ['name', 'phone', 'email', 'vehicle_type', 'vehicle_number', 'license_number', 'base_location'];
+        $writable = ['name', 'phone', 'email', 'vehicle_type', 'vehicle_number', 'make_model', 'license_number', 'max_capacity', 'base_location'];
         $allowedFields = array_values(array_filter(
             $writable,
             fn (string $field) => Schema::hasColumn($driver->getTable(), $field)

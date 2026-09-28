@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\DriverAssignmentController;
 use App\Http\Controllers\Api\V1\DriverBusHandoffController;
 use App\Http\Controllers\Api\V1\DriverBusStationController;
 use App\Http\Controllers\Api\V1\DriverDeliveryController;
+use App\Http\Controllers\Api\V1\DriverEarningsController;
 use App\Http\Controllers\Api\V1\DriverNotificationController;
 use App\Http\Controllers\Api\V1\DriverPackageController;
 use App\Http\Controllers\Api\V1\DriverProfileController;
@@ -206,6 +207,18 @@ Route::prefix('v1/driver')->group(function () {
         Route::get('transports', [DriverTransportController::class, 'index']);
         Route::get('transports/{manifest}', [DriverTransportController::class, 'show']);
         Route::post('transports/{manifest}/start-loading', [DriverTransportController::class, 'startLoading']);
+
+        /*
+         * The vehicle screen used to post here. The route never existed (404), so
+         * nothing it saved was ever stored. It is kept as an alias of the profile
+         * update because builds already installed on testers' phones still call
+         * it, and a 404 is a worse answer than a working save.
+         */
+        Route::post('vehicle/update', [DriverProfileController::class, 'update']);
+
+        Route::get('earnings', [DriverEarningsController::class, 'index']);
+        Route::post('payouts/request', [DriverEarningsController::class, 'requestPayout']);
+        Route::put('notifications/preferences', [DriverNotificationController::class, 'updatePreferences']);
         Route::post('transports/{manifest}/scan-load', [DriverTransportController::class, 'scanLoad']);
         Route::post('transports/{manifest}/scan-issue', [DriverTransportController::class, 'scanIssue']);
         Route::post('transports/{manifest}/depart', [DriverTransportController::class, 'depart']);

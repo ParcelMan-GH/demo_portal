@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Driver;
 use App\Models\NotificationLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -94,6 +95,13 @@ class DriverNotificationController extends Controller
             'success' => true,
             'message' => 'Notifications retrieved successfully.',
             'data'    => [
+                /*
+                 * The alert toggles live here so the notifications screen has one
+                 * request instead of two. There was no preferences endpoint and no
+                 * column, so the switches had nothing to read and always showed
+                 * their defaults.
+                 */
+                'preferences' => $driver->notificationPreferences(),
                 'notifications' => $rows,
                 'unread_count'  => $unreadCount,
                 'pagination'    => [
@@ -107,6 +115,39 @@ class DriverNotificationController extends Controller
                     'per_page'     => $limit,
                 ],
             ],
+        ]);
+    }
+
+    /**
+     * PUT /api/v1/driver/notifications/preferences
+     *
+     * Saves the alert toggles.
+     *
+     * The two-way merge matters: the app sends only the switch that changed, so
+     * replacing the whole array would silently reset the other three to their
+     * defaults every time a driver touched one.
+     */
+    public function updatePreferences(Request $request): JsonResponse
+    {
+        $driver = $request->user();
+
+        $rules = [];
+        foreach (array_keys(Driver::DEFAULT_NOTIFICATION_PREFERENCES) as $key) {
+            $rules[$key] = ['sometimes', 'boolean'];
+        }
+
+        $validated = $request->validate($rules);
+
+        $preferences = array_merge($driver->notificationPreferences(), $validated);
+
+        // forceFill: `notification_settings` is fillable, but the driver here is
+        // the authenticated model and may have been resolved without it.
+        $driver->forceFill(['notification_settings' => $preferences])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notification preferences saved.',
+            'data' => ['preferences' => $preferences],
         ]);
     }
 

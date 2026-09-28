@@ -35,12 +35,28 @@ class Driver extends Authenticatable
         'vehicle_type',
         'vehicle_number',
         'license_number',
+        'make_model',
+        'max_capacity',
         'base_location',
+        'notification_settings',
         'status',
         'is_active',
         'task_capabilities',
         'last_login_at',
         'fcm_token',
+    ];
+
+    /**
+     * Alert toggles, and what they are when a driver has never touched them.
+     *
+     * ON by default: a driver who has never opened the screen should still get
+     * told about a batch they have been assigned.
+     */
+    public const DEFAULT_NOTIFICATION_PREFERENCES = [
+        'batch_alerts' => true,
+        'route_updates' => true,
+        'payout_alerts' => true,
+        'sound_vibration' => true,
     ];
 
     protected $hidden = [
@@ -49,10 +65,39 @@ class Driver extends Authenticatable
     ];
 
     protected $casts = [
+        'notification_settings' => 'array',
         'is_active' => 'boolean',
         'task_capabilities' => 'array',
         'last_login_at' => 'datetime',
     ];
+
+    /**
+     * The driver's alert toggles, with defaults filled in.
+     *
+     * Reading through this rather than `$driver->notification_settings` directly
+     * means a driver who has never saved anything, or one whose stored array is
+     * missing a key added later, still gets a complete set of answers.
+     *
+     * @return array<string, bool>
+     */
+    public function notificationPreferences(): array
+    {
+        $stored = $this->notification_settings;
+
+        if (! is_array($stored)) {
+            return self::DEFAULT_NOTIFICATION_PREFERENCES;
+        }
+
+        $preferences = self::DEFAULT_NOTIFICATION_PREFERENCES;
+
+        foreach ($preferences as $key => $default) {
+            if (array_key_exists($key, $stored)) {
+                $preferences[$key] = (bool) $stored[$key];
+            }
+        }
+
+        return $preferences;
+    }
 
     /**
      * Get normalized driver capabilities.

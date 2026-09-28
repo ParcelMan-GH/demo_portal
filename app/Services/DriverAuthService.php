@@ -137,6 +137,14 @@ class DriverAuthService
     /**
      * Format driver for API response.
      */
+    /**
+     * The driver as every screen receives them.
+     *
+     * This is the shape the app writes back from after a save, so a column that
+     * is persisted but missing here reads as "the server dropped my change" on
+     * the vehicle and profile screens. Keep it in step with the writable fields
+     * in DriverProfileService.
+     */
     public function formatDriver(Driver $driver): array
     {
         return [
@@ -148,11 +156,17 @@ class DriverAuthService
             'phone' => $driver->phone,
             'vehicle_type' => $driver->vehicle_type,
             'vehicle_number' => $driver->vehicle_number,
+            'make_model' => $driver->make_model,
             'license_number' => $driver->license_number,
+            'max_capacity' => $driver->max_capacity,
             'base_location' => $driver->base_location,
             'status' => $driver->status,
             'is_active' => $driver->is_active,
             'task_capabilities' => $driver->getCapabilities(),
+
+            // The alert toggles, so the app has them before the notifications
+            // screen is ever opened.
+            'notification_settings' => $driver->notificationPreferences(),
         ];
     }
 }

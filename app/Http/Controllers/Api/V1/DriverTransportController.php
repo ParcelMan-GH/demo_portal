@@ -154,8 +154,18 @@ class DriverTransportController extends Controller
                 'destination_warehouse_id' => $destinationId,
                 'assigned_driver_id' => $driver->id,
                 'assigned_at' => $now,
-                'status' => 'in_transit',
-                'dispatched_at' => $now,
+                /*
+                 * Handed over as `assigned`, not `in_transit`.
+                 *
+                 * The scan screen's next step is POST .../start-loading, and
+                 * driverStartLoading only accepts `assigned` or `loading` — so a
+                 * bridged manifest created straight into `in_transit` came back
+                 * "Manifest is not ready for loading." The driver could see the
+                 * batch but not load it, which is the flow this is meant to
+                 * unblock. The lifecycle now runs normally:
+                 * assigned -> loading -> in_transit -> arrived.
+                 */
+                'status' => TransportManifest::STATUS_ASSIGNED,
                 'notes' => 'Created from outgoing batch '.$batch->batch_number.' during a transporter scan.',
             ], fn ($value) => $value !== null), array_flip(Schema::getColumnListing('transport_manifests')));
 
@@ -257,13 +267,41 @@ class DriverTransportController extends Controller
                         }
                     }
 
-                    if ($isFirst) {
-                        $q->whereHas('containers', fn ($cq) => $cq->where('code', 'like', "%{$search}%"));
-                    } else {
-                        $q->orWhereHas('containers', fn ($cq) => $cq->where('code', 'like', "%{$search}%"));
+                    /*
+                     * Both of these used columns that do not exist, and an
+                     * unguarded column reference is a hard SQL error rather than
+                     * a no-op:
+                     *
+                     *   transport_containers.code          -> the column is container_code
+                     *   transport_manifest_items.tracking_code -> no such column at all;
+                     *       the tracking code lives on the related shipment item.
+                     *
+                     * So EVERY scan died with "Unknown column 'code' in 'WHERE'"
+                     * (HTTP 500), which the app reports as "Batch Not Found".
+                     * Every code was affected, not just the reported one.
+                     */
+                    $containerColumn = collect(['container_code', 'code'])
+                        ->first(fn ($col) => Schema::hasColumn('transport_containers', $col));
+
+                    if ($containerColumn) {
+                        $containerMatch = fn ($cq) => $cq->where($containerColumn, 'like', "%{$search}%");
+
+                        if ($isFirst) {
+                            $q->whereHas('containers', $containerMatch);
+                            $isFirst = false;
+                        } else {
+                            $q->orWhereHas('containers', $containerMatch);
+                        }
                     }
 
-                    $q->orWhereHas('items', fn ($iq) => $iq->where('tracking_code', 'like', CodeResolver::likeTerm($search)));
+                    // The tracking code belongs to the shipment item, which this
+                    // line references — not to the manifest line itself.
+                    if (Schema::hasColumn('shipment_items', 'tracking_code')) {
+                        $q->orWhereHas(
+                            'items.shipmentItem',
+                            fn ($iq) => $iq->where('tracking_code', 'like', CodeResolver::likeTerm($search))
+                        );
+                    }
                 });
             }
 
