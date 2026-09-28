@@ -426,6 +426,21 @@ class AdminTransportManifestController extends Controller
         $prepared = $labels->prepare($batch->shipmentItems);
         $total = count($prepared['parcels']);
 
+        /*
+         * The label is on the box now, and that — not the per-parcel label rows
+         * — is what departure waits for. Recorded here because printing is the
+         * moment the warehouse commits the box.
+         */
+        TransportManifest::query()
+            ->where(function ($query) use ($batch) {
+                $query->where('sort_batch_id', $batch->id)
+                    // The bridge creates the manifest with the batch number as
+                    // its manifest number and does not set sort_batch_id, so that
+                    // string is the link for every manifest it created.
+                    ->orWhere('manifest_number', $batch->batch_number);
+            })
+            ->update(['labels_printed_at' => now()]);
+
         $html = $labels->renderSheet([
             'batch' => $batch,
             'code' => $batch->batch_number,

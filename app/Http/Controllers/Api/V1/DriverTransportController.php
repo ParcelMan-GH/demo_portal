@@ -78,6 +78,11 @@ class DriverTransportController extends Controller
 
             $attributes = array_intersect_key(array_filter([
                 'manifest_number' => $batch->batch_number,
+                // The real link back to the batch. Without it the only connection
+                // is the manifest number matching the batch number, which is a
+                // string coincidence rather than a relationship — and it is what
+                // the label-print step had to fall back on.
+                'sort_batch_id' => $batch->id,
                 'origin_warehouse_id' => $originId,
                 'destination_warehouse_id' => $destinationId,
                 'assigned_driver_id' => $driver->id,

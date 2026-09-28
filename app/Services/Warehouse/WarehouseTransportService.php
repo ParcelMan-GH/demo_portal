@@ -20,7 +20,6 @@ use App\Models\TransportManifestLabelScan;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
-use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceiptItemLabel;
 use App\Services\DriverWorkloadService;
 use App\Services\RiderAssignmentAuditService;
@@ -2054,36 +2053,6 @@ class WarehouseTransportService
     }
 
     /**
-     * Has every parcel in this batch been labelled at the warehouse?
-     *
-     * That is the signal that the box was packed and sealed, which is what
-     * actually has to be true before a batch can leave. Checked per parcel
-     * rather than counted, because one parcel can have more than one receipt if
-     * it was received in parts.
-     */
-    private function boxHasBeenLabelled(TransportManifest $manifest): bool
-    {
-        $shipmentItemIds = $manifest->items()->pluck('shipment_item_id');
-
-        if ($shipmentItemIds->isEmpty()) {
-            return false;
-        }
-
-        foreach ($shipmentItemIds as $shipmentItemId) {
-            $labelled = WarehouseReceiptItem::query()
-                ->where('shipment_item_id', $shipmentItemId)
-                ->whereHas('labels')
-                ->exists();
-
-            if (! $labelled) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
      * Mark the batch's boxes loaded.
      *
      * A sealed, labelled box is loaded the moment the driver takes it; there is
@@ -2115,16 +2084,23 @@ class WarehouseTransportService
         }
 
         /*
-         * A batch travels as one sealed box with one label on it, so the gate is
-         * whether that box was labelled at the warehouse — not whether the driver
-         * has scanned anything. The app has no per-parcel scanning step, so the
-         * old status-only guard left a driver who had scanned nothing with
-         * "Manifest is not ready to depart." and no way forward.
+         * The gate is whether the box label has been printed — not whether every
+         * parcel carries its own label row.
+         *
+         * A batch travels as one box, and printing the box label at the hub is
+         * the moment the warehouse commits it. Gating on per-parcel labels made
+         * a single parcel that was never receipted strand the whole box: there
+         * is no receipt item to derive a barcode from, so no amount of printing
+         * would clear it, and the driver was holding a sealed, labelled box the
+         * app would not release.
+         *
+         * A shortfall in parcel labels is a warehouse problem and is reported on
+         * the sheet, where it can still be acted on before the box is sealed.
          */
-        if (! $this->boxHasBeenLabelled($manifest)) {
+        if (! $manifest->labels_printed_at) {
             return [
                 'success' => false,
-                'message' => 'All parcels in this batch must be receipted and labeled at the warehouse before departing.',
+                'message' => 'This batch must be receipted and labeled at the warehouse before departing.',
             ];
         }
 
