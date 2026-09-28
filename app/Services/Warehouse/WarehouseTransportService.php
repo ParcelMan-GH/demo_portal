@@ -755,9 +755,48 @@ class WarehouseTransportService
         });
     }
 
+    /**
+     * Take an unassigned batch for this driver.
+     *
+     * "Close & Dispatch" hands a batch to transport without having to name the
+     * transporter doing the run. When nobody was named, the manifest reaches the
+     * app unassigned, and the driver who scans it is the driver taking it — the
+     * scan IS the claim, and it is recorded here. A batch already assigned to
+     * somebody else is never taken, so a second driver scanning the same code
+     * cannot quietly walk off with another driver's load.
+     *
+     * Only a batch that has not left yet can be claimed: `draft` (the manifest
+     * reads "Ready" at the warehouse) and `assigned`. Claiming never resurrects
+     * a box that is already on the road or already closed.
+     */
+    public function claimManifest(TransportManifest $manifest, Driver $driver): bool
+    {
+        $owner = (int) ($manifest->assigned_driver_id ?? 0);
+
+        if ($owner === (int) $driver->id) {
+            return true;
+        }
+
+        if ($owner !== 0) {
+            return false;
+        }
+
+        if (! in_array($manifest->status, [TransportManifest::STATUS_DRAFT, TransportManifest::STATUS_ASSIGNED], true)) {
+            return false;
+        }
+
+        $manifest->update([
+            'assigned_driver_id' => $driver->id,
+            'assigned_at' => $manifest->assigned_at ?? now(),
+            'status' => TransportManifest::STATUS_ASSIGNED,
+        ]);
+
+        return true;
+    }
+
     public function driverStartLoading(TransportManifest $manifest, Driver $driver): array
     {
-        if ((int) $manifest->assigned_driver_id !== (int) $driver->id) {
+        if (! $this->claimManifest($manifest, $driver)) {
             return ['success' => false, 'message' => 'Manifest not found.'];
         }
 
@@ -779,7 +818,7 @@ class WarehouseTransportService
 
     public function driverScanLoad(TransportManifest $manifest, Driver $driver, string $trackingCode): array
     {
-        if ((int) $manifest->assigned_driver_id !== (int) $driver->id) {
+        if (! $this->claimManifest($manifest, $driver)) {
             return ['success' => false, 'message' => 'Manifest not found.'];
         }
 
@@ -2075,7 +2114,7 @@ class WarehouseTransportService
 
     public function driverDepart(TransportManifest $manifest, Driver $driver): array
     {
-        if ((int) $manifest->assigned_driver_id !== (int) $driver->id) {
+        if (! $this->claimManifest($manifest, $driver)) {
             return ['success' => false, 'message' => 'Manifest not found.'];
         }
 
@@ -2084,26 +2123,17 @@ class WarehouseTransportService
         }
 
         /*
-         * The gate is whether the box label has been printed — not whether every
-         * parcel carries its own label row.
+         * No label gate here on purpose.
          *
-         * A batch travels as one box, and printing the box label at the hub is
-         * the moment the warehouse commits it. Gating on per-parcel labels made
-         * a single parcel that was never receipted strand the whole box: there
-         * is no receipt item to derive a barcode from, so no amount of printing
-         * would clear it, and the driver was holding a sealed, labelled box the
-         * app would not release.
+         * Printing a label is paper. It does not release a batch, and it was
+         * wrong to make departure wait for it — a hub that printed nothing, or
+         * a parcel that could never be labelled, both left a driver unable to
+         * move a box that the admin had already dispatched.
          *
-         * A shortfall in parcel labels is a warehouse problem and is reported on
-         * the sheet, where it can still be acted on before the box is sealed.
+         * Releasing a batch is the admin's "Close & Dispatch", which puts the
+         * batch in `dispatched` and hands it to transport. From there the
+         * transporter scans it and starts the trip; that is the whole flow.
          */
-        if (! $manifest->labels_printed_at) {
-            return [
-                'success' => false,
-                'message' => 'This batch must be receipted and labeled at the warehouse before departing.',
-            ];
-        }
-
         // Taking a prepared box IS the loading step: the warehouse sealed and
         // labelled it, and the driver is not going to open it on the roadside.
         if ($manifest->status === TransportManifest::STATUS_ASSIGNED) {

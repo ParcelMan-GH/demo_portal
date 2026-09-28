@@ -40,7 +40,16 @@ class DriverTransportController extends Controller
             $existing = TransportManifest::query()->where('manifest_number', $code)->first();
 
             if ($existing) {
-                return $existing;
+                /*
+                 * The batch was closed and dispatched without naming a
+                 * transporter, so it reached the app unassigned. Scanning it is
+                 * the claim: the driver holding the scanner is the driver taking
+                 * the load. A manifest already assigned to somebody else is left
+                 * exactly as it is.
+                 */
+                $this->transportService->claimManifest($existing, $driver);
+
+                return $existing->fresh();
             }
 
             $batch = CodeResolver::resolveOutgoingBatch($code);
@@ -444,13 +453,18 @@ class DriverTransportController extends Controller
     {
         $driver = $this->actingDriver($request);
 
-        // Same phantom column that broke index(): neither `driver_id` nor
-        // `transporter_id` exists, so this always took the fallback and the
-        // update died with "Unknown column 'transporter_id'".
-        if (! $manifest->assigned_driver_id) {
-            $manifest->update(['assigned_driver_id' => $driver->id]);
-        }
-
+        /*
+         * Claiming is not done here any more; WarehouseTransportService::
+         * claimManifest() owns it, and driverDepart() calls it first.
+         *
+         * This method used to claim on its own with
+         * `$manifest->update(['assigned_driver_id' => $driver->id])`. That
+         * recorded the driver but left the manifest in `draft`, so the very next
+         * check inside driverDepart() read `draft` and refused the departure
+         * with "This batch has already left the warehouse." — on a batch that had
+         * never moved. The claim is now one call, in one place, and it sets the
+         * driver and the status together.
+         */
         $result = $this->transportService->driverDepart($manifest, $driver);
 
         return $this->transportActionResponse($driver, $manifest, $result, 400);

@@ -426,21 +426,6 @@ class AdminTransportManifestController extends Controller
         $prepared = $labels->prepare($batch->shipmentItems);
         $total = count($prepared['parcels']);
 
-        /*
-         * The label is on the box now, and that — not the per-parcel label rows
-         * — is what departure waits for. Recorded here because printing is the
-         * moment the warehouse commits the box.
-         */
-        TransportManifest::query()
-            ->where(function ($query) use ($batch) {
-                $query->where('sort_batch_id', $batch->id)
-                    // The bridge creates the manifest with the batch number as
-                    // its manifest number and does not set sort_batch_id, so that
-                    // string is the link for every manifest it created.
-                    ->orWhere('manifest_number', $batch->batch_number);
-            })
-            ->update(['labels_printed_at' => now()]);
-
         $html = $labels->renderSheet([
             'batch' => $batch,
             'code' => $batch->batch_number,
@@ -578,8 +563,20 @@ class AdminTransportManifestController extends Controller
             'destination_warehouse_id' => $destination->id,
             'assigned_driver_id' => $driverId,
             'assigned_at' => $driverId ? $now : null,
-            'status' => $driverId ? TransportManifest::STATUS_IN_TRANSIT : TransportManifest::STATUS_DRAFT,
-            'dispatched_at' => $driverId ? $now : null,
+            /*
+             * `assigned` when a transporter was named, `draft` when the batch is
+             * still waiting for one.
+             *
+             * This used to raise the manifest straight to `in_transit`, which
+             * meant the very transporter the operator had just named opened the
+             * app and was told the batch had already left the warehouse. Closing
+             * and dispatching hands the batch over; it does not start the run.
+             * The run starts when the transporter departs, and the manifest
+             * walks assigned -> loading -> in_transit -> arrived like every
+             * other one. `dispatched_at` is left to that departure for the same
+             * reason: until then, the box is still standing at the origin.
+             */
+            'status' => $driverId ? TransportManifest::STATUS_ASSIGNED : TransportManifest::STATUS_DRAFT,
             'created_by_user_id' => $user?->id,
             'notes' => 'Created automatically from outgoing batch '.$batch->batch_number.'.',
         ], fn ($value) => $value !== null);
