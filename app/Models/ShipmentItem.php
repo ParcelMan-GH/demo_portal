@@ -146,6 +146,48 @@ class ShipmentItem extends Model
     }
 
     /**
+     * Parcels this hub is holding that still have to go on a bus.
+     *
+     * This is the dashboard's "Ready for Bus" tile. Three things must hold:
+     *
+     *  1. the parcel is here — by either arrival route, see `scopeAtHub()`;
+     *  2. it is still awaiting outbound movement, meaning its status is one that
+     *     says "sitting at a hub" and it has not already been handed over. That
+     *     second half is the bug this replaces: the tile used to count
+     *     `dispatched_to_bus`, i.e. parcels that had already gone, so it read
+     *     zero in normal operation and meant the opposite of its own label;
+     *  3. its destination is not one this hub can serve itself. A parcel we can
+     *     prove is destined inside the hub's own region is local delivery work,
+     *     not a bus consignment.
+     *
+     * A parcel with no recorded destination is counted on purpose. It cannot be
+     * shown to be local, and the hub is still holding it and still has to move
+     * it somewhere — excluding it would under-report the hub's workload, which is
+     * the failure this tile is already recovering from.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<ShipmentItem>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<ShipmentItem>
+     */
+    public function scopeAwaitingBus($query, Warehouse $hub)
+    {
+        $query->atHub($hub->id)
+            ->whereIn('status', array_map(fn (ItemStatus $status) => $status->value, self::AT_HUB_STATUSES))
+            ->whereDoesntHave('busHandoffs');
+
+        // Only meaningful when the hub itself carries a region to compare with.
+        // Without one the region test would compare against NULL and exclude
+        // everything, which is the failure mode being fixed.
+        if (filled($hub->region_id)) {
+            $query->where(function ($destination) use ($hub) {
+                $destination->whereNull('delivery_region_id')
+                    ->orWhere('delivery_region_id', '!=', $hub->region_id);
+            });
+        }
+
+        return $query;
+    }
+
+    /**
      * Is this parcel physically at the given hub?
      *
      * Delegates to the scope rather than repeating the rule, so a single parcel
@@ -305,6 +347,17 @@ class ShipmentItem extends Model
     public function busHandoffConfirmations(): HasMany
     {
         return $this->hasMany(BusHandoffConfirmation::class);
+    }
+
+    /**
+     * Bus handovers recorded for this parcel.
+     *
+     * A parcel that has one has already left on a bus, so it is no longer work
+     * the hub has waiting.
+     */
+    public function busHandoffs(): HasMany
+    {
+        return $this->hasMany(HubBusHandoff::class);
     }
 
     public function riderLocationChanges(): HasMany

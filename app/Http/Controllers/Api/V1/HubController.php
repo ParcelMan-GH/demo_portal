@@ -135,7 +135,7 @@ class HubController extends Controller
                 'metrics' => [
                     'in_hub_count' => $counts['at_hub'],
                     'inbound_today_count' => $counts['received_today'],
-                    'ready_for_bus_count' => $counts['dispatched_to_bus'],
+                    'ready_for_bus_count' => $counts['ready_for_bus'],
                     'released_today_count' => $counts['released_today'],
                 ],
                 // Retained in the shape the hub screens already read.
@@ -944,11 +944,16 @@ class HubController extends Controller
     {
         $base = ShipmentItem::query()->atHub($hub->id);
 
+        // Parcels still waiting to go on a bus. Deliberately not the
+        // dispatched count — see ShipmentItem::scopeAwaitingBus().
+        $readyForBus = (clone $base)->awaitingBus($hub)->count();
+
         return [
             'at_hub' => (clone $base)->whereIn('status', array_map(
                 fn (ItemStatus $status) => $status->value,
                 self::AT_HUB_STATUSES
             ))->count(),
+            'ready_for_bus' => $readyForBus,
             'dispatched_to_bus' => (clone $base)->where('status', ItemStatus::DISPATCHED_TO_BUS->value)->count(),
             'released_today' => (clone $base)->whereNotNull('released_at')
                 ->whereDate('released_at', today())
