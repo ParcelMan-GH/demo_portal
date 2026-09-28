@@ -15,7 +15,16 @@ class ProfilePhotoService
 {
     public const FOLDER_DRIVER = 'driver-photos';
     public const FOLDER_VENDOR = 'vendor-photos';
-    public const FOLDER_USER = 'user-photos';
+    /**
+     * Where a person's avatar is kept, served from
+     * https://<host>/storage/avatars/<file>.
+     *
+     * Note the driver and vendor photos live in `driver-photos` / `vendor-photos`,
+     * so this one reads differently. That is deliberate: it is the path the ops
+     * team asked for, and existing files were moved across to it rather than
+     * leaving user photos split between two folders.
+     */
+    public const FOLDER_USER = 'avatars';
 
     /**
      * Photos are capped at 5MB. The app resizes before upload, but the server

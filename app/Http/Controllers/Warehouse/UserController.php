@@ -27,6 +27,7 @@ use App\Models\WarehouseCapability;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceiptItemPhoto;
+use App\Services\ProfilePhotoService;
 use App\Services\StorageService;
 use App\Services\Warehouse\WarehousePortalService;
 use App\Support\GenericPdfExporter;
@@ -270,7 +271,7 @@ class UserController extends Controller
             'email' => $validated['email'] ?? null,
             'phone' => PhoneHelper::format($validated['phone']),
             'photo_path' => $request->hasFile('profile_photo')
-                ? $this->storageService->upload($request->file('profile_photo'), 'user-photos')['path']
+                ? $this->storageService->upload($request->file('profile_photo'), ProfilePhotoService::FOLDER_USER)['path']
                 : null,
             'password' => Hash::make($validated['password']),
             'warehouse_id' => $warehouse->id,
@@ -354,7 +355,7 @@ class UserController extends Controller
                 $this->storageService->delete($user->photo_path);
             }
 
-            $payload['photo_path'] = $this->storageService->upload($request->file('profile_photo'), 'user-photos')['path'];
+            $payload['photo_path'] = $this->storageService->upload($request->file('profile_photo'), ProfilePhotoService::FOLDER_USER)['path'];
         }
 
         $user->update($payload);

@@ -63,6 +63,8 @@ function registerWarehouseTransportManifestsPage() {
         return {
             ...page,
             showFilters: false,
+            /** Field errors from a rejected create, keyed by field name. */
+            errors: {},
             transferBatches: Array.isArray(config.transfer_batches) ? config.transfer_batches : [],
             transportDrivers: Array.isArray(config.transport_drivers) ? config.transport_drivers : [],
             destinationWarehouses: Array.isArray(config.destination_warehouses) ? config.destination_warehouses : [],
@@ -343,7 +345,15 @@ function registerWarehouseTransportManifestsPage() {
                     .then(setupPicker);
             },
 
-            async createManifest() {
+            /**
+             * Create an outgoing batch.
+             *
+             * Takes the payload rather than sending an empty body: the endpoint
+             * requires a region and a district, so `JSON.stringify({})` could only
+             * ever come back 422. `payload` is the create form's state, including
+             * `destination_warehouse_id` when the operator picked one.
+             */
+            async createManifest(payload = {}) {
                 this.loading = true;
                 try {
                     const response = await fetch(config.create_endpoint, {
@@ -354,10 +364,16 @@ function registerWarehouseTransportManifestsPage() {
                             'X-CSRF-TOKEN': csrfToken(),
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({}),
+                        body: JSON.stringify(payload ?? {}),
                     });
 
                     const result = await response.json();
+
+                    if (response.status === 422) {
+                        this.errors = result.errors || {};
+                        throw new Error(result.message || 'Please correct the highlighted fields.');
+                    }
+
                     if (!response.ok || !result.success) {
                         throw new Error(result.message || 'Failed to create outgoing transfer.');
                     }

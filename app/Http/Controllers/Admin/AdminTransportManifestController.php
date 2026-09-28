@@ -7,6 +7,8 @@ use App\Enums\ItemStatus;
 use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
+use App\Models\District;
+use App\Models\Region;
 use App\Models\OutgoingBatch;
 use App\Models\ShipmentItem;
 use App\Models\TransportManifest;
@@ -51,12 +53,21 @@ class AdminTransportManifestController extends Controller
             ['value' => 'dispatched', 'label' => 'Dispatched'],
         ];
 
+        // The create-batch modal needs somewhere to send it. Regions and districts
+        // are not derivable from a warehouse, so both lists come through.
+        $regions = Region::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $districts = District::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'region_id', 'name']);
+
         return view('admin.transport-manifests.index', compact(
             'warehouses', 
             'drivers', 
             'transportDrivers',
             'statuses', 
-            'transferBatches'
+            'transferBatches',
+            'regions',
+            'districts'
         ));
     }
 
@@ -86,11 +97,20 @@ class AdminTransportManifestController extends Controller
 
         // Same guard, same reason: only write the column once it exists.
         if (Schema::hasColumn('outgoing_batches', 'destination_warehouse_id')) {
+            // A select with nothing chosen submits an empty string, not null. Read
+            // through `filled()` rather than `??` so "" counts as "no choice" and
+            // does not reach the column as an integer — which MySQL rejects
+            // outright ("Incorrect integer value: ''"), and which the framework's
+            // empty-string-to-null middleware would otherwise paper over for form
+            // posts while a JSON client still hit it.
+            $chosen = $validated['destination_warehouse_id'] ?? null;
+
             // An explicit choice wins; otherwise work it out from where the batch
             // is going. Null when that region has no hub, which is the honest
             // answer rather than pointing at a plausible-looking wrong hub.
-            $attributes['destination_warehouse_id'] = $validated['destination_warehouse_id']
-                ?? OutgoingBatch::resolveDestinationWarehouseId(
+            $attributes['destination_warehouse_id'] = filled($chosen)
+                ? (int) $chosen
+                : OutgoingBatch::resolveDestinationWarehouseId(
                     (int) $validated['delivery_region_id'],
                     (int) $validated['delivery_district_id']
                 );
@@ -190,6 +210,12 @@ class AdminTransportManifestController extends Controller
 
         if ($status = $request->get('status')) {
             $query->where('status', $status);
+        }
+
+        // The batch list offers a Destination filter; without this the parameter
+        // was sent and silently ignored.
+        if ($destinationWarehouseId = $request->get('destination_warehouse_id')) {
+            $query->where('destination_warehouse_id', (int) $destinationWarehouseId);
         }
 
         if ($dateFilter = $request->get('date_filter')) {

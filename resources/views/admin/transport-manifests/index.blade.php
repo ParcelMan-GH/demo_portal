@@ -12,7 +12,13 @@
             'name' => $driver->name,
             'phone' => $driver->phone,
         ])->values(),
-        'destination_warehouses' => $warehouses ?? [],
+        'destination_warehouses' => collect($warehouses ?? [])->map(fn ($warehouse) => [
+            'id' => $warehouse->id,
+            'name' => $warehouse->name,
+        ])->values(),
+        'regions' => collect($regions ?? [])->values(),
+        'districts' => collect($districts ?? [])->values(),
+        'create_endpoint' => route('admin.transport-manifests.store'),
     ];
 @endphp
 
@@ -92,6 +98,79 @@
                             <option value="dispatched">Dispatched</option>
                         </select>
                     </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Destination</label>
+                        <select x-model="filters.destination_warehouse_id" @change="loadData()" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                            <option value="">All destinations</option>
+                            <template x-for="warehouse in config.destination_warehouses || []" :key="warehouse.id">
+                                <option :value="warehouse.id" x-text="warehouse.name"></option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Create Batch --}}
+        <div x-show="showCreate" x-cloak class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+            <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="showCreate = false"></div>
+
+            <div class="relative mx-auto my-10 w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+                <div class="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Outgoing</p>
+                        <h3 class="text-lg font-extrabold text-slate-900">Manually Create A Batch</h3>
+                    </div>
+                    <button type="button" @click="showCreate = false" class="text-2xl font-bold leading-none text-slate-400 hover:text-slate-600">&times;</button>
+                </div>
+
+                <div class="space-y-4 px-5 py-4">
+                    <div>
+                        <label class="mb-1 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Region <span class="text-red-500">*</span></label>
+                        <select x-model="newBatch.delivery_region_id" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400">
+                            <option value="">Select a region</option>
+                            <template x-for="region in config.regions || []" :key="region.id">
+                                <option :value="region.id" x-text="region.name"></option>
+                            </template>
+                        </select>
+                        <p class="mt-1 text-xs font-semibold text-red-600" x-show="createErrors.delivery_region_id" x-text="createErrors.delivery_region_id?.[0]"></p>
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-xs font-extrabold uppercase tracking-wide text-slate-600">District <span class="text-red-500">*</span></label>
+                        <select x-model="newBatch.delivery_district_id" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400">
+                            <option value="">Select a district</option>
+                            <template x-for="district in districtsForRegion" :key="district.id">
+                                <option :value="district.id" x-text="district.name"></option>
+                            </template>
+                        </select>
+                        <p class="mt-1 text-xs font-semibold text-red-600" x-show="createErrors.delivery_district_id" x-text="createErrors.delivery_district_id?.[0]"></p>
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Destination hub</label>
+                        <select x-model="newBatch.destination_warehouse_id" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400">
+                            <option value="">Work it out from the region</option>
+                            <template x-for="warehouse in config.destination_warehouses || []" :key="warehouse.id">
+                                <option :value="warehouse.id" x-text="warehouse.name"></option>
+                            </template>
+                        </select>
+                        <p class="mt-1 text-[11px] font-medium text-slate-500">Leave blank to use the hub serving that region. A region with no hub leaves this unset, and its parcels will not count as waiting for a bus.</p>
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Notes</label>
+                        <input type="text" x-model="newBatch.notes" class="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400">
+                    </div>
+
+                    <p class="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700" x-show="createErrors.generic" x-text="createErrors.generic"></p>
+                </div>
+
+                <div class="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+                    <button type="button" @click="showCreate = false" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="button" @click="submitManualBatch()" :disabled="creating" class="rounded-xl bg-[#E2762B] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#d1651d] disabled:opacity-50">
+                        <span x-text="creating ? 'Creating...' : 'Create Batch'"></span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -184,7 +263,11 @@
                 { label: 'Items Heading to Tamale', value: '0' },
                 { label: 'Expected Value Today', value: 'GH₵ 0.00' }
             ],
-            filters: { status: '' },
+            filters: { status: '', destination_warehouse_id: '' },
+            showCreate: false,
+            creating: false,
+            createErrors: {},
+            newBatch: { delivery_region_id: '', delivery_district_id: '', destination_warehouse_id: '', destination_type: '', notes: '' },
             meta: { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 },
             config: {},
             init() {
@@ -203,6 +286,7 @@
                     page: this.meta.current_page,
                     search: this.search,
                     status: this.filters.status,
+                    destination_warehouse_id: this.filters.destination_warehouse_id,
                     date_filter: this.dateFilter,
                 });
 
@@ -215,8 +299,60 @@
                     })
                     .finally(() => { this.loading = false; });
             },
+            /** Districts in the chosen region. Districts outside it would be a 422 waiting to happen. */
+            get districtsForRegion() {
+                const regionId = String(this.newBatch.delivery_region_id || '');
+                if (!regionId) return [];
+                return (this.config.districts || []).filter((district) => String(district.region_id) === regionId);
+            },
+
             createManualBatch() {
-                alert('Manual Batch creation popup coming up!');
+                this.createErrors = {};
+                this.newBatch = { delivery_region_id: '', delivery_district_id: '', destination_warehouse_id: '', destination_type: '', notes: '' };
+                this.showCreate = true;
+            },
+
+            /**
+             * Send the batch. Previously this button only raised a "coming up!"
+             * alert, so nothing could be created from the admin portal at all.
+             */
+            async submitManualBatch() {
+                this.creating = true;
+                this.createErrors = {};
+
+                try {
+                    const response = await fetch(this.config.create_endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(this.newBatch),
+                    });
+
+                    const result = await response.json().catch(() => ({}));
+
+                    if (response.status === 422) {
+                        // Field errors belong next to their field, not in a toast.
+                        this.createErrors = result.errors || {};
+                        return;
+                    }
+
+                    if (!response.ok || !result.success) {
+                        this.createErrors = { generic: result.message || 'Unable to create the batch.' };
+                        return;
+                    }
+
+                    this.showCreate = false;
+                    window.showToast?.(result.message || 'Batch created.', 'success');
+                    await this.loadData();
+                } catch (error) {
+                    this.createErrors = { generic: error.message || 'Unable to create the batch.' };
+                } finally {
+                    this.creating = false;
+                }
             },
             closeAndDispatch(batchId) {
                 if (!confirm('Are you sure you want to close and dispatch this batch?')) return;
