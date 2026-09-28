@@ -22,7 +22,6 @@ use App\Services\Warehouse\WarehouseTransportService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\Services\Warehouse\TransportLabelService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -373,51 +372,6 @@ class TransportManifestController extends Controller
                 'view_url' => route('warehouse.manifests.transport.show', $manifest),
             ];
         }, ['summary' => $summary]);
-    }
-
-    /**
-     * Printable batch + parcel labels for a manifest.
-     *
-     * Same sheet and same side effect as the admin Outgoing Batches action: it
-     * creates the `warehouse_receipt_item_labels` rows the driver's scanner
-     * matches on, which is what "Manifest is not ready to depart" is waiting for.
-     */
-    public function printLabels(TransportManifest $manifest, TransportLabelService $labels): JsonResponse
-    {
-        $this->authorizePermission('warehouse.manifest.manage');
-
-        $manifest->load(['destinationWarehouse:id,name', 'sortBatch:id,batch_number', 'items.shipmentItem']);
-
-        $items = $manifest->items->map->shipmentItem->filter()->values();
-
-        $prepared = $labels->prepare($items);
-        $total = count($prepared['parcels']);
-
-        // The batch number is what the driver's scanner knows; the manifest
-        // number is the fallback for a draft that has no batch yet.
-        $code = $manifest->sortBatch?->batch_number ?? $manifest->manifest_number;
-
-        $html = $labels->renderSheet([
-            'batch' => $manifest,
-            'code' => $code,
-            'destination' => $manifest->destinationWarehouse?->name ?? 'Not set',
-            'origin' => $prepared['origin'],
-            'parcels' => $prepared['parcels'],
-            'batchBarcode' => $labels->batchBarcode($code),
-            'labelledCount' => $prepared['labelled'],
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => $labels->message($prepared['labels_created'], $prepared['labelled'], $total),
-            'data' => [
-                'batch_number' => $code,
-                'packages_total' => $total,
-                'packages_labelled' => $prepared['labelled'],
-                'labels_created' => $prepared['labels_created'],
-                'label_html' => $html,
-            ],
-        ]);
     }
 
     public function create(Request $request): JsonResponse

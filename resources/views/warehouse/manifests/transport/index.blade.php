@@ -44,7 +44,17 @@
         // {region_id, region_name} for each summary card, resolved server-side so
         // the city-to-region mapping lives in one place.
         'summary_cards' => collect($summaryCards ?? [])->values(),
-        'print_labels_endpoint' => route('warehouse.manifests.transport.print-labels', ['manifest' => '__ID__']),
+        /*
+         * The admin batch route, not the warehouse manifest one.
+         *
+         * This screen's rows come from `admin.transport-manifests.data`, which
+         * returns OutgoingBatch records — so `row.id` is a batch id. The other
+         * actions on the row (detail, packages, dispatch) are all batch routes
+         * for the same reason. Pointing this at manifests/transport/{manifest}
+         * made every Print Label click fail with
+         * "No query results for model [App\Models\TransportManifest] 20".
+         */
+        'print_labels_endpoint' => route('admin.transport-manifests.print-labels', ['batch' => '__ID__']),
     ];
 @endphp
 
